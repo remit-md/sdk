@@ -31,17 +31,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: typescript/package-lock.json
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
       - name: Install
-        run: cd typescript && npm ci
+        run: cd typescript && pnpm install --frozen-lockfile
       - name: Typecheck
-        run: cd typescript && npx tsc --noEmit
+        run: cd typescript && pnpm tsc --noEmit
       - name: Build
-        run: cd typescript && npx tsc
+        run: cd typescript && pnpm tsc
 
   go:
     name: SDK Go

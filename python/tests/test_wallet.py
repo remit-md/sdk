@@ -1,7 +1,5 @@
 """Tests for Wallet construction, signer isolation, and utility methods."""
 
-import os
-
 import pytest
 
 from remitmd.signer import PrivateKeySigner

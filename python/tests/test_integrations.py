@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
-import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from remitmd.models.common import Transaction, WalletStatus
-from remitmd.models.tab import Tab, TabStatus
+from remitmd.models.tab import TabStatus
 from remitmd.testing.mock import MockRemit
 
 
@@ -35,7 +32,6 @@ class TestLangChainIntegration:
 
     def test_langchain_tools_import(self):
         """Import should fail gracefully if langchain not installed."""
-        import importlib
         import sys
 
         # If langchain is not installed, importing should raise ImportError

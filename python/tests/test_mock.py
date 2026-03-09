@@ -1,7 +1,6 @@
 """Tests for MockRemit — all Wallet methods tested against the in-memory mock."""
 
 import pytest
-import pytest_asyncio
 
 from remitmd.errors import (
     BountyNotFound,

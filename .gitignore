@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.venv/
+
+# TypeScript/Node
+node_modules/
+dist/
+*.js.map
+
+# Rust
+target/
+
+# Go
+vendor/
+
+# Ruby
+.bundle/
+pkg/
+Gemfile.lock
+
+# Elixir
+_build/
+deps/
+*.ez
+
+# Java/Kotlin
+.gradle/
+build/
+*.class
+
+# .NET
+bin/
+obj/
+*.nupkg
+
+# Swift
+.build/
+.swiftpm/
+Package.resolved
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store

@@ -1,0 +1,650 @@
+use rust_decimal::Decimal;
+use serde_json::{json, Value};
+use std::env;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
+use crate::http::{chain_config, HttpTransport, Transport};
+use crate::models::*;
+use crate::signer::{PrivateKeySigner, Signer};
+
+/// Primary remit.md client for AI agents that send and receive payments.
+///
+/// All payment operations are async methods on `Wallet`. Create a wallet with
+/// a private key or from environment variables.
+///
+/// # Quick start
+///
+/// ```rust,no_run
+/// use remitmd::Wallet;
+/// use rust_decimal_macros::dec;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let wallet = Wallet::from_env()?;
+///     let tx = wallet.pay("0xRecipient...", dec!(1.50)).await?;
+///     println!("paid: {} in tx {}", tx.amount, tx.tx_hash);
+///     Ok(())
+/// }
+/// ```
+///
+/// # Testing
+///
+/// Use `MockRemit` for unit tests — zero network, deterministic:
+///
+/// ```rust
+/// use remitmd::MockRemit;
+/// use rust_decimal_macros::dec;
+///
+/// #[tokio::test]
+/// async fn test_agent_pays() {
+///     let mock = MockRemit::new();
+///     let wallet = mock.wallet();
+///     wallet.pay("0xRecipient0000000000000000000000000000001", dec!(5.00)).await.unwrap();
+///     assert!(mock.was_paid("0xRecipient0000000000000000000000000000001", dec!(5.00)).await);
+/// }
+/// ```
+pub struct Wallet {
+    pub(crate) transport: Arc<dyn Transport>,
+    pub(crate) address: String,
+    pub(crate) chain_id: ChainId,
+}
+
+impl Wallet {
+    /// Create a wallet from a hex-encoded private key.
+    ///
+    /// # Arguments
+    /// - `private_key` — 32-byte private key as hex (with or without `0x` prefix)
+    ///
+    /// # Options
+    /// - `.chain("arbitrum")` — select chain (default: `"base"`)
+    /// - `.testnet()` — use testnet
+    /// - `.base_url("http://localhost:3000")` — override API URL
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(private_key: &str) -> WalletBuilder<WithKey> {
+        WalletBuilder {
+            key_or_signer: WithKey(private_key.to_string()),
+            chain: "base".to_string(),
+            testnet: false,
+            base_url: None,
+        }
+    }
+
+    /// Create a wallet with a custom signer (e.g., KMS-backed).
+    pub fn with_signer(signer: impl Signer + 'static) -> WalletBuilder<WithSigner> {
+        WalletBuilder {
+            key_or_signer: WithSigner(Arc::new(signer)),
+            chain: "base".to_string(),
+            testnet: false,
+            base_url: None,
+        }
+    }
+
+    /// Create a wallet from environment variables:
+    /// - `REMITMD_KEY` — hex-encoded private key (required)
+    /// - `REMITMD_CHAIN` — chain name (default: `"base"`)
+    /// - `REMITMD_TESTNET` — `"1"`, `"true"`, or `"yes"` for testnet
+    pub fn from_env() -> Result<Self, RemitError> {
+        let key = env::var("REMITMD_KEY").map_err(|_| {
+            remit_err_ctx(
+                codes::UNAUTHORIZED,
+                "REMITMD_KEY environment variable is not set. Set it to your hex-encoded private key.",
+                "hint",
+                "export REMITMD_KEY=0x...",
+            )
+        })?;
+
+        let chain = env::var("REMITMD_CHAIN").unwrap_or_else(|_| "base".to_string());
+        let testnet = matches!(
+            env::var("REMITMD_TESTNET").as_deref(),
+            Ok("1") | Ok("true") | Ok("yes")
+        );
+
+        let mut builder = Self::new(&key).chain(&chain);
+        if testnet {
+            builder = builder.testnet();
+        }
+        builder.build()
+    }
+
+    /// Ethereum address of this wallet (checksummed `0x`-prefixed hex).
+    pub fn address(&self) -> &str {
+        &self.address
+    }
+
+    /// Chain ID this wallet is connected to.
+    pub fn chain_id(&self) -> ChainId {
+        self.chain_id
+    }
+
+    // ─── Internal helpers ────────────────────────────────────────────────────
+
+    async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, RemitError> {
+        let v = self.transport.get(path).await?;
+        serde_json::from_value(v).map_err(|e| {
+            remit_err(
+                codes::SERVER_ERROR,
+                format!("failed to deserialize response: {e}"),
+            )
+        })
+    }
+
+    async fn post<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        body: Value,
+    ) -> Result<T, RemitError> {
+        let v = self.transport.post(path, Some(body)).await?;
+        serde_json::from_value(v).map_err(|e| {
+            remit_err(
+                codes::SERVER_ERROR,
+                format!("failed to deserialize response: {e}"),
+            )
+        })
+    }
+}
+
+// ─── Payment methods ─────────────────────────────────────────────────────────
+
+impl Wallet {
+    /// Return the current USDC balance of this wallet.
+    pub async fn balance(&self) -> Result<Balance, RemitError> {
+        self.get("/v0/wallet/balance").await
+    }
+
+    /// Send a direct USDC payment.
+    ///
+    /// Direct payments are one-way transfers with no escrow or refund mechanism.
+    /// For reversible payments, use `create_escrow`.
+    ///
+    /// # Arguments
+    /// - `to` — recipient Ethereum address
+    /// - `amount` — USDC amount (minimum: 0.000001, maximum: 1,000,000)
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// use rust_decimal_macros::dec;
+    /// let tx = wallet.pay("0xAgent...", dec!(0.003)).await?;
+    /// ```
+    pub async fn pay(&self, to: &str, amount: Decimal) -> Result<Transaction, RemitError> {
+        self.pay_with_memo(to, amount, "").await
+    }
+
+    /// Send a direct USDC payment with an optional memo.
+    pub async fn pay_with_memo(
+        &self,
+        to: &str,
+        amount: Decimal,
+        memo: &str,
+    ) -> Result<Transaction, RemitError> {
+        validate_address(to)?;
+        validate_amount(amount)?;
+        self.post(
+            "/v0/payments/direct",
+            json!({
+                "to": to,
+                "amount": amount.to_string(),
+                "memo": memo,
+            }),
+        )
+        .await
+    }
+
+    /// Return paginated transaction history.
+    ///
+    /// # Arguments
+    /// - `page` — 1-indexed page number (default: 1)
+    /// - `per_page` — results per page (default: 20, max: 100)
+    pub async fn history(&self, page: u32, per_page: u32) -> Result<TransactionList, RemitError> {
+        let per_page = per_page.clamp(1, 100);
+        let path = format!("/v0/wallet/history?page={page}&per_page={per_page}");
+        self.get(&path).await
+    }
+
+    /// Return the on-chain reputation for any Ethereum address.
+    pub async fn reputation(&self, address: &str) -> Result<Reputation, RemitError> {
+        validate_address(address)?;
+        self.get(&format!("/v0/reputation/{address}")).await
+    }
+
+    /// Return spending analytics for this wallet.
+    ///
+    /// # Arguments
+    /// - `period` — `"day"`, `"week"`, `"month"`, or `"all"`
+    pub async fn spending_summary(&self, period: &str) -> Result<SpendingSummary, RemitError> {
+        self.get(&format!("/v0/wallet/spending?period={period}"))
+            .await
+    }
+
+    /// Return the remaining spending budget under operator-set limits.
+    pub async fn remaining_budget(&self) -> Result<Budget, RemitError> {
+        self.get("/v0/wallet/budget").await
+    }
+
+    // ─── Escrow ──────────────────────────────────────────────────────────────
+
+    /// Create and fund an escrow for work to be done.
+    ///
+    /// Funds are locked until the payer calls `release_escrow`, the payee
+    /// disputes, or the escrow expires. Use for high-value tasks where delivery
+    /// must be verified before payment.
+    ///
+    /// # Arguments
+    /// - `payee` — the agent that will receive funds on release
+    /// - `amount` — total USDC to lock
+    pub async fn create_escrow(&self, payee: &str, amount: Decimal) -> Result<Escrow, RemitError> {
+        validate_address(payee)?;
+        validate_amount(amount)?;
+        self.post(
+            "/v0/escrows",
+            json!({
+                "payee": payee,
+                "amount": amount.to_string(),
+            }),
+        )
+        .await
+    }
+
+    /// Create an escrow with optional milestones and splits.
+    pub async fn create_escrow_full(
+        &self,
+        payee: &str,
+        amount: Decimal,
+        memo: &str,
+        milestones: &[Milestone],
+        splits: &[Split],
+        expires_in_secs: Option<u64>,
+    ) -> Result<Escrow, RemitError> {
+        validate_address(payee)?;
+        validate_amount(amount)?;
+        self.post(
+            "/v0/escrows",
+            json!({
+                "payee": payee,
+                "amount": amount.to_string(),
+                "memo": memo,
+                "milestones": milestones,
+                "splits": splits,
+                "expires_in_seconds": expires_in_secs,
+            }),
+        )
+        .await
+    }
+
+    /// Release escrow funds to the payee.
+    ///
+    /// Optionally specify a `milestone_id` to release only one milestone.
+    pub async fn release_escrow(
+        &self,
+        escrow_id: &str,
+        milestone_id: Option<&str>,
+    ) -> Result<Transaction, RemitError> {
+        let mut body = json!({ "escrow_id": escrow_id });
+        if let Some(mid) = milestone_id {
+            body["milestone_id"] = json!(mid);
+        }
+        self.post(&format!("/v0/escrows/{escrow_id}/release"), body)
+            .await
+    }
+
+    /// Cancel the escrow and return funds to the payer.
+    pub async fn cancel_escrow(&self, escrow_id: &str) -> Result<Transaction, RemitError> {
+        self.post(&format!("/v0/escrows/{escrow_id}/cancel"), json!({}))
+            .await
+    }
+
+    /// Fetch the current state of an escrow.
+    pub async fn get_escrow(&self, escrow_id: &str) -> Result<Escrow, RemitError> {
+        self.get(&format!("/v0/escrows/{escrow_id}")).await
+    }
+
+    // ─── Tab ─────────────────────────────────────────────────────────────────
+
+    /// Open a payment channel for batched micro-payments.
+    ///
+    /// Tabs are ideal for high-frequency low-value payments (e.g., per-token LLM
+    /// billing, per-query data APIs). Debits are off-chain; settlement is on-chain.
+    ///
+    /// # Arguments
+    /// - `counterpart` — the agent receiving payments
+    /// - `limit` — maximum USDC pre-deposited into the channel
+    pub async fn create_tab(&self, counterpart: &str, limit: Decimal) -> Result<Tab, RemitError> {
+        validate_address(counterpart)?;
+        self.post(
+            "/v0/tabs",
+            json!({
+                "counterpart": counterpart,
+                "limit": limit.to_string(),
+            }),
+        )
+        .await
+    }
+
+    /// Open a tab with a custom expiry.
+    pub async fn create_tab_with_expiry(
+        &self,
+        counterpart: &str,
+        limit: Decimal,
+        expires_in_secs: u64,
+    ) -> Result<Tab, RemitError> {
+        validate_address(counterpart)?;
+        self.post(
+            "/v0/tabs",
+            json!({
+                "counterpart": counterpart,
+                "limit": limit.to_string(),
+                "expires_in_seconds": expires_in_secs,
+            }),
+        )
+        .await
+    }
+
+    /// Debit a charge from an open tab (off-chain, signed).
+    pub async fn debit_tab(
+        &self,
+        tab_id: &str,
+        amount: Decimal,
+        memo: &str,
+    ) -> Result<TabDebit, RemitError> {
+        validate_amount(amount)?;
+        self.post(
+            &format!("/v0/tabs/{tab_id}/debit"),
+            json!({
+                "tab_id": tab_id,
+                "amount": amount.to_string(),
+                "memo": memo,
+            }),
+        )
+        .await
+    }
+
+    /// Close the tab and settle all charges on-chain.
+    pub async fn settle_tab(&self, tab_id: &str) -> Result<Transaction, RemitError> {
+        self.post(&format!("/v0/tabs/{tab_id}/settle"), json!({}))
+            .await
+    }
+
+    // ─── Stream ──────────────────────────────────────────────────────────────
+
+    /// Start a per-second USDC payment stream.
+    ///
+    /// Streams are ideal for subscription-style payments where the recipient
+    /// provides ongoing value (compute time, uptime guarantees, etc.).
+    ///
+    /// # Arguments
+    /// - `recipient` — the agent receiving the stream
+    /// - `rate_per_sec` — USDC per second
+    /// - `deposit` — total USDC pre-deposited (determines stream duration)
+    pub async fn create_stream(
+        &self,
+        recipient: &str,
+        rate_per_sec: Decimal,
+        deposit: Decimal,
+    ) -> Result<Stream, RemitError> {
+        validate_address(recipient)?;
+        validate_amount(deposit)?;
+        self.post(
+            "/v0/streams",
+            json!({
+                "recipient": recipient,
+                "rate_per_sec": rate_per_sec.to_string(),
+                "deposit": deposit.to_string(),
+            }),
+        )
+        .await
+    }
+
+    /// Withdraw all vested stream payments (called by the recipient).
+    pub async fn withdraw_stream(&self, stream_id: &str) -> Result<Transaction, RemitError> {
+        self.post(&format!("/v0/streams/{stream_id}/withdraw"), json!({}))
+            .await
+    }
+
+    // ─── Bounty ──────────────────────────────────────────────────────────────
+
+    /// Post a USDC bounty for task completion.
+    ///
+    /// Any agent can submit work; the poster awards the bounty to the winner.
+    ///
+    /// # Arguments
+    /// - `award` — USDC prize for the winner
+    /// - `description` — task description (agent-readable)
+    pub async fn create_bounty(
+        &self,
+        award: Decimal,
+        description: &str,
+    ) -> Result<Bounty, RemitError> {
+        validate_amount(award)?;
+        self.post(
+            "/v0/bounties",
+            json!({
+                "award": award.to_string(),
+                "description": description,
+            }),
+        )
+        .await
+    }
+
+    /// Create a bounty with a custom expiry.
+    pub async fn create_bounty_with_expiry(
+        &self,
+        award: Decimal,
+        description: &str,
+        expires_in_secs: u64,
+    ) -> Result<Bounty, RemitError> {
+        validate_amount(award)?;
+        self.post(
+            "/v0/bounties",
+            json!({
+                "award": award.to_string(),
+                "description": description,
+                "expires_in_seconds": expires_in_secs,
+            }),
+        )
+        .await
+    }
+
+    /// Award a bounty to the winner.
+    pub async fn award_bounty(
+        &self,
+        bounty_id: &str,
+        winner: &str,
+    ) -> Result<Transaction, RemitError> {
+        validate_address(winner)?;
+        self.post(
+            &format!("/v0/bounties/{bounty_id}/award"),
+            json!({
+                "bounty_id": bounty_id,
+                "winner": winner,
+            }),
+        )
+        .await
+    }
+
+    // ─── Deposit ─────────────────────────────────────────────────────────────
+
+    /// Lock a security deposit with a beneficiary.
+    ///
+    /// The depositor's funds are locked until the beneficiary forfeits them,
+    /// the depositor requests return (after the lock period), or the deposit expires.
+    ///
+    /// # Arguments
+    /// - `beneficiary` — address that can forfeit the deposit
+    /// - `amount` — USDC to lock
+    /// - `expires_in_secs` — lock duration in seconds
+    pub async fn lock_deposit(
+        &self,
+        beneficiary: &str,
+        amount: Decimal,
+        expires_in_secs: u64,
+    ) -> Result<Deposit, RemitError> {
+        validate_address(beneficiary)?;
+        validate_amount(amount)?;
+        self.post(
+            "/v0/deposits",
+            json!({
+                "beneficiary": beneficiary,
+                "amount": amount.to_string(),
+                "expires_in_seconds": expires_in_secs,
+            }),
+        )
+        .await
+    }
+
+    // ─── Intent negotiation ──────────────────────────────────────────────────
+
+    /// Propose a payment intent for negotiation (agent-to-agent).
+    pub async fn propose_intent(
+        &self,
+        to: &str,
+        amount: Decimal,
+        payment_type: &str,
+    ) -> Result<Intent, RemitError> {
+        validate_address(to)?;
+        self.post(
+            "/v0/intents",
+            json!({
+                "to": to,
+                "amount": amount.to_string(),
+                "type": payment_type,
+            }),
+        )
+        .await
+    }
+}
+
+// ─── WalletBuilder ────────────────────────────────────────────────────────────
+
+/// Typestate for WalletBuilder: key-based construction.
+pub struct WithKey(String);
+/// Typestate for WalletBuilder: custom signer construction.
+pub struct WithSigner(Arc<dyn Signer>);
+
+/// Builder for `Wallet`. Use `Wallet::new(key)` or `Wallet::with_signer(signer)`.
+pub struct WalletBuilder<S> {
+    pub(crate) key_or_signer: S,
+    pub(crate) chain: String,
+    pub(crate) testnet: bool,
+    pub(crate) base_url: Option<String>,
+}
+
+impl<S> WalletBuilder<S> {
+    /// Set the target chain. Valid values: `"base"`, `"arbitrum"`, `"optimism"`.
+    /// Default: `"base"`.
+    pub fn chain(mut self, chain: &str) -> Self {
+        self.chain = chain.to_string();
+        self
+    }
+
+    /// Target the testnet version of the selected chain.
+    pub fn testnet(mut self) -> Self {
+        self.testnet = true;
+        self
+    }
+
+    /// Override the API base URL. Useful for self-hosted deployments or local testing.
+    pub fn base_url(mut self, url: &str) -> Self {
+        self.base_url = Some(url.to_string());
+        self
+    }
+}
+
+impl WalletBuilder<WithKey> {
+    /// Build the `Wallet`, returning an error if the private key or chain is invalid.
+    pub fn build(self) -> Result<Wallet, RemitError> {
+        let signer = Arc::new(PrivateKeySigner::new(&self.key_or_signer.0)?);
+        build_wallet(signer, &self.chain, self.testnet, self.base_url)
+    }
+}
+
+impl WalletBuilder<WithSigner> {
+    /// Build the `Wallet` with the custom signer.
+    pub fn build(self) -> Result<Wallet, RemitError> {
+        build_wallet(
+            self.key_or_signer.0,
+            &self.chain,
+            self.testnet,
+            self.base_url,
+        )
+    }
+}
+
+fn build_wallet(
+    signer: Arc<dyn Signer>,
+    chain: &str,
+    testnet: bool,
+    base_url_override: Option<String>,
+) -> Result<Wallet, RemitError> {
+    let chain_key = if testnet {
+        format!("{chain}-sepolia")
+    } else {
+        chain.to_string()
+    };
+
+    let cfg = chain_config(&chain_key).ok_or_else(|| {
+        remit_err(
+            codes::CHAIN_MISMATCH,
+            format!(
+                "unsupported chain: {chain:?}. Valid chains: base, arbitrum, optimism. For testnet, use .testnet()."
+            ),
+        )
+    })?;
+
+    let api_url = base_url_override.unwrap_or_else(|| cfg.api_url.to_string());
+    let address = signer.address().to_string();
+    let transport = Arc::new(HttpTransport::new(api_url, signer));
+
+    Ok(Wallet {
+        transport,
+        address,
+        chain_id: ChainId(cfg.chain_id),
+    })
+}
+
+// ─── Input validation ─────────────────────────────────────────────────────────
+
+/// Validate an Ethereum address. Returns a descriptive error if invalid.
+pub(crate) fn validate_address(addr: &str) -> Result<(), RemitError> {
+    let addr = addr.trim();
+    let hex_part = addr
+        .strip_prefix("0x")
+        .or_else(|| addr.strip_prefix("0X"))
+        .unwrap_or(addr);
+
+    if hex_part.len() != 40 || !hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(remit_err_ctx(
+            codes::INVALID_ADDRESS,
+            format!(
+                "invalid address {addr:?}: expected 0x-prefixed 40-character hex string (Ethereum address). See remit.md/docs/errors#INVALID_ADDRESS"
+            ),
+            "address",
+            addr,
+        ));
+    }
+    Ok(())
+}
+
+/// Validate a USDC amount. Returns descriptive errors for out-of-range values.
+pub(crate) fn validate_amount(amount: Decimal) -> Result<(), RemitError> {
+    let min = Decimal::from_str("0.000001").unwrap();
+    let max = Decimal::from_str("1000000").unwrap();
+
+    if amount < min {
+        return Err(remit_err_ctx(
+            codes::INVALID_AMOUNT,
+            format!("amount {amount} is below minimum 0.000001 USDC (1 base unit). See remit.md/docs/errors#INVALID_AMOUNT"),
+            "minimum",
+            "0.000001",
+        ));
+    }
+    if amount > max {
+        return Err(remit_err_ctx(
+            codes::INVALID_AMOUNT,
+            format!("amount {amount} exceeds per-transaction maximum of 1,000,000 USDC. See remit.md/docs/errors#INVALID_AMOUNT"),
+            "maximum",
+            "1000000",
+        ));
+    }
+    Ok(())
+}

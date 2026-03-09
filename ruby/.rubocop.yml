@@ -1,0 +1,251 @@
+AllCops:
+  TargetRubyVersion: 3.0
+  NewCops: disable
+  SuggestExtensions: false
+  Exclude:
+    - "vendor/**/*"
+    - "bin/**/*"
+
+# ─── Style ────────────────────────────────────────────────────────────────────
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/Documentation:
+  Enabled: false
+
+Style/MultilineBlockChain:
+  Enabled: false
+
+Style/TrailingCommaInHashLiteral:
+  Enabled: false
+
+Style/TrailingCommaInArrayLiteral:
+  Enabled: false
+
+Style/TrailingCommaInArguments:
+  Enabled: false
+
+Style/HashSyntax:
+  Enabled: false
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+Style/GuardClause:
+  Enabled: false
+
+Style/NumericLiterals:
+  Enabled: false
+
+Style/EmptyMethod:
+  Enabled: false
+
+Style/SymbolArray:
+  Enabled: false
+
+Style/WordArray:
+  Enabled: false
+
+Style/RedundantSelf:
+  Enabled: false
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Style/AccessModifierDeclarations:
+  Enabled: false
+
+Style/InPatternThen:
+  Enabled: false
+
+Style/MissingElse:
+  Enabled: false
+
+Style/ConditionalAssignment:
+  Enabled: false
+
+Style/CaseLikeIf:
+  Enabled: false
+
+Style/MultilineTernaryOperator:
+  Enabled: false
+
+Style/RescueStandardError:
+  Enabled: false
+
+Style/RedundantFreeze:
+  Enabled: false
+
+Style/StringConcatenation:
+  Enabled: false
+
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+Style/MutableConstant:
+  Enabled: false
+
+Style/ExpandPathArguments:
+  Enabled: false
+
+Style/SpecialGlobalVars:
+  Enabled: false
+
+Style/SlicingWithRange:
+  Enabled: false
+
+Style/ParallelAssignment:
+  Enabled: false
+
+Style/MixinUsage:
+  Enabled: false
+
+Style/GlobalStdStream:
+  Enabled: false
+
+Style/StderrPuts:
+  Enabled: false
+
+Style/RegexpLiteral:
+  Enabled: false
+
+Style/OpenStructUse:
+  Enabled: false
+
+Style/MethodCallWithoutArgsParentheses:
+  Enabled: false
+
+Style/SafeNavigation:
+  Enabled: false
+
+Style/ZeroLengthPredicate:
+  Enabled: false
+
+Style/NegatedIf:
+  Enabled: false
+
+# ─── Layout ───────────────────────────────────────────────────────────────────
+
+Layout/LineLength:
+  Max: 120
+
+Layout/HashAlignment:
+  Enabled: false
+
+Layout/ArrayAlignment:
+  Enabled: false
+
+Layout/MultilineMethodCallIndentation:
+  Enabled: false
+
+Layout/FirstHashElementIndentation:
+  Enabled: false
+
+Layout/FirstArrayElementIndentation:
+  Enabled: false
+
+Layout/EmptyLinesAroundModuleBody:
+  Enabled: false
+
+Layout/EmptyLinesAroundClassBody:
+  Enabled: false
+
+Layout/EmptyLinesAroundBlockBody:
+  Enabled: false
+
+Layout/TrailingWhitespace:
+  Enabled: true
+
+Layout/SpaceInsideHashLiteralBraces:
+  Enabled: false
+
+Layout/ExtraSpacing:
+  Enabled: false
+
+Layout/MultilineMethodCallBraceLayout:
+  Enabled: false
+
+# ─── Metrics ──────────────────────────────────────────────────────────────────
+
+Metrics/MethodLength:
+  Max: 200
+
+Metrics/ClassLength:
+  Max: 500
+
+Metrics/ModuleLength:
+  Max: 500
+
+Metrics/BlockLength:
+  Max: 200
+
+Metrics/AbcSize:
+  Max: 250
+
+Metrics/CyclomaticComplexity:
+  Max: 40
+
+Metrics/PerceivedComplexity:
+  Max: 40
+
+Metrics/ParameterLists:
+  Max: 8
+
+# ─── Naming ───────────────────────────────────────────────────────────────────
+
+Naming/MethodParameterName:
+  MinNameLength: 1
+
+Naming/VariableName:
+  Enabled: false
+
+Naming/AccessorMethodName:
+  Enabled: false
+
+Naming/PredicatePrefix:
+  Enabled: false
+
+Naming/MethodName:
+  Enabled: false
+
+Naming/BlockForwarding:
+  Enabled: false
+
+# ─── Lint ─────────────────────────────────────────────────────────────────────
+
+Lint/ScriptPermission:
+  Enabled: false
+
+Lint/UnusedMethodArgument:
+  AllowUnusedKeywordArguments: true
+
+Lint/UnusedBlockArgument:
+  Enabled: false
+
+Lint/MissingSuper:
+  Enabled: false
+
+Lint/SuppressedException:
+  Enabled: false
+
+Lint/DuplicateBranch:
+  Enabled: false
+
+Lint/ConstantDefinitionInBlock:
+  Enabled: false
+
+# ─── Gemspec ──────────────────────────────────────────────────────────────────
+
+Gemspec/DevelopmentDependencies:
+  Enabled: false
+
+Gemspec/RequireMFA:
+  Enabled: false

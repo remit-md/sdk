@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net6.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>CS1573;CS1591</NoWarn>
+
+    <!-- NuGet package metadata -->
+    <PackageId>RemitMd</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>remit-md</Authors>
+    <Description>C#/.NET SDK for the remit.md universal AI payment protocol. Pay any AI agent in USDC with three lines of code.</Description>
+    <RepositoryUrl>https://github.com/remit-md/sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>payments;usdc;agents;ai;ethereum;base;stablecoin;remitmd;mcp</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- EIP-712 signing + secp256k1 ECDSA via Nethereum (lightweight signer only) -->
+    <PackageReference Include="Nethereum.Signer" Version="4.21.0" />
+    <!-- Semantic Kernel integration (optional — no hard dep, uses conditional compile) -->
+    <PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.21.1" Condition="'$(IncludeSemanticKernel)' == 'true'" />
+  </ItemGroup>
+
+  <!-- Exclude Semantic Kernel plugin when the package isn't included -->
+  <ItemGroup Condition="'$(IncludeSemanticKernel)' != 'true'">
+    <Compile Remove="SemanticKernel\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

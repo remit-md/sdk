@@ -181,7 +181,7 @@ class Wallet(RemitClient):
         body: dict[str, Any] = {"to": to, "amount": amount, "interval": interval}
         if max_periods is not None:
             body["max_periods"] = max_periods
-        return await self._http.post("/v1/subscriptions", body)  # type: ignore[return-value]
+        return await self._http.post("/v1/subscriptions", body)  # type: ignore[return-value,no-any-return]
 
     async def cancel_subscription(self, sub_id: str) -> Transaction:
         data = await self._http.post(f"/v1/subscriptions/{sub_id}/cancel")

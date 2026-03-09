@@ -50,10 +50,10 @@ class PrivateKeySigner(Signer):
     ) -> str:
         structured = encode_typed_data(domain_data=domain, message_types=types, message_data=value)
         signed = self._account.sign_message(structured)
-        return signed.signature.hex()
+        return str(signed.signature.hex())
 
     def get_address(self) -> str:
-        return self._account.address
+        return str(self._account.address)
 
     # Never expose key material
     def __repr__(self) -> str:

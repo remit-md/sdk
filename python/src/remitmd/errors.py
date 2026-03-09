@@ -28,6 +28,7 @@ class RemitError(Exception):
 
 # ─── Auth errors ─────────────────────────────────────────────────────────────
 
+
 class InvalidSignature(RemitError):
     code = "INVALID_SIGNATURE"
     http_status = 401
@@ -50,6 +51,7 @@ class Unauthorized(RemitError):
 
 # ─── Balance / funds ──────────────────────────────────────────────────────────
 
+
 class InsufficientBalance(RemitError):
     code = "INSUFFICIENT_BALANCE"
     http_status = 402
@@ -61,6 +63,7 @@ class InsufficientAllowance(RemitError):
 
 
 # ─── Not found ────────────────────────────────────────────────────────────────
+
 
 class InvoiceNotFound(RemitError):
     code = "INVOICE_NOT_FOUND"
@@ -98,6 +101,7 @@ class WebhookNotFound(RemitError):
 
 
 # ─── State machine / validation ───────────────────────────────────────────────
+
 
 class InvalidState(RemitError):
     code = "INVALID_STATE"
@@ -141,12 +145,14 @@ class InvalidChain(RemitError):
 
 # ─── Rate limiting ────────────────────────────────────────────────────────────
 
+
 class RateLimitExceeded(RemitError):
     code = "RATE_LIMIT_EXCEEDED"
     http_status = 429
 
 
 # ─── Server errors ────────────────────────────────────────────────────────────
+
 
 class ChainUnavailable(RemitError):
     code = "CHAIN_UNAVAILABLE"

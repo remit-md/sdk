@@ -116,6 +116,7 @@ class MockRemit:
         code = self._state.forced_errors.pop(address, None)
         if code is not None:
             from remitmd.errors import from_error_code
+
             raise from_error_code(code, f"Forced error: {code}", 400)
 
     def _debit(self, address: str, amount: float) -> None:
@@ -258,9 +259,7 @@ class MockWallet:
 
     # ─── Tabs ─────────────────────────────────────────────────────────────────
 
-    async def open_tab(
-        self, to: str, limit: float, per_unit: float, expires: int = 86400
-    ) -> Tab:
+    async def open_tab(self, to: str, limit: float, per_unit: float, expires: int = 86400) -> Tab:
         self._mock._check_forced_error(self.address)
         # Reserve funds up-front
         self._mock._debit(self.address, limit)
@@ -347,6 +346,7 @@ class MockWallet:
         stream = self._mock._state.streams.get(stream_id)
         if stream is None:
             from remitmd.errors import StreamNotFound
+
             raise StreamNotFound(f"Stream {stream_id!r} not found")
 
         elapsed = self._mock.now() - stream.started_at

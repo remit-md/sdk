@@ -25,8 +25,7 @@ try:
     from crewai.tools import BaseTool
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
-        "CrewAI integration requires crewai. "
-        "Install with: pip install remitmd[crewai]"
+        "CrewAI integration requires crewai. Install with: pip install remitmd[crewai]"
     ) from exc
 
 if TYPE_CHECKING:
@@ -104,6 +103,7 @@ class RemitCreateEscrowTool(BaseTool):
 
     def _run(self, to: str, amount: float, task: str, timeout: int = 86400) -> str:
         from remitmd.models.invoice import Invoice
+
         invoice = Invoice(to=to, amount=amount, memo=task, timeout=timeout)
         result = asyncio.run(self.wallet.pay(invoice))
         return f"Escrow created. invoice_id={result.invoice_id}"

@@ -63,10 +63,23 @@ def test_unknown_error_code_returns_base():
 
 def test_all_errors_are_subclasses_of_remit_error():
     classes = [
-        InvalidSignature, SignatureExpired, NonceReused, Unauthorized,
-        InsufficientBalance, EscrowNotFound, TabNotFound, BountyNotFound,
-        InvalidState, TabLimitExceeded, TabExpired, InvalidAddress, InvalidChain,
-        RateLimitExceeded, ChainUnavailable, TransactionFailed, ServerError,
+        InvalidSignature,
+        SignatureExpired,
+        NonceReused,
+        Unauthorized,
+        InsufficientBalance,
+        EscrowNotFound,
+        TabNotFound,
+        BountyNotFound,
+        InvalidState,
+        TabLimitExceeded,
+        TabExpired,
+        InvalidAddress,
+        InvalidChain,
+        RateLimitExceeded,
+        ChainUnavailable,
+        TransactionFailed,
+        ServerError,
     ]
     for cls in classes:
         assert issubclass(cls, RemitError), f"{cls.__name__} is not a subclass of RemitError"

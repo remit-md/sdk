@@ -21,8 +21,7 @@ try:
     from autogen import AssistantAgent, UserProxyAgent  # type: ignore[import]
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
-        "AutoGen integration requires pyautogen. "
-        "Install with: pip install remitmd[autogen]"
+        "AutoGen integration requires pyautogen. Install with: pip install remitmd[autogen]"
     ) from exc
 
 if TYPE_CHECKING:
@@ -64,6 +63,7 @@ def register_remit_tools(
     @assistant.register_for_llm(description="Create an escrow for a task.")  # type: ignore[misc]
     async def remit_create_escrow(to: str, amount: float, task: str) -> str:
         from remitmd.models.invoice import Invoice
+
         invoice = Invoice(to=to, amount=amount, memo=task)
         result = await wallet.pay(invoice)
         return f"Escrow created: {result.invoice_id}"

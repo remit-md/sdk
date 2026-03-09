@@ -27,6 +27,7 @@ def payee(mock):
 
 # ─── LangChain ────────────────────────────────────────────────────────────────
 
+
 class TestLangChainIntegration:
     """Test LangChain tools using MockWallet without importing langchain."""
 
@@ -49,6 +50,7 @@ class TestLangChainIntegration:
     @pytest.mark.asyncio
     async def test_create_escrow_tool_async(self, payer, payee):
         from remitmd.models.invoice import Invoice
+
         invoice = Invoice(to=payee.address, amount=50.0, memo="task")
         tx = await payer.pay(invoice)
         assert tx.invoice_id is not None
@@ -56,6 +58,7 @@ class TestLangChainIntegration:
     @pytest.mark.asyncio
     async def test_release_escrow_tool_async(self, payer, payee):
         from remitmd.models.invoice import Invoice
+
         invoice = Invoice(to=payee.address, amount=50.0)
         tx = await payer.pay(invoice)
         await payer.release_escrow(tx.invoice_id)
@@ -80,6 +83,7 @@ class TestLangChainIntegration:
 
 # ─── Escrow ───────────────────────────────────────────────────────────────────
 
+
 class TestEscrowIntegration:
     @pytest.mark.asyncio
     async def test_full_escrow_lifecycle_via_mock(self, payer, payee):
@@ -98,6 +102,7 @@ class TestEscrowIntegration:
 
 
 # ─── Tab metered billing ──────────────────────────────────────────────────────
+
 
 class TestTabIntegration:
     @pytest.mark.asyncio
@@ -118,6 +123,7 @@ class TestTabIntegration:
 
 
 # ─── Bounty workflow ──────────────────────────────────────────────────────────
+
 
 class TestBountyIntegration:
     @pytest.mark.asyncio

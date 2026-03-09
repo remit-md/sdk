@@ -56,6 +56,7 @@ class RemitToolkit(BaseToolkit):
 
 # ─── Tool schemas ─────────────────────────────────────────────────────────────
 
+
 class _PayDirectInput(BaseModel):
     to: str = Field(description="Recipient wallet address (0x...)")
     amount: float = Field(description="Amount in USD (e.g. 5.00)")
@@ -99,6 +100,7 @@ class _FileDisputeInput(BaseModel):
 
 # ─── Tool implementations ─────────────────────────────────────────────────────
 
+
 class RemitPayDirectTool(BaseTool):
     name: str = "remit_pay_direct"
     description: str = "Send a direct USDC payment to another agent or address."
@@ -130,12 +132,14 @@ class RemitCreateEscrowTool(BaseTool):
 
     def _run(self, to: str, amount: float, task: str, timeout: int = 86400) -> str:
         from remitmd.models.invoice import Invoice
+
         invoice = Invoice(to=to, amount=amount, memo=task, timeout=timeout)
         result = asyncio.run(self.wallet.pay(invoice))
         return f"Escrow created. invoice_id={result.invoice_id}"
 
     async def _arun(self, to: str, amount: float, task: str, timeout: int = 86400) -> str:
         from remitmd.models.invoice import Invoice
+
         invoice = Invoice(to=to, amount=amount, memo=task, timeout=timeout)
         result = await self.wallet.pay(invoice)
         return f"Escrow created. invoice_id={result.invoice_id}"
@@ -262,16 +266,10 @@ class RemitFileDisputeTool(BaseTool):
     class Config:
         arbitrary_types_allowed = True
 
-    def _run(
-        self, invoice_id: str, reason: str, details: str, evidence_uri: str
-    ) -> str:
-        dispute = asyncio.run(
-            self.wallet.file_dispute(invoice_id, reason, details, evidence_uri)
-        )
+    def _run(self, invoice_id: str, reason: str, details: str, evidence_uri: str) -> str:
+        dispute = asyncio.run(self.wallet.file_dispute(invoice_id, reason, details, evidence_uri))
         return f"Dispute filed. dispute_id={dispute.id}"
 
-    async def _arun(
-        self, invoice_id: str, reason: str, details: str, evidence_uri: str
-    ) -> str:
+    async def _arun(self, invoice_id: str, reason: str, details: str, evidence_uri: str) -> str:
         dispute = await self.wallet.file_dispute(invoice_id, reason, details, evidence_uri)
         return f"Dispute filed. dispute_id={dispute.id}"

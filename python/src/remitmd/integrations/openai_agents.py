@@ -61,6 +61,7 @@ def remit_tools(wallet: Wallet) -> list[Any]:
     async def remit_create_escrow(to: str, amount: float, task: str) -> str:
         """Lock funds in escrow for a task. Funds released only after completion."""
         from remitmd.models.invoice import Invoice
+
         invoice = Invoice(to=to, amount=amount, memo=task)
         result = await wallet.pay(invoice)
         return f"Escrow created. invoice_id={result.invoice_id}"

@@ -135,9 +135,7 @@ class AuthenticatedClient:
 
         if not resp.is_success:
             code = data.get("code", "SERVER_ERROR") if isinstance(data, dict) else "SERVER_ERROR"
-            message = (
-                data.get("message", resp.text) if isinstance(data, dict) else resp.text
-            )
+            message = data.get("message", resp.text) if isinstance(data, dict) else resp.text
             raise from_error_code(str(code), str(message), resp.status_code)
 
         return data

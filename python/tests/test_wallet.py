@@ -7,6 +7,7 @@ from remitmd.wallet import Wallet
 
 # ─── Construction ─────────────────────────────────────────────────────────────
 
+
 def test_wallet_from_private_key():
     key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     wallet = Wallet(private_key=key, chain="localhost", testnet=True)
@@ -57,6 +58,7 @@ def test_wallet_key_and_signer_exclusive():
 
 # ─── Security: key never exposed ──────────────────────────────────────────────
 
+
 def test_wallet_repr_does_not_expose_key():
     key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     wallet = Wallet(private_key=key, chain="localhost", testnet=True)
@@ -66,6 +68,7 @@ def test_wallet_repr_does_not_expose_key():
 
 def test_wallet_cannot_be_pickled():
     import pickle
+
     key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     wallet = Wallet(private_key=key, chain="localhost", testnet=True)
     with pytest.raises(TypeError, match="pickled"):

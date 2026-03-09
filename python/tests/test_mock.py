@@ -38,6 +38,7 @@ def payee(mock: MockRemit):
 
 # ─── Direct payment ───────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_pay_direct_transfers_funds(mock, payer, payee):
     await payer.pay_direct(payee.address, 50.0, memo="hello")
@@ -53,6 +54,7 @@ async def test_pay_direct_insufficient_balance(mock, payer, payee):
 
 
 # ─── Escrow ───────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_escrow_full_lifecycle(mock, payer, payee):
@@ -96,6 +98,7 @@ async def test_escrow_claim_start_changes_status(mock, payer, payee):
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_tab_open_and_close(mock, payer, payee):
     tab = await payer.open_tab(payee.address, limit=10.0, per_unit=0.01)
@@ -133,6 +136,7 @@ async def test_tab_double_close_raises(mock, payer, payee):
 
 # ─── Streams ──────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_stream_open_and_close(mock, payer, payee):
     stream = await payer.open_stream(payee.address, rate=1.0, max_duration=60)
@@ -150,11 +154,10 @@ async def test_stream_open_and_close(mock, payer, payee):
 
 # ─── Bounties ─────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_bounty_post_and_award(mock, payer, payee):
-    bounty = await payer.post_bounty(
-        amount=50.0, task="write tests", deadline=mock.now() + 3600
-    )
+    bounty = await payer.post_bounty(amount=50.0, task="write tests", deadline=mock.now() + 3600)
     assert bounty.status == BountyStatus.open
     assert await payer.balance() == 950.0
 
@@ -181,6 +184,7 @@ async def test_bounty_double_award_raises(mock, payer, payee):
 
 # ─── Deposits ─────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_deposit_locked_and_returned(mock, payer, payee):
     deposit = await payer.place_deposit(payee.address, amount=20.0, expires=3600)
@@ -202,6 +206,7 @@ async def test_deposit_forfeited(mock, payer, payee):
 
 # ─── Disputes ─────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_file_dispute(mock, payer, payee):
     invoice = Invoice(to=payee.address, amount=100.0)
@@ -218,9 +223,11 @@ async def test_file_dispute(mock, payer, payee):
 
 # ─── Forced errors ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_set_behavior_forces_error(mock, payer, payee):
     from remitmd.errors import RemitError
+
     mock.set_behavior(payer.address, "RATE_LIMIT_EXCEEDED")
     with pytest.raises(RemitError) as exc_info:
         await payer.pay_direct(payee.address, 1.0)
@@ -231,6 +238,7 @@ async def test_set_behavior_forces_error(mock, payer, payee):
 async def test_forced_error_is_consumed_once(mock, payer, payee):
     mock.set_behavior(payer.address, "SERVER_ERROR")
     from remitmd.errors import RemitError
+
     with pytest.raises(RemitError):
         await payer.pay_direct(payee.address, 1.0)
     # Second call should succeed
@@ -239,6 +247,7 @@ async def test_forced_error_is_consumed_once(mock, payer, payee):
 
 
 # ─── Testnet faucet ───────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_request_testnet_funds(mock, payer):
@@ -249,6 +258,7 @@ async def test_request_testnet_funds(mock, payer):
 
 
 # ─── Webhooks ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_register_webhook(mock, payer):

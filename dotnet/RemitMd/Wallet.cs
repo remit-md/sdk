@@ -36,14 +36,15 @@ public sealed class Wallet
     /// <param name="chain">Target chain name: "base", "arbitrum", "optimism". Default: "base".</param>
     /// <param name="testnet">When true, targets the testnet variant of <paramref name="chain"/>.</param>
     /// <param name="baseUrl">Override the API base URL (useful for local or self-hosted setups).</param>
-    public Wallet(string privateKeyHex, string chain = "base", bool testnet = false, string? baseUrl = null)
-        : this(new PrivateKeySigner(privateKeyHex), chain, testnet, baseUrl)
+    public Wallet(string privateKeyHex, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null)
+        : this(new PrivateKeySigner(privateKeyHex), chain, testnet, baseUrl, routerAddress)
     { }
 
     /// <summary>
     /// Creates a Wallet with a custom <see cref="IRemitSigner"/> (KMS, HSM, etc.).
     /// </summary>
-    public Wallet(IRemitSigner signer, string chain = "base", bool testnet = false, string? baseUrl = null)
+    /// <param name="routerAddress">EIP-712 verifying contract address. Required for production use.</param>
+    public Wallet(IRemitSigner signer, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null)
     {
         var key = testnet ? $"{chain}-sepolia" : chain;
 
@@ -58,12 +59,13 @@ public sealed class Wallet
 
         _signer = signer;
         _chainId = cc.ChainId;
-        _transport = new HttpTransport(signer, cc.ChainId, baseUrl ?? cc.ApiUrl);
+        _transport = new HttpTransport(signer, cc.ChainId, routerAddress ?? string.Empty, baseUrl ?? cc.ApiUrl);
     }
 
     /// <summary>
     /// Creates a Wallet from the standard environment variables:
-    /// <c>REMITMD_KEY</c> (required), <c>REMITMD_CHAIN</c> (optional), <c>REMITMD_TESTNET</c> (optional).
+    /// <c>REMITMD_KEY</c> (required), <c>REMITMD_CHAIN</c> (optional), <c>REMITMD_TESTNET</c> (optional),
+    /// <c>REMITMD_ROUTER_ADDRESS</c> (optional).
     /// </summary>
     public static Wallet FromEnvironment()
     {
@@ -72,10 +74,11 @@ public sealed class Wallet
                 "REMITMD_KEY environment variable is not set. " +
                 "Export your agent's private key: export REMITMD_KEY=0x...");
 
-        var chain   = Environment.GetEnvironmentVariable("REMITMD_CHAIN") ?? "base";
-        var testnet = Environment.GetEnvironmentVariable("REMITMD_TESTNET") is "1" or "true";
+        var chain         = Environment.GetEnvironmentVariable("REMITMD_CHAIN") ?? "base";
+        var testnet       = Environment.GetEnvironmentVariable("REMITMD_TESTNET") is "1" or "true";
+        var routerAddress = Environment.GetEnvironmentVariable("REMITMD_ROUTER_ADDRESS");
 
-        return new Wallet(key, chain, testnet);
+        return new Wallet(new PrivateKeySigner(key), chain, testnet, null, routerAddress);
     }
 
     /// <summary>The agent's Ethereum address (derived from the private key).</summary>

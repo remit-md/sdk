@@ -1,6 +1,6 @@
 defmodule RemitMd.Http do
   @moduledoc false
-  # HTTP transport layer. Signs each request with EIP-712-style headers and
+  # HTTP transport layer. Signs each request with EIP-712 headers and
   # retries transient failures with exponential backoff.
   # Uses Erlang's built-in :httpc (via :inets) — no external HTTP deps.
 
@@ -17,8 +17,8 @@ defmodule RemitMd.Http do
   @base_delay_ms 500
   @retry_codes [429, 500, 502, 503, 504]
 
-  @enforce_keys [:base_url, :signer, :chain_id]
-  defstruct [:base_url, :signer, :chain_id]
+  @enforce_keys [:base_url, :signer, :chain_id, :router_address]
+  defstruct [:base_url, :signer, :chain_id, :router_address]
 
   def new(opts) do
     chain = Keyword.get(opts, :chain, "base")
@@ -29,11 +29,13 @@ defmodule RemitMd.Http do
 
     base_url = Keyword.get(opts, :api_url, cfg.url)
     signer = Keyword.fetch!(opts, :signer)
+    router_address = Keyword.get(opts, :router_address, "")
 
     %__MODULE__{
       base_url: base_url,
       signer: signer,
-      chain_id: cfg.chain_id
+      chain_id: cfg.chain_id,
+      router_address: router_address
     }
   end
 
@@ -45,28 +47,74 @@ defmodule RemitMd.Http do
     request(t, :post, path, body, 1)
   end
 
+  # ─── EIP-712 hash (exposed for golden-vector testing) ──────────────────
+
+  @doc false
+  def eip712_hash(chain_id, router_address, method, path, timestamp, nonce_bytes)
+      when is_binary(nonce_bytes) and byte_size(nonce_bytes) == 32 do
+    keccak = &RemitMd.Keccak.hash/1
+
+    domain_type_hash =
+      keccak.("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+
+    request_type_hash =
+      keccak.("APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)")
+
+    # Domain separator
+    name_hash = keccak.("remit.md")
+    version_hash = keccak.("0.1")
+    chain_id_enc = <<chain_id::unsigned-big-integer-size(256)>>
+    contract_enc = address_to_bytes32(router_address)
+
+    domain_separator =
+      keccak.(domain_type_hash <> name_hash <> version_hash <> chain_id_enc <> contract_enc)
+
+    # Struct hash
+    method_hash = keccak.(method)
+    path_hash = keccak.(path)
+    timestamp_enc = <<timestamp::unsigned-big-integer-size(256)>>
+
+    struct_hash =
+      keccak.(request_type_hash <> method_hash <> path_hash <> timestamp_enc <> nonce_bytes)
+
+    # Final: keccak256(0x1901 || domainSeparator || structHash)
+    keccak.(<<0x19, 0x01>> <> domain_separator <> struct_hash)
+  end
+
   # ─── Private ──────────────────────────────────────────────────────────────
 
   defp request(transport, method, path, body, attempt) do
     url = transport.base_url <> path
-    nonce = generate_nonce()
-    timestamp = Integer.to_string(:os.system_time(:second))
+
+    # 32-byte random nonce
+    nonce_bytes = :crypto.strong_rand_bytes(32)
+    nonce_hex = "0x" <> Base.encode16(nonce_bytes, case: :lower)
+
+    # Unix epoch timestamp
+    timestamp = :os.system_time(:second)
+
     body_json = if body, do: Jason.encode!(body), else: ""
 
-    signed_payload =
-      [method_string(method), path, nonce, timestamp, body_json]
-      |> Enum.join("\n")
+    # EIP-712 hash and signature
+    digest =
+      eip712_hash(
+        transport.chain_id,
+        transport.router_address,
+        method_string(method),
+        path,
+        timestamp,
+        nonce_bytes
+      )
 
-    signature = call_sign(transport.signer, signed_payload)
+    signature = call_sign(transport.signer, digest)
     agent_address = call_address(transport.signer)
 
     headers = [
       {~c"content-type", ~c"application/json"},
-      {~c"x-remit-signature", String.to_charlist(signature)},
       {~c"x-remit-agent", String.to_charlist(agent_address)},
-      {~c"x-remit-timestamp", String.to_charlist(timestamp)},
-      {~c"x-remit-nonce", String.to_charlist(nonce)},
-      {~c"x-remit-chain-id", String.to_charlist(Integer.to_string(transport.chain_id))}
+      {~c"x-remit-nonce", String.to_charlist(nonce_hex)},
+      {~c"x-remit-timestamp", String.to_charlist(Integer.to_string(timestamp))},
+      {~c"x-remit-signature", String.to_charlist(signature)}
     ]
 
     url_charlist = String.to_charlist(url)
@@ -78,12 +126,27 @@ defmodule RemitMd.Http do
 
         :post ->
           body_charlist = String.to_charlist(body_json)
-          :httpc.request(:post, {url_charlist, headers, ~c"application/json", body_charlist}, http_opts(), [])
+
+          :httpc.request(
+            :post,
+            {url_charlist, headers, ~c"application/json", body_charlist},
+            http_opts(),
+            []
+          )
       end
 
     case result do
       {:ok, {{_version, status, _reason}, _resp_headers, resp_body}} ->
-        handle_response(status, to_string(resp_body), url, transport, method, path, body, attempt)
+        handle_response(
+          status,
+          to_string(resp_body),
+          url,
+          transport,
+          method,
+          path,
+          body,
+          attempt
+        )
 
       {:error, reason} ->
         if attempt < @max_retries do
@@ -111,7 +174,10 @@ defmodule RemitMd.Http do
         raise Error.new(code, Map.get(parsed, "message", "Bad request"), context: parsed)
 
       status == 401 ->
-        raise Error.new(Error.unauthorized(), "Authentication failed — check private key and chain ID")
+        raise Error.new(
+          Error.unauthorized(),
+          "Authentication failed — check private key and chain ID"
+        )
 
       status == 403 ->
         raise Error.new(Error.forbidden(), Map.get(parsed, "message", "Forbidden"))
@@ -130,8 +196,18 @@ defmodule RemitMd.Http do
     end
   end
 
-  defp generate_nonce do
-    :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
+  defp address_to_bytes32(nil), do: <<0::256>>
+  defp address_to_bytes32(""), do: <<0::256>>
+
+  defp address_to_bytes32(address) do
+    hex = String.trim_leading(address, "0x")
+
+    if String.length(hex) == 40 do
+      addr_bytes = Base.decode16!(hex, case: :mixed)
+      :binary.copy(<<0>>, 12) <> addr_bytes
+    else
+      <<0::256>>
+    end
   end
 
   defp method_string(:get), do: "GET"

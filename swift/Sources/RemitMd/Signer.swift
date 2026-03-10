@@ -24,7 +24,7 @@ public protocol Signer: Sendable {
 /// ```
 public final class PrivateKeySigner: Signer {
     public let address: String
-    private let privateKey: secp256k1.Signing.PrivateKey
+    private let privateKey: secp256k1.Recovery.PrivateKey
 
     /// - Parameter privateKey: 32-byte hex private key (with or without 0x prefix).
     public init(privateKey hex: String) throws {
@@ -35,12 +35,13 @@ public final class PrivateKeySigner: Signer {
                 "private key must be 64 hex chars (32 bytes), got \(stripped.count) chars"
             )
         }
-        let key = try secp256k1.Signing.PrivateKey(dataRepresentation: keyData)
+        let key = try secp256k1.Recovery.PrivateKey(dataRepresentation: keyData)
         self.privateKey = key
         self.address = PrivateKeySigner.deriveAddress(compressedPubKey: key.publicKey.dataRepresentation)
     }
 
-    /// Sign a 32-byte digest using ECDSA, returning hex-encoded 65-byte signature (r+s+v).
+    /// Sign a 32-byte EIP-712 digest using ECDSA, returning hex-encoded 65-byte signature (r+s+v).
+    /// v is 0x1b (27) or 0x1c (28) per Ethereum convention.
     public func sign(digest: Data) throws -> String {
         guard digest.count == 32 else {
             throw RemitError(
@@ -49,8 +50,9 @@ public final class PrivateKeySigner: Signer {
             )
         }
         let sig = try privateKey.signature(for: digest)
-        var result = Data(sig.dataRepresentation) // 64 bytes: r+s
-        result.append(0x1b)                        // v = 27 (Ethereum convention)
+        // sig.dataRepresentation is 64 bytes (r+s); sig.recoveryId is 0 or 1
+        var result = Data(sig.dataRepresentation)
+        result.append(UInt8(sig.recoveryId) + 27)  // v = 27 or 28
         return "0x" + result.hexString
     }
 

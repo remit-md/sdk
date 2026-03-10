@@ -19,12 +19,12 @@ defmodule RemitMd.Signer do
   """
 
   @doc """
-  Sign the given message binary. Returns a 0x-prefixed hex signature string.
-  The implementation may hash the message as needed before signing.
+  Sign a 32-byte EIP-712 digest. Returns a 0x-prefixed 65-byte hex signature (r+s+v).
+  v is 27 or 28 (Ethereum convention).
 
-  The first argument is the signer struct, the second is the message to sign.
+  The first argument is the signer struct, the second is the 32-byte digest to sign.
   """
-  @callback sign(signer :: term(), message :: binary()) :: String.t()
+  @callback sign(signer :: term(), digest :: binary()) :: String.t()
 
   @doc """
   Return the Ethereum address (0x-prefixed, 40 hex chars) for this signer.
@@ -69,6 +69,12 @@ defmodule RemitMd.PrivateKeySigner do
   @enforce_keys [:address, :__key__]
   defstruct [:address, :__key__]
 
+  # secp256k1 curve parameters
+  @p 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+  @n 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+  @gx 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
+  @gy 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
+
   @doc """
   Create a signer from a 0x-prefixed or bare 64-character hex private key.
   """
@@ -89,11 +95,19 @@ defmodule RemitMd.PrivateKeySigner do
   end
 
   @impl true
-  def sign(%__MODULE__{__key__: key_bytes}, message) when is_binary(message) do
-    # :crypto.sign(:ecdsa, :sha256, message, key, curve) computes sha256 internally
-    # before signing with the secp256k1 private key.
-    sig_der = :crypto.sign(:ecdsa, :sha256, message, [key_bytes, :secp256k1])
-    "0x" <> Base.encode16(sig_der, case: :lower)
+  def sign(%__MODULE__{__key__: key_bytes, address: signer_addr}, digest)
+      when is_binary(digest) and byte_size(digest) == 32 do
+    # Sign the raw 32-byte EIP-712 digest (no additional hashing)
+    der = :crypto.sign(:ecdsa, :none, digest, [key_bytes, :secp256k1])
+    {r, s} = parse_der(der)
+
+    # Compute recovery ID by checking which parity recovers our address
+    z = :binary.decode_unsigned(digest)
+    v = recover_v(r, s, z, signer_addr)
+
+    # Build 65-byte Ethereum signature: r(32) || s(32) || v(1)
+    sig = <<r::unsigned-big-integer-size(256), s::unsigned-big-integer-size(256), v>>
+    "0x" <> Base.encode16(sig, case: :lower)
   end
 
   @impl true
@@ -114,46 +128,136 @@ defmodule RemitMd.PrivateKeySigner do
   # ─── Private ──────────────────────────────────────────────────────────────
 
   defp derive_address(private_key_bytes) do
-    # Derive the uncompressed secp256k1 public key (65 bytes: 0x04 || x || y)
     {pub_key, _priv} = :crypto.generate_key(:ecdh, :secp256k1, private_key_bytes)
 
-    # pub_key is the compressed (33 bytes) or uncompressed (65 bytes) form.
-    # :crypto.generate_key with a supplied private key returns the public key.
-    # For secp256k1 ECDH, it returns the compressed public key (33 bytes).
-    # We need uncompressed (65 bytes) for address derivation.
-    # Compute uncompressed from compressed using :crypto.
     pub_uncompressed =
       case byte_size(pub_key) do
         65 -> pub_key
-        33 ->
-          # Decompress: use :crypto.ec_point_mul (OTP 26+) or compute manually
-          decompress_public_key(pub_key)
+        33 -> decompress_public_key(pub_key)
       end
 
-    # Drop the 0x04 prefix, hash the remaining 64 bytes with Keccak-256
     <<0x04, pub_64::binary-size(64)>> = pub_uncompressed
     keccak_hash = RemitMd.Keccak.hash(pub_64)
-
-    # Ethereum address = last 20 bytes of keccak hash
     <<_prefix::binary-size(12), address_bytes::binary-size(20)>> = keccak_hash
     "0x" <> Base.encode16(address_bytes, case: :lower)
   end
 
-  # Decompress a secp256k1 compressed public key (33 bytes) to uncompressed (65 bytes).
-  # secp256k1: y^2 = x^3 + 7 (mod p), p = 2^256 - 2^32 - 977
-  defp decompress_public_key(<<prefix, x_bytes::binary-size(32)>>) when prefix in [0x02, 0x03] do
-    p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
-    x = :binary.decode_unsigned(x_bytes)
+  # ─── DER parsing ─────────────────────────────────────────────────────────
 
-    # y^2 = x^3 + 7 mod p
-    y_squared = rem(pow_mod(x, 3, p) + 7, p)
-    y_candidate = pow_mod(y_squared, div(p + 1, 4), p)
+  defp parse_der(<<0x30, _len, 0x02, r_len, rest::binary>>) do
+    <<r_raw::binary-size(r_len), 0x02, s_len, s_rest::binary>> = rest
+    <<s_raw::binary-size(s_len), _::binary>> = s_rest
+    r = :binary.decode_unsigned(strip_leading_zero(r_raw))
+    s = :binary.decode_unsigned(strip_leading_zero(s_raw))
+    {r, s}
+  end
+
+  defp strip_leading_zero(<<0, rest::binary>>), do: rest
+  defp strip_leading_zero(bin), do: bin
+
+  # ─── ECDSA v recovery ────────────────────────────────────────────────────
+
+  defp recover_v(r, s, z, expected_addr) do
+    r_inv = modinv(r, @n)
+    a = Integer.mod(r_inv * s, @n)
+    b = Integer.mod(@n - Integer.mod(r_inv * z, @n), @n)
+
+    Enum.find_value([0, 1], fn parity ->
+      case recover_r_point(r, parity) do
+        nil ->
+          nil
+
+        r_point ->
+          # Q = a*R + b*G
+          ar = ec_mul(a, r_point)
+          bg = ec_mul(b, {@gx, @gy})
+          q = ec_add(ar, bg)
+
+          case q do
+            :infinity ->
+              nil
+
+            point ->
+              addr = point_to_address(point)
+
+              if String.downcase(addr) == String.downcase(expected_addr) do
+                27 + parity
+              end
+          end
+      end
+    end) || raise "Could not determine ECDSA recovery ID"
+  end
+
+  defp recover_r_point(r, parity) do
+    y_squared = Integer.mod(pow_mod(r, 3, @p) + 7, @p)
+    y_candidate = pow_mod(y_squared, div(@p + 1, 4), @p)
+
+    if Integer.mod(y_candidate * y_candidate, @p) != y_squared do
+      nil
+    else
+      y = if Integer.mod(y_candidate, 2) == parity, do: y_candidate, else: @p - y_candidate
+      {r, y}
+    end
+  end
+
+  defp point_to_address({x, y}) do
+    pub_64 = <<x::unsigned-big-integer-size(256), y::unsigned-big-integer-size(256)>>
+    keccak_hash = RemitMd.Keccak.hash(pub_64)
+    <<_prefix::binary-size(12), address_bytes::binary-size(20)>> = keccak_hash
+    "0x" <> Base.encode16(address_bytes, case: :lower)
+  end
+
+  # ─── EC point arithmetic on secp256k1 ────────────────────────────────────
+
+  defp ec_add(:infinity, q), do: q
+  defp ec_add(p, :infinity), do: p
+
+  defp ec_add({x1, y1}, {x2, y2}) do
+    if x1 == x2 do
+      if y1 == y2, do: ec_double({x1, y1}), else: :infinity
+    else
+      lam = Integer.mod((y2 - y1) * modinv(x2 - x1, @p), @p)
+      x3 = Integer.mod(lam * lam - x1 - x2, @p)
+      y3 = Integer.mod(lam * (x1 - x3) - y1, @p)
+      {x3, y3}
+    end
+  end
+
+  defp ec_double(:infinity), do: :infinity
+
+  defp ec_double({x, y}) do
+    lam = Integer.mod(3 * x * x * modinv(2 * y, @p), @p)
+    x3 = Integer.mod(lam * lam - 2 * x, @p)
+    y3 = Integer.mod(lam * (x - x3) - y, @p)
+    {x3, y3}
+  end
+
+  defp ec_mul(0, _p), do: :infinity
+  defp ec_mul(_k, :infinity), do: :infinity
+  defp ec_mul(k, point), do: do_ec_mul(k, point, :infinity)
+
+  defp do_ec_mul(0, _p, acc), do: acc
+
+  defp do_ec_mul(k, p, acc) do
+    acc = if rem(k, 2) == 1, do: ec_add(acc, p), else: acc
+    do_ec_mul(div(k, 2), ec_double(p), acc)
+  end
+
+  # Modular inverse via Fermat's little theorem (p and n are prime)
+  defp modinv(a, m), do: pow_mod(Integer.mod(a + m, m), m - 2, m)
+
+  # ─── secp256k1 public key decompression ──────────────────────────────────
+
+  defp decompress_public_key(<<prefix, x_bytes::binary-size(32)>>) when prefix in [0x02, 0x03] do
+    x = :binary.decode_unsigned(x_bytes)
+    y_squared = Integer.mod(pow_mod(x, 3, @p) + 7, @p)
+    y_candidate = pow_mod(y_squared, div(@p + 1, 4), @p)
 
     y =
       if rem(y_candidate, 2) == prefix - 2 do
         y_candidate
       else
-        p - y_candidate
+        @p - y_candidate
       end
 
     y_bytes = <<y::unsigned-big-integer-size(256)>>

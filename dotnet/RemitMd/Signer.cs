@@ -88,73 +88,84 @@ internal static class ByteArrayExtensions
 }
 
 /// <summary>
-/// Computes EIP-712 typed data hashes for remit.md payment messages.
+/// Computes EIP-712 typed data hashes for remit.md API request authentication.
 /// The domain separator binds signatures to a specific chain and contract.
 /// </summary>
 internal static class Eip712
 {
     // EIP-712 domain type hash
-    private static readonly byte[] DomainTypeHash = Sha3(
+    private static readonly byte[] DomainTypeHash = Keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
-    // Payment type hash
-    private static readonly byte[] PaymentTypeHash = Sha3(
-        "Payment(address from,address to,uint256 amount,uint256 nonce,uint256 deadline,string memo)");
+    // APIRequest type hash — must match server's auth.rs exactly
+    private static readonly byte[] RequestTypeHash = Keccak256(
+        "APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)");
 
-    /// <summary>Computes the domain separator for the given chain and contract.</summary>
-    public static byte[] DomainSeparator(long chainId, string verifyingContract)
+    /// <summary>
+    /// Computes the EIP-712 hash for an APIRequest struct.
+    ///
+    /// Domain: name="remit.md", version="0.1", chainId, verifyingContract
+    /// Struct: APIRequest(string method, string path, uint256 timestamp, bytes32 nonce)
+    /// </summary>
+    public static byte[] ComputeRequestDigest(
+        long chainId,
+        string verifyingContract,
+        string method,
+        string path,
+        ulong timestamp,
+        byte[] nonce)
     {
-        var name    = Sha3("remit.md");
-        var version = Sha3("1");
+        var domainSeparator = BuildDomainSeparator(chainId, verifyingContract);
+        var structHash = BuildStructHash(method, path, timestamp, nonce);
 
-        // abi.encode(DOMAIN_TYPE_HASH, name, version, chainId, verifyingContract)
-        var encoded = AbiEncode(
-            DomainTypeHash,
-            name,
-            version,
-            PadUint256((ulong)chainId),
-            PadAddress(verifyingContract)
-        );
-        return Sha3(encoded);
-    }
-
-    /// <summary>Computes the EIP-712 hash for a payment message.</summary>
-    public static byte[] PaymentHash(
-        byte[] domainSeparator,
-        string from,
-        string to,
-        decimal amount,
-        ulong nonce,
-        ulong deadline,
-        string memo)
-    {
-        var amountWei = ToWei(amount); // USDC uses 6 decimals
-        var memoHash  = Sha3(memo);
-
-        var structHash = Sha3(AbiEncode(
-            PaymentTypeHash,
-            PadAddress(from),
-            PadAddress(to),
-            PadUint256(amountWei),
-            PadUint256(nonce),
-            PadUint256(deadline),
-            memoHash
-        ));
-
-        // EIP-712 final hash: \x19\x01 + domainSeparator + structHash
-        var payload = new byte[2 + 32 + 32];
+        // EIP-712 final hash: "\x19\x01" || domainSeparator || structHash
+        var payload = new byte[66];
         payload[0] = 0x19;
         payload[1] = 0x01;
         Buffer.BlockCopy(domainSeparator, 0, payload, 2, 32);
         Buffer.BlockCopy(structHash, 0, payload, 34, 32);
-        return Sha3(payload);
+        return Keccak256(payload);
+    }
+
+    private static byte[] BuildDomainSeparator(long chainId, string verifyingContract)
+    {
+        var nameHash    = Keccak256("remit.md");
+        var versionHash = Keccak256("0.1");
+
+        var encoded = AbiEncode(
+            DomainTypeHash,
+            nameHash,
+            versionHash,
+            PadUint256((ulong)chainId),
+            PadAddress(verifyingContract)
+        );
+        return Keccak256(encoded);
+    }
+
+    private static byte[] BuildStructHash(string method, string path, ulong timestamp, byte[] nonce)
+    {
+        var methodHash = Keccak256(method);
+        var pathHash   = Keccak256(path);
+
+        // nonce is bytes32 — use directly (must be exactly 32 bytes)
+        var paddedNonce = new byte[32];
+        Buffer.BlockCopy(nonce, 0, paddedNonce, 0, Math.Min(nonce.Length, 32));
+
+        var encoded = AbiEncode(
+            RequestTypeHash,
+            methodHash,
+            pathHash,
+            PadUint256(timestamp),
+            paddedNonce
+        );
+        return Keccak256(encoded);
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
 
-    private static byte[] Sha3(string text) => Sha3(Encoding.UTF8.GetBytes(text));
+    internal static byte[] Keccak256(string text) => Keccak256(Encoding.UTF8.GetBytes(text));
 
-    private static byte[] Sha3(byte[] data)
+    internal static byte[] Keccak256(byte[] data)
     {
         var keccak = new Sha3Keccack();
         return keccak.CalculateHash(data);
@@ -164,7 +175,7 @@ internal static class Eip712
     {
         var result = new byte[parts.Length * 32];
         for (var i = 0; i < parts.Length; i++)
-            Buffer.BlockCopy(parts[i], parts[i].Length > 32 ? 0 : 0, result, i * 32, Math.Min(parts[i].Length, 32));
+            Buffer.BlockCopy(parts[i], 0, result, i * 32, Math.Min(parts[i].Length, 32));
         return result;
     }
 
@@ -179,6 +190,7 @@ internal static class Eip712
 
     private static byte[] PadAddress(string address)
     {
+        if (string.IsNullOrWhiteSpace(address)) return new byte[32];
         var result = new byte[32];
         var cleaned = address.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
             ? address[2..]
@@ -187,9 +199,6 @@ internal static class Eip712
         Buffer.BlockCopy(addrBytes, 0, result, 32 - addrBytes.Length, addrBytes.Length);
         return result;
     }
-
-    // USDC has 6 decimals; amount is in USDC units
-    private static ulong ToWei(decimal amount) => (ulong)(amount * 1_000_000m);
 
     private static byte[] HexToBytes(string hex)
     {

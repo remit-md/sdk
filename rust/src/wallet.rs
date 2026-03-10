@@ -68,6 +68,7 @@ impl Wallet {
             chain: "base".to_string(),
             testnet: false,
             base_url: None,
+            router_address: None,
         }
     }
 
@@ -78,6 +79,7 @@ impl Wallet {
             chain: "base".to_string(),
             testnet: false,
             base_url: None,
+            router_address: None,
         }
     }
 
@@ -85,6 +87,7 @@ impl Wallet {
     /// - `REMITMD_KEY` — hex-encoded private key (required)
     /// - `REMITMD_CHAIN` — chain name (default: `"base"`)
     /// - `REMITMD_TESTNET` — `"1"`, `"true"`, or `"yes"` for testnet
+    /// - `REMITMD_ROUTER_ADDRESS` — EIP-712 verifying contract address
     pub fn from_env() -> Result<Self, RemitError> {
         let key = env::var("REMITMD_KEY").map_err(|_| {
             remit_err_ctx(
@@ -100,10 +103,14 @@ impl Wallet {
             env::var("REMITMD_TESTNET").as_deref(),
             Ok("1") | Ok("true") | Ok("yes")
         );
+        let router_address = env::var("REMITMD_ROUTER_ADDRESS").unwrap_or_default();
 
         let mut builder = Self::new(&key).chain(&chain);
         if testnet {
             builder = builder.testnet();
+        }
+        if !router_address.is_empty() {
+            builder = builder.router_address(&router_address);
         }
         builder.build()
     }
@@ -527,6 +534,7 @@ pub struct WalletBuilder<S> {
     pub(crate) chain: String,
     pub(crate) testnet: bool,
     pub(crate) base_url: Option<String>,
+    pub(crate) router_address: Option<String>,
 }
 
 impl<S> WalletBuilder<S> {
@@ -548,13 +556,19 @@ impl<S> WalletBuilder<S> {
         self.base_url = Some(url.to_string());
         self
     }
+
+    /// Set the EIP-712 verifying contract address (router). Required for production use.
+    pub fn router_address(mut self, addr: &str) -> Self {
+        self.router_address = Some(addr.to_string());
+        self
+    }
 }
 
 impl WalletBuilder<WithKey> {
     /// Build the `Wallet`, returning an error if the private key or chain is invalid.
     pub fn build(self) -> Result<Wallet, RemitError> {
         let signer = Arc::new(PrivateKeySigner::new(&self.key_or_signer.0)?);
-        build_wallet(signer, &self.chain, self.testnet, self.base_url)
+        build_wallet(signer, &self.chain, self.testnet, self.base_url, self.router_address)
     }
 }
 
@@ -566,6 +580,7 @@ impl WalletBuilder<WithSigner> {
             &self.chain,
             self.testnet,
             self.base_url,
+            self.router_address,
         )
     }
 }
@@ -575,6 +590,7 @@ fn build_wallet(
     chain: &str,
     testnet: bool,
     base_url_override: Option<String>,
+    router_address: Option<String>,
 ) -> Result<Wallet, RemitError> {
     let chain_key = if testnet {
         format!("{chain}-sepolia")
@@ -592,8 +608,9 @@ fn build_wallet(
     })?;
 
     let api_url = base_url_override.unwrap_or_else(|| cfg.api_url.to_string());
+    let router_addr = router_address.unwrap_or_default();
     let address = signer.address().to_string();
-    let transport = Arc::new(HttpTransport::new(api_url, signer));
+    let transport = Arc::new(HttpTransport::new(api_url, cfg.chain_id, router_addr, signer));
 
     Ok(Wallet {
         transport,

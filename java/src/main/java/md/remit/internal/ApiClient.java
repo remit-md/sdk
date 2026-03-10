@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Map;
 
@@ -35,11 +36,13 @@ public class ApiClient {
     private final HttpClient http;
     private final String baseUrl;
     private final long chainId;
+    private final String routerAddress;
     private final Signer signer;
 
-    public ApiClient(String baseUrl, long chainId, Signer signer) {
+    public ApiClient(String baseUrl, long chainId, String routerAddress, Signer signer) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.chainId = chainId;
+        this.routerAddress = routerAddress != null ? routerAddress : "";
         this.signer = signer;
         this.http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -55,17 +58,18 @@ public class ApiClient {
     }
 
     private <T> T doGet(String path, Class<T> responseType) throws Exception {
-        String nonce = generateNonce();
-        String timestamp = Instant.now().toString();
-        String signature = signRequest("GET", path, "", nonce, timestamp);
+        byte[] nonce = generateNonce();
+        String nonceHex = "0x" + HexFormat.of().formatHex(nonce);
+        long timestamp = Instant.now().getEpochSecond();
+        String signature = signEip712("GET", path, timestamp, nonce);
 
         HttpRequest req = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + path))
-            .header("Content-Type", "application/json")
-            .header("X-Remit-Nonce", nonce)
-            .header("X-Remit-Timestamp", timestamp)
+            .header("Accept", "application/json")
+            .header("X-Remit-Agent", signer.address())
+            .header("X-Remit-Nonce", nonceHex)
+            .header("X-Remit-Timestamp", String.valueOf(timestamp))
             .header("X-Remit-Signature", signature)
-            .header("X-Remit-Chain", String.valueOf(chainId))
             .timeout(Duration.ofSeconds(30))
             .GET()
             .build();
@@ -76,17 +80,19 @@ public class ApiClient {
 
     private <T> T doPost(String path, Object body, Class<T> responseType) throws Exception {
         String bodyJson = body != null ? MAPPER.writeValueAsString(body) : "{}";
-        String nonce = generateNonce();
-        String timestamp = Instant.now().toString();
-        String signature = signRequest("POST", path, bodyJson, nonce, timestamp);
+        byte[] nonce = generateNonce();
+        String nonceHex = "0x" + HexFormat.of().formatHex(nonce);
+        long timestamp = Instant.now().getEpochSecond();
+        String signature = signEip712("POST", path, timestamp, nonce);
 
         HttpRequest req = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + path))
             .header("Content-Type", "application/json")
-            .header("X-Remit-Nonce", nonce)
-            .header("X-Remit-Timestamp", timestamp)
+            .header("Accept", "application/json")
+            .header("X-Remit-Agent", signer.address())
+            .header("X-Remit-Nonce", nonceHex)
+            .header("X-Remit-Timestamp", String.valueOf(timestamp))
             .header("X-Remit-Signature", signature)
-            .header("X-Remit-Chain", String.valueOf(chainId))
             .timeout(Duration.ofSeconds(30))
             .POST(HttpRequest.BodyPublishers.ofString(bodyJson))
             .build();
@@ -117,14 +123,19 @@ public class ApiClient {
         throw new RemitError(code, message, Map.of("http_status", status), status);
     }
 
-    private String signRequest(String method, String path, String body, String nonce, String timestamp) {
-        // EIP-712 inspired request signing:
-        // hash(method + path + sha256(body) + nonce + timestamp + chainId)
-        String payload = method + "\n" + path + "\n" + sha256Hex(body) + "\n" + nonce + "\n" + timestamp + "\n" + chainId;
-        byte[] hash = keccak256(payload.getBytes(StandardCharsets.UTF_8));
+    // ─── EIP-712 ─────────────────────────────────────────────────────────────
+
+    /**
+     * Computes the EIP-712 hash for an APIRequest and signs it.
+     *
+     * <p>Domain: name="remit.md", version="0.1", chainId, verifyingContract<br>
+     * Struct: APIRequest(string method, string path, uint256 timestamp, bytes32 nonce)
+     */
+    private String signEip712(String method, String path, long timestamp, byte[] nonce) {
+        byte[] digest = computeEip712Hash(chainId, routerAddress, method, path, timestamp, nonce);
         try {
-            byte[] sig = signer.sign(hash);
-            return HexFormat.of().formatHex(sig);
+            byte[] sig = signer.sign(digest);
+            return "0x" + HexFormat.of().formatHex(sig);
         } catch (Exception e) {
             throw new RemitError(ErrorCodes.INVALID_SIGNATURE,
                 "Failed to sign request. Check that your private key is valid.",
@@ -133,27 +144,97 @@ public class ApiClient {
         }
     }
 
-    private String generateNonce() {
-        byte[] b = new byte[16];
-        new SecureRandom().nextBytes(b);
-        return HexFormat.of().formatHex(b);
+    static byte[] computeEip712Hash(
+            long chainId,
+            String routerAddress,
+            String method,
+            String path,
+            long timestamp,
+            byte[] nonce) {
+        // Type hashes.
+        byte[] domainTypeHash = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                .getBytes(StandardCharsets.UTF_8));
+        byte[] requestTypeHash = keccak256(
+            "APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)"
+                .getBytes(StandardCharsets.UTF_8));
+
+        // Domain separator components.
+        byte[] nameHash = keccak256("remit.md".getBytes(StandardCharsets.UTF_8));
+        byte[] versionHash = keccak256("0.1".getBytes(StandardCharsets.UTF_8));
+        byte[] chainIdBytes = toUint256(chainId);
+        byte[] contractBytes = addressToBytes32(routerAddress);
+
+        byte[] domainData = concat(domainTypeHash, nameHash, versionHash, chainIdBytes, contractBytes);
+        byte[] domainSeparator = keccak256(domainData);
+
+        // Struct hash.
+        byte[] methodHash = keccak256(method.getBytes(StandardCharsets.UTF_8));
+        byte[] pathHash = keccak256(path.getBytes(StandardCharsets.UTF_8));
+        byte[] timestampBytes = toUint256(timestamp);
+        // nonce is already 32 bytes (bytes32)
+        byte[] paddedNonce = new byte[32];
+        System.arraycopy(nonce, 0, paddedNonce, 0, Math.min(nonce.length, 32));
+
+        byte[] structData = concat(requestTypeHash, methodHash, pathHash, timestampBytes, paddedNonce);
+        byte[] structHash = keccak256(structData);
+
+        // Final EIP-712 hash: "\x19\x01" || domainSeparator || structHash
+        byte[] finalData = new byte[2 + 32 + 32];
+        finalData[0] = 0x19;
+        finalData[1] = 0x01;
+        System.arraycopy(domainSeparator, 0, finalData, 2, 32);
+        System.arraycopy(structHash, 0, finalData, 34, 32);
+        return keccak256(finalData);
     }
 
     private static byte[] keccak256(byte[] input) {
         return org.web3j.crypto.Hash.sha3(input);
     }
 
-    private static String sha256Hex(String input) {
-        try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RemitError(ErrorCodes.INVALID_SIGNATURE,
-                "SHA-256 hash computation failed: " + e.getMessage(),
-                Map.of()
-            );
+    /** Encode a long as ABI uint256 (32 bytes, big-endian, unsigned). */
+    static byte[] toUint256(long value) {
+        // Use Long.toUnsignedString so that large u64 values (e.g. u64::MAX stored as -1L)
+        // are treated as positive unsigned integers.
+        BigInteger unsigned = new BigInteger(Long.toUnsignedString(value));
+        byte[] b = unsigned.toByteArray();
+        byte[] result = new byte[32];
+        // BigInteger.toByteArray() may include a leading 0 sign byte — strip it.
+        int start = (b.length > 1 && b[0] == 0) ? 1 : 0;
+        int len = b.length - start;
+        System.arraycopy(b, start, result, 32 - len, len);
+        return result;
+    }
+
+    /** Encode a 20-byte Ethereum address as ABI bytes32 (left-zero-padded). */
+    private static byte[] addressToBytes32(String address) {
+        if (address == null || address.isBlank()) return new byte[32];
+        String hex = address.startsWith("0x") ? address.substring(2) : address;
+        if (hex.length() != 40) return new byte[32];
+        byte[] addr = HexFormat.of().parseHex(hex);
+        byte[] result = new byte[32];
+        System.arraycopy(addr, 0, result, 12, 20);
+        return result;
+    }
+
+    /** Concatenate multiple byte arrays. */
+    private static byte[] concat(byte[]... arrays) {
+        int total = 0;
+        for (byte[] a : arrays) total += a.length;
+        byte[] result = new byte[total];
+        int pos = 0;
+        for (byte[] a : arrays) {
+            System.arraycopy(a, 0, result, pos, a.length);
+            pos += a.length;
         }
+        return result;
+    }
+
+    /** Generate a random 32-byte nonce. */
+    private static byte[] generateNonce() {
+        byte[] b = new byte[32];
+        new SecureRandom().nextBytes(b);
+        return b;
     }
 
     @FunctionalInterface

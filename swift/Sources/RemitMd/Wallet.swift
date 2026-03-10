@@ -5,9 +5,14 @@ public final class RemitWallet: Sendable {
     private let transport: any Transport
     private let signerAddress: String
 
-    public init(privateKey: String, chain: RemitChain = .baseSepolia, baseURL: String? = nil) throws {
+    public init(privateKey: String, chain: RemitChain = .baseSepolia, baseURL: String? = nil, routerAddress: String? = nil) throws {
         let signer = try PrivateKeySigner(privateKey: privateKey)
-        self.transport = HttpTransport(baseURL: baseURL ?? chain.baseURL, signer: signer)
+        self.transport = HttpTransport(
+            baseURL: baseURL ?? chain.baseURL,
+            chainId: UInt64(chain.rawValue),
+            routerAddress: routerAddress ?? "",
+            signer: signer
+        )
         self.signerAddress = signer.address
     }
 
@@ -17,15 +22,17 @@ public final class RemitWallet: Sendable {
     }
 
     public static func fromEnvironment() throws -> RemitWallet {
-        guard let key = ProcessInfo.processInfo.environment["REMIT_PRIVATE_KEY"] else {
-            throw RemitError(RemitError.unauthorized, "REMIT_PRIVATE_KEY environment variable not set")
+        let env = ProcessInfo.processInfo.environment
+        guard let key = env["REMITMD_PRIVATE_KEY"] else {
+            throw RemitError(RemitError.unauthorized, "REMITMD_PRIVATE_KEY environment variable not set")
         }
-        let chainStr = ProcessInfo.processInfo.environment["REMIT_CHAIN"] ?? "base-sepolia"
+        let chainStr = env["REMITMD_CHAIN"] ?? "base-sepolia"
         let chain: RemitChain = chainStr == "base" ? .base
             : chainStr == "arbitrum" ? .arbitrum
             : chainStr == "optimism" ? .optimism
             : .baseSepolia
-        return try RemitWallet(privateKey: key, chain: chain)
+        let routerAddress = env["REMITMD_ROUTER_ADDRESS"]
+        return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress)
     }
 
     // MARK: - Direct payment

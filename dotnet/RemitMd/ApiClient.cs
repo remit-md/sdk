@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,7 +9,7 @@ namespace RemitMd;
 
 /// <summary>
 /// Low-level HTTP transport used by <see cref="Wallet"/>.
-/// Handles auth headers, retries, and structured error parsing.
+/// Handles EIP-712 request signing, auth headers, retries, and structured error parsing.
 /// </summary>
 internal sealed class ApiClient : IDisposable
 {
@@ -22,34 +23,61 @@ internal sealed class ApiClient : IDisposable
     private readonly HttpClient _http;
     private readonly IRemitSigner _signer;
     private readonly long _chainId;
+    private readonly string _routerAddress;
 
-    internal ApiClient(IRemitSigner signer, long chainId, string baseUrl)
+    internal ApiClient(IRemitSigner signer, long chainId, string routerAddress, string baseUrl)
     {
-        _signer  = signer;
-        _chainId = chainId;
+        _signer        = signer;
+        _chainId       = chainId;
+        _routerAddress = routerAddress ?? string.Empty;
 
         _http = new HttpClient { BaseAddress = new Uri(baseUrl) };
         _http.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
-        _http.DefaultRequestHeaders.Add("X-Remit-Chain-ID", chainId.ToString());
-        _http.DefaultRequestHeaders.Add("X-Remit-Address", signer.Address);
         _http.Timeout = TimeSpan.FromSeconds(30);
     }
 
     /// <summary>Makes a GET request and deserializes the response.</summary>
     internal async Task<T> GetAsync<T>(string path, CancellationToken ct)
     {
-        var response = await ExecuteWithRetryAsync(() =>
-            _http.GetAsync(path, ct), ct);
+        var response = await ExecuteWithRetryAsync(
+            () => SendSignedAsync(HttpMethod.Get, path, body: null, ct), ct);
         return await DeserializeAsync<T>(response);
     }
 
     /// <summary>Makes a POST request with a JSON body and deserializes the response.</summary>
     internal async Task<T> PostAsync<T>(string path, object body, CancellationToken ct)
     {
-        var response = await ExecuteWithRetryAsync(() =>
-            _http.PostAsJsonAsync(path, body, JsonOptions, ct), ct);
+        var response = await ExecuteWithRetryAsync(
+            () => SendSignedAsync(HttpMethod.Post, path, body, ct), ct);
         return await DeserializeAsync<T>(response);
+    }
+
+    private async Task<HttpResponseMessage> SendSignedAsync(
+        HttpMethod method,
+        string path,
+        object? body,
+        CancellationToken ct)
+    {
+        // Generate fresh nonce and timestamp for each attempt (replay protection).
+        var nonceBytes = RandomNumberGenerator.GetBytes(32);
+        var nonceHex   = "0x" + Convert.ToHexString(nonceBytes).ToLowerInvariant();
+        var timestamp  = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        // Compute EIP-712 hash and sign it.
+        var digest    = Eip712.ComputeRequestDigest(_chainId, _routerAddress, method.Method, path, timestamp, nonceBytes);
+        var signature = _signer.Sign(digest);
+
+        var req = new HttpRequestMessage(method, path);
+        req.Headers.Add("X-Remit-Agent",     _signer.Address);
+        req.Headers.Add("X-Remit-Nonce",     nonceHex);
+        req.Headers.Add("X-Remit-Timestamp", timestamp.ToString());
+        req.Headers.Add("X-Remit-Signature", signature);
+
+        if (body is not null)
+            req.Content = JsonContent.Create(body, options: JsonOptions);
+
+        return await _http.SendAsync(req, ct);
     }
 
     private static async Task<HttpResponseMessage> ExecuteWithRetryAsync(
@@ -187,8 +215,8 @@ internal sealed class SnakeCaseNamingPolicy : JsonNamingPolicy
 internal sealed class HttpTransport : IRemitTransport, IDisposable
 {
     private readonly ApiClient _client;
-    internal HttpTransport(IRemitSigner signer, long chainId, string baseUrl)
-        => _client = new ApiClient(signer, chainId, baseUrl);
+    internal HttpTransport(IRemitSigner signer, long chainId, string routerAddress, string baseUrl)
+        => _client = new ApiClient(signer, chainId, routerAddress, baseUrl);
 
     public Task<T> GetAsync<T>(string path, CancellationToken ct)   => _client.GetAsync<T>(path, ct);
     public Task<T> PostAsync<T>(string path, object body, CancellationToken ct) => _client.PostAsync<T>(path, body, ct);

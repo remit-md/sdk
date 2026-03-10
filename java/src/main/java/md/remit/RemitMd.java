@@ -12,7 +12,7 @@ import java.util.Map;
  * <p><b>From environment variables (recommended):</b>
  * <pre>{@code
  * Wallet wallet = RemitMd.fromEnv();
- * // Reads REMITMD_KEY, REMITMD_CHAIN, REMITMD_TESTNET
+ * // Reads REMITMD_KEY, REMITMD_CHAIN, REMITMD_TESTNET, REMITMD_ROUTER_ADDRESS
  * }</pre>
  *
  * <p><b>With explicit key:</b>
@@ -52,6 +52,7 @@ public final class RemitMd {
      *   <li>{@code REMITMD_KEY} — hex-encoded private key (required)</li>
      *   <li>{@code REMITMD_CHAIN} — chain name, default "base"</li>
      *   <li>{@code REMITMD_TESTNET} — "1", "true", or "yes" for testnet</li>
+     *   <li>{@code REMITMD_ROUTER_ADDRESS} — EIP-712 verifying contract address</li>
      * </ul>
      *
      * @throws RemitError if REMITMD_KEY is not set or is malformed
@@ -72,6 +73,8 @@ public final class RemitMd {
         if ("1".equals(testnet) || "true".equalsIgnoreCase(testnet) || "yes".equalsIgnoreCase(testnet)) {
             b = b.testnet(true);
         }
+        String routerAddress = System.getenv("REMITMD_ROUTER_ADDRESS");
+        if (routerAddress != null && !routerAddress.isBlank()) b = b.routerAddress(routerAddress);
         return b.build();
     }
 
@@ -91,6 +94,7 @@ public final class RemitMd {
         private String chain = "base";
         private boolean testnet = false;
         private String baseUrl = null;
+        private String routerAddress = null;
 
         private Builder(Signer signer) {
             this.signer = signer;
@@ -114,6 +118,12 @@ public final class RemitMd {
             return this;
         }
 
+        /** Sets the EIP-712 verifying contract address (router). Required for production use. */
+        public Builder routerAddress(String addr) {
+            this.routerAddress = addr;
+            return this;
+        }
+
         /** Builds the {@link Wallet}. */
         public Wallet build() {
             String chainKey = testnet ? chain + "-sepolia" : chain;
@@ -126,7 +136,7 @@ public final class RemitMd {
             }
             String apiUrl = baseUrl != null ? baseUrl : API_URLS.get(chainKey);
             long chainId = CHAIN_IDS.get(chainKey);
-            ApiClient client = new ApiClient(apiUrl, chainId, signer);
+            ApiClient client = new ApiClient(apiUrl, chainId, routerAddress, signer);
             return new Wallet(client, signer, chainId);
         }
     }

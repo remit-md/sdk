@@ -44,8 +44,9 @@ def test_wallet_from_env_missing_key_raises(monkeypatch):
         Wallet.from_env()
 
 
-def test_wallet_requires_key_or_signer():
-    with pytest.raises(ValueError, match="Provide either"):
+def test_wallet_requires_key_or_signer(monkeypatch):
+    monkeypatch.delenv("REMITMD_KEY", raising=False)
+    with pytest.raises(ValueError, match="REMITMD_KEY"):
         Wallet(chain="localhost", testnet=True)
 
 

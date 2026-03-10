@@ -63,10 +63,15 @@ export class Wallet extends RemitClient {
   readonly #auth: AuthenticatedClient;
 
   constructor(options: WalletOptions = {}) {
-    const { privateKey, signer, ...clientOptions } = options;
+    const { privateKey: explicitKey, signer, ...clientOptions } = options;
+
+    const privateKey =
+      explicitKey ?? (!signer ? process.env["REMITMD_KEY"] : undefined);
 
     if (!privateKey && !signer) {
-      throw new Error("Wallet requires privateKey or signer.");
+      throw new Error(
+        "Wallet requires privateKey, signer, or the REMITMD_KEY environment variable."
+      );
     }
 
     super(clientOptions);

@@ -8,8 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -153,21 +156,30 @@ func (c *httpClient) attempt(ctx context.Context, method, path string, bodyBytes
 	return nil
 }
 
-// sign adds the EIP-712 signature and nonce headers to the request.
+// sign adds EIP-712 authentication headers to the request.
+//
+// Sets X-Remit-Agent, X-Remit-Nonce, X-Remit-Timestamp, and X-Remit-Signature.
+// Matches the server's auth middleware (APIRequest struct type).
 func (c *httpClient) sign(req *http.Request, body []byte) error {
-	// Generate a random nonce for replay protection
 	var nonceBytes [32]byte
 	if _, err := rand.Read(nonceBytes[:]); err != nil {
 		return fmt.Errorf("generate nonce: %w", err)
 	}
-	nonce := hex.EncodeToString(nonceBytes[:])
+	nonce := "0x" + hex.EncodeToString(nonceBytes[:])
+	timestamp := uint64(time.Now().Unix())
 
-	// In the real implementation, sign(hash(method + path + nonce + body))
-	// For now, use address-based auth with nonce header
-	req.Header.Set("X-Remit-Address", c.signer.Address().Hex())
+	chainID := new(big.Int).SetUint64(uint64(c.chainID))
+	digest := computeRequestDigest(chainID, common.Address{}, req.Method, req.URL.Path, timestamp, nonceBytes)
+
+	sig, err := c.signer.Sign(digest)
+	if err != nil {
+		return fmt.Errorf("sign request: %w", err)
+	}
+
+	req.Header.Set("X-Remit-Agent", c.signer.Address().Hex())
 	req.Header.Set("X-Remit-Nonce", nonce)
-
-	// TODO: Add EIP-712 signature of request digest when auth middleware is finalized
+	req.Header.Set("X-Remit-Timestamp", fmt.Sprintf("%d", timestamp))
+	req.Header.Set("X-Remit-Signature", "0x"+hex.EncodeToString(sig))
 	return nil
 }
 

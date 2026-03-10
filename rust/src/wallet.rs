@@ -150,7 +150,7 @@ impl Wallet {
 impl Wallet {
     /// Return the current USDC balance of this wallet.
     pub async fn balance(&self) -> Result<Balance, RemitError> {
-        self.get("/v0/wallet/balance").await
+        self.get("/api/v0/wallet/balance").await
     }
 
     /// Send a direct USDC payment.
@@ -181,7 +181,7 @@ impl Wallet {
         validate_address(to)?;
         validate_amount(amount)?;
         self.post(
-            "/v0/payments/direct",
+            "/api/v0/payments/direct",
             json!({
                 "to": to,
                 "amount": amount.to_string(),
@@ -198,14 +198,14 @@ impl Wallet {
     /// - `per_page` — results per page (default: 20, max: 100)
     pub async fn history(&self, page: u32, per_page: u32) -> Result<TransactionList, RemitError> {
         let per_page = per_page.clamp(1, 100);
-        let path = format!("/v0/wallet/history?page={page}&per_page={per_page}");
+        let path = format!("/api/v0/wallet/history?page={page}&per_page={per_page}");
         self.get(&path).await
     }
 
     /// Return the on-chain reputation for any Ethereum address.
     pub async fn reputation(&self, address: &str) -> Result<Reputation, RemitError> {
         validate_address(address)?;
-        self.get(&format!("/v0/reputation/{address}")).await
+        self.get(&format!("/api/v0/reputation/{address}")).await
     }
 
     /// Return spending analytics for this wallet.
@@ -213,13 +213,13 @@ impl Wallet {
     /// # Arguments
     /// - `period` — `"day"`, `"week"`, `"month"`, or `"all"`
     pub async fn spending_summary(&self, period: &str) -> Result<SpendingSummary, RemitError> {
-        self.get(&format!("/v0/wallet/spending?period={period}"))
+        self.get(&format!("/api/v0/wallet/spending?period={period}"))
             .await
     }
 
     /// Return the remaining spending budget under operator-set limits.
     pub async fn remaining_budget(&self) -> Result<Budget, RemitError> {
-        self.get("/v0/wallet/budget").await
+        self.get("/api/v0/wallet/budget").await
     }
 
     // ─── Escrow ──────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ impl Wallet {
         validate_address(payee)?;
         validate_amount(amount)?;
         self.post(
-            "/v0/escrows",
+            "/api/v0/escrows",
             json!({
                 "payee": payee,
                 "amount": amount.to_string(),
@@ -259,7 +259,7 @@ impl Wallet {
         validate_address(payee)?;
         validate_amount(amount)?;
         self.post(
-            "/v0/escrows",
+            "/api/v0/escrows",
             json!({
                 "payee": payee,
                 "amount": amount.to_string(),
@@ -284,19 +284,19 @@ impl Wallet {
         if let Some(mid) = milestone_id {
             body["milestone_id"] = json!(mid);
         }
-        self.post(&format!("/v0/escrows/{escrow_id}/release"), body)
+        self.post(&format!("/api/v0/escrows/{escrow_id}/release"), body)
             .await
     }
 
     /// Cancel the escrow and return funds to the payer.
     pub async fn cancel_escrow(&self, escrow_id: &str) -> Result<Transaction, RemitError> {
-        self.post(&format!("/v0/escrows/{escrow_id}/cancel"), json!({}))
+        self.post(&format!("/api/v0/escrows/{escrow_id}/cancel"), json!({}))
             .await
     }
 
     /// Fetch the current state of an escrow.
     pub async fn get_escrow(&self, escrow_id: &str) -> Result<Escrow, RemitError> {
-        self.get(&format!("/v0/escrows/{escrow_id}")).await
+        self.get(&format!("/api/v0/escrows/{escrow_id}")).await
     }
 
     // ─── Tab ─────────────────────────────────────────────────────────────────
@@ -312,7 +312,7 @@ impl Wallet {
     pub async fn create_tab(&self, counterpart: &str, limit: Decimal) -> Result<Tab, RemitError> {
         validate_address(counterpart)?;
         self.post(
-            "/v0/tabs",
+            "/api/v0/tabs",
             json!({
                 "counterpart": counterpart,
                 "limit": limit.to_string(),
@@ -330,7 +330,7 @@ impl Wallet {
     ) -> Result<Tab, RemitError> {
         validate_address(counterpart)?;
         self.post(
-            "/v0/tabs",
+            "/api/v0/tabs",
             json!({
                 "counterpart": counterpart,
                 "limit": limit.to_string(),
@@ -349,7 +349,7 @@ impl Wallet {
     ) -> Result<TabDebit, RemitError> {
         validate_amount(amount)?;
         self.post(
-            &format!("/v0/tabs/{tab_id}/debit"),
+            &format!("/api/v0/tabs/{tab_id}/debit"),
             json!({
                 "tab_id": tab_id,
                 "amount": amount.to_string(),
@@ -361,7 +361,7 @@ impl Wallet {
 
     /// Close the tab and settle all charges on-chain.
     pub async fn settle_tab(&self, tab_id: &str) -> Result<Transaction, RemitError> {
-        self.post(&format!("/v0/tabs/{tab_id}/settle"), json!({}))
+        self.post(&format!("/api/v0/tabs/{tab_id}/settle"), json!({}))
             .await
     }
 
@@ -385,7 +385,7 @@ impl Wallet {
         validate_address(recipient)?;
         validate_amount(deposit)?;
         self.post(
-            "/v0/streams",
+            "/api/v0/streams",
             json!({
                 "recipient": recipient,
                 "rate_per_sec": rate_per_sec.to_string(),
@@ -397,7 +397,7 @@ impl Wallet {
 
     /// Withdraw all vested stream payments (called by the recipient).
     pub async fn withdraw_stream(&self, stream_id: &str) -> Result<Transaction, RemitError> {
-        self.post(&format!("/v0/streams/{stream_id}/withdraw"), json!({}))
+        self.post(&format!("/api/v0/streams/{stream_id}/withdraw"), json!({}))
             .await
     }
 
@@ -417,7 +417,7 @@ impl Wallet {
     ) -> Result<Bounty, RemitError> {
         validate_amount(award)?;
         self.post(
-            "/v0/bounties",
+            "/api/v0/bounties",
             json!({
                 "award": award.to_string(),
                 "description": description,
@@ -435,7 +435,7 @@ impl Wallet {
     ) -> Result<Bounty, RemitError> {
         validate_amount(award)?;
         self.post(
-            "/v0/bounties",
+            "/api/v0/bounties",
             json!({
                 "award": award.to_string(),
                 "description": description,
@@ -453,7 +453,7 @@ impl Wallet {
     ) -> Result<Transaction, RemitError> {
         validate_address(winner)?;
         self.post(
-            &format!("/v0/bounties/{bounty_id}/award"),
+            &format!("/api/v0/bounties/{bounty_id}/award"),
             json!({
                 "bounty_id": bounty_id,
                 "winner": winner,
@@ -482,7 +482,7 @@ impl Wallet {
         validate_address(beneficiary)?;
         validate_amount(amount)?;
         self.post(
-            "/v0/deposits",
+            "/api/v0/deposits",
             json!({
                 "beneficiary": beneficiary,
                 "amount": amount.to_string(),
@@ -503,7 +503,7 @@ impl Wallet {
     ) -> Result<Intent, RemitError> {
         validate_address(to)?;
         self.post(
-            "/v0/intents",
+            "/api/v0/intents",
             json!({
                 "to": to,
                 "amount": amount.to_string(),

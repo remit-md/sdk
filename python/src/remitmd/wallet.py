@@ -84,7 +84,7 @@ class Wallet(RemitClient):
     async def pay_direct(self, to: str, amount: float, memo: str = "") -> Transaction:
         """Send a direct USDC payment (no escrow, no refund)."""
         data = await self._http.post(
-            "/v1/payments/direct",
+            "/api/v0/payments/direct",
             {"to": to, "amount": amount, "memo": memo},
         )
         return Transaction.model_validate(data)
@@ -94,14 +94,14 @@ class Wallet(RemitClient):
     async def pay(self, invoice: Invoice) -> Transaction:
         """Fund an escrow from a structured Invoice object."""
         data = await self._http.post(
-            "/v1/escrows",
+            "/api/v0/escrows",
             invoice.model_dump(exclude_none=True),
         )
         return Transaction.model_validate(data)
 
     async def claim_start(self, invoice_id: str) -> Transaction:
         """Payee calls this to start work and begin the escrow timer."""
-        data = await self._http.post(f"/v1/escrows/{invoice_id}/claim-start")
+        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/claim-start")
         return Transaction.model_validate(data)
 
     async def submit_evidence(
@@ -111,24 +111,24 @@ class Wallet(RemitClient):
         milestone_index: int = 0,
     ) -> Transaction:
         data = await self._http.post(
-            f"/v1/escrows/{invoice_id}/submit-evidence",
+            f"/api/v0/escrows/{invoice_id}/submit-evidence",
             {"evidence_uri": evidence_uri, "milestone_index": milestone_index},
         )
         return Transaction.model_validate(data)
 
     async def release_escrow(self, invoice_id: str) -> Transaction:
-        data = await self._http.post(f"/v1/escrows/{invoice_id}/release")
+        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/release")
         return Transaction.model_validate(data)
 
     async def release_milestone(self, invoice_id: str, milestone_index: int) -> Transaction:
         data = await self._http.post(
-            f"/v1/escrows/{invoice_id}/release-milestone",
+            f"/api/v0/escrows/{invoice_id}/release-milestone",
             {"milestone_index": milestone_index},
         )
         return Transaction.model_validate(data)
 
     async def cancel_escrow(self, invoice_id: str) -> Transaction:
-        data = await self._http.post(f"/v1/escrows/{invoice_id}/cancel")
+        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/cancel")
         return Transaction.model_validate(data)
 
     # ─── Metered tabs ─────────────────────────────────────────────────────────
@@ -141,13 +141,13 @@ class Wallet(RemitClient):
         expires: int = 86400,
     ) -> Tab:
         data = await self._http.post(
-            "/v1/tabs",
+            "/api/v0/tabs",
             {"to": to, "limit": limit, "per_unit": per_unit, "expires": expires},
         )
         return Tab.model_validate(data)
 
     async def close_tab(self, tab_id: str) -> Transaction:
-        data = await self._http.post(f"/v1/tabs/{tab_id}/close")
+        data = await self._http.post(f"/api/v0/tabs/{tab_id}/close")
         return Transaction.model_validate(data)
 
     # ─── Streaming ────────────────────────────────────────────────────────────
@@ -162,11 +162,11 @@ class Wallet(RemitClient):
         body: dict[str, Any] = {"to": to, "rate": rate, "max_duration": max_duration}
         if max_total is not None:
             body["max_total"] = max_total
-        data = await self._http.post("/v1/streams", body)
+        data = await self._http.post("/api/v0/streams", body)
         return Stream.model_validate(data)
 
     async def close_stream(self, stream_id: str) -> Transaction:
-        data = await self._http.post(f"/v1/streams/{stream_id}/close")
+        data = await self._http.post(f"/api/v0/streams/{stream_id}/close")
         return Transaction.model_validate(data)
 
     # ─── Subscriptions ────────────────────────────────────────────────────────
@@ -181,10 +181,10 @@ class Wallet(RemitClient):
         body: dict[str, Any] = {"to": to, "amount": amount, "interval": interval}
         if max_periods is not None:
             body["max_periods"] = max_periods
-        return await self._http.post("/v1/subscriptions", body)  # type: ignore[return-value,no-any-return]
+        return await self._http.post("/api/v0/subscriptions", body)  # type: ignore[return-value,no-any-return]
 
     async def cancel_subscription(self, sub_id: str) -> Transaction:
-        data = await self._http.post(f"/v1/subscriptions/{sub_id}/cancel")
+        data = await self._http.post(f"/api/v0/subscriptions/{sub_id}/cancel")
         return Transaction.model_validate(data)
 
     # ─── Bounties ─────────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ class Wallet(RemitClient):
         max_attempts: int = 10,
     ) -> Bounty:
         data = await self._http.post(
-            "/v1/bounties",
+            "/api/v0/bounties",
             {
                 "amount": amount,
                 "task": task,
@@ -211,14 +211,14 @@ class Wallet(RemitClient):
 
     async def submit_bounty(self, bounty_id: str, evidence_uri: str) -> Transaction:
         data = await self._http.post(
-            f"/v1/bounties/{bounty_id}/submit",
+            f"/api/v0/bounties/{bounty_id}/submit",
             {"evidence_uri": evidence_uri},
         )
         return Transaction.model_validate(data)
 
     async def award_bounty(self, bounty_id: str, winner: str) -> Transaction:
         data = await self._http.post(
-            f"/v1/bounties/{bounty_id}/award",
+            f"/api/v0/bounties/{bounty_id}/award",
             {"winner": winner},
         )
         return Transaction.model_validate(data)
@@ -227,7 +227,7 @@ class Wallet(RemitClient):
 
     async def place_deposit(self, to: str, amount: float, expires: int) -> Deposit:
         data = await self._http.post(
-            "/v1/deposits",
+            "/api/v0/deposits",
             {"to": to, "amount": amount, "expires": expires},
         )
         return Deposit.model_validate(data)
@@ -242,7 +242,7 @@ class Wallet(RemitClient):
         evidence_uri: str,
     ) -> Dispute:
         data = await self._http.post(
-            "/v1/disputes",
+            "/api/v0/disputes",
             {
                 "invoice_id": invoice_id,
                 "reason": reason,
@@ -278,7 +278,7 @@ class Wallet(RemitClient):
         body: dict[str, Any] = {"url": url, "events": events}
         if chains is not None:
             body["chains"] = chains
-        data = await self._http.post("/v1/webhooks", body)
+        data = await self._http.post("/api/v0/webhooks", body)
         return Webhook.model_validate(data)
 
     # ─── Testnet ──────────────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ class Wallet(RemitClient):
     async def request_testnet_funds(self) -> Transaction:
         if not self.testnet:
             raise ValueError("request_testnet_funds() is only available on testnet")
-        data = await self._http.post("/v1/faucet", {"address": self.address})
+        data = await self._http.post("/api/v0/faucet", {"address": self.address})
         return Transaction.model_validate(data)
 
     # ─── Repr (never expose key) ──────────────────────────────────────────────

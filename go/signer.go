@@ -13,6 +13,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+
 // Signer signs EIP-712 typed data for authenticating API requests.
 // Implement this interface to use hardware wallets, KMS, or other signing backends.
 type Signer interface {
@@ -92,11 +93,19 @@ var (
 		{Type: mustType("uint256")},  // amount
 		{Type: mustType("bytes32")},  // nonce
 	}
+	apiRequestType = abi.Arguments{
+		{Type: mustType("bytes32")},  // typeHash
+		{Type: mustType("bytes32")},  // keccak256(method)
+		{Type: mustType("bytes32")},  // keccak256(path)
+		{Type: mustType("uint256")},  // timestamp
+		{Type: mustType("bytes32")},  // nonce
+	}
 
-	domainTypeHash  = crypto.Keccak256Hash([]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"))
-	paymentTypeHash = crypto.Keccak256Hash([]byte("Payment(address recipient,uint256 amount,bytes32 nonce)"))
-	nameHash        = crypto.Keccak256Hash([]byte("remit.md"))
-	versionHash     = crypto.Keccak256Hash([]byte("1"))
+	domainTypeHash      = crypto.Keccak256Hash([]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"))
+	paymentTypeHash     = crypto.Keccak256Hash([]byte("Payment(address recipient,uint256 amount,bytes32 nonce)"))
+	apiRequestTypeHash  = crypto.Keccak256Hash([]byte("APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)"))
+	nameHash            = crypto.Keccak256Hash([]byte("remit.md"))
+	versionHash         = crypto.Keccak256Hash([]byte("0.1"))
 )
 
 // computeDomainSeparator returns the EIP-712 domain separator for a given chain and contract.
@@ -118,6 +127,30 @@ func computePaymentDigest(domain [32]byte, recipient common.Address, amount deci
 		append([]byte("\x19\x01"), append(domain[:], structHash[:]...)...),
 	)
 	return digest
+}
+
+// computeRequestDigest computes the EIP-712 digest for authenticating an API request.
+//
+// This matches the server's auth middleware (auth.rs: compute_eip712_hash).
+// Struct: APIRequest(string method, string path, uint256 timestamp, bytes32 nonce)
+func computeRequestDigest(chainID *big.Int, contract common.Address, method, path string, timestamp uint64, nonce [32]byte) [32]byte {
+	domain := computeDomainSeparator(chainID, contract)
+
+	methodHash := crypto.Keccak256Hash([]byte(method))
+	pathHash := crypto.Keccak256Hash([]byte(path))
+
+	packed, _ := apiRequestType.Pack(
+		apiRequestTypeHash,
+		methodHash,
+		pathHash,
+		new(big.Int).SetUint64(timestamp),
+		nonce,
+	)
+	structHash := crypto.Keccak256Hash(packed)
+
+	return crypto.Keccak256Hash(
+		append([]byte("\x19\x01"), append(domain[:], structHash[:]...)...),
+	)
 }
 
 func mustType(t string) abi.Type {

@@ -13,10 +13,10 @@ import type { Dispute } from "./models/dispute.js";
 import type { Subscription } from "./models/subscription.js";
 
 const DEFAULT_API_URLS: Record<string, string> = {
-  base: "https://api.remit.md/v1",
-  "base-sepolia": "https://testnet.remit.md/v1",
-  arbitrum: "https://api.remit.md/v1",
-  "arbitrum-sepolia": "https://testnet.remit.md/v1",
+  base: "https://api.remit.md/api/v0",
+  "base-sepolia": "https://testnet.remit.md/api/v0",
+  arbitrum: "https://api.remit.md/api/v0",
+  "arbitrum-sepolia": "https://testnet.remit.md/api/v0",
 };
 
 export interface RemitClientOptions {

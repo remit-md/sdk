@@ -9,10 +9,10 @@ require "time"
 module Remitmd
   # Chain configuration: maps chain names to (api_url, chain_id) pairs.
   CHAIN_CONFIG = {
-    "base"          => { url: "https://api.remit.md/v0",          chain_id: 8453 },
-    "base_sepolia"  => { url: "https://testnet-api.remit.md/v0",  chain_id: 84532 },
-    "arbitrum"      => { url: "https://api.remit.md/v0",          chain_id: 42161 },
-    "optimism"      => { url: "https://api.remit.md/v0",          chain_id: 10 },
+    "base"          => { url: "https://api.remit.md/api/v0",          chain_id: 8453 },
+    "base_sepolia"  => { url: "https://testnet-api.remit.md/api/v0",  chain_id: 84532 },
+    "arbitrum"      => { url: "https://api.remit.md/api/v0",          chain_id: 42161 },
+    "optimism"      => { url: "https://api.remit.md/api/v0",          chain_id: 10 },
   }.freeze
 
   # Default testnet URL for overriding in tests.

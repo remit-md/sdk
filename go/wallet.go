@@ -141,7 +141,7 @@ func (w *Wallet) ChainID() ChainID {
 // Balance returns the current USDC balance of this wallet.
 func (w *Wallet) Balance(ctx context.Context) (*Balance, error) {
 	var b Balance
-	if err := w.http.get(ctx, "/v0/wallet/balance", &b); err != nil {
+	if err := w.http.get(ctx, "/api/v0/wallet/balance", &b); err != nil {
 		return nil, err
 	}
 	return &b, nil
@@ -178,7 +178,7 @@ func (w *Wallet) Pay(ctx context.Context, to string, amount decimal.Decimal, opt
 	}
 
 	var tx Transaction
-	err := w.http.post(ctx, "/v0/payments/direct", map[string]any{
+	err := w.http.post(ctx, "/api/v0/payments/direct", map[string]any{
 		"to":     to,
 		"amount": amount.String(),
 		"memo":   cfg.Memo,
@@ -201,7 +201,7 @@ type HistoryOptions struct {
 
 // History returns paginated transaction history for this wallet.
 func (w *Wallet) History(ctx context.Context, opts *HistoryOptions) (*TransactionList, error) {
-	path := "/v0/wallet/history"
+	path := "/api/v0/wallet/history"
 	if opts != nil && opts.Page > 0 {
 		path += fmt.Sprintf("?page=%d&per_page=%d", opts.Page, max(opts.PerPage, 20))
 	}
@@ -220,7 +220,7 @@ func (w *Wallet) Reputation(ctx context.Context, address string) (*Reputation, e
 		return nil, err
 	}
 	var rep Reputation
-	if err := w.http.get(ctx, "/v0/reputation/"+address, &rep); err != nil {
+	if err := w.http.get(ctx, "/api/v0/reputation/"+address, &rep); err != nil {
 		return nil, err
 	}
 	return &rep, nil
@@ -290,7 +290,7 @@ func (w *Wallet) CreateEscrow(ctx context.Context, payee string, amount decimal.
 	}
 
 	var escrow Escrow
-	if err := w.http.post(ctx, "/v0/escrows", body, &escrow); err != nil {
+	if err := w.http.post(ctx, "/api/v0/escrows", body, &escrow); err != nil {
 		return nil, err
 	}
 	return &escrow, nil
@@ -303,7 +303,7 @@ func (w *Wallet) ReleaseEscrow(ctx context.Context, escrowID string, milestoneID
 		body["milestone_id"] = milestoneID[0]
 	}
 	var tx Transaction
-	if err := w.http.post(ctx, "/v0/escrows/"+escrowID+"/release", body, &tx); err != nil {
+	if err := w.http.post(ctx, "/api/v0/escrows/"+escrowID+"/release", body, &tx); err != nil {
 		return nil, err
 	}
 	return &tx, nil
@@ -312,7 +312,7 @@ func (w *Wallet) ReleaseEscrow(ctx context.Context, escrowID string, milestoneID
 // CancelEscrow cancels an escrow and returns funds to the payer.
 func (w *Wallet) CancelEscrow(ctx context.Context, escrowID string) (*Transaction, error) {
 	var tx Transaction
-	if err := w.http.post(ctx, "/v0/escrows/"+escrowID+"/cancel", nil, &tx); err != nil {
+	if err := w.http.post(ctx, "/api/v0/escrows/"+escrowID+"/cancel", nil, &tx); err != nil {
 		return nil, err
 	}
 	return &tx, nil
@@ -321,7 +321,7 @@ func (w *Wallet) CancelEscrow(ctx context.Context, escrowID string) (*Transactio
 // GetEscrow returns the current state of an escrow.
 func (w *Wallet) GetEscrow(ctx context.Context, escrowID string) (*Escrow, error) {
 	var escrow Escrow
-	if err := w.http.get(ctx, "/v0/escrows/"+escrowID, &escrow); err != nil {
+	if err := w.http.get(ctx, "/api/v0/escrows/"+escrowID, &escrow); err != nil {
 		return nil, err
 	}
 	return &escrow, nil
@@ -343,7 +343,7 @@ func (w *Wallet) CreateTab(ctx context.Context, counterpart string, limit decima
 		body["expires_in_seconds"] = int(expiresIn[0].Seconds())
 	}
 	var tab Tab
-	if err := w.http.post(ctx, "/v0/tabs", body, &tab); err != nil {
+	if err := w.http.post(ctx, "/api/v0/tabs", body, &tab); err != nil {
 		return nil, err
 	}
 	return &tab, nil
@@ -357,7 +357,7 @@ func (w *Wallet) DebitTab(ctx context.Context, tabID string, amount decimal.Deci
 		"memo":   memo,
 	}
 	var debit TabDebit
-	if err := w.http.post(ctx, "/v0/tabs/"+tabID+"/debit", body, &debit); err != nil {
+	if err := w.http.post(ctx, "/api/v0/tabs/"+tabID+"/debit", body, &debit); err != nil {
 		return nil, err
 	}
 	return &debit, nil
@@ -366,7 +366,7 @@ func (w *Wallet) DebitTab(ctx context.Context, tabID string, amount decimal.Deci
 // SettleTab closes the tab and settles all charges on-chain.
 func (w *Wallet) SettleTab(ctx context.Context, tabID string) (*Transaction, error) {
 	var tx Transaction
-	if err := w.http.post(ctx, "/v0/tabs/"+tabID+"/settle", nil, &tx); err != nil {
+	if err := w.http.post(ctx, "/api/v0/tabs/"+tabID+"/settle", nil, &tx); err != nil {
 		return nil, err
 	}
 	return &tx, nil
@@ -385,7 +385,7 @@ func (w *Wallet) CreateStream(ctx context.Context, recipient string, ratePerSec 
 		"deposit":      deposit.String(),
 	}
 	var stream Stream
-	if err := w.http.post(ctx, "/v0/streams", body, &stream); err != nil {
+	if err := w.http.post(ctx, "/api/v0/streams", body, &stream); err != nil {
 		return nil, err
 	}
 	return &stream, nil
@@ -394,7 +394,7 @@ func (w *Wallet) CreateStream(ctx context.Context, recipient string, ratePerSec 
 // WithdrawStream claims all vested stream payments (callable by recipient).
 func (w *Wallet) WithdrawStream(ctx context.Context, streamID string) (*Transaction, error) {
 	var tx Transaction
-	if err := w.http.post(ctx, "/v0/streams/"+streamID+"/withdraw", nil, &tx); err != nil {
+	if err := w.http.post(ctx, "/api/v0/streams/"+streamID+"/withdraw", nil, &tx); err != nil {
 		return nil, err
 	}
 	return &tx, nil
@@ -415,7 +415,7 @@ func (w *Wallet) CreateBounty(ctx context.Context, award decimal.Decimal, descri
 		body["expires_in_seconds"] = int(expiresIn[0].Seconds())
 	}
 	var bounty Bounty
-	if err := w.http.post(ctx, "/v0/bounties", body, &bounty); err != nil {
+	if err := w.http.post(ctx, "/api/v0/bounties", body, &bounty); err != nil {
 		return nil, err
 	}
 	return &bounty, nil
@@ -431,7 +431,7 @@ func (w *Wallet) AwardBounty(ctx context.Context, bountyID string, winner string
 		"winner":    winner,
 	}
 	var tx Transaction
-	if err := w.http.post(ctx, "/v0/bounties/"+bountyID+"/award", body, &tx); err != nil {
+	if err := w.http.post(ctx, "/api/v0/bounties/"+bountyID+"/award", body, &tx); err != nil {
 		return nil, err
 	}
 	return &tx, nil
@@ -450,7 +450,7 @@ func (w *Wallet) LockDeposit(ctx context.Context, beneficiary string, amount dec
 		"expires_in_seconds": int(expiresIn.Seconds()),
 	}
 	var deposit Deposit
-	if err := w.http.post(ctx, "/v0/deposits", body, &deposit); err != nil {
+	if err := w.http.post(ctx, "/api/v0/deposits", body, &deposit); err != nil {
 		return nil, err
 	}
 	return &deposit, nil
@@ -462,7 +462,7 @@ func (w *Wallet) LockDeposit(ctx context.Context, beneficiary string, amount dec
 // period: "day", "week", "month", or "all"
 func (w *Wallet) SpendingSummary(ctx context.Context, period string) (*SpendingSummary, error) {
 	var summary SpendingSummary
-	if err := w.http.get(ctx, "/v0/wallet/spending?period="+period, &summary); err != nil {
+	if err := w.http.get(ctx, "/api/v0/wallet/spending?period="+period, &summary); err != nil {
 		return nil, err
 	}
 	return &summary, nil
@@ -471,7 +471,7 @@ func (w *Wallet) SpendingSummary(ctx context.Context, period string) (*SpendingS
 // RemainingBudget returns how much the agent can still spend under operator limits.
 func (w *Wallet) RemainingBudget(ctx context.Context) (*Budget, error) {
 	var budget Budget
-	if err := w.http.get(ctx, "/v0/wallet/budget", &budget); err != nil {
+	if err := w.http.get(ctx, "/api/v0/wallet/budget", &budget); err != nil {
 		return nil, err
 	}
 	return &budget, nil
@@ -490,7 +490,7 @@ func (w *Wallet) ProposeIntent(ctx context.Context, to string, amount decimal.De
 		"type":   paymentType,
 	}
 	var intent Intent
-	if err := w.http.post(ctx, "/v0/intents", body, &intent); err != nil {
+	if err := w.http.post(ctx, "/api/v0/intents", body, &intent); err != nil {
 		return nil, err
 	}
 	return &intent, nil

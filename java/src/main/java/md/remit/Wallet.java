@@ -47,7 +47,7 @@ public class Wallet {
 
     /** Returns the current USDC balance of this wallet. */
     public Balance balance() {
-        return client.get("/v0/wallet/balance", Balance.class);
+        return client.get("/api/v0/wallet/balance", Balance.class);
     }
 
     // ─── Direct Payment ───────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ public class Wallet {
     public Transaction pay(String to, BigDecimal amount, String memo) {
         validateAddress(to);
         validateAmount(amount);
-        return client.post("/v0/payments/direct",
+        return client.post("/api/v0/payments/direct",
             Map.of("to", to, "amount", amount.toPlainString(), "memo", memo != null ? memo : ""),
             Transaction.class);
     }
@@ -83,12 +83,12 @@ public class Wallet {
      * @param perPage items per page (default 50, max 200)
      */
     public TransactionList history(int page, int perPage) {
-        return client.get("/v0/wallet/history?page=" + page + "&per_page=" + perPage, TransactionList.class);
+        return client.get("/api/v0/wallet/history?page=" + page + "&per_page=" + perPage, TransactionList.class);
     }
 
     /** Returns the first page of transaction history (50 items). */
     public TransactionList history() {
-        return client.get("/v0/wallet/history", TransactionList.class);
+        return client.get("/api/v0/wallet/history", TransactionList.class);
     }
 
     // ─── Reputation ───────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ public class Wallet {
     /** Returns the on-chain reputation for a given address. */
     public Reputation reputation(String address) {
         validateAddress(address);
-        return client.get("/v0/reputation/" + address, Reputation.class);
+        return client.get("/api/v0/reputation/" + address, Reputation.class);
     }
 
     // ─── Escrow ───────────────────────────────────────────────────────────────
@@ -130,29 +130,29 @@ public class Wallet {
         if (milestones != null && !milestones.isEmpty()) body.put("milestones", milestones);
         if (splits != null && !splits.isEmpty()) body.put("splits", splits);
 
-        return client.post("/v0/escrows", body, Escrow.class);
+        return client.post("/api/v0/escrows", body, Escrow.class);
     }
 
     /** Releases escrow funds to the payee. */
     public Transaction releaseEscrow(String escrowId) {
-        return client.post("/v0/escrows/" + escrowId + "/release",
+        return client.post("/api/v0/escrows/" + escrowId + "/release",
             Map.of("escrow_id", escrowId), Transaction.class);
     }
 
     /** Releases a specific milestone within an escrow. */
     public Transaction releaseEscrowMilestone(String escrowId, String milestoneId) {
-        return client.post("/v0/escrows/" + escrowId + "/release",
+        return client.post("/api/v0/escrows/" + escrowId + "/release",
             Map.of("escrow_id", escrowId, "milestone_id", milestoneId), Transaction.class);
     }
 
     /** Cancels an escrow and returns funds to the payer. */
     public Transaction cancelEscrow(String escrowId) {
-        return client.post("/v0/escrows/" + escrowId + "/cancel", null, Transaction.class);
+        return client.post("/api/v0/escrows/" + escrowId + "/cancel", null, Transaction.class);
     }
 
     /** Returns the current state of an escrow. */
     public Escrow getEscrow(String escrowId) {
-        return client.get("/v0/escrows/" + escrowId, Escrow.class);
+        return client.get("/api/v0/escrows/" + escrowId, Escrow.class);
     }
 
     // ─── Tab ──────────────────────────────────────────────────────────────────
@@ -174,19 +174,19 @@ public class Wallet {
         body.put("counterpart", counterpart);
         body.put("limit", limit.toPlainString());
         if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());
-        return client.post("/v0/tabs", body, Tab.class);
+        return client.post("/api/v0/tabs", body, Tab.class);
     }
 
     /** Charges the given amount from an open tab (off-chain, signed). */
     public TabDebit debitTab(String tabId, BigDecimal amount, String memo) {
-        return client.post("/v0/tabs/" + tabId + "/debit",
+        return client.post("/api/v0/tabs/" + tabId + "/debit",
             Map.of("tab_id", tabId, "amount", amount.toPlainString(), "memo", memo != null ? memo : ""),
             TabDebit.class);
     }
 
     /** Closes the tab and settles all charges on-chain. */
     public Transaction settleTab(String tabId) {
-        return client.post("/v0/tabs/" + tabId + "/settle", null, Transaction.class);
+        return client.post("/api/v0/tabs/" + tabId + "/settle", null, Transaction.class);
     }
 
     // ─── Stream ───────────────────────────────────────────────────────────────
@@ -200,7 +200,7 @@ public class Wallet {
      */
     public Stream createStream(String recipient, BigDecimal ratePerSec, BigDecimal deposit) {
         validateAddress(recipient);
-        return client.post("/v0/streams",
+        return client.post("/api/v0/streams",
             Map.of("recipient", recipient, "rate_per_sec", ratePerSec.toPlainString(),
                    "deposit", deposit.toPlainString()),
             Stream.class);
@@ -208,7 +208,7 @@ public class Wallet {
 
     /** Claims all vested stream payments (callable by recipient). */
     public Transaction withdrawStream(String streamId) {
-        return client.post("/v0/streams/" + streamId + "/withdraw", null, Transaction.class);
+        return client.post("/api/v0/streams/" + streamId + "/withdraw", null, Transaction.class);
     }
 
     // ─── Bounty ───────────────────────────────────────────────────────────────
@@ -230,13 +230,13 @@ public class Wallet {
         body.put("award", award.toPlainString());
         body.put("description", description);
         if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());
-        return client.post("/v0/bounties", body, Bounty.class);
+        return client.post("/api/v0/bounties", body, Bounty.class);
     }
 
     /** Pays the bounty to the winner. */
     public Transaction awardBounty(String bountyId, String winner) {
         validateAddress(winner);
-        return client.post("/v0/bounties/" + bountyId + "/award",
+        return client.post("/api/v0/bounties/" + bountyId + "/award",
             Map.of("bounty_id", bountyId, "winner", winner), Transaction.class);
     }
 
@@ -252,7 +252,7 @@ public class Wallet {
     public Deposit lockDeposit(String beneficiary, BigDecimal amount, Duration expiresIn) {
         validateAddress(beneficiary);
         validateAmount(amount);
-        return client.post("/v0/deposits",
+        return client.post("/api/v0/deposits",
             Map.of("beneficiary", beneficiary,
                    "amount", amount.toPlainString(),
                    "expires_in_seconds", (int) expiresIn.toSeconds()),
@@ -267,12 +267,12 @@ public class Wallet {
      * @param period "day", "week", "month", or "all"
      */
     public SpendingSummary spendingSummary(String period) {
-        return client.get("/v0/wallet/spending?period=" + period, SpendingSummary.class);
+        return client.get("/api/v0/wallet/spending?period=" + period, SpendingSummary.class);
     }
 
     /** Returns how much the agent can still spend under operator-set limits. */
     public Budget remainingBudget() {
-        return client.get("/v0/wallet/budget", Budget.class);
+        return client.get("/api/v0/wallet/budget", Budget.class);
     }
 
     // ─── Validation ───────────────────────────────────────────────────────────

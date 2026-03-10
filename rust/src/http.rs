@@ -207,24 +207,7 @@ fn parse_api_error(status: u16, body: &[u8]) -> RemitError {
 }
 
 fn rand_bytes<const N: usize>() -> [u8; N] {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    use std::time::SystemTime;
-
-    // Use thread_id + system time for a non-crypto random nonce.
-    // This is adequate for replay protection (not security-sensitive).
-    let mut hasher = DefaultHasher::new();
-    SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos()
-        .hash(&mut hasher);
-    std::thread::current().id().hash(&mut hasher);
-
-    let seed = hasher.finish();
     let mut out = [0u8; N];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = (seed.wrapping_mul(i as u64 + 1).wrapping_add(seed >> 8)) as u8;
-    }
+    getrandom::getrandom(&mut out).expect("getrandom failed: system CSPRNG unavailable");
     out
 }

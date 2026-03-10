@@ -11,8 +11,8 @@ import { fromErrorCode, NetworkError, RateLimitedError } from "./errors.js";
 import type { Signer } from "./signer.js";
 
 const EIP712_DOMAIN = {
-  name: "RemitMD",
-  version: "1",
+  name: "remit.md",
+  version: "0.1",
 } as const;
 
 const EIP712_TYPES = {

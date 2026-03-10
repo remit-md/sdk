@@ -166,7 +166,7 @@ impl MockTransport {
 
         match (method, path) {
             // ─── Balance ──────────────────────────────────────────────────
-            ("GET", "/v0/wallet/balance") => {
+            ("GET", "/api/v0/wallet/balance") => {
                 let s = self.state.lock().await;
                 Ok(json!({
                     "usdc": s.balance,
@@ -177,7 +177,7 @@ impl MockTransport {
             }
 
             // ─── Direct payment ───────────────────────────────────────────
-            ("POST", "/v0/payments/direct") => {
+            ("POST", "/api/v0/payments/direct") => {
                 let to = str_field(&b, "to")?;
                 let amount = decimal_field(&b, "amount")?;
                 let memo = b["memo"].as_str().unwrap_or("").to_string();
@@ -203,7 +203,7 @@ impl MockTransport {
             }
 
             // ─── Escrow create ────────────────────────────────────────────
-            ("POST", "/v0/escrows") => {
+            ("POST", "/api/v0/escrows") => {
                 let payee = str_field(&b, "payee")?;
                 let amount = decimal_field(&b, "amount")?;
                 let memo = b["memo"].as_str().unwrap_or("").to_string();
@@ -231,7 +231,7 @@ impl MockTransport {
 
             // ─── Escrow release ───────────────────────────────────────────
             (method, path) if method == "POST" && path.ends_with("/release") => {
-                let escrow_id = extract_id(path, "/v0/escrows/", "/release");
+                let escrow_id = extract_id(path, "/api/v0/escrows/", "/release");
                 let mut s = self.state.lock().await;
                 let escrow = s.escrows.get_mut(escrow_id).ok_or_else(|| {
                     remit_err(
@@ -259,7 +259,7 @@ impl MockTransport {
 
             // ─── Escrow cancel ────────────────────────────────────────────
             (method, path) if method == "POST" && path.ends_with("/cancel") => {
-                let escrow_id = extract_id(path, "/v0/escrows/", "/cancel");
+                let escrow_id = extract_id(path, "/api/v0/escrows/", "/cancel");
                 let mut s = self.state.lock().await;
 
                 // Extract values before releasing the mutable borrow of `escrow`
@@ -292,8 +292,8 @@ impl MockTransport {
             }
 
             // ─── Escrow get ───────────────────────────────────────────────
-            ("GET", path) if path.starts_with("/v0/escrows/") => {
-                let escrow_id = path.trim_start_matches("/v0/escrows/");
+            ("GET", path) if path.starts_with("/api/v0/escrows/") => {
+                let escrow_id = path.trim_start_matches("/api/v0/escrows/");
                 let s = self.state.lock().await;
                 let escrow = s.escrows.get(escrow_id).ok_or_else(|| {
                     remit_err(
@@ -305,7 +305,7 @@ impl MockTransport {
             }
 
             // ─── Tab ──────────────────────────────────────────────────────
-            ("POST", "/v0/tabs") => {
+            ("POST", "/api/v0/tabs") => {
                 let counterpart = str_field(&b, "counterpart")?;
                 let limit = decimal_field(&b, "limit")?;
 
@@ -327,7 +327,7 @@ impl MockTransport {
 
             // ─── Tab settle ───────────────────────────────────────────────
             (method, path) if method == "POST" && path.ends_with("/settle") => {
-                let tab_id = extract_id(path, "/v0/tabs/", "/settle");
+                let tab_id = extract_id(path, "/api/v0/tabs/", "/settle");
                 let mut s = self.state.lock().await;
                 let tab = s.tabs.get_mut(tab_id).ok_or_else(|| {
                     remit_err(codes::TAB_NOT_FOUND, format!("tab {tab_id:?} not found"))
@@ -352,7 +352,7 @@ impl MockTransport {
             }
 
             // ─── Stream ───────────────────────────────────────────────────
-            ("POST", "/v0/streams") => {
+            ("POST", "/api/v0/streams") => {
                 let recipient = str_field(&b, "recipient")?;
                 let rate_per_sec = decimal_field(&b, "rate_per_sec")?;
                 let deposit = decimal_field(&b, "deposit")?;
@@ -377,7 +377,7 @@ impl MockTransport {
             }
 
             // ─── Bounty ───────────────────────────────────────────────────
-            ("POST", "/v0/bounties") => {
+            ("POST", "/api/v0/bounties") => {
                 let award = decimal_field(&b, "award")?;
                 let description = str_field(&b, "description")?;
 
@@ -401,7 +401,7 @@ impl MockTransport {
 
             // ─── Bounty award ─────────────────────────────────────────────
             (method, path) if method == "POST" && path.ends_with("/award") => {
-                let bounty_id = extract_id(path, "/v0/bounties/", "/award");
+                let bounty_id = extract_id(path, "/api/v0/bounties/", "/award");
                 let winner = str_field(&b, "winner")?;
 
                 let mut s = self.state.lock().await;
@@ -432,7 +432,7 @@ impl MockTransport {
             }
 
             // ─── Deposit ──────────────────────────────────────────────────
-            ("POST", "/v0/deposits") => {
+            ("POST", "/api/v0/deposits") => {
                 let beneficiary = str_field(&b, "beneficiary")?;
                 let amount = decimal_field(&b, "amount")?;
 
@@ -454,8 +454,8 @@ impl MockTransport {
             }
 
             // ─── Reputation ───────────────────────────────────────────────
-            ("GET", path) if path.starts_with("/v0/reputation/") => {
-                let address = path.trim_start_matches("/v0/reputation/");
+            ("GET", path) if path.starts_with("/api/v0/reputation/") => {
+                let address = path.trim_start_matches("/api/v0/reputation/");
                 Ok(json!({
                     "address": address,
                     "score": 750u32,
@@ -468,7 +468,7 @@ impl MockTransport {
             }
 
             // ─── Spending summary ─────────────────────────────────────────
-            ("GET", path) if path.starts_with("/v0/wallet/spending") => {
+            ("GET", path) if path.starts_with("/api/v0/wallet/spending") => {
                 let s = self.state.lock().await;
                 let total: Decimal = s.transactions.iter().map(|tx| tx.amount).sum();
                 let count = s.transactions.len() as u64;
@@ -483,7 +483,7 @@ impl MockTransport {
             }
 
             // ─── Budget ───────────────────────────────────────────────────
-            ("GET", "/v0/wallet/budget") => Ok(json!({
+            ("GET", "/api/v0/wallet/budget") => Ok(json!({
                 "daily_limit": "10000.0",
                 "daily_used": "0.0",
                 "daily_remaining": "10000.0",
@@ -494,7 +494,7 @@ impl MockTransport {
             })),
 
             // ─── History ──────────────────────────────────────────────────
-            ("GET", path) if path.starts_with("/v0/wallet/history") => {
+            ("GET", path) if path.starts_with("/api/v0/wallet/history") => {
                 let s = self.state.lock().await;
                 let total = s.transactions.len() as u64;
                 Ok(json!({
@@ -507,7 +507,7 @@ impl MockTransport {
             }
 
             // ─── Intents ──────────────────────────────────────────────────
-            ("POST", "/v0/intents") => {
+            ("POST", "/api/v0/intents") => {
                 let to = str_field(&b, "to")?;
                 let amount = decimal_field(&b, "amount")?;
                 let payment_type = b["type"].as_str().unwrap_or("direct").to_string();
@@ -526,7 +526,7 @@ impl MockTransport {
             (method, path) if method == "POST" && path.ends_with("/debit") => {
                 let amount = decimal_field(&b, "amount")?;
                 let memo = b["memo"].as_str().unwrap_or("").to_string();
-                let tab_id = extract_id(path, "/v0/tabs/", "/debit");
+                let tab_id = extract_id(path, "/api/v0/tabs/", "/debit");
 
                 let mut s = self.state.lock().await;
                 let tab = s.tabs.get_mut(tab_id).ok_or_else(|| {
@@ -546,7 +546,7 @@ impl MockTransport {
 
             // ─── Stream withdraw ──────────────────────────────────────────
             (method, path) if method == "POST" && path.ends_with("/withdraw") => {
-                let stream_id = extract_id(path, "/v0/streams/", "/withdraw");
+                let stream_id = extract_id(path, "/api/v0/streams/", "/withdraw");
                 let s = self.state.lock().await;
                 let stream = s.streams.get(stream_id).ok_or_else(|| {
                     remit_err(

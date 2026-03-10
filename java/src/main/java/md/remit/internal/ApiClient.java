@@ -149,7 +149,10 @@ public class ApiClient {
             byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
-            return "";
+            throw new RemitError(ErrorCodes.INVALID_SIGNATURE,
+                "SHA-256 hash computation failed: " + e.getMessage(),
+                Map.of()
+            );
         }
     }
 

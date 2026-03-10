@@ -19,12 +19,12 @@ public sealed class Wallet
     // Chain → API base URL map
     private static readonly Dictionary<string, (long ChainId, string ApiUrl)> Chains = new()
     {
-        ["base"]               = (8453,  "https://api.remit.md/v0"),
-        ["base-sepolia"]       = (84532, "https://api-sepolia.remit.md/v0"),
-        ["arbitrum"]           = (42161, "https://api-arb.remit.md/v0"),
-        ["arbitrum-sepolia"]   = (421614,"https://api-arb-sepolia.remit.md/v0"),
-        ["optimism"]           = (10,    "https://api-op.remit.md/v0"),
-        ["optimism-sepolia"]   = (11155420,"https://api-op-sepolia.remit.md/v0"),
+        ["base"]               = (8453,  "https://api.remit.md/api/v0"),
+        ["base-sepolia"]       = (84532, "https://api-sepolia.remit.md/api/v0"),
+        ["arbitrum"]           = (42161, "https://api-arb.remit.md/api/v0"),
+        ["arbitrum-sepolia"]   = (421614,"https://api-arb-sepolia.remit.md/api/v0"),
+        ["optimism"]           = (10,    "https://api-op.remit.md/api/v0"),
+        ["optimism-sepolia"]   = (11155420,"https://api-op-sepolia.remit.md/api/v0"),
     };
 
     // ─── Constructors ─────────────────────────────────────────────────────────

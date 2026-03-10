@@ -39,60 +39,60 @@ class RemitClient:
     # ─── Invoices ─────────────────────────────────────────────────────────────
 
     async def get_invoice(self, invoice_id: str) -> Invoice:
-        data = await self._http.get(f"/v1/invoices/{invoice_id}")
+        data = await self._http.get(f"/api/v0/invoices/{invoice_id}")
         return Invoice.model_validate(data)
 
     # ─── Escrows ──────────────────────────────────────────────────────────────
 
     async def get_escrow(self, invoice_id: str) -> Escrow:
-        data = await self._http.get(f"/v1/escrows/{invoice_id}")
+        data = await self._http.get(f"/api/v0/escrows/{invoice_id}")
         return Escrow.model_validate(data)
 
     # ─── Tabs ─────────────────────────────────────────────────────────────────
 
     async def get_tab(self, tab_id: str) -> Tab:
-        data = await self._http.get(f"/v1/tabs/{tab_id}")
+        data = await self._http.get(f"/api/v0/tabs/{tab_id}")
         return Tab.model_validate(data)
 
     # ─── Streams ──────────────────────────────────────────────────────────────
 
     async def get_stream(self, stream_id: str) -> Stream:
-        data = await self._http.get(f"/v1/streams/{stream_id}")
+        data = await self._http.get(f"/api/v0/streams/{stream_id}")
         return Stream.model_validate(data)
 
     # ─── Bounties ─────────────────────────────────────────────────────────────
 
     async def get_bounty(self, bounty_id: str) -> Bounty:
-        data = await self._http.get(f"/v1/bounties/{bounty_id}")
+        data = await self._http.get(f"/api/v0/bounties/{bounty_id}")
         return Bounty.model_validate(data)
 
     async def list_bounties(self, status: str = "open", limit: int = 20) -> list[Bounty]:
-        data = await self._http.get("/v1/bounties", status=status, limit=limit)
+        data = await self._http.get("/api/v0/bounties", status=status, limit=limit)
         items: list[dict[str, object]] = data.get("items", []) if isinstance(data, dict) else data
         return [Bounty.model_validate(d) for d in items]
 
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
     async def get_deposit(self, deposit_id: str) -> Deposit:
-        data = await self._http.get(f"/v1/deposits/{deposit_id}")
+        data = await self._http.get(f"/api/v0/deposits/{deposit_id}")
         return Deposit.model_validate(data)
 
     # ─── Disputes ─────────────────────────────────────────────────────────────
 
     async def get_dispute(self, dispute_id: str) -> Dispute:
-        data = await self._http.get(f"/v1/disputes/{dispute_id}")
+        data = await self._http.get(f"/api/v0/disputes/{dispute_id}")
         return Dispute.model_validate(data)
 
     # ─── Wallet status ────────────────────────────────────────────────────────
 
     async def get_status(self, wallet: str) -> WalletStatus:
-        data = await self._http.get(f"/v1/status/{wallet}")
+        data = await self._http.get(f"/api/v0/status/{wallet}")
         return WalletStatus.model_validate(data)
 
     # ─── Reputation ───────────────────────────────────────────────────────────
 
     async def get_reputation(self, wallet: str) -> Reputation:
-        data = await self._http.get(f"/v1/reputation/{wallet}")
+        data = await self._http.get(f"/api/v0/reputation/{wallet}")
         return Reputation.model_validate(data)
 
     # ─── Events ───────────────────────────────────────────────────────────────
@@ -101,14 +101,14 @@ class RemitClient:
         params: dict[str, object] = {"wallet": wallet}
         if since is not None:
             params["since"] = since
-        data = await self._http.get("/v1/events", **params)
+        data = await self._http.get("/api/v0/events", **params)
         items: list[dict[str, object]] = data.get("items", []) if isinstance(data, dict) else data
         return [Event.model_validate(d) for d in items]
 
     # ─── Webhooks (read-only) ─────────────────────────────────────────────────
 
     async def get_webhook(self, webhook_id: str) -> Webhook:
-        data = await self._http.get(f"/v1/webhooks/{webhook_id}")
+        data = await self._http.get(f"/api/v0/webhooks/{webhook_id}")
         return Webhook.model_validate(data)
 
     # ─── Lifecycle ────────────────────────────────────────────────────────────

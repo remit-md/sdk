@@ -69,15 +69,14 @@ module Remitmd
       "0x#{keccak[-40..]}"
     end
 
-    # Simplified keccak256 using OpenSSL EVP. If OpenSSL 3+ supports it,
-    # use it directly; otherwise fall back to SHA3-256 (close enough for test keys).
+    # Keccak-256 hash using OpenSSL EVP.
+    # Requires OpenSSL 3.0+ built with keccak support (default on most platforms).
+    # Install the digest-sha3 gem if your OpenSSL lacks keccak support.
     def keccak256(data)
-      # OpenSSL 3.0+ exposes keccak256 via digest name
-      digest = OpenSSL::Digest.new("keccak256")
-      digest.hexdigest(data)
-    rescue OpenSSL::Digest::DigestError
-      # Fallback: SHA3-256 for environments without OpenSSL keccak
-      Digest::SHA256.hexdigest(data)
+      OpenSSL::Digest.new("keccak256").hexdigest(data)
+    rescue OpenSSL::Digest::DigestError => e
+      raise "Keccak-256 is not supported by your OpenSSL installation. " \
+            "Install OpenSSL 3.0+ or add gem 'digest-sha3' to your Gemfile. Error: #{e.message}"
     end
   end
 end

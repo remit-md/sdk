@@ -5,13 +5,18 @@ identity without a session cookie or bearer token.
 
 Auth header format:
     X-Remit-Signature: <hex_sig>
-    X-Remit-Address: <checksummed_address>
+    X-Remit-Agent: <checksummed_address>
     X-Remit-Timestamp: <unix_seconds>
-    X-Remit-Nonce: <32-byte hex>
+    X-Remit-Nonce: <0x-prefixed 32-byte hex>
 
 The signed payload is an EIP-712 typed struct:
-    domain: { name: "remit.md", version: "1", chainId: <n> }
-    type:   RequestAuth { method: string, path: string, timestamp: uint64, nonce: bytes32 }
+    domain: {
+        name: "remit.md",
+        version: "0.1",
+        chainId: <n>,
+        verifyingContract: <router_address>,
+    }
+    type: APIRequest { method: string, path: string, timestamp: uint256, nonce: bytes32 }
 """
 
 from __future__ import annotations
@@ -25,14 +30,12 @@ import httpx
 
 from remitmd.errors import RateLimitExceeded, from_error_code
 
-# EIP-712 domain for request authentication
-_AUTH_DOMAIN = {"name": "remit.md", "version": "1"}
-
+# EIP-712 typed struct definition — must match server's auth.rs exactly.
 _AUTH_TYPES = {
-    "RequestAuth": [
+    "APIRequest": [
         {"name": "method", "type": "string"},
         {"name": "path", "type": "string"},
-        {"name": "timestamp", "type": "uint64"},
+        {"name": "timestamp", "type": "uint256"},
         {"name": "nonce", "type": "bytes32"},
     ]
 }
@@ -55,11 +58,13 @@ class AuthenticatedClient:
         base_url: str,
         signer: Any | None,  # remitmd.signer.Signer | None
         chain_id: int,
+        verifying_contract: str = "",
         timeout: float = 30.0,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._signer = signer
         self._chain_id = chain_id
+        self._verifying_contract = verifying_contract
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
             timeout=timeout,
@@ -147,7 +152,12 @@ class AuthenticatedClient:
         timestamp = int(time.time())
         nonce = "0x" + secrets.token_hex(32)
 
-        domain = {**_AUTH_DOMAIN, "chainId": self._chain_id}
+        domain: dict[str, Any] = {
+            "name": "remit.md",
+            "version": "0.1",
+            "chainId": self._chain_id,
+            "verifyingContract": self._verifying_contract,
+        }
         value = {
             "method": method.upper(),
             "path": path,
@@ -160,7 +170,7 @@ class AuthenticatedClient:
 
         return {
             "X-Remit-Signature": sig,
-            "X-Remit-Address": address,
+            "X-Remit-Agent": address,
             "X-Remit-Timestamp": str(timestamp),
             "X-Remit-Nonce": nonce,
         }

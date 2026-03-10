@@ -38,6 +38,7 @@ class Wallet(RemitClient):
         testnet: bool = False,
         api_url: str | None = None,
         signer: Signer | None = None,
+        router_address: str | None = None,
     ) -> None:
         if private_key is None and signer is None:
             private_key = os.environ.get("REMITMD_KEY")
@@ -52,8 +53,13 @@ class Wallet(RemitClient):
         self.chain = chain
         self.testnet = testnet
 
+        # Router contract address for EIP-712 domain — must match server's ROUTER_ADDRESS.
+        verifying_contract = router_address or os.environ.get("REMITMD_ROUTER_ADDRESS", "")
+
         self._signer: Signer = signer if signer is not None else PrivateKeySigner(private_key)  # type: ignore[arg-type]
-        self._http = AuthenticatedClient(url, signer=self._signer, chain_id=chain_id)
+        self._http = AuthenticatedClient(
+            url, signer=self._signer, chain_id=chain_id, verifying_contract=verifying_contract
+        )
 
         # Event callbacks: event_type → list of callables
         self._callbacks: dict[str, list[Callable[..., Any]]] = {}

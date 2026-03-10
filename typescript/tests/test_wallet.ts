@@ -20,8 +20,14 @@ describe("Wallet construction", () => {
     assert.equal(wallet.address.toLowerCase(), TEST_ADDR.toLowerCase());
   });
 
-  it("throws without key or signer", () => {
-    assert.throws(() => new Wallet({}), /requires privateKey or signer/);
+  it("throws without key or signer when REMITMD_KEY not set", () => {
+    const saved = process.env["REMITMD_KEY"];
+    delete process.env["REMITMD_KEY"];
+    try {
+      assert.throws(() => new Wallet({}), /REMITMD_KEY/);
+    } finally {
+      if (saved !== undefined) process.env["REMITMD_KEY"] = saved;
+    }
   });
 
   it("Wallet.create() generates unique addresses", () => {

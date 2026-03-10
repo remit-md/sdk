@@ -40,7 +40,11 @@ class Wallet(RemitClient):
         signer: Signer | None = None,
     ) -> None:
         if private_key is None and signer is None:
-            raise ValueError("Provide either private_key or a Signer instance")
+            private_key = os.environ.get("REMITMD_KEY")
+            if not private_key:
+                raise ValueError(
+                    "Provide private_key, signer, or set the REMITMD_KEY environment variable"
+                )
         if private_key is not None and signer is not None:
             raise ValueError("Provide private_key OR signer, not both")
 

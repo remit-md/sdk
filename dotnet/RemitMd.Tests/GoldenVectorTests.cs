@@ -24,7 +24,7 @@ public sealed class GoldenVectorTests
     private static readonly string VectorsPath =
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../..", "test-vectors", "eip712.json"));
 
-    private record VectorData(
+    public record VectorData(
         string Description,
         long ChainId,
         string VerifyingContract,

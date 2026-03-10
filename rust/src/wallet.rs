@@ -568,7 +568,13 @@ impl WalletBuilder<WithKey> {
     /// Build the `Wallet`, returning an error if the private key or chain is invalid.
     pub fn build(self) -> Result<Wallet, RemitError> {
         let signer = Arc::new(PrivateKeySigner::new(&self.key_or_signer.0)?);
-        build_wallet(signer, &self.chain, self.testnet, self.base_url, self.router_address)
+        build_wallet(
+            signer,
+            &self.chain,
+            self.testnet,
+            self.base_url,
+            self.router_address,
+        )
     }
 }
 
@@ -610,7 +616,12 @@ fn build_wallet(
     let api_url = base_url_override.unwrap_or_else(|| cfg.api_url.to_string());
     let router_addr = router_address.unwrap_or_default();
     let address = signer.address().to_string();
-    let transport = Arc::new(HttpTransport::new(api_url, cfg.chain_id, router_addr, signer));
+    let transport = Arc::new(HttpTransport::new(
+        api_url,
+        cfg.chain_id,
+        router_addr,
+        signer,
+    ));
 
     Ok(Wallet {
         transport,

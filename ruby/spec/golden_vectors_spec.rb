@@ -17,7 +17,9 @@ VECTORS_PATH = File.expand_path("../../test-vectors/eip712.json", __dir__)
 TEST_PRIV_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 def load_vectors
-  skip "test-vectors/eip712.json not found — run `cargo run --bin gen_vectors` in remit-server" unless File.exist?(VECTORS_PATH)
+  unless File.exist?(VECTORS_PATH)
+    skip "test-vectors/eip712.json not found — run gen_vectors"
+  end
 
   file = JSON.parse(File.read(VECTORS_PATH))
   vectors = file["vectors"]
@@ -99,7 +101,7 @@ RSpec.describe "Golden vectors: signature matches server" do
       transport.instance_variable_set(:@chain_id, chain_id)
       transport.instance_variable_set(:@router_address, router)
 
-      digest    = transport.compute_eip712_hash(
+      digest = transport.compute_eip712_hash(
         v.dig("message", "method"),
         v.dig("message", "path"),
         timestamp,

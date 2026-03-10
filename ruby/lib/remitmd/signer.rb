@@ -36,7 +36,7 @@ module Remitmd
       @key   = OpenSSL::PKey::EC.new("secp256k1")
       bn     = OpenSSL::BN.new(key_bytes, 2)
       @key.private_key = bn
-      group  = OpenSSL::PKey::EC::Group.new("secp256k1")
+      group = OpenSSL::PKey::EC::Group.new("secp256k1")
       @key.public_key = group.generator.mul(bn)
       @address = derive_address(@key.public_key)
     end

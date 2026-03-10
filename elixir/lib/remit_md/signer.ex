@@ -97,8 +97,9 @@ defmodule RemitMd.PrivateKeySigner do
   @impl true
   def sign(%__MODULE__{__key__: key_bytes, address: signer_addr}, digest)
       when is_binary(digest) and byte_size(digest) == 32 do
-    # Sign the raw 32-byte EIP-712 digest (no additional hashing)
-    der = :crypto.sign(:ecdsa, :none, digest, [key_bytes, :secp256k1])
+    # Sign the raw 32-byte EIP-712 digest (no additional hashing).
+    # Use {:digest, digest} to tell :crypto the data is already hashed.
+    der = :crypto.sign(:ecdsa, :sha256, {:digest, digest}, [key_bytes, :secp256k1])
     {r, s} = parse_der(der)
 
     # Compute recovery ID by checking which parity recovers our address

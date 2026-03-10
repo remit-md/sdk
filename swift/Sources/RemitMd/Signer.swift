@@ -1,5 +1,5 @@
 import Foundation
-import secp256k1
+@preconcurrency import secp256k1
 
 // MARK: - Signer protocol
 
@@ -50,9 +50,10 @@ public final class PrivateKeySigner: Signer {
             )
         }
         let sig = try privateKey.signature(for: digest)
-        // sig.dataRepresentation is 64 bytes (r+s); sig.recoveryId is 0 or 1
-        var result = Data(sig.dataRepresentation)
-        result.append(UInt8(sig.recoveryId) + 27)  // v = 27 or 28
+        // dataRepresentation is 65 bytes: r(32) || s(32) || recid(1)
+        let sigData = sig.dataRepresentation
+        var result = Data(sigData.prefix(64))
+        result.append(sigData[64] + 27)  // v = 27 or 28
         return "0x" + result.hexString
     }
 

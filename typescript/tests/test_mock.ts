@@ -116,16 +116,6 @@ describe("MockRemit", () => {
     assert(payeeBal >= 30 && payeeBal <= 40, `payee balance ${payeeBal} should be ~30`);
   });
 
-  it("subscription: creates and credits payee", async () => {
-    const payer = mock.createWallet(200);
-    const payee = mock.createWallet(0);
-
-    const sub = await payer.subscribe({ to: payee.address, amount: 25 });
-    assert.equal(sub.status, "active");
-    assert.equal(await payer.balance(), 175);
-    assert.equal(await payee.balance(), 25);
-  });
-
   it("bounty: post, award", async () => {
     const poster = mock.createWallet(100);
     const winner = mock.createWallet(0);

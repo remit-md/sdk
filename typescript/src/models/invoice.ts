@@ -21,7 +21,7 @@ export interface Invoice {
   amount: number; // USD
   chain: string;
   status: InvoiceStatus;
-  paymentType: "escrow" | "tab" | "stream" | "subscription" | "bounty" | "deposit" | "direct";
+  paymentType: "escrow" | "tab" | "stream" | "bounty" | "deposit" | "direct";
   memo?: string;
   milestones?: Milestone[];
   splits?: Split[];

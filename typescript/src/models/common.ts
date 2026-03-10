@@ -38,8 +38,6 @@ export type DepositStatus = "locked" | "returned" | "forfeited" | "expired";
 
 export type DisputeStatus = "open" | "under_review" | "resolved" | "closed";
 
-export type SubscriptionStatus = "active" | "paused" | "cancelled" | "expired";
-
 export type ReputationTier = "new" | "trusted" | "verified" | "elite";
 
 /** Result of a write operation. */

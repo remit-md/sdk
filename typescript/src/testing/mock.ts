@@ -32,8 +32,6 @@ import type { Stream } from "../models/stream.js";
 import type { Bounty } from "../models/bounty.js";
 import type { Deposit } from "../models/deposit.js";
 import type { Dispute } from "../models/dispute.js";
-import type { Subscription } from "../models/subscription.js";
-
 let _idCounter = 1;
 function nextId(): string {
   return `mock-${_idCounter++}`;
@@ -67,7 +65,6 @@ export class MockRemit {
   readonly #bounties: Map<string, Bounty> = new Map();
   readonly #deposits: Map<string, Deposit> = new Map();
   readonly #disputes: Map<string, Dispute> = new Map();
-  readonly #subscriptions: Map<string, Subscription> = new Map();
   #timeOffset = 0;
 
   static _now(): number {
@@ -307,27 +304,6 @@ export class MockRemit {
     return mkTx();
   }
 
-  subscribe(from: string, to: string, amount: number, interval: string): Subscription {
-    this._checkForced(from);
-    this._debit(from, amount);
-    const id = nextId();
-    const sub: Subscription = {
-      id,
-      payer: from,
-      payee: to,
-      amount,
-      interval: interval as Subscription["interval"],
-      periodsCompleted: 1,
-      chain: "base",
-      status: "active",
-      nextPaymentAt: this._now() + 30 * 86400,
-      createdAt: this._now(),
-    };
-    this._credit(to, amount);
-    this.#subscriptions.set(id, sub);
-    return { ...sub };
-  }
-
   postBounty(
     from: string,
     amount: number,
@@ -461,15 +437,6 @@ export class MockWallet extends Wallet {
 
   override async closeStream(streamId: string): Promise<Transaction> {
     return this.#mock.closeStream(this.address, streamId);
-  }
-
-  override async subscribe(options: Parameters<Wallet["subscribe"]>[0]): Promise<Subscription> {
-    return this.#mock.subscribe(
-      this.address,
-      options.to,
-      options.amount,
-      options.interval ?? "monthly",
-    );
   }
 
   override async postBounty(options: Parameters<Wallet["postBounty"]>[0]): Promise<Bounty> {

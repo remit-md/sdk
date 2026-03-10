@@ -6,5 +6,4 @@ export * from "./stream.js";
 export * from "./bounty.js";
 export * from "./deposit.js";
 export * from "./dispute.js";
-export * from "./subscription.js";
 export * from "./reputation.js";

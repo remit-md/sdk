@@ -150,20 +150,6 @@ export class RateExceedsCapError extends RemitError {
   }
 }
 
-// ─── Subscription errors ──────────────────────────────────────────────────────
-
-export class SubscriptionCancelledError extends RemitError {
-  constructor(msg = "Subscription has been cancelled.") {
-    super(msg, "SUBSCRIPTION_CANCELLED", 410);
-  }
-}
-
-export class SubscriptionNotFoundError extends RemitError {
-  constructor(msg = "Subscription not found.") {
-    super(msg, "SUBSCRIPTION_NOT_FOUND", 404);
-  }
-}
-
 // ─── Bounty errors ────────────────────────────────────────────────────────────
 
 export class BountyExpiredError extends RemitError {
@@ -276,8 +262,6 @@ const ERROR_MAP: Record<string, new (msg?: string) => RemitError> = {
   TAB_NOT_FOUND: TabNotFoundError,
   STREAM_NOT_FOUND: StreamNotFoundError,
   RATE_EXCEEDS_CAP: RateExceedsCapError,
-  SUBSCRIPTION_CANCELLED: SubscriptionCancelledError,
-  SUBSCRIPTION_NOT_FOUND: SubscriptionNotFoundError,
   BOUNTY_EXPIRED: BountyExpiredError,
   BOUNTY_CLAIMED: BountyClaimedError,
   BOUNTY_MAX_ATTEMPTS: BountyMaxAttemptsError,

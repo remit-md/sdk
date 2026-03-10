@@ -169,24 +169,6 @@ class Wallet(RemitClient):
         data = await self._http.post(f"/api/v0/streams/{stream_id}/close")
         return Transaction.model_validate(data)
 
-    # ─── Subscriptions ────────────────────────────────────────────────────────
-
-    async def subscribe(
-        self,
-        to: str,
-        amount: float,
-        interval: str = "monthly",
-        max_periods: int | None = None,
-    ) -> dict[str, Any]:
-        body: dict[str, Any] = {"to": to, "amount": amount, "interval": interval}
-        if max_periods is not None:
-            body["max_periods"] = max_periods
-        return await self._http.post("/api/v0/subscriptions", body)  # type: ignore[return-value,no-any-return]
-
-    async def cancel_subscription(self, sub_id: str) -> Transaction:
-        data = await self._http.post(f"/api/v0/subscriptions/{sub_id}/cancel")
-        return Transaction.model_validate(data)
-
     # ─── Bounties ─────────────────────────────────────────────────────────────
 
     async def post_bounty(

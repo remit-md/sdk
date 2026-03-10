@@ -18,8 +18,6 @@ import type { Stream } from "./models/stream.js";
 import type { Bounty } from "./models/bounty.js";
 import type { Deposit } from "./models/deposit.js";
 import type { Dispute } from "./models/dispute.js";
-import type { Subscription } from "./models/subscription.js";
-
 export interface WalletOptions extends RemitClientOptions {
   privateKey?: string;
   signer?: Signer;
@@ -37,13 +35,6 @@ export interface OpenStreamOptions {
   rate: number; // per second
   maxDuration?: number; // seconds
   maxTotal?: number;
-}
-
-export interface SubscribeOptions {
-  to: string;
-  amount: number;
-  interval?: "daily" | "weekly" | "monthly" | "yearly";
-  maxPeriods?: number;
 }
 
 export interface PostBountyOptions {
@@ -178,21 +169,6 @@ export class Wallet extends RemitClient {
 
   closeStream(streamId: string): Promise<Transaction> {
     return this.#auth.post<Transaction>(`/streams/${streamId}/close`);
-  }
-
-  // ─── Subscriptions ──────────────────────────────────────────────────────────
-
-  subscribe(options: SubscribeOptions): Promise<Subscription> {
-    return this.#auth.post<Subscription>("/subscriptions", {
-      to: options.to,
-      amount: options.amount,
-      interval: options.interval ?? "monthly",
-      maxPeriods: options.maxPeriods,
-    });
-  }
-
-  cancelSubscription(subscriptionId: string): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/subscriptions/${subscriptionId}/cancel`);
   }
 
   // ─── Bounties ───────────────────────────────────────────────────────────────

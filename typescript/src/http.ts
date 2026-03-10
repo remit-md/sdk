@@ -10,17 +10,16 @@ import { randomBytes } from "node:crypto";
 import { fromErrorCode, NetworkError, RateLimitedError } from "./errors.js";
 import type { Signer } from "./signer.js";
 
-const EIP712_DOMAIN = {
-  name: "remit.md",
-  version: "0.1",
-} as const;
-
+// EIP-712 typed struct definition — must match server's auth.rs exactly.
+// Struct name: APIRequest (not Request)
+// Timestamp type: uint256 (not uint64 or uint32)
+// Nonce type: bytes32 (not string)
 const EIP712_TYPES = {
-  Request: [
+  APIRequest: [
     { name: "method", type: "string" },
     { name: "path", type: "string" },
     { name: "timestamp", type: "uint256" },
-    { name: "nonce", type: "string" },
+    { name: "nonce", type: "bytes32" },
   ],
 } as const;
 
@@ -30,8 +29,9 @@ interface ApiErrorBody {
   message?: string;
 }
 
-function newNonce(): string {
-  return randomBytes(16).toString("hex");
+/** 32-byte hex nonce with 0x prefix — required for bytes32 EIP-712 field. */
+function newNonce(): `0x${string}` {
+  return `0x${randomBytes(32).toString("hex")}`;
 }
 
 function newIdempotencyKey(): string {
@@ -48,15 +48,21 @@ async function sleep(ms: number): Promise<void> {
 export interface HttpClientOptions {
   signer: Signer;
   baseUrl: string;
+  chainId: number;
+  verifyingContract?: string;
 }
 
 export class AuthenticatedClient {
   readonly #signer: Signer;
   readonly #baseUrl: string;
+  readonly #chainId: number;
+  readonly #verifyingContract: string;
 
-  constructor({ signer, baseUrl }: HttpClientOptions) {
+  constructor({ signer, baseUrl, chainId, verifyingContract = "" }: HttpClientOptions) {
     this.#signer = signer;
     this.#baseUrl = baseUrl.replace(/\/$/, "");
+    this.#chainId = chainId;
+    this.#verifyingContract = verifyingContract;
   }
 
   async get<T>(path: string): Promise<T> {
@@ -79,9 +85,16 @@ export class AuthenticatedClient {
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = newNonce();
 
+    const domain = {
+      name: "remit.md",
+      version: "0.1",
+      chainId: this.#chainId,
+      verifyingContract: this.#verifyingContract,
+    };
+
     // Sign the request metadata (never body — body may be large)
     const signature = await this.#signer.signTypedData(
-      EIP712_DOMAIN,
+      domain,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       EIP712_TYPES as any,
       { method, path, timestamp: BigInt(timestamp), nonce },
@@ -89,7 +102,7 @@ export class AuthenticatedClient {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "X-Remit-Address": this.#signer.getAddress(),
+      "X-Remit-Agent": this.#signer.getAddress(),
       "X-Remit-Signature": signature,
       "X-Remit-Timestamp": String(timestamp),
       "X-Remit-Nonce": nonce,

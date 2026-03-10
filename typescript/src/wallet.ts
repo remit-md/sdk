@@ -21,6 +21,8 @@ import type { Dispute } from "./models/dispute.js";
 export interface WalletOptions extends RemitClientOptions {
   privateKey?: string;
   signer?: Signer;
+  /** Router contract address for EIP-712 domain — must match server's ROUTER_ADDRESS. */
+  routerAddress?: string;
 }
 
 export interface OpenTabOptions {
@@ -63,7 +65,7 @@ export class Wallet extends RemitClient {
   readonly #auth: AuthenticatedClient;
 
   constructor(options: WalletOptions = {}) {
-    const { privateKey: explicitKey, signer, ...clientOptions } = options;
+    const { privateKey: explicitKey, signer, routerAddress, ...clientOptions } = options;
 
     const privateKey =
       explicitKey ?? (!signer ? process.env["REMITMD_KEY"] : undefined);
@@ -76,10 +78,16 @@ export class Wallet extends RemitClient {
 
     super(clientOptions);
 
+    // Router contract address for EIP-712 domain — falls back to env var.
+    const verifyingContract =
+      routerAddress ?? process.env["REMITMD_ROUTER_ADDRESS"] ?? "";
+
     this.#signer = signer ?? new PrivateKeySigner(privateKey!);
     this.#auth = new AuthenticatedClient({
       signer: this.#signer,
       baseUrl: this._apiUrl,
+      chainId: this._chainId,
+      verifyingContract,
     });
   }
 

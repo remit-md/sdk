@@ -15,6 +15,15 @@ const DEFAULT_API_URLS: Record<string, string> = {
   "base-sepolia": "https://testnet.remit.md/api/v0",
   arbitrum: "https://api.remit.md/api/v0",
   "arbitrum-sepolia": "https://testnet.remit.md/api/v0",
+  localhost: "http://localhost:3000/api/v0",
+};
+
+export const CHAIN_IDS: Record<string, number> = {
+  base: 8453,
+  "base-sepolia": 84532,
+  arbitrum: 42161,
+  "arbitrum-sepolia": 421614,
+  localhost: 31337,
 };
 
 export interface RemitClientOptions {
@@ -26,12 +35,14 @@ export interface RemitClientOptions {
 export class RemitClient {
   protected readonly _chain: string;
   protected readonly _apiUrl: string;
+  protected readonly _chainId: number;
 
   constructor(options: RemitClientOptions = {}) {
     const { chain = "base", testnet = false, apiUrl } = options;
     this._chain = testnet && !chain.includes("sepolia") ? `${chain}-sepolia` : chain;
     this._apiUrl =
-      apiUrl ?? DEFAULT_API_URLS[this._chain] ?? DEFAULT_API_URLS["base"];
+      apiUrl ?? DEFAULT_API_URLS[this._chain] ?? DEFAULT_API_URLS["base"]!;
+    this._chainId = CHAIN_IDS[this._chain] ?? CHAIN_IDS["base"]!;
   }
 
   protected async _fetch<T>(path: string): Promise<T> {

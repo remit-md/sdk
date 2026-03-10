@@ -1,19 +1,32 @@
 # remit.md / sdk
 
 Python and TypeScript SDKs for the [remit.md](https://remit.md) payment protocol.
+Let AI agents pay for tools, data, and services — one env var, no crypto experience required.
 
-## Quickstart
+## Quickstart (3 steps)
 
-1. Register at [remit.md](https://remit.md) to get your agent private key.
-2. Set the `REMITMD_KEY` environment variable:
+### Step 1 — Create an account
+
+Sign up at [dashboard.remit.md](https://dashboard.remit.md). A wallet is generated automatically.
+Fund it with a credit card, Apple Pay, or bank transfer through the Setup Wizard.
+
+### Step 2 — Set your agent key
+
+After signup, copy your agent key from the dashboard and set it as an environment variable:
 
 ```bash
-export REMITMD_KEY=0xYourPrivateKey
+export REMITMD_KEY=0xYourAgentKey
 ```
 
-3. Install and use the SDK:
+Or in a `.env` file:
 
-### Python
+```
+REMITMD_KEY=0xYourAgentKey
+```
+
+### Step 3 — Install the SDK and pay
+
+#### Python
 
 ```bash
 pip install remitmd
@@ -22,36 +35,15 @@ pip install remitmd
 ```python
 from remitmd import Wallet
 
-# Reads REMITMD_KEY from environment automatically
-wallet = Wallet()
+wallet = Wallet()  # reads REMITMD_KEY from environment
+print(f"Balance: ${wallet.balance:.2f}")
 
-# Or pass the key explicitly
-wallet = Wallet(private_key="0xYourPrivateKey")
-
-# Pay someone
-tx = await wallet.pay_direct("0xRecipient...", 5.00, memo="thanks")
-
-# Open an escrow
-escrow = await wallet.create_escrow(
-    to="0xRecipient...",
-    amount=10.00,
-    description="Code review",
-    timeout=86400,
-)
+# Pay an API provider
+tx = await wallet.pay_direct("0xProviderAddress", 0.50, memo="gpt-4o call")
+print(f"Paid: {tx.id}")
 ```
 
-**Framework integrations:** LangChain, CrewAI, AutoGen, OpenAI Agents.
-
-**Testing:**
-```python
-from remitmd.testing import MockRemit
-
-mock = MockRemit()  # No network, <1ms responses
-async with mock.session() as wallet:
-    tx = await wallet.pay_direct("0xAnyone", 1.00)
-```
-
-### TypeScript
+#### TypeScript / Node.js
 
 ```bash
 npm install @remitmd/sdk
@@ -60,38 +52,174 @@ npm install @remitmd/sdk
 ```typescript
 import { Wallet } from '@remitmd/sdk';
 
-// Reads REMITMD_KEY from process.env automatically
+const wallet = new Wallet(); // reads REMITMD_KEY from process.env
+
+// Pay an API provider
+const tx = await wallet.payDirect('0xProviderAddress', 0.50, 'gpt-4o call');
+console.log('Paid:', tx.id);
+```
+
+#### MCP (Claude Desktop / Cursor)
+
+```json
+{
+  "mcpServers": {
+    "remit": {
+      "command": "npx",
+      "args": ["@remitmd/mcp"],
+      "env": {
+        "REMITMD_KEY": "0xYourAgentKey"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Framework Integrations
+
+### LangChain (Python)
+
+```python
+from langchain.tools import tool
+from remitmd import Wallet
+
+wallet = Wallet()
+
+@tool
+async def pay_for_data(provider_address: str, amount: float, description: str) -> str:
+    """Pay a data provider using remit.md."""
+    tx = await wallet.pay_direct(provider_address, amount, memo=description)
+    return f"Payment sent: {tx.id}"
+```
+
+### CrewAI (Python)
+
+```python
+from crewai import Agent
+from crewai.tools import BaseTool
+from remitmd import Wallet
+
+wallet = Wallet()
+
+class PayTool(BaseTool):
+    name: str = "pay_provider"
+    description: str = "Pay a service provider for completed work"
+
+    def _run(self, address: str, amount: float, note: str) -> str:
+        import asyncio
+        tx = asyncio.run(wallet.pay_direct(address, amount, memo=note))
+        return f"Paid ${amount:.2f}: {tx.id}"
+
+agent = Agent(role="AI Buyer", tools=[PayTool()])
+```
+
+### Vercel AI SDK (TypeScript)
+
+```typescript
+import { tool } from 'ai';
+import { z } from 'zod';
+import { Wallet } from '@remitmd/sdk';
+
 const wallet = new Wallet();
 
-// Or pass the key explicitly
-const wallet = new Wallet({ privateKey: process.env.REMITMD_KEY });
-
-// Pay someone
-const tx = await wallet.payDirect('0xRecipient...', 5.00, 'thanks');
-
-// Open an escrow
-const escrow = await wallet.createEscrow({
-  to: '0xRecipient...',
-  amount: 10.00,
-  description: 'Code review',
-  timeout: 86400,
+export const payTool = tool({
+  description: 'Pay a service provider',
+  parameters: z.object({
+    address: z.string().describe('Provider wallet address'),
+    amount: z.number().describe('Amount in USD'),
+    memo: z.string().describe('Payment description'),
+  }),
+  execute: async ({ address, amount, memo }) => {
+    const tx = await wallet.payDirect(address, amount, memo);
+    return { txId: tx.id, paid: amount };
+  },
 });
 ```
 
-**Integrations:** Vercel AI SDK.
+### OpenAI Agents (Python)
+
+```python
+from agents import function_tool
+from remitmd import Wallet
+
+wallet = Wallet()
+
+@function_tool
+async def pay_provider(address: str, amount: float, note: str) -> dict:
+    """Pay a service provider via remit.md."""
+    tx = await wallet.pay_direct(address, amount, memo=note)
+    return {"tx_id": tx.id, "amount": amount}
+```
+
+---
+
+## Payment Types
+
+| Type | Use Case | Method |
+|------|----------|--------|
+| Direct | One-off service call | `pay_direct` / `payDirect` |
+| Tab | Metered API access (pay per call) | `open_tab` / `openTab` |
+| Escrow | Work with acceptance criteria | `create_escrow` / `createEscrow` |
+| Stream | Time-based work (pay per second) | `open_stream` / `openStream` |
+| Bounty | Competitive task completion | `post_bounty` / `postBounty` |
+| Deposit | Refundable collateral | `lock_deposit` / `lockDeposit` |
+
+---
+
+## Testing
+
+No API key needed for unit tests:
+
+```python
+from remitmd.testing import MockRemit
+
+mock = MockRemit()  # in-memory, <1ms, no network
+async with mock.session() as wallet:
+    tx = await wallet.pay_direct("0xAnyone", 1.00)
+    assert tx.status == "confirmed"
+```
+
+```typescript
+import { MockRemit } from '@remitmd/sdk/testing';
+
+const mock = new MockRemit();
+const wallet = await mock.session();
+const tx = await wallet.payDirect('0xAnyone', 1.00, 'test');
+```
+
+---
+
+## Error Reference
+
+| Error Code | Meaning | Fix |
+|------------|---------|-----|
+| `MISSING_KEY` | `REMITMD_KEY` not set | Set the env var: `export REMITMD_KEY=0x...` |
+| `INSUFFICIENT_BALANCE` | Not enough funds | Top up at [dashboard.remit.md/fund](https://dashboard.remit.md/fund) |
+| `BUDGET_EXCEEDED` | Spending limit reached | Raise limits at [dashboard.remit.md/spending-controls](https://dashboard.remit.md/spending-controls) |
+| `INVALID_KEY` | Key format invalid | Copy the full key from the dashboard (starts with `0x`) |
+| `RATE_LIMITED` | Too many requests | Back off and retry — the SDK handles this automatically |
+
+---
+
+## Configuration
+
+| Environment Variable | Required | Default | Description |
+|---------------------|----------|---------|-------------|
+| `REMITMD_KEY` | Yes | — | Agent key from the operator dashboard |
+| `REMITMD_API_URL` | No | `https://api.remit.md` | API server URL |
+| `REMITMD_CHAIN` | No | `base` | Chain name (`base` or `base-sepolia` for testnet) |
+| `REMITMD_TESTNET` | No | `false` | Set to `true` to use testnet |
+
+---
 
 ## Examples
 
 - **`examples/demo-agent/`** — Python AI agent demonstrating tab, escrow, stream, and bounty lifecycles
-- **`examples/demo-services/`** — Three TypeScript microservices accepting remit.md payments (LLM API, Data API, Code Review)
+- **`examples/demo-services/`** — TypeScript microservices accepting remit.md payments (LLM API, Data API, Code Review)
 
-## Configuration
-
-| Environment Variable | Required | Description |
-|---------------------|----------|-------------|
-| `REMITMD_KEY` | Yes | Agent private key (0x-prefixed hex). Get it from the operator dashboard. |
-| `REMITMD_CHAIN` | No | Chain name (`base` default, `base-sepolia` for testnet) |
-| `REMITMD_TESTNET` | No | Set to `1` or `true` to use testnet |
+---
 
 ## License
 

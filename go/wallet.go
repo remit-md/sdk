@@ -33,9 +33,10 @@ type Wallet struct {
 type Option func(*walletConfig)
 
 type walletConfig struct {
-	chain   string
-	testnet bool
-	baseURL string
+	chain         string
+	testnet       bool
+	baseURL       string
+	routerAddress common.Address
 }
 
 // WithChain sets the target chain ("base", "arbitrum", "optimism"). Default: "base".
@@ -51,6 +52,12 @@ func WithTestnet() Option {
 // WithBaseURL overrides the API base URL (useful for self-hosted or local testing).
 func WithBaseURL(url string) Option {
 	return func(c *walletConfig) { c.baseURL = url }
+}
+
+// WithRouterAddress sets the router contract address used in the EIP-712 domain separator.
+// This must match the ROUTER_ADDRESS configured on the server.
+func WithRouterAddress(addr string) Option {
+	return func(c *walletConfig) { c.routerAddress = common.HexToAddress(addr) }
 }
 
 // NewWallet creates a Wallet from a hex-encoded private key.
@@ -92,7 +99,7 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 	}
 
 	return &Wallet{
-		http:    newHTTPClient(apiURL, cc.ChainID, signer),
+		http:    newHTTPClient(apiURL, cc.ChainID, cfg.routerAddress, signer),
 		signer:  signer,
 		chainID: cc.ChainID,
 		chain:   cfg.chain,
@@ -104,6 +111,7 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 //   - REMITMD_KEY — hex-encoded private key (required)
 //   - REMITMD_CHAIN — chain name (default: "base")
 //   - REMITMD_TESTNET — "1", "true", or "yes" to use testnet
+//   - REMITMD_ROUTER_ADDRESS — router contract address for EIP-712 domain
 func FromEnv(opts ...Option) (*Wallet, error) {
 	key := os.Getenv("REMITMD_KEY")
 	if key == "" {
@@ -120,6 +128,9 @@ func FromEnv(opts ...Option) (*Wallet, error) {
 	testnetEnv := os.Getenv("REMITMD_TESTNET")
 	if testnetEnv == "1" || strings.EqualFold(testnetEnv, "true") || strings.EqualFold(testnetEnv, "yes") {
 		envOpts = append(envOpts, WithTestnet())
+	}
+	if routerAddr := os.Getenv("REMITMD_ROUTER_ADDRESS"); routerAddr != "" {
+		envOpts = append(envOpts, WithRouterAddress(routerAddr))
 	}
 
 	// Caller opts take precedence over env opts

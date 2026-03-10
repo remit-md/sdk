@@ -1,0 +1,124 @@
+#!/bin/bash
+set -e
+
+echo "=== Pre-commit: sdk ==="
+
+# Detect which SDKs have staged changes
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+RAN_TESTS=0
+
+if echo "$STAGED" | grep -q '^python/'; then
+    echo "[SDK] Python: ruff + pytest..."
+    cd python && ruff check . && ruff format --check . && pytest -v && cd ..
+    RAN_TESTS=1
+fi
+
+if echo "$STAGED" | grep -q '^typescript/'; then
+    echo "[SDK] TypeScript: tsc + eslint..."
+    cd typescript && pnpm tsc --noEmit && pnpm eslint src && cd ..
+    RAN_TESTS=1
+fi
+
+if echo "$STAGED" | grep -q '^go/'; then
+    if command -v go &>/dev/null; then
+        echo "[SDK] Go: vet + test..."
+        cd go && go vet ./... && go test ./... -v -count=1 && cd ..
+    else
+        echo "[SDK] Go: go binary not found — CI will run tests"
+    fi
+    RAN_TESTS=1
+fi
+
+if echo "$STAGED" | grep -q '^rust/'; then
+    if command -v cargo &>/dev/null; then
+        echo "[SDK] Rust: fmt + clippy + test..."
+        cd rust && cargo fmt --check && cargo clippy -- -D warnings && cargo test && cd ..
+    else
+        echo "[SDK] Rust: cargo not found — CI will run tests"
+    fi
+    RAN_TESTS=1
+fi
+
+if echo "$STAGED" | grep -q '^dotnet/'; then
+    if command -v dotnet &>/dev/null; then
+        echo "[SDK] .NET: build + test..."
+        cd dotnet && dotnet build --no-restore -c Release && dotnet test --no-build -c Release && cd ..
+    else
+        echo "[SDK] .NET: dotnet not found — CI will run tests"
+    fi
+    RAN_TESTS=1
+fi
+
+if echo "$STAGED" | grep -q '^java/'; then
+    if command -v gradle &>/dev/null; then
+        echo "[SDK] Java: build + test..."
+        cd java && gradle test --no-daemon && cd ..
+    else
+        echo "[SDK] Java: gradle not found — CI will run tests"
+    fi
+    RAN_TESTS=1
+fi
+
+if echo "$STAGED" | grep -q '^ruby/'; then
+    if command -v bundle &>/dev/null; then
+        echo "[SDK] Ruby: rubocop + rspec..."
+        cd ruby && bundle exec rubocop --no-color && bundle exec rspec && cd ..
+    else
+        echo "[SDK] Ruby: bundle not found — CI will run tests"
+    fi
+    RAN_TESTS=1
+fi
+
+if echo "$STAGED" | grep -q '^swift/'; then
+    if command -v swift &>/dev/null; then
+        echo "[SDK] Swift: build + test..."
+        cd swift && swift build && swift test && cd ..
+    else
+        echo "[SDK] Swift: swift not found — CI will run tests"
+    fi
+    RAN_TESTS=1
+fi
+
+if echo "$STAGED" | grep -q '^elixir/'; then
+    if command -v mix &>/dev/null; then
+        echo "[SDK] Elixir: compile + test..."
+        cd elixir && mix deps.get && mix compile --warnings-as-errors && mix test && cd ..
+    else
+        echo "[SDK] Elixir: mix not found — CI will run tests"
+    fi
+    RAN_TESTS=1
+fi
+
+# Anti-shortcut checks on ALL staged files
+echo "[QA] Anti-shortcut scan..."
+FAIL=0
+
+CODE_STAGED=$(echo "$STAGED" | grep -v '^\.githooks/')
+
+if echo "$CODE_STAGED" | xargs grep -n 'TODO\|FIXME\|HACK\|placeholder\|stub' 2>/dev/null; then
+    echo "  FAIL: TODO/FIXME/placeholder found"
+    FAIL=1
+fi
+
+if echo "$CODE_STAGED" | xargs grep -n '0x0\{40,\}' 2>/dev/null; then
+    echo "  FAIL: Placeholder zero hash found"
+    FAIL=1
+fi
+
+# EIP-712 domain consistency check
+if echo "$CODE_STAGED" | xargs grep -n '"RemitMD"\|"Remit"\|"REMIT"' 2>/dev/null; then
+    echo "  FAIL: EIP-712 domain must be \"remit.md\" (lowercase with dot)"
+    FAIL=1
+fi
+
+if [ "$FAIL" -eq 1 ]; then
+    echo ""
+    echo "BLOCKED: Anti-shortcut check failed. Fix issues above."
+    exit 1
+fi
+
+if [ "$RAN_TESTS" -eq 0 ]; then
+    echo "No SDK directories changed — skipping tests."
+fi
+
+echo "=== Pre-commit passed ==="

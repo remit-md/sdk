@@ -42,17 +42,19 @@ var chainConfig = map[string]struct {
 
 // httpClient is the authenticated HTTP client used by Wallet.
 type httpClient struct {
-	baseURL    string
-	chainID    ChainID
-	signer     Signer
-	httpClient *http.Client
+	baseURL       string
+	chainID       ChainID
+	routerAddress common.Address
+	signer        Signer
+	httpClient    *http.Client
 }
 
-func newHTTPClient(baseURL string, chainID ChainID, signer Signer) *httpClient {
+func newHTTPClient(baseURL string, chainID ChainID, routerAddress common.Address, signer Signer) *httpClient {
 	return &httpClient{
-		baseURL: baseURL,
-		chainID: chainID,
-		signer:  signer,
+		baseURL:       baseURL,
+		chainID:       chainID,
+		routerAddress: routerAddress,
+		signer:        signer,
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 		},
@@ -169,7 +171,7 @@ func (c *httpClient) sign(req *http.Request, body []byte) error {
 	timestamp := uint64(time.Now().Unix())
 
 	chainID := new(big.Int).SetUint64(uint64(c.chainID))
-	digest := computeRequestDigest(chainID, common.Address{}, req.Method, req.URL.Path, timestamp, nonceBytes)
+	digest := computeRequestDigest(chainID, c.routerAddress, req.Method, req.URL.Path, timestamp, nonceBytes)
 
 	sig, err := c.signer.Sign(digest)
 	if err != nil {

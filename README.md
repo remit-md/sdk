@@ -2,23 +2,42 @@
 
 Python and TypeScript SDKs for the [remit.md](https://remit.md) payment protocol.
 
-## Python SDK
+## Quickstart
+
+1. Register at [remit.md](https://remit.md) to get your agent private key.
+2. Set the `REMITMD_KEY` environment variable:
+
+```bash
+export REMITMD_KEY=0xYourPrivateKey
+```
+
+3. Install and use the SDK:
+
+### Python
 
 ```bash
 pip install remitmd
 ```
 
-Requires Python 3.10+.
-
 ```python
-from remitmd import RemitClient, Wallet
+from remitmd import Wallet
 
-wallet = Wallet.create()
-client = RemitClient(api_key="...", wallet=wallet)
+# Reads REMITMD_KEY from environment automatically
+wallet = Wallet()
 
-# Pay for an API call via tab
-tab = await client.tabs.open(payee="0x...", deposit="5.00")
-voucher = wallet.sign_voucher(tab.id, amount="0.003")
+# Or pass the key explicitly
+wallet = Wallet(private_key="0xYourPrivateKey")
+
+# Pay someone
+tx = await wallet.pay_direct("0xRecipient...", 5.00, memo="thanks")
+
+# Open an escrow
+escrow = await wallet.create_escrow(
+    to="0xRecipient...",
+    amount=10.00,
+    description="Code review",
+    timeout=86400,
+)
 ```
 
 **Framework integrations:** LangChain, CrewAI, AutoGen, OpenAI Agents.
@@ -28,24 +47,34 @@ voucher = wallet.sign_voucher(tab.id, amount="0.003")
 from remitmd.testing import MockRemit
 
 mock = MockRemit()  # No network, <1ms responses
+async with mock.session() as wallet:
+    tx = await wallet.pay_direct("0xAnyone", 1.00)
 ```
 
-## TypeScript SDK
+### TypeScript
 
 ```bash
 npm install @remitmd/sdk
 ```
 
-Requires Node.js 20+.
-
 ```typescript
-import { RemitClient, Wallet } from '@remitmd/sdk';
+import { Wallet } from '@remitmd/sdk';
 
-const wallet = Wallet.create();
-const client = new RemitClient({ apiKey: '...', wallet });
+// Reads REMITMD_KEY from process.env automatically
+const wallet = new Wallet();
 
-const escrow = await client.escrows.create({
-  payee: '0x...', amount: '2.00', description: 'Code review'
+// Or pass the key explicitly
+const wallet = new Wallet({ privateKey: process.env.REMITMD_KEY });
+
+// Pay someone
+const tx = await wallet.payDirect('0xRecipient...', 5.00, 'thanks');
+
+// Open an escrow
+const escrow = await wallet.createEscrow({
+  to: '0xRecipient...',
+  amount: 10.00,
+  description: 'Code review',
+  timeout: 86400,
 });
 ```
 
@@ -56,6 +85,14 @@ const escrow = await client.escrows.create({
 - **`examples/demo-agent/`** — Python AI agent demonstrating tab, escrow, stream, and bounty lifecycles
 - **`examples/demo-services/`** — Three TypeScript microservices accepting remit.md payments (LLM API, Data API, Code Review)
 
+## Configuration
+
+| Environment Variable | Required | Description |
+|---------------------|----------|-------------|
+| `REMITMD_KEY` | Yes | Agent private key (0x-prefixed hex). Get it from the operator dashboard. |
+| `REMITMD_CHAIN` | No | Chain name (`base` default, `base-sepolia` for testnet) |
+| `REMITMD_TESTNET` | No | Set to `1` or `true` to use testnet |
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

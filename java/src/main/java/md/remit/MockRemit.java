@@ -351,7 +351,7 @@ public class MockRemit {
         private final MockRemit mock;
 
         MockApiClient(MockRemit mock) {
-            super("http://mock.invalid", MockRemit.MOCK_CHAIN_ID, hash -> new byte[65]);
+            super("http://mock.invalid", MockRemit.MOCK_CHAIN_ID, "", hash -> new byte[65]);
             this.mock = mock;
         }
 

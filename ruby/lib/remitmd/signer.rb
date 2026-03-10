@@ -33,12 +33,24 @@ module Remitmd
       raise ArgumentError, "Private key must be 64 hex characters" unless hex.match?(/\A[0-9a-fA-F]{64}\z/)
 
       key_bytes = [hex].pack("H*")
-      @key   = OpenSSL::PKey::EC.new("secp256k1")
-      bn     = OpenSSL::BN.new(key_bytes, 2)
-      @key.private_key = bn
       group = OpenSSL::PKey::EC::Group.new("secp256k1")
-      @key.public_key = group.generator.mul(bn)
-      @address = derive_address(@key.public_key)
+      bn = OpenSSL::BN.new(key_bytes, 2)
+      pub_point = group.generator.mul(bn)
+
+      # Build SEC1 DER-encoded private key (OpenSSL 3.x: PKey objects are immutable)
+      asn1 = OpenSSL::ASN1::Sequence.new([
+        OpenSSL::ASN1::Integer.new(1),
+        OpenSSL::ASN1::OctetString.new(key_bytes),
+        OpenSSL::ASN1::ASN1Data.new(
+          [OpenSSL::ASN1::ObjectId.new("secp256k1")], 0, :CONTEXT_SPECIFIC
+        ),
+        OpenSSL::ASN1::ASN1Data.new(
+          [OpenSSL::ASN1::BitString.new(pub_point.to_octet_string(:uncompressed))],
+          1, :CONTEXT_SPECIFIC
+        )
+      ])
+      @key = OpenSSL::PKey::EC.new(asn1.to_der)
+      @address = derive_address(pub_point)
     end
 
     # Sign a 32-byte EIP-712 digest (raw binary bytes).

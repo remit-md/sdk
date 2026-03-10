@@ -102,6 +102,10 @@ defmodule RemitMd.PrivateKeySigner do
     der = :crypto.sign(:ecdsa, :sha256, {:digest, digest}, [key_bytes, :secp256k1])
     {r, s} = parse_der(der)
 
+    # Normalize s to low-s canonical form (s <= n/2) to match RFC 6979 / Ethereum convention
+    half_n = div(@n, 2)
+    s = if s > half_n, do: @n - s, else: s
+
     # Compute recovery ID by checking which parity recovers our address
     z = :binary.decode_unsigned(digest)
     v = recover_v(r, s, z, signer_addr)

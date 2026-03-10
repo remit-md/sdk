@@ -144,7 +144,7 @@ public class ApiClient {
         }
     }
 
-    static byte[] computeEip712Hash(
+    public static byte[] computeEip712Hash(
             long chainId,
             String routerAddress,
             String method,

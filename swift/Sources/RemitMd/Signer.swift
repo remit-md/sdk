@@ -37,7 +37,17 @@ public final class PrivateKeySigner: Signer {
         }
         let key = try secp256k1.Recovery.PrivateKey(dataRepresentation: keyData)
         self.privateKey = key
-        self.address = PrivateKeySigner.deriveAddress(compressedPubKey: key.publicKey.dataRepresentation)
+        // Use the library's uncompressed key (65 bytes: 04 || x || y) to derive the address.
+        // This avoids the pure-Swift y-decompression code path entirely.
+        let uncompressed = key.publicKey.rawRepresentation
+        let pubXY: Data
+        if uncompressed.count == 65, uncompressed.first == 0x04 {
+            pubXY = uncompressed.dropFirst()
+        } else {
+            pubXY = uncompressed
+        }
+        let hash = keccak256(pubXY)
+        self.address = "0x" + hash.suffix(20).hexString
     }
 
     /// Sign a 32-byte EIP-712 digest using ECDSA, returning hex-encoded 65-byte signature (r+s+v).

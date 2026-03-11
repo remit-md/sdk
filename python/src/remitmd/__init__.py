@@ -21,9 +21,9 @@ from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice, Milestone, Split
 from remitmd.models.stream import Stream
 from remitmd.models.tab import Tab, TabCharge
+from remitmd.provider import X402Paywall
 from remitmd.signer import PrivateKeySigner, Signer
 from remitmd.wallet import Wallet
-from remitmd.provider import X402Paywall
 from remitmd.x402 import AllowanceExceededError, X402Client
 
 __all__ = [

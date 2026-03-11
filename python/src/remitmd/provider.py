@@ -157,7 +157,6 @@ class X402Paywall:
         """
         try:
             from fastapi import HTTPException
-            from fastapi.responses import JSONResponse
             from starlette.requests import Request as StarletteRequest  # type: ignore[import]
         except ImportError as exc:
             raise ImportError(

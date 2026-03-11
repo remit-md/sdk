@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -13,6 +14,7 @@ from remitmd.models.bounty import Bounty
 from remitmd.models.common import Transaction, WalletStatus, Webhook
 from remitmd.models.deposit import Deposit
 from remitmd.models.dispute import Dispute
+from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
 from remitmd.models.stream import Stream
 from remitmd.models.tab import Tab
@@ -93,53 +95,82 @@ class Wallet(RemitClient):
 
     async def pay_direct(self, to: str, amount: float, memo: str = "") -> Transaction:
         """Send a direct USDC payment (no escrow, no refund)."""
+        nonce = secrets.token_hex(16)
         data = await self._http.post(
             "/api/v0/payments/direct",
-            {"to": to, "amount": amount, "memo": memo},
+            {
+                "to": to,
+                "amount": amount,
+                "task": memo,
+                "chain": self.chain,
+                "nonce": nonce,
+                "signature": "0x",
+            },
         )
         return Transaction.model_validate(data)
 
     # ─── Escrow ───────────────────────────────────────────────────────────────
 
-    async def pay(self, invoice: Invoice) -> Transaction:
-        """Fund an escrow from a structured Invoice object."""
+    async def pay(self, invoice: Invoice) -> Escrow:
+        """Fund an escrow: create invoice then fund escrow in one call."""
+        import uuid
+
+        invoice_id = invoice.id or str(uuid.uuid4())
+        nonce = secrets.token_hex(16)
+
+        # Step 1: create the invoice on the server.
+        inv_body: dict[str, Any] = {
+            "id": invoice_id,
+            "chain": invoice.chain or self.chain,
+            "from_agent": self.address,
+            "to_agent": invoice.to,
+            "amount": invoice.amount,
+            "type": invoice.payment_model or "escrow",
+            "task": invoice.memo,
+            "nonce": nonce,
+            "signature": "0x",
+        }
+        if invoice.timeout:
+            inv_body["escrow_timeout"] = invoice.timeout
+        await self._http.post("/api/v0/invoices", inv_body)
+
+        # Step 2: fund the escrow.
         data = await self._http.post(
             "/api/v0/escrows",
-            invoice.model_dump(exclude_none=True),
+            {"invoice_id": invoice_id},
         )
-        return Transaction.model_validate(data)
+        return Escrow.model_validate(data)
 
-    async def claim_start(self, invoice_id: str) -> Transaction:
+    async def claim_start(self, invoice_id: str) -> Escrow:
         """Payee calls this to start work and begin the escrow timer."""
-        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/claim-start")
-        return Transaction.model_validate(data)
+        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/claim-start", {})
+        return Escrow.model_validate(data)
 
     async def submit_evidence(
         self,
         invoice_id: str,
         evidence_uri: str,
-        milestone_index: int = 0,
-    ) -> Transaction:
+    ) -> Escrow:
         data = await self._http.post(
-            f"/api/v0/escrows/{invoice_id}/submit-evidence",
-            {"evidence_uri": evidence_uri, "milestone_index": milestone_index},
+            f"/api/v0/escrows/{invoice_id}/claim-start",
+            {"evidence_uri": evidence_uri},
         )
-        return Transaction.model_validate(data)
+        return Escrow.model_validate(data)
 
-    async def release_escrow(self, invoice_id: str) -> Transaction:
-        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/release")
-        return Transaction.model_validate(data)
+    async def release_escrow(self, invoice_id: str) -> Escrow:
+        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/release", {})
+        return Escrow.model_validate(data)
 
-    async def release_milestone(self, invoice_id: str, milestone_index: int) -> Transaction:
+    async def release_milestone(self, invoice_id: str, milestone_index: int) -> Escrow:
         data = await self._http.post(
-            f"/api/v0/escrows/{invoice_id}/release-milestone",
-            {"milestone_index": milestone_index},
+            f"/api/v0/escrows/{invoice_id}/release",
+            {"milestone_ids": [str(milestone_index)]},
         )
-        return Transaction.model_validate(data)
+        return Escrow.model_validate(data)
 
-    async def cancel_escrow(self, invoice_id: str) -> Transaction:
-        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/cancel")
-        return Transaction.model_validate(data)
+    async def cancel_escrow(self, invoice_id: str) -> Escrow:
+        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/cancel", {})
+        return Escrow.model_validate(data)
 
     # ─── Metered tabs ─────────────────────────────────────────────────────────
 
@@ -150,15 +181,25 @@ class Wallet(RemitClient):
         per_unit: float,
         expires: int = 86400,
     ) -> Tab:
+        expiry = int(time.time()) + expires
         data = await self._http.post(
             "/api/v0/tabs",
-            {"to": to, "limit": limit, "per_unit": per_unit, "expires": expires},
+            {
+                "chain": self.chain,
+                "provider": to,
+                "limit_amount": limit,
+                "per_unit": per_unit,
+                "expiry": expiry,
+            },
         )
         return Tab.model_validate(data)
 
-    async def close_tab(self, tab_id: str) -> Transaction:
-        data = await self._http.post(f"/api/v0/tabs/{tab_id}/close")
-        return Transaction.model_validate(data)
+    async def close_tab(self, tab_id: str) -> Tab:
+        data = await self._http.post(
+            f"/api/v0/tabs/{tab_id}/close",
+            {"final_amount": 0, "provider_sig": "0x"},
+        )
+        return Tab.model_validate(data)
 
     # ─── Streaming ────────────────────────────────────────────────────────────
 
@@ -256,8 +297,8 @@ class Wallet(RemitClient):
         return await self.get_status(self.address)
 
     async def balance(self) -> float:
-        ws = await self.status()
-        return ws.usdc_balance
+        # Server does not track on-chain USDC balance — requires direct chain query.
+        raise NotImplementedError("balance() requires on-chain query (not yet implemented)")
 
     # ─── Webhooks ─────────────────────────────────────────────────────────────
 
@@ -279,7 +320,13 @@ class Wallet(RemitClient):
         if not self.testnet:
             raise ValueError("request_testnet_funds() is only available on testnet")
         data = await self._http.post("/api/v0/faucet", {"wallet": self.address})
-        return Transaction.model_validate(data)
+        # Server returns FaucetResponse {tx_hash, amount, recipient} — not a full Transaction.
+        return Transaction(
+            tx_hash=data.get("tx_hash"),
+            chain=self.chain,
+            status="confirmed",
+            created_at=int(time.time()),
+        )
 
     # ─── Repr (never expose key) ──────────────────────────────────────────────
 

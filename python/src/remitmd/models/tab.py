@@ -8,28 +8,34 @@ from remitmd.models.common import TabStatus
 
 
 class Tab(BaseModel):
-    """Open metered payment tab."""
+    """Metered payment tab as returned by the API.
+
+    Field names match the server's ``models::tab::Tab`` struct.
+    """
 
     id: str
-    payer: str
-    payee: str
-    limit: float
-    per_unit: float
-    used: float
-    remaining: float
-    expires_at: int
-    status: TabStatus
     chain: str
-    created_at: int
-    updated_at: int
+    payer: str
+    provider: str
+    limit_amount: float
+    per_unit: float
+    total_charged: float
+    call_count: int
+    status: TabStatus | str
+    expiry: str  # RFC-3339
+    tx_hash: str
+    closed_tx_hash: str | None = None
+    created_at: str  # RFC-3339
+    updated_at: str  # RFC-3339
 
 
 class TabCharge(BaseModel):
     """A single charge event on a tab."""
 
-    id: str
+    id: int
     tab_id: str
-    units: float
     amount: float
-    memo: str
-    created_at: int
+    cumulative: float
+    call_count: int
+    provider_sig: str
+    charged_at: str  # RFC-3339

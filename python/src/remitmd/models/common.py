@@ -77,24 +77,30 @@ class DisputeStatus(str, Enum):
 
 
 class Transaction(BaseModel):
-    """Result of a write operation."""
+    """Result of a write operation.
+
+    Fields are optional because different server endpoints return different
+    subsets (e.g. DirectPaymentResponse has no ``chain``/``created_at``,
+    FaucetResponse has only ``tx_hash``).
+    """
 
     invoice_id: str | None = None
     tx_hash: str | None = None
-    chain: str
-    status: str
-    created_at: int  # unix timestamp
+    chain: str | None = None
+    status: str | None = None
+    created_at: str | int | None = None  # ISO-8601 string or unix timestamp
 
 
 class WalletStatus(BaseModel):
-    """Wallet status including balance and tier info."""
+    """Wallet status as returned by the server."""
 
-    address: str
-    chain: str
-    usdc_balance: float
+    wallet: str
     tier: str
     monthly_volume: float
     fee_rate_bps: int  # basis points
+    active_escrows: int = 0
+    active_tabs: int = 0
+    active_streams: int = 0
 
 
 class Reputation(BaseModel):

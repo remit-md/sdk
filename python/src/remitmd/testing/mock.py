@@ -18,6 +18,7 @@ import secrets
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from remitmd.errors import (
@@ -56,6 +57,12 @@ def _id(prefix: str) -> str:
 
 def _now() -> int:
     return int(time.time())
+
+
+def _iso(ts: int | None = None) -> str:
+    """Return an ISO-8601 timestamp string (UTC)."""
+    t = ts if ts is not None else _now()
+    return datetime.fromtimestamp(t, tz=timezone.utc).isoformat()
 
 
 @dataclass
@@ -161,9 +168,7 @@ class MockWallet:
 
     async def status(self) -> WalletStatus:
         return WalletStatus(
-            address=self.address,
-            chain="mock",
-            usdc_balance=await self.balance(),
+            wallet=self.address,
             tier="free",
             monthly_volume=0.0,
             fee_rate_bps=30,
@@ -195,23 +200,24 @@ class MockWallet:
         self._mock._check_forced_error(self.address)
         self._mock._debit(self.address, invoice.amount)
 
-        eid = _id("esc")
+        invoice_id = invoice.id or _id("inv")
+        now = _iso(self._mock.now())
+        timeout = _iso(self._mock.now() + invoice.timeout)
         escrow = Escrow(
-            id=eid,
-            invoice_id=invoice.id or _id("inv"),
+            invoice_id=invoice_id,
+            chain="mock",
+            tx_hash="0x" + secrets.token_hex(32),
+            status=EscrowStatus.funded,
             payer=self.address,
             payee=invoice.to,
             amount=invoice.amount,
-            fee_bps=30,
-            status=EscrowStatus.funded,
-            timeout_at=self._mock.now() + invoice.timeout,
-            milestones=invoice.milestones,
-            chain="mock",
-            created_at=self._mock.now(),
-            updated_at=self._mock.now(),
+            fee=0.0,
+            timeout=timeout,
+            created_at=now,
+            updated_at=now,
         )
-        self._mock._state.escrows[eid] = escrow
-        return self._mock._make_tx(invoice_id=escrow.invoice_id)
+        self._mock._state.escrows[invoice_id] = escrow
+        return self._mock._make_tx(invoice_id=invoice_id)
 
     async def release_escrow(self, invoice_id: str) -> Transaction:
         self._mock._check_forced_error(self.address)
@@ -265,19 +271,22 @@ class MockWallet:
         self._mock._debit(self.address, limit)
 
         tid = _id("tab")
+        now = _iso(self._mock.now())
+        expiry = _iso(self._mock.now() + expires)
         tab = Tab(
             id=tid,
-            payer=self.address,
-            payee=to,
-            limit=limit,
-            per_unit=per_unit,
-            used=0.0,
-            remaining=limit,
-            expires_at=self._mock.now() + expires,
-            status=TabStatus.open,
             chain="mock",
-            created_at=self._mock.now(),
-            updated_at=self._mock.now(),
+            payer=self.address,
+            provider=to,
+            limit_amount=limit,
+            per_unit=per_unit,
+            total_charged=0.0,
+            call_count=0,
+            status=TabStatus.open,
+            expiry=expiry,
+            tx_hash="0x" + secrets.token_hex(32),
+            created_at=now,
+            updated_at=now,
         )
         self._mock._state.tabs[tid] = tab
         return tab
@@ -290,9 +299,10 @@ class MockWallet:
         if tab.status != TabStatus.open:
             raise InvalidState(f"Tab is {tab.status}, expected open")
 
-        # Settle: payee gets used amount, payer gets remaining back
-        self._mock._credit(tab.payee, tab.used)
-        self._mock._credit(self.address, tab.remaining)
+        remaining = tab.limit_amount - tab.total_charged
+        # Settle: provider gets charged amount, payer gets remaining back
+        self._mock._credit(tab.provider, tab.total_charged)
+        self._mock._credit(self.address, remaining)
         tab.status = TabStatus.closed
         return self._mock._make_tx()
 
@@ -302,10 +312,11 @@ class MockWallet:
         if tab is None:
             raise TabNotFound(f"Tab {tab_id!r} not found")
         amount = units * tab.per_unit
-        if amount > tab.remaining:
-            raise TabLimitExceeded(f"Charge {amount:.2f} exceeds remaining {tab.remaining:.2f}")
-        tab.used += amount
-        tab.remaining -= amount
+        remaining = tab.limit_amount - tab.total_charged
+        if amount > remaining:
+            raise TabLimitExceeded(f"Charge {amount:.2f} exceeds remaining {remaining:.2f}")
+        tab.total_charged += amount
+        tab.call_count += 1
         return self._mock._make_tx()
 
     # ─── Streams ──────────────────────────────────────────────────────────────

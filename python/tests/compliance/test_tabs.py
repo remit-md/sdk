@@ -18,8 +18,8 @@ async def test_tab_open_returns_open_tab(wallet_pair):
     tab = await payer.open_tab(payee_addr, limit=20.0, per_unit=0.10)
 
     assert tab.id is not None
-    assert tab.status == TabStatus.open
-    assert tab.limit == pytest.approx(20.0, abs=0.01)
+    assert tab.status == TabStatus.open or tab.status == "open"
+    assert tab.limit_amount == pytest.approx(20.0, abs=0.01)
 
 
 @pytest.mark.asyncio

@@ -51,7 +51,11 @@ jobs:
           REMIT_TEST_SERVER_URL: http://localhost:3000
           REMIT_ROUTER_ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
           REMIT_CHAIN_ID: "84532"
-        run: cd python && pytest tests/compliance/ -v --tb=short
+        run: cd python && pytest tests/compliance/ -v -s --tb=short
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
 
       - name: Tear down compliance harness
         if: always()

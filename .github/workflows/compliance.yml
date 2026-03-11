@@ -12,6 +12,9 @@ jobs:
   python-compliance:
     name: Python Compliance (real server)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read   # required to pull ghcr.io/remit-md/server from private registry
 
     steps:
       - uses: actions/checkout@v4

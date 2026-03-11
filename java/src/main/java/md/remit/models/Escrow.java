@@ -27,7 +27,7 @@ public class Escrow {
     public BigDecimal fee;
 
     @JsonProperty("status")
-    public String status; // "funded" | "released" | "cancelled" | "disputed"
+    public String status; // "funded" | "released" | "cancelled"
 
     @JsonProperty("memo")
     public String memo;

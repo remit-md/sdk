@@ -25,7 +25,6 @@ class InvoiceStatus(str, Enum):
     active = "active"
     completed = "completed"
     cancelled = "cancelled"
-    disputed = "disputed"
     failed = "failed"
 
 
@@ -35,7 +34,6 @@ class EscrowStatus(str, Enum):
     active = "active"
     completed = "completed"
     cancelled = "cancelled"
-    disputed = "disputed"
     failed = "failed"
 
 

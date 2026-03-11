@@ -31,14 +31,12 @@ const (
 	InvoiceStatusFunded    InvoiceStatus = "funded"
 	InvoiceStatusReleased  InvoiceStatus = "released"
 	InvoiceStatusCancelled InvoiceStatus = "cancelled"
-	InvoiceStatusDisputed  InvoiceStatus = "disputed"
 	InvoiceStatusExpired   InvoiceStatus = "expired"
 
 	EscrowStatusPending   EscrowStatus = "pending"
 	EscrowStatusFunded    EscrowStatus = "funded"
 	EscrowStatusReleased  EscrowStatus = "released"
 	EscrowStatusCancelled EscrowStatus = "cancelled"
-	EscrowStatusDisputed  EscrowStatus = "disputed"
 	EscrowStatusExpired   EscrowStatus = "expired"
 
 	TabStatusOpen   TabStatus = "open"

@@ -21,7 +21,7 @@ public enum RemitChain: Int, Codable, Sendable {
 // MARK: - Status enums
 
 public enum EscrowStatus: String, Codable, Sendable {
-    case pending, funded, released, cancelled, disputed, expired
+    case pending, funded, released, cancelled, expired
 }
 
 public enum TabStatus: String, Codable, Sendable {

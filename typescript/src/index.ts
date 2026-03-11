@@ -26,7 +26,6 @@ export {
   EscrowNotFoundError,
   EscrowAlreadyFundedError,
   EscrowExpiredError,
-  EscrowFrozenError,
   InvalidInvoiceError,
   DuplicateInvoiceError,
   SelfPaymentError,

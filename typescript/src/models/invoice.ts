@@ -26,7 +26,6 @@ export interface Invoice {
   milestones?: Milestone[];
   splits?: Split[];
   timeout?: number; // seconds
-  disputeWindow?: number; // seconds
   createdAt: number;
   expiresAt?: number;
   metadata?: Record<string, unknown>;

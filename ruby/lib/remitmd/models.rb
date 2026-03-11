@@ -20,7 +20,6 @@ module Remitmd
     FUNDED    = "funded"
     RELEASED  = "released"
     CANCELLED = "cancelled"
-    DISPUTED  = "disputed"
     EXPIRED   = "expired"
   end
 

@@ -11,7 +11,6 @@ export interface Escrow {
   milestoneIndex?: number;
   claimStartedAt?: number;
   evidenceUri?: string;
-  disputeId?: string;
   createdAt: number;
   expiresAt?: number;
 }

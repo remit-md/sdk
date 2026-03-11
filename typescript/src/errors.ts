@@ -84,12 +84,6 @@ export class EscrowExpiredError extends RemitError {
   }
 }
 
-export class EscrowFrozenError extends RemitError {
-  constructor(msg = "Escrow is frozen during dispute.") {
-    super(msg, "ESCROW_FROZEN", 409);
-  }
-}
-
 // ─── Invoice errors ───────────────────────────────────────────────────────────
 
 export class InvalidInvoiceError extends RemitError {
@@ -238,7 +232,6 @@ const ERROR_MAP: Record<string, new (msg?: string) => RemitError> = {
   ESCROW_NOT_FOUND: EscrowNotFoundError,
   ESCROW_ALREADY_FUNDED: EscrowAlreadyFundedError,
   ESCROW_EXPIRED: EscrowExpiredError,
-  ESCROW_FROZEN: EscrowFrozenError,
   INVALID_INVOICE: InvalidInvoiceError,
   DUPLICATE_INVOICE: DuplicateInvoiceError,
   SELF_PAYMENT: SelfPaymentError,

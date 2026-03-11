@@ -34,7 +34,6 @@ pub enum EscrowStatus {
     Funded,
     Released,
     Cancelled,
-    Disputed,
     Expired,
 }
 

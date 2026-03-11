@@ -16,7 +16,6 @@ export type InvoiceStatus =
   | "active"
   | "completed"
   | "cancelled"
-  | "disputed"
   | "failed";
 
 export type EscrowStatus =
@@ -25,7 +24,6 @@ export type EscrowStatus =
   | "active"
   | "completed"
   | "cancelled"
-  | "disputed"
   | "failed";
 
 export type TabStatus = "open" | "closed" | "expired" | "suspended";

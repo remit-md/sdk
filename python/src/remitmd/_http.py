@@ -90,10 +90,10 @@ class AuthenticatedClient:
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
     ) -> Any:
-        headers = await self._build_auth_headers(method, path)
-
-        if method in ("POST", "PUT"):
-            headers["X-Idempotency-Key"] = secrets.token_hex(16)
+        # Idempotency key is fixed for all retries of the same logical operation.
+        # Auth headers (including nonce) are regenerated on each attempt so that
+        # a retry after a 5xx does not hit NONCE_REUSED on the server.
+        idempotency_key = secrets.token_hex(16) if method in ("POST", "PUT") else None
 
         last_exc: Exception | None = None
         for attempt in range(_MAX_RETRIES + 1):
@@ -101,6 +101,11 @@ class AuthenticatedClient:
                 # Exponential backoff: 1s, 2s, 4s
                 wait = 2 ** (attempt - 1)
                 await _async_sleep(wait)
+
+            # Fresh nonce + timestamp on every attempt.
+            headers = await self._build_auth_headers(method, path)
+            if idempotency_key is not None:
+                headers["X-Idempotency-Key"] = idempotency_key
 
             try:
                 resp = await self._client.request(

@@ -121,8 +121,7 @@ module Remitmd
     def pay(to, amount, memo: nil)
       validate_address!(to)
       validate_amount!(amount)
-      body = { to: to, amount: amount.to_s }
-      body[:memo] = memo if memo
+      body = { to: to, amount: amount.to_s, task: memo || "" }
       Transaction.new(@transport.post("/payments/direct", body))
     end
 

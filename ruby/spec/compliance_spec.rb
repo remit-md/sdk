@@ -68,7 +68,7 @@ module ComplianceHelpers
     Remitmd::RemitWallet.new(
       private_key:    private_key,
       chain:          "base_sepolia",
-      api_url:        COMPLIANCE_SERVER_URL,
+      api_url:        "#{COMPLIANCE_SERVER_URL}/api/v0",
       router_address: COMPLIANCE_ROUTER_ADDR
     )
   end

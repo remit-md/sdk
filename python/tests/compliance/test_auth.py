@@ -18,17 +18,13 @@ async def test_authenticated_request_returns_200_not_401(wallet):
 
     from .conftest import SERVER_URL
 
-    headers = await wallet._http._build_auth_headers(
-        "GET", f"/api/v0/status/{wallet.address}"
-    )
+    headers = await wallet._http._build_auth_headers("GET", f"/api/v0/status/{wallet.address}")
     async with httpx.AsyncClient(base_url=SERVER_URL, timeout=10.0) as client:
         resp = await client.get(
             f"/api/v0/status/{wallet.address}",
             headers=headers,
         )
-    assert resp.status_code == 200, (
-        f"Expected 200, got {resp.status_code}: {resp.text}"
-    )
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
 
 @pytest.mark.asyncio
@@ -47,9 +43,7 @@ async def test_unauthenticated_request_returns_401(http):
                 "amount": 1.0,
             },
         )
-    assert resp.status_code == 401, (
-        f"Expected 401, got {resp.status_code}: {resp.text}"
-    )
+    assert resp.status_code == 401, f"Expected 401, got {resp.status_code}: {resp.text}"
 
 
 @pytest.mark.asyncio
@@ -66,6 +60,4 @@ async def test_events_empty_for_new_wallet(wallet):
     """GET /api/v0/events returns empty list for a fresh wallet."""
     events = await wallet.get_events(wallet.address)
     assert isinstance(events, list)
-    assert len(events) == 0, (
-        f"Expected empty events for new wallet, got {events}"
-    )
+    assert len(events) == 0, f"Expected empty events for new wallet, got {events}"

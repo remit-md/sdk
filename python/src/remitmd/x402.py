@@ -49,8 +49,7 @@ class AllowanceExceededError(Exception):
 
     def __init__(self, amount_usdc: float, limit_usdc: float) -> None:
         super().__init__(
-            f"x402 payment {amount_usdc:.6f} USDC exceeds auto-pay limit"
-            f" {limit_usdc:.6f} USDC"
+            f"x402 payment {amount_usdc:.6f} USDC exceeds auto-pay limit {limit_usdc:.6f} USDC"
         )
         self.amount_usdc = amount_usdc
         self.limit_usdc = limit_usdc
@@ -166,7 +165,7 @@ class X402Client:
                 "authorization": {
                     "from": self._address,
                     "to": required["payTo"],
-                    "value": required["amount"],   # string (base units)
+                    "value": required["amount"],  # string (base units)
                     "validAfter": "0",
                     "validBefore": str(valid_before),
                     "nonce": nonce,
@@ -193,6 +192,5 @@ class X402Client:
 
     def __repr__(self) -> str:
         return (
-            f"X402Client(address={self._address!r},"
-            f" max_auto_pay_usdc={self._max_auto_pay_usdc!r})"
+            f"X402Client(address={self._address!r}, max_auto_pay_usdc={self._max_auto_pay_usdc!r})"
         )

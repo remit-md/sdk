@@ -278,7 +278,7 @@ class Wallet(RemitClient):
     async def request_testnet_funds(self) -> Transaction:
         if not self.testnet:
             raise ValueError("request_testnet_funds() is only available on testnet")
-        data = await self._http.post("/api/v0/faucet", {"address": self.address})
+        data = await self._http.post("/api/v0/faucet", {"wallet": self.address})
         return Transaction.model_validate(data)
 
     # ─── Repr (never expose key) ──────────────────────────────────────────────

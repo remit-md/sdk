@@ -14,9 +14,31 @@ from .conftest import server_available
 @server_available
 async def test_authenticated_request_returns_200_not_401(wallet):
     """GET /api/v0/status/{address} with valid EIP-712 auth must return 200."""
+    import httpx
+
+    from .conftest import SERVER_URL
+
+    # Debug: make a raw authenticated request to see exactly what's sent/received
+    headers = await wallet._http._build_auth_headers("GET", f"/api/v0/status/{wallet.address}")
+    print(f"\n=== DEBUG: wallet.address = {wallet.address}")
+    print(f"=== DEBUG: chain_id = {wallet._http._chain_id}")
+    print(f"=== DEBUG: verifying_contract = {wallet._http._verifying_contract}")
+    for k, v in headers.items():
+        val = v[:40] + "..." if len(v) > 40 else v
+        print(f"=== DEBUG: {k}: {val}")
+
+    async with httpx.AsyncClient(base_url=SERVER_URL, timeout=10.0) as client:
+        resp = await client.get(
+            f"/api/v0/status/{wallet.address}",
+            headers=headers,
+        )
+    print(f"=== DEBUG: status_code = {resp.status_code}")
+    print(f"=== DEBUG: response body = {resp.text[:500]}")
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+
     from remitmd.models.common import WalletStatus
 
-    status = await wallet.status()
+    status = WalletStatus.model_validate(resp.json())
     assert isinstance(status, WalletStatus)
     assert status.address.lower() == wallet.address.lower()
 

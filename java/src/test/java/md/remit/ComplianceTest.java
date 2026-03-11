@@ -158,10 +158,10 @@ class ComplianceTest {
             .routerAddress(ROUTER_ADDRESS)
             .build();
 
-        // Use history() instead of balance(): /wallet/balance returns 404 for fresh wallets
-        // but /wallet/history returns 200 with empty list.
-        TransactionList history = wallet.history(1, 10);
-        assertThat(history).as("history() must not throw 401").isNotNull();
+        // reputation() makes an authenticated GET to /api/v0/reputation/{address} —
+        // this endpoint exists for all registered addresses and returns 401 if auth fails.
+        var rep = wallet.reputation(wallet.address());
+        assertThat(rep).as("reputation() must not throw 401").isNotNull();
     }
 
     @Test

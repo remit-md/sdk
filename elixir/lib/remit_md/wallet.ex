@@ -200,11 +200,14 @@ defmodule RemitMd.Wallet do
   def pay(%__MODULE__{} = w, to, amount_usdc, opts \\ []) do
     with :ok <- validate_address(to),
          :ok <- validate_amount(amount_usdc) do
+      nonce = :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
       body = %{
         to: to,
         amount: amount_usdc,
         task:   Keyword.get(opts, :description) || "",
         chain:  w.chain,
+        nonce:  nonce,
+        signature: "0x",
         metadata: Keyword.get(opts, :metadata)
       }
 

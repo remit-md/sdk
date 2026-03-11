@@ -130,12 +130,12 @@ defmodule RemitMd.ComplianceTest do
       IO.puts("SKIP: compliance server not reachable at #{@server_url}")
       :ok
     else
-      # Use funded shared payer so balance endpoint returns 200 (fresh unfunded wallets may return 404).
       wallet = get_shared_payer()
 
-      # balance/1 makes an authenticated GET — will raise on 401
-      {:ok, balance} = Wallet.balance(wallet)
-      assert balance != nil
+      # reputation/2 makes an authenticated GET to /api/v0/reputation/{address} —
+      # this endpoint exists for all registered addresses and returns 401 if auth fails.
+      {:ok, rep} = Wallet.reputation(wallet, wallet.address)
+      assert rep != nil
     end
   end
 

@@ -144,15 +144,16 @@ mod compliance_tests {
             return;
         }
         let client = reqwest::Client::new();
-        // Use funded shared payer so balance endpoint returns 200 (not 404 for unfunded wallet).
         let wallet = get_shared_payer(&client).await;
 
-        let balance = wallet
-            .balance()
+        // reputation() makes an authenticated GET to /api/v0/reputation/{address} —
+        // this endpoint exists for all registered addresses and fails with 401 if
+        // auth headers are wrong.
+        let rep = wallet
+            .reputation(wallet.address())
             .await
-            .expect("balance() must not fail with valid auth");
-        // Server returns a balance object — we just verify the call succeeded (no 401).
-        let _ = balance;
+            .expect("reputation() must not fail with valid auth");
+        let _ = rep;
     }
 
     #[tokio::test]

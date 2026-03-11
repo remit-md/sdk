@@ -124,7 +124,8 @@ module Remitmd
     def pay(to, amount, memo: nil)
       validate_address!(to)
       validate_amount!(amount)
-      body = { to: to, amount: amount.to_s, task: memo || "", chain: @chain }
+      nonce = SecureRandom.hex(16)
+      body = { to: to, amount: amount.to_s, task: memo || "", chain: @chain, nonce: nonce, signature: "0x" }
       Transaction.new(@transport.post("/payments/direct", body))
     end
 

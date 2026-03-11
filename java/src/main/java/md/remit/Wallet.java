@@ -71,8 +71,12 @@ public class Wallet {
     public Transaction pay(String to, BigDecimal amount, String memo) {
         validateAddress(to);
         validateAmount(amount);
+        byte[] nb = new byte[16];
+        new java.security.SecureRandom().nextBytes(nb);
+        String nonce = java.util.HexFormat.of().formatHex(nb);
         return client.post("/api/v0/payments/direct",
-            Map.of("to", to, "amount", amount.toPlainString(), "task", memo != null ? memo : "", "chain", chain),
+            Map.of("to", to, "amount", amount.toPlainString(), "task", memo != null ? memo : "",
+                   "chain", chain, "nonce", nonce, "signature", "0x"),
             Transaction.class);
     }
 

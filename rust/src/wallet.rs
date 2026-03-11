@@ -188,6 +188,10 @@ impl Wallet {
     ) -> Result<Transaction, RemitError> {
         validate_address(to)?;
         validate_amount(amount)?;
+        let mut nb = [0u8; 16];
+        getrandom::getrandom(&mut nb)
+            .map_err(|_| remit_err(codes::SERVER_ERROR, "random generation failed"))?;
+        let nonce = hex::encode(nb);
         self.post(
             "/api/v0/payments/direct",
             json!({
@@ -195,6 +199,8 @@ impl Wallet {
                 "amount": amount.to_string(),
                 "task": memo,
                 "chain": &self.chain,
+                "nonce": nonce,
+                "signature": "0x",
             }),
         )
         .await

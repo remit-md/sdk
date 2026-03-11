@@ -115,12 +115,16 @@ public sealed class Wallet
         ValidateAddress(recipient, nameof(recipient));
         ValidateAmount(amount);
 
+        var nonce = Convert.ToHexString(
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
         return _transport.PostAsync<Transaction>("/api/v0/payments/direct", new
         {
-            to     = recipient,
-            amount = amount.ToString("F6"),
-            task   = memo,
-            chain  = _chain,
+            to        = recipient,
+            amount    = amount.ToString("F6"),
+            task      = memo,
+            chain     = _chain,
+            nonce     = nonce,
+            signature = "0x",
         }, ct);
     }
 

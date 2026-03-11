@@ -107,7 +107,7 @@ public sealed class MockRemit
 
                 var p when p.StartsWith("/api/v0/reputation/") => new Reputation(
                     MockAddress, 750, _mock._transactions.Sum(t => t.Amount), 0m,
-                    _mock._transactions.Count, 0.0, DateTimeOffset.UtcNow.AddDays(-30)),
+                    _mock._transactions.Count, DateTimeOffset.UtcNow.AddDays(-30)),
 
                 var p when p.StartsWith("/api/v0/escrows/") =>
                     _mock._escrows.TryGetValue(PathId(p), out var e)

@@ -32,7 +32,7 @@ from remitmd.signer import Signer
 
 # EIP-712 type definition for USDC's transferWithAuthorization (EIP-3009).
 # Domain: { name: "USD Coin", version: "2", chainId: N, verifyingContract: USDC }
-_EIP3009_TYPES: dict[str, list[dict[str, str]]] = {
+_EIP3009_TYPES: dict[str, object] = {
     "TransferWithAuthorization": [
         {"name": "from", "type": "address"},
         {"name": "to", "type": "address"},

@@ -3,12 +3,10 @@ package md.remit.signer;
 import md.remit.ErrorCodes;
 import md.remit.RemitError;
 import org.web3j.crypto.Credentials;
-import org.web3j.crypto.Keys;
 import org.web3j.crypto.Sign;
 import org.web3j.utils.Numeric;
 
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 
 /**
  * Signs EIP-712 hashes using an in-process Ethereum private key.
@@ -48,12 +46,33 @@ public class PrivateKeySigner implements Signer {
 
     @Override
     public byte[] sign(byte[] hash) {
-        Sign.SignatureData sig = Sign.signMessage(hash, credentials.getEcKeyPair(), false);
-        // Pack into 65-byte r+s+v format
+        // Sign the hash. ECKeyPair.sign() uses RFC-6979 deterministic k and normalises
+        // s to low-s form via toCanonicalised(), which is required by the server's k256
+        // verifier (Signature::from_slice rejects high-s signatures).
+        Sign.ECDSASignature sig = credentials.getEcKeyPair().sign(hash);
+
+        // Find the correct recovery ID (0 or 1) for the *canonicalized* signature.
+        // We cannot use Sign.signMessage's built-in recId: web3j computes the recId
+        // before calling toCanonicalised(), so when s is flipped the stored recId is
+        // wrong, causing the server to recover the wrong address and return 401.
+        BigInteger publicKey = credentials.getEcKeyPair().getPublicKey();
+        int recId = -1;
+        for (int i = 0; i < 2; i++) {
+            BigInteger recovered = Sign.recoverFromSignature(i, sig, hash);
+            if (recovered != null && recovered.equals(publicKey)) {
+                recId = i;
+                break;
+            }
+        }
+        if (recId == -1) {
+            throw new RuntimeException(
+                "Could not recover public key from signature — private key or hash may be invalid");
+        }
+
         byte[] result = new byte[65];
-        System.arraycopy(sig.getR(), 0, result, 0, 32);
-        System.arraycopy(sig.getS(), 0, result, 32, 32);
-        result[64] = sig.getV()[0];
+        System.arraycopy(Numeric.toBytesPadded(sig.r, 32), 0, result, 0, 32);
+        System.arraycopy(Numeric.toBytesPadded(sig.s, 32), 0, result, 32, 32);
+        result[64] = (byte) (recId + 27);
         return result;
     }
 

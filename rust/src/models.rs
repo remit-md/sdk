@@ -1,9 +1,24 @@
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// Deserializes a field that may arrive as either a JSON number or a JSON string.
+/// Used for `dispute_rate` which the server serializes as a BigDecimal string ("0").
+fn deser_f64_or_str<'de, D: Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum F64OrStr {
+        Float(f64),
+        Str(String),
+    }
+    match F64OrStr::deserialize(d)? {
+        F64OrStr::Float(f) => Ok(f),
+        F64OrStr::Str(s) => s.parse::<f64>().map_err(serde::de::Error::custom),
+    }
+}
 
 /// EVM chain IDs supported by remit.md.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct ChainId(pub u64);
 
@@ -81,19 +96,25 @@ pub enum DepositStatus {
 /// Result of any payment operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
+    /// Payment / invoice ID.  The server may return this as `invoice_id`.
+    #[serde(default, alias = "invoice_id")]
     pub id: String,
     pub tx_hash: String,
+    #[serde(default)]
     pub from: String,
+    #[serde(default)]
     pub to: String,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(default, with = "rust_decimal::serde::float")]
     pub amount: Decimal,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(default, with = "rust_decimal::serde::float")]
     pub fee: Decimal,
     #[serde(default)]
     pub memo: String,
+    #[serde(default)]
     pub chain_id: ChainId,
     #[serde(default)]
     pub block_number: u64,
+    #[serde(default)]
     pub created_at: DateTime<Utc>,
 }
 
@@ -110,15 +131,22 @@ pub struct Balance {
 /// An agent's on-chain payment reputation score (0–1000).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Reputation {
+    /// Wallet address.  The server may return this as `wallet`.
+    #[serde(default, alias = "wallet")]
     pub address: String,
     /// Score from 0 (no history) to 1000 (perfect record).
+    #[serde(default)]
     pub score: u32,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(default, with = "rust_decimal::serde::float")]
     pub total_paid: Decimal,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(default, with = "rust_decimal::serde::float")]
     pub total_received: Decimal,
+    #[serde(default)]
     pub transaction_count: u64,
+    /// Dispute rate (0.0–1.0).  May be serialized as a decimal string by the server.
+    #[serde(default, deserialize_with = "deser_f64_or_str")]
     pub dispute_rate: f64,
+    #[serde(default)]
     pub member_since: DateTime<Utc>,
 }
 

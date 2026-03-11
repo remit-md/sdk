@@ -79,6 +79,16 @@ module Remitmd
       a = r_inv.mod_mul(bn_s, n)
       b = n - r_inv.mod_mul(z, n)   # -r_inv*z mod n
 
+      # Normalize s to low-s canonical form (required by the server's k256 verifier).
+      # k256::ecdsa::Signature::from_slice rejects signatures with s > n/2.
+      half_n = n >> 1
+      if bn_s > half_n
+        bn_s = n - bn_s
+        # Recompute a and b for the new s
+        a = r_inv.mod_mul(bn_s, n)
+        b = n - r_inv.mod_mul(z, n)
+      end
+
       v = nil
       [0, 1].each do |parity|
         r_point = recover_r_point(group, bn_r, parity)

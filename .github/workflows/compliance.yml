@@ -170,3 +170,258 @@ jobs:
       - name: Tear down compliance harness
         if: always()
         run: docker compose -f docker-compose.compliance.yml down -v
+
+  java-compliance:
+    name: Java Compliance (real server)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start compliance test harness
+        run: |
+          docker compose -f docker-compose.compliance.yml up -d
+          echo "Waiting for server to be healthy..."
+          timeout 120 bash -c '
+            until docker compose -f docker-compose.compliance.yml ps server \
+              | grep -q "(healthy)"; do
+              sleep 3
+            done
+          '
+          echo "Server is healthy"
+          curl -sf http://localhost:3000/health | python3 -m json.tool
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Run Java compliance tests
+        env:
+          REMIT_TEST_SERVER_URL: http://localhost:3000
+          REMIT_ROUTER_ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+        run: cd java && gradle test --no-daemon --tests "md.remit.ComplianceTest"
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+
+      - name: Tear down compliance harness
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml down -v
+
+  ruby-compliance:
+    name: Ruby Compliance (real server)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start compliance test harness
+        run: |
+          docker compose -f docker-compose.compliance.yml up -d
+          echo "Waiting for server to be healthy..."
+          timeout 120 bash -c '
+            until docker compose -f docker-compose.compliance.yml ps server \
+              | grep -q "(healthy)"; do
+              sleep 3
+            done
+          '
+          echo "Server is healthy"
+          curl -sf http://localhost:3000/health | python3 -m json.tool
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: ruby
+
+      - name: Run Ruby compliance tests
+        env:
+          REMIT_TEST_SERVER_URL: http://localhost:3000
+          REMIT_ROUTER_ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+        run: cd ruby && bundle exec rspec spec/compliance_spec.rb --format documentation
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+
+      - name: Tear down compliance harness
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml down -v
+
+  rust-compliance:
+    name: Rust Compliance (real server)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start compliance test harness
+        run: |
+          docker compose -f docker-compose.compliance.yml up -d
+          echo "Waiting for server to be healthy..."
+          timeout 120 bash -c '
+            until docker compose -f docker-compose.compliance.yml ps server \
+              | grep -q "(healthy)"; do
+              sleep 3
+            done
+          '
+          echo "Server is healthy"
+          curl -sf http://localhost:3000/health | python3 -m json.tool
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Run Rust compliance tests
+        env:
+          REMIT_TEST_SERVER_URL: http://localhost:3000
+          REMIT_ROUTER_ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+        run: cd rust && cargo test compliance -- --include-ignored
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+
+      - name: Tear down compliance harness
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml down -v
+
+  dotnet-compliance:
+    name: .NET Compliance (real server)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start compliance test harness
+        run: |
+          docker compose -f docker-compose.compliance.yml up -d
+          echo "Waiting for server to be healthy..."
+          timeout 120 bash -c '
+            until docker compose -f docker-compose.compliance.yml ps server \
+              | grep -q "(healthy)"; do
+              sleep 3
+            done
+          '
+          echo "Server is healthy"
+          curl -sf http://localhost:3000/health | python3 -m json.tool
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore and build
+        run: cd dotnet && dotnet restore && dotnet build --no-restore -c Release
+
+      - name: Run .NET compliance tests
+        env:
+          REMIT_TEST_SERVER_URL: http://localhost:3000
+          REMIT_ROUTER_ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+        run: cd dotnet && dotnet test --no-build -c Release --verbosity normal --filter "FullyQualifiedName~ComplianceTests"
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+
+      - name: Tear down compliance harness
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml down -v
+
+  elixir-compliance:
+    name: Elixir Compliance (real server)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start compliance test harness
+        run: |
+          docker compose -f docker-compose.compliance.yml up -d
+          echo "Waiting for server to be healthy..."
+          timeout 120 bash -c '
+            until docker compose -f docker-compose.compliance.yml ps server \
+              | grep -q "(healthy)"; do
+              sleep 3
+            done
+          '
+          echo "Server is healthy"
+          curl -sf http://localhost:3000/health | python3 -m json.tool
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16"
+          otp-version: "26"
+
+      - name: Install Elixir dependencies
+        run: cd elixir && mix deps.get
+
+      - name: Run Elixir compliance tests
+        env:
+          REMIT_TEST_SERVER_URL: http://localhost:3000
+          REMIT_ROUTER_ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+        run: cd elixir && mix test test/compliance_test.exs --trace
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+
+      - name: Tear down compliance harness
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml down -v

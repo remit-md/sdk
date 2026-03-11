@@ -39,6 +39,9 @@ module Remitmd
       end
 
       @signer = signer || PrivateKeySigner.new(private_key)
+      # Normalize to the base chain name (strip testnet suffix) for use in pay body.
+      # The server accepts "base", "arbitrum", "optimism" — not "base_sepolia" etc.
+      @chain  = chain.sub(/_sepolia\z/, "").sub(/-sepolia\z/, "")
       cfg     = CHAIN_CONFIG.fetch(chain) do
         raise ArgumentError, "Unknown chain: #{chain}. Valid: #{CHAIN_CONFIG.keys.join(", ")}"
       end
@@ -121,7 +124,7 @@ module Remitmd
     def pay(to, amount, memo: nil)
       validate_address!(to)
       validate_amount!(amount)
-      body = { to: to, amount: amount.to_s, task: memo || "" }
+      body = { to: to, amount: amount.to_s, task: memo || "", chain: @chain }
       Transaction.new(@transport.post("/payments/direct", body))
     end
 

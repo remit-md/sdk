@@ -164,7 +164,15 @@ defmodule RemitMd.Http do
   end
 
   defp handle_response(status, resp_body, _url, transport, method, path, req_body, attempt) do
-    parsed = if resp_body == "", do: %{}, else: Jason.decode!(resp_body)
+    parsed =
+      if resp_body == "" do
+        %{}
+      else
+        case Jason.decode(resp_body) do
+          {:ok, data} -> data
+          {:error, _} -> %{"message" => resp_body}
+        end
+      end
 
     cond do
       status in 200..299 ->

@@ -15,6 +15,7 @@ public sealed class Wallet
     private readonly IRemitTransport _transport;
     private readonly IRemitSigner _signer;
     private readonly long _chainId;
+    private readonly string _chain;
 
     // Chain → API base URL map
     private static readonly Dictionary<string, (long ChainId, string ApiUrl)> Chains = new()
@@ -59,6 +60,7 @@ public sealed class Wallet
 
         _signer = signer;
         _chainId = cc.ChainId;
+        _chain = chain;
         _transport = new HttpTransport(signer, cc.ChainId, routerAddress ?? string.Empty, baseUrl ?? cc.ApiUrl);
     }
 
@@ -117,6 +119,7 @@ public sealed class Wallet
             to     = recipient,
             amount = amount.ToString("F6"),
             task   = memo,
+            chain  = _chain,
         }, ct);
     }
 

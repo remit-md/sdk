@@ -49,6 +49,7 @@ pub struct Wallet {
     pub(crate) transport: Arc<dyn Transport>,
     pub(crate) address: String,
     pub(crate) chain_id: ChainId,
+    pub(crate) chain: String,
 }
 
 impl Wallet {
@@ -193,6 +194,7 @@ impl Wallet {
                 "to": to,
                 "amount": amount.to_string(),
                 "task": memo,
+                "chain": &self.chain,
             }),
         )
         .await
@@ -627,6 +629,7 @@ fn build_wallet(
         transport,
         address,
         chain_id: ChainId(cfg.chain_id),
+        chain: chain.to_string(),
     })
 }
 

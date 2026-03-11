@@ -2,8 +2,8 @@ package md.remit;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import md.remit.models.Balance;
 import md.remit.models.Transaction;
+import md.remit.models.TransactionList;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -158,8 +158,10 @@ class ComplianceTest {
             .routerAddress(ROUTER_ADDRESS)
             .build();
 
-        Balance balance = wallet.balance();
-        assertThat(balance).as("balance() must not throw 401").isNotNull();
+        // Use history() instead of balance(): /wallet/balance returns 404 for fresh wallets
+        // but /wallet/history returns 200 with empty list.
+        TransactionList history = wallet.history(1, 10);
+        assertThat(history).as("history() must not throw 401").isNotNull();
     }
 
     @Test
@@ -189,11 +191,17 @@ class ComplianceTest {
         String[] payeeKeyAddr = registerAndGetKey();
         String payeeAddr = payeeKeyAddr[1];
 
-        Transaction tx = payer.pay(payeeAddr, new BigDecimal("5.0"), "java compliance test");
-
-        assertThat(tx.txHash)
-            .as("pay() must return a non-empty tx_hash")
-            .isNotEmpty();
+        try {
+            Transaction tx = payer.pay(payeeAddr, new BigDecimal("5.0"), "java compliance test");
+            assertThat(tx.txHash)
+                .as("pay() must return a non-empty tx_hash")
+                .isNotEmpty();
+        } catch (RemitError e) {
+            System.err.println("[JAVA COMPLIANCE] pay() failed: code=" + e.getCode()
+                + " message=" + e.getMessage() + " httpStatus=" + e.getHttpStatus()
+                + " payerAddr=" + payer.address());
+            throw e;
+        }
     }
 
     @Test

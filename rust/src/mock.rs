@@ -84,6 +84,7 @@ impl MockRemit {
             }),
             address: "0xMockWallet0000000000000000000000000001".to_string(),
             chain_id: ChainId::BASE_SEPOLIA,
+            chain: "base".to_string(),
         }
     }
 

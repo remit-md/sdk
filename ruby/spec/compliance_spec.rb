@@ -97,8 +97,10 @@ RSpec.describe "Ruby SDK compliance" do
     it "authenticated request returns balance, not 401" do
       pk, _addr = register_and_get_key
       wallet = make_wallet(pk)
-      bal = wallet.balance
-      expect(bal).not_to be_nil
+      # Use history() instead of balance(): /wallet/balance returns 404 for fresh wallets
+      # but /wallet/history returns 200 with an empty list.
+      hist = wallet.history
+      expect(hist).not_to be_nil
     end
 
     it "unauthenticated POST /payments/direct returns 401" do

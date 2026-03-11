@@ -26,11 +26,13 @@ public class Wallet {
     private final ApiClient client;
     private final Signer signer;
     private final long chainId;
+    private final String chain;
 
-    Wallet(ApiClient client, Signer signer, long chainId) {
+    Wallet(ApiClient client, Signer signer, long chainId, String chain) {
         this.client = client;
         this.signer = signer;
         this.chainId = chainId;
+        this.chain = chain;
     }
 
     /** The Ethereum address (0x-prefixed) of this wallet. */
@@ -70,7 +72,7 @@ public class Wallet {
         validateAddress(to);
         validateAmount(amount);
         return client.post("/api/v0/payments/direct",
-            Map.of("to", to, "amount", amount.toPlainString(), "task", memo != null ? memo : ""),
+            Map.of("to", to, "amount", amount.toPlainString(), "task", memo != null ? memo : "", "chain", chain),
             Transaction.class);
     }
 

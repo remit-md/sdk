@@ -10,7 +10,6 @@
 
 import { generatePrivateKey, privateKeyToAddress } from "viem/accounts";
 import { Wallet } from "../wallet.js";
-import { PrivateKeySigner } from "../signer.js";
 import {
   InsufficientBalanceError,
   EscrowNotFoundError,
@@ -22,7 +21,6 @@ import type {
   Transaction,
   WalletStatus,
   Reputation,
-  RemitEvent,
   Webhook,
 } from "../models/index.js";
 import type { Invoice } from "../models/invoice.js";

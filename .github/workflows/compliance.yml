@@ -60,3 +60,60 @@ jobs:
       - name: Tear down compliance harness
         if: always()
         run: docker compose -f docker-compose.compliance.yml down -v
+
+  typescript-compliance:
+    name: TypeScript Compliance (real server)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start compliance test harness
+        run: |
+          docker compose -f docker-compose.compliance.yml up -d
+          echo "Waiting for server to be healthy..."
+          timeout 120 bash -c '
+            until docker compose -f docker-compose.compliance.yml ps server \
+              | grep -q "(healthy)"; do
+              sleep 3
+            done
+          '
+          echo "Server is healthy"
+          curl -sf http://localhost:3000/health | python3 -m json.tool
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install TypeScript SDK dependencies
+        run: cd typescript && pnpm install
+
+      - name: Run TypeScript compliance tests
+        env:
+          REMIT_TEST_SERVER_URL: http://localhost:3000
+          REMIT_ROUTER_ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+          REMIT_CHAIN_ID: "84532"
+        run: cd typescript && pnpm run compliance
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+
+      - name: Tear down compliance harness
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml down -v

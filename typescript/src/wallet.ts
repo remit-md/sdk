@@ -13,6 +13,7 @@ import type {
   RemitEvent,
 } from "./models/index.js";
 import type { Invoice } from "./models/invoice.js";
+import type { Escrow } from "./models/escrow.js";
 import type { Tab } from "./models/tab.js";
 import type { Stream } from "./models/stream.js";
 import type { Bounty } from "./models/bounty.js";
@@ -223,6 +224,24 @@ export class Wallet extends RemitClient {
       details: options.details,
       evidenceUri: options.evidenceUri,
     });
+  }
+
+  // ─── Authenticated reads (override unauthenticated base class versions) ──────
+
+  /** GET /escrows/{id} — authenticated; server requires auth to access escrow details. */
+  override getEscrow(invoiceId: string): Promise<Escrow> {
+    return this.#auth.get<Escrow>(`/escrows/${invoiceId}`);
+  }
+
+  /** GET /tabs/{id} — authenticated; server requires auth to access tab details. */
+  override getTab(tabId: string): Promise<Tab> {
+    return this.#auth.get<Tab>(`/tabs/${tabId}`);
+  }
+
+  /** GET /events/{wallet} — authenticated. */
+  override getEvents(wallet: string, since?: number): Promise<RemitEvent[]> {
+    const qs = since ? `?since=${since}` : "";
+    return this.#auth.get<RemitEvent[]>(`/events/${wallet}${qs}`);
   }
 
   // ─── Events ─────────────────────────────────────────────────────────────────

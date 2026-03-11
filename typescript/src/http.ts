@@ -57,12 +57,19 @@ export class AuthenticatedClient {
   readonly #baseUrl: string;
   readonly #chainId: number;
   readonly #verifyingContract: string;
+  /** Path prefix extracted from baseUrl (e.g. "/api/v0") to prepend when signing.
+   *  The server verifies the full path (/api/v0/payments/direct) via OriginalUri,
+   *  not just the relative segment (/payments/direct). */
+  readonly #signPathPrefix: string;
 
   constructor({ signer, baseUrl, chainId, verifyingContract = "" }: HttpClientOptions) {
     this.#signer = signer;
     this.#baseUrl = baseUrl.replace(/\/$/, "");
     this.#chainId = chainId;
     this.#verifyingContract = verifyingContract;
+    // Parse path prefix from baseUrl so signed path matches OriginalUri on server.
+    const parsedUrl = new URL(this.#baseUrl);
+    this.#signPathPrefix = parsedUrl.pathname.replace(/\/$/, "");
   }
 
   async get<T>(path: string): Promise<T> {
@@ -92,12 +99,16 @@ export class AuthenticatedClient {
       verifyingContract: this.#verifyingContract,
     };
 
+    // Sign the full path (prefix + relative) so it matches OriginalUri on the server.
+    // e.g. baseUrl "http://…/api/v0" + path "/payments/direct" → signed "/api/v0/payments/direct"
+    const signedPath = `${this.#signPathPrefix}${path}`;
+
     // Sign the request metadata (never body — body may be large)
     const signature = await this.#signer.signTypedData(
       domain,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       EIP712_TYPES as any,
-      { method, path, timestamp: BigInt(timestamp), nonce },
+      { method, path: signedPath, timestamp: BigInt(timestamp), nonce },
     );
 
     const headers: Record<string, string> = {

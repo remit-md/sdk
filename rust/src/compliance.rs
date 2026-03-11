@@ -52,7 +52,7 @@ mod compliance_tests {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_millis()
+                .as_nanos()
         );
         let reg: serde_json::Value = client
             .post(format!("{}/api/v0/auth/register", server_url()))

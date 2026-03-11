@@ -76,6 +76,8 @@ public class PrivateKeySigner implements Signer {
 
     @Override
     public String address() {
-        return "0x" + credentials.getAddress();
+        // credentials.getAddress() already returns "0x"-prefixed address (web3j Credentials stores
+        // the address with Numeric.prependHexPrefix applied).  Do NOT prepend another "0x".
+        return credentials.getAddress();
     }
 }

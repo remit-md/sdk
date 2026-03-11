@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from remitmd.signer import PrivateKeySigner
 from remitmd.wallet import Wallet
 from remitmd.x402 import AllowanceExceededError, X402Client
 

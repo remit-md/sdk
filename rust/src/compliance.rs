@@ -52,7 +52,7 @@ mod compliance_tests {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .subsec_millis()
+                .as_millis()
         );
         let reg: serde_json::Value = client
             .post(format!("{}/api/v0/auth/register", server_url()))
@@ -144,8 +144,8 @@ mod compliance_tests {
             return;
         }
         let client = reqwest::Client::new();
-        let (pk, _addr) = register_and_get_key(&client).await;
-        let wallet = make_wallet(&pk);
+        // Use funded shared payer so balance endpoint returns 200 (not 404 for unfunded wallet).
+        let wallet = get_shared_payer(&client).await;
 
         let balance = wallet
             .balance()

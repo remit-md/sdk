@@ -192,7 +192,7 @@ impl Wallet {
             json!({
                 "to": to,
                 "amount": amount.to_string(),
-                "memo": memo,
+                "task": memo,
             }),
         )
         .await

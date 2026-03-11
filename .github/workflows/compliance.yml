@@ -153,8 +153,8 @@ jobs:
           go-version: "1.22"
           cache-dependency-path: go/go.sum
 
-      - name: Download Go dependencies
-        run: cd go && go mod download
+      - name: Tidy Go dependencies
+        run: cd go && go mod tidy
 
       - name: Run Go compliance tests
         env:

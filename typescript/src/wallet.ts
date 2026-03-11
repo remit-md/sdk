@@ -2,6 +2,7 @@
  * Wallet — read + write operations, requires a private key (or custom Signer).
  */
 
+import { randomBytes } from "node:crypto";
 import { generatePrivateKey } from "viem/accounts";
 import { RemitClient, type RemitClientOptions } from "./client.js";
 import { AuthenticatedClient } from "./http.js";
@@ -123,13 +124,35 @@ export class Wallet extends RemitClient {
   // ─── Direct Payment ─────────────────────────────────────────────────────────
 
   payDirect(to: string, amount: number, memo = ""): Promise<Transaction> {
-    return this.#auth.post<Transaction>("/payments/direct", { to, amount, memo });
+    return this.#auth.post<Transaction>("/payments/direct", {
+      to,
+      amount,
+      task: memo,
+      chain: this._chain,
+      nonce: randomBytes(16).toString("hex"),
+      signature: "0x",
+    });
   }
 
   // ─── Escrow ─────────────────────────────────────────────────────────────────
 
-  pay(invoice: Invoice): Promise<Transaction> {
-    return this.#auth.post<Transaction>("/invoices", invoice);
+  async pay(invoice: Invoice): Promise<Escrow> {
+    // Step 1: create invoice on server.
+    const invoiceId = invoice.id || randomBytes(16).toString("hex");
+    await this.#auth.post<unknown>("/invoices", {
+      id: invoiceId,
+      chain: invoice.chain || this._chain,
+      from_agent: this.address.toLowerCase(),
+      to_agent: invoice.to.toLowerCase(),
+      amount: invoice.amount,
+      type: invoice.paymentType ?? "escrow",
+      task: invoice.memo ?? "",
+      nonce: randomBytes(16).toString("hex"),
+      signature: "0x",
+      ...(invoice.timeout ? { escrow_timeout: invoice.timeout } : {}),
+    });
+    // Step 2: fund the escrow and return it.
+    return this.#auth.post<Escrow>("/escrows", { invoice_id: invoiceId });
   }
 
   claimStart(invoiceId: string): Promise<Transaction> {
@@ -152,22 +175,26 @@ export class Wallet extends RemitClient {
   }
 
   cancelEscrow(invoiceId: string): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/cancel`);
+    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/cancel`, {});
   }
 
   // ─── Metered Tabs ───────────────────────────────────────────────────────────
 
   openTab(options: OpenTabOptions): Promise<Tab> {
     return this.#auth.post<Tab>("/tabs", {
-      to: options.to,
-      limit: options.limit,
-      perUnit: options.perUnit,
-      expires: options.expires ?? 86400,
+      chain: this._chain,
+      provider: options.to,
+      limit_amount: options.limit,
+      per_unit: options.perUnit,
+      expiry: Math.floor(Date.now() / 1000) + (options.expires ?? 86400),
     });
   }
 
   closeTab(tabId: string): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/tabs/${tabId}/close`);
+    return this.#auth.post<Transaction>(`/tabs/${tabId}/close`, {
+      final_amount: 0,
+      provider_sig: "0x",
+    });
   }
 
   // ─── Streaming ──────────────────────────────────────────────────────────────

@@ -202,12 +202,12 @@ export class MockRemit {
     const id = invoice.id ?? nextId();
     const escrow: Escrow = {
       invoiceId: id,
+      txHash: `0x${nextId()}`,
       payer: from,
       payee: invoice.to,
       amount: invoice.amount,
       chain: "base",
       status: "funded",
-      milestoneIndex: 0,
       createdAt: this._now(),
     };
     this.#escrows.set(id, escrow);
@@ -396,9 +396,9 @@ export class MockWallet extends Wallet {
     return this.#mock.payDirect(this.address, to, amount);
   }
 
-  override async pay(invoice: Invoice): Promise<Transaction> {
-    const { tx } = this.#mock.fundEscrow(this.address, invoice);
-    return tx;
+  override async pay(invoice: Invoice): Promise<Escrow> {
+    const { escrow } = this.#mock.fundEscrow(this.address, invoice);
+    return escrow;
   }
 
   override async releaseEscrow(invoiceId: string): Promise<Transaction> {

@@ -73,7 +73,7 @@ describe("Vercel AI integration", () => {
       50,
       "Build a widget",
     )) as { status: string };
-    assert.equal(tx.status, "confirmed");
+    assert.equal(tx.status, "funded");
     assert.equal(await payer.balance(), 150);
   });
 

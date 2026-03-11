@@ -138,9 +138,7 @@ module Remitmd
 
     # Returns the keccak256 digest as raw binary bytes.
     def keccak256_bytes(data)
-      OpenSSL::Digest.new("keccak256").digest(data)
-    rescue OpenSSL::Digest::DigestError => e
-      raise "Keccak-256 unavailable — install OpenSSL 3.0+. Error: #{e.message}"
+      Remitmd::Keccak.digest(data)
     end
 
     # ─── Response handling ────────────────────────────────────────────────────

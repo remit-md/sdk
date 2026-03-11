@@ -140,9 +140,7 @@ module Remitmd
 
     # Returns the keccak256 digest as a hex string (no 0x prefix).
     def keccak256_hex(data)
-      OpenSSL::Digest.new("keccak256").hexdigest(data)
-    rescue OpenSSL::Digest::DigestError => e
-      raise "Keccak-256 unavailable — install OpenSSL 3.0+ or add gem 'digest-sha3'. Error: #{e.message}"
+      Remitmd::Keccak.hexdigest(data)
     end
   end
 end

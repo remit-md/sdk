@@ -37,17 +37,10 @@ public final class PrivateKeySigner: Signer {
         }
         let key = try secp256k1.Recovery.PrivateKey(dataRepresentation: keyData)
         self.privateKey = key
-        // Use the library's uncompressed key (65 bytes: 04 || x || y) to derive the address.
-        // This avoids the pure-Swift y-decompression code path entirely.
-        let uncompressed = key.publicKey.rawRepresentation
-        let pubXY: Data
-        if uncompressed.count == 65, uncompressed.first == 0x04 {
-            pubXY = uncompressed.dropFirst()
-        } else {
-            pubXY = uncompressed
-        }
-        let hash = keccak256(pubXY)
-        self.address = "0x" + hash.suffix(20).hexString
+        // Use Signing key to get compressed pubkey as Data (Recovery.PublicKey.rawRepresentation
+        // returns a C struct, but Signing.PublicKey.rawRepresentation returns Data).
+        let signingKey = try secp256k1.Signing.PrivateKey(dataRepresentation: keyData)
+        self.address = PrivateKeySigner.deriveAddress(compressedPubKey: signingKey.publicKey.rawRepresentation)
     }
 
     /// Sign a 32-byte EIP-712 digest using ECDSA, returning hex-encoded 65-byte signature (r+s+v).
@@ -132,8 +125,14 @@ private func decompressY(x: [UInt8], evenY: Bool) -> [UInt8]? {
 
 /// (a + b) mod m — assumes a,b < m
 private func addmod(_ a: [UInt8], _ b: [UInt8], _ m: [UInt8]) -> [UInt8] {
-    let s = add256(a, b)
-    return cmp256(s, m) >= 0 ? sub256(s, m) : s
+    var result = [UInt8](repeating: 0, count: 32)
+    var carry: UInt16 = 0
+    for i in (0..<32).reversed() {
+        let s = UInt16(a[i]) + UInt16(b[i]) + carry
+        result[i] = UInt8(s & 0xFF)
+        carry = s >> 8
+    }
+    return (carry != 0 || cmp256(result, m) >= 0) ? sub256(result, m) : result
 }
 
 /// (a - b) mod m — assumes a,b < m

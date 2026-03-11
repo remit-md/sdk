@@ -2,6 +2,7 @@
 
 require_relative "remitmd/errors"
 require_relative "remitmd/models"
+require_relative "remitmd/keccak"
 require_relative "remitmd/signer"
 require_relative "remitmd/http"
 require_relative "remitmd/wallet"

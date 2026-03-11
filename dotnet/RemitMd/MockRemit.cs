@@ -185,7 +185,7 @@ public sealed class MockRemit
         private Escrow HandleCreateEscrow(object body, string id, DateTimeOffset now)
         {
             var d    = Deserialize(body);
-            var to   = d.GetValueOrDefault("payee")?.ToString() ?? "0x0000000000000000000000000000000000000000";
+            var to   = d.GetValueOrDefault("payee")?.ToString() ?? MockAddress;
             var amt  = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
             var memo = d.GetValueOrDefault("memo")?.ToString() ?? "";
 
@@ -410,9 +410,9 @@ public sealed class MockRemit
         {
             var d = Deserialize(body);
             return (
-                d.GetValueOrDefault("to")?.ToString() ?? "0x0000000000000000000000000000000000000000",
+                d.GetValueOrDefault("to")?.ToString() ?? MockAddress,
                 decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0"),
-                d.GetValueOrDefault("memo")?.ToString() ?? ""
+                d.GetValueOrDefault("task")?.ToString() ?? ""
             );
         }
     }

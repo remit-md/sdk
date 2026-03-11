@@ -116,7 +116,7 @@ public sealed class Wallet
         {
             to     = recipient,
             amount = amount.ToString("F6"),
-            memo,
+            task   = memo,
         }, ct);
     }
 

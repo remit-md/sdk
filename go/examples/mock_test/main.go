@@ -50,14 +50,14 @@ func main() {
 		log.Fatalf("CreateEscrow failed: %v", err)
 	}
 	fmt.Printf("Escrow created: %s (status: %s, amount: %s USDC)\n",
-		escrow.ID, escrow.Status, escrow.Amount)
+		escrow.InvoiceID, escrow.Status, escrow.Amount)
 
 	// Release escrow after work is done
-	relTx, err := wallet.ReleaseEscrow(ctx, escrow.ID)
+	relTx, err := wallet.ReleaseEscrow(ctx, escrow.InvoiceID)
 	if err != nil {
 		log.Fatalf("ReleaseEscrow failed: %v", err)
 	}
-	fmt.Printf("Escrow released: %s USDC to %s\n", relTx.Amount, relTx.To)
+	fmt.Printf("Escrow released: %s USDC to %s\n", relTx.Amount, relTx.Payee)
 
 	// Final balance
 	bal, _ = wallet.Balance(ctx)

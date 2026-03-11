@@ -93,6 +93,7 @@ public sealed class Wallet
         _transport = transport;
         _signer = signer;
         _chainId = chainId;
+        _chain = "base";
     }
 
     // ─── Direct payments ──────────────────────────────────────────────────────

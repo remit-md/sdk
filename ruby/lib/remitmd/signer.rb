@@ -9,6 +9,12 @@ module Remitmd
     "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16
   ).freeze
 
+  # Precomputed (p + 1) / 4 — the modular square root exponent for p ≡ 3 (mod 4).
+  # Avoids BN division at runtime (which returns Integer on some OpenSSL versions).
+  SECP256K1_SQRT_EXP = OpenSSL::BN.new(
+    "3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBFFFFF0C", 16
+  ).freeze
+
   # Interface for signing remit.md API requests.
   # Implement this module to provide custom signing (HSM, KMS, etc.).
   module Signer
@@ -117,10 +123,7 @@ module Remitmd
       rhs = x3 + OpenSSL::BN.new("7")
       y_squared = rhs % p
       # Tonelli–Shanks: since p ≡ 3 mod 4, sqrt = y²^((p+1)/4) mod p
-      # BN division may return Integer on some OpenSSL versions; ensure BN.
-      exp = (p + OpenSSL::BN.new("1")) / OpenSSL::BN.new("4")
-      exp = OpenSSL::BN.new(exp.to_s) unless exp.is_a?(OpenSSL::BN)
-      y = y_squared.mod_exp(exp, p)
+      y = y_squared.mod_exp(SECP256K1_SQRT_EXP, p)
       # Verify that y² ≡ y_squared (mod p) — i.e., a square root exists
       return nil unless y.mod_mul(y, p) == y_squared
 

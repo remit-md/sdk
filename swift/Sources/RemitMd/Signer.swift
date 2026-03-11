@@ -1,5 +1,5 @@
 import Foundation
-import secp256k1
+@preconcurrency import secp256k1
 
 // MARK: - Signer protocol
 
@@ -24,7 +24,7 @@ public protocol Signer: Sendable {
 /// ```
 public final class PrivateKeySigner: Signer {
     public let address: String
-    private let privateKey: secp256k1.Signing.PrivateKey
+    private let privateKey: secp256k1.Recovery.PrivateKey
 
     /// - Parameter privateKey: 32-byte hex private key (with or without 0x prefix).
     public init(privateKey hex: String) throws {
@@ -35,12 +35,17 @@ public final class PrivateKeySigner: Signer {
                 "private key must be 64 hex chars (32 bytes), got \(stripped.count) chars"
             )
         }
-        let key = try secp256k1.Signing.PrivateKey(dataRepresentation: keyData)
+        let key = try secp256k1.Recovery.PrivateKey(dataRepresentation: keyData)
         self.privateKey = key
-        self.address = PrivateKeySigner.deriveAddress(compressedPubKey: key.publicKey.dataRepresentation)
+        // Use Signing key to get compressed pubkey as Data.
+        // rawRepresentation returns the C struct secp256k1_pubkey for all key types,
+        // but dataRepresentation returns the serialized bytes.
+        let signingKey = try secp256k1.Signing.PrivateKey(dataRepresentation: keyData)
+        self.address = PrivateKeySigner.deriveAddress(compressedPubKey: signingKey.publicKey.dataRepresentation)
     }
 
-    /// Sign a 32-byte digest using ECDSA, returning hex-encoded 65-byte signature (r+s+v).
+    /// Sign a 32-byte EIP-712 digest using ECDSA, returning hex-encoded 65-byte signature (r+s+v).
+    /// v is 0x1b (27) or 0x1c (28) per Ethereum convention.
     public func sign(digest: Data) throws -> String {
         guard digest.count == 32 else {
             throw RemitError(
@@ -49,8 +54,10 @@ public final class PrivateKeySigner: Signer {
             )
         }
         let sig = try privateKey.signature(for: digest)
-        var result = Data(sig.dataRepresentation) // 64 bytes: r+s
-        result.append(0x1b)                        // v = 27 (Ethereum convention)
+        // dataRepresentation is 65 bytes: r(32) || s(32) || recid(1)
+        let sigData = sig.dataRepresentation
+        var result = Data(sigData.prefix(64))
+        result.append(sigData[64] + 27)  // v = 27 or 28
         return "0x" + result.hexString
     }
 
@@ -119,8 +126,14 @@ private func decompressY(x: [UInt8], evenY: Bool) -> [UInt8]? {
 
 /// (a + b) mod m — assumes a,b < m
 private func addmod(_ a: [UInt8], _ b: [UInt8], _ m: [UInt8]) -> [UInt8] {
-    let s = add256(a, b)
-    return cmp256(s, m) >= 0 ? sub256(s, m) : s
+    var result = [UInt8](repeating: 0, count: 32)
+    var carry: UInt16 = 0
+    for i in (0..<32).reversed() {
+        let s = UInt16(a[i]) + UInt16(b[i]) + carry
+        result[i] = UInt8(s & 0xFF)
+        carry = s >> 8
+    }
+    return (carry != 0 || cmp256(result, m) >= 0) ? sub256(result, m) : result
 }
 
 /// (a - b) mod m — assumes a,b < m

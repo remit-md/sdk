@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use serde_json::Value;
+use sha3::{Digest, Keccak256};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::error::{codes, remit_err, RemitError};
 use crate::signer::Signer;
@@ -57,11 +59,18 @@ const MAX_RETRIES: u32 = 3;
 pub(crate) struct HttpTransport {
     client: reqwest::Client,
     base_url: String,
+    chain_id: u64,
+    router_address: String,
     signer: Arc<dyn Signer>,
 }
 
 impl HttpTransport {
-    pub(crate) fn new(base_url: impl Into<String>, signer: Arc<dyn Signer>) -> Self {
+    pub(crate) fn new(
+        base_url: impl Into<String>,
+        chain_id: u64,
+        router_address: impl Into<String>,
+        signer: Arc<dyn Signer>,
+    ) -> Self {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECS))
             .build()
@@ -70,6 +79,8 @@ impl HttpTransport {
         Self {
             client,
             base_url: base_url.into(),
+            chain_id,
+            router_address: router_address.into(),
             signer,
         }
     }
@@ -102,7 +113,7 @@ impl HttpTransport {
                 tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
             }
 
-            match self.attempt(method, &url, body.clone()).await {
+            match self.attempt(method, &url, path, body.clone()).await {
                 Ok(v) => return Ok(v),
                 Err(e) => {
                     // Only retry on rate limit and server errors.
@@ -122,13 +133,30 @@ impl HttpTransport {
         &self,
         method: &str,
         url: &str,
+        path: &str,
         body: Option<Value>,
     ) -> Result<Value, RemitError> {
-        // Generate a random nonce for replay protection.
-        let nonce = {
-            let bytes: [u8; 16] = rand_bytes();
-            hex::encode(bytes)
-        };
+        // Generate a random 32-byte nonce for replay protection.
+        let nonce_bytes: [u8; 32] = rand_bytes();
+        let nonce_hex = format!("0x{}", hex::encode(nonce_bytes));
+
+        // Current Unix timestamp in seconds.
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // Compute EIP-712 hash and sign it.
+        let digest = compute_eip712_hash(
+            self.chain_id,
+            &self.router_address,
+            method,
+            path,
+            timestamp,
+            &nonce_bytes,
+        );
+        let sig = self.signer.sign(&digest)?;
+        let sig_hex = format!("0x{}", hex::encode(&sig));
 
         let mut req = if method == "POST" {
             self.client
@@ -140,8 +168,10 @@ impl HttpTransport {
 
         req = req
             .header("Accept", "application/json")
-            .header("X-Remit-Address", self.signer.address())
-            .header("X-Remit-Nonce", &nonce);
+            .header("X-Remit-Agent", self.signer.address())
+            .header("X-Remit-Nonce", &nonce_hex)
+            .header("X-Remit-Timestamp", timestamp.to_string())
+            .header("X-Remit-Signature", &sig_hex);
 
         if let Some(body) = body {
             req = req.json(&body);
@@ -177,6 +207,82 @@ impl HttpTransport {
     }
 }
 
+// ─── EIP-712 ──────────────────────────────────────────────────────────────────
+
+fn keccak256_hash(data: &[u8]) -> [u8; 32] {
+    let mut h = Keccak256::new();
+    h.update(data);
+    h.finalize().into()
+}
+
+/// Compute the EIP-712 hash for an APIRequest struct.
+///
+/// Domain: name="remit.md", version="0.1", chainId, verifyingContract
+/// Struct: APIRequest(string method, string path, uint256 timestamp, bytes32 nonce)
+pub(crate) fn compute_eip712_hash(
+    chain_id: u64,
+    router_address: &str,
+    method: &str,
+    path: &str,
+    timestamp: u64,
+    nonce: &[u8; 32],
+) -> [u8; 32] {
+    // Type hashes.
+    let domain_type_hash = keccak256_hash(
+        b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+    );
+    let request_type_hash =
+        keccak256_hash(b"APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)");
+
+    // Domain separator components.
+    let name_hash = keccak256_hash(b"remit.md");
+    let version_hash = keccak256_hash(b"0.1");
+
+    let mut chain_id_padded = [0u8; 32];
+    chain_id_padded[24..].copy_from_slice(&chain_id.to_be_bytes());
+
+    // Parse verifying contract address → 32 bytes (left-zero-padded).
+    let addr_hex = router_address.trim_start_matches("0x");
+    let addr_bytes = hex::decode(addr_hex).unwrap_or_default();
+    let mut addr_padded = [0u8; 32];
+    if addr_bytes.len() == 20 {
+        addr_padded[12..].copy_from_slice(&addr_bytes);
+    }
+
+    let mut domain_data = [0u8; 160]; // 5 × 32
+    domain_data[0..32].copy_from_slice(&domain_type_hash);
+    domain_data[32..64].copy_from_slice(&name_hash);
+    domain_data[64..96].copy_from_slice(&version_hash);
+    domain_data[96..128].copy_from_slice(&chain_id_padded);
+    domain_data[128..160].copy_from_slice(&addr_padded);
+    let domain_separator = keccak256_hash(&domain_data);
+
+    // Struct hash.
+    let method_hash = keccak256_hash(method.as_bytes());
+    let path_hash = keccak256_hash(path.as_bytes());
+
+    let mut timestamp_padded = [0u8; 32];
+    timestamp_padded[24..].copy_from_slice(&timestamp.to_be_bytes());
+
+    let mut struct_data = [0u8; 160]; // 5 × 32
+    struct_data[0..32].copy_from_slice(&request_type_hash);
+    struct_data[32..64].copy_from_slice(&method_hash);
+    struct_data[64..96].copy_from_slice(&path_hash);
+    struct_data[96..128].copy_from_slice(&timestamp_padded);
+    struct_data[128..160].copy_from_slice(nonce);
+    let struct_hash = keccak256_hash(&struct_data);
+
+    // EIP-712 final hash: "\x19\x01" || domainSeparator || structHash
+    let mut final_data = [0u8; 66];
+    final_data[0] = 0x19;
+    final_data[1] = 0x01;
+    final_data[2..34].copy_from_slice(&domain_separator);
+    final_data[34..66].copy_from_slice(&struct_hash);
+    keccak256_hash(&final_data)
+}
+
+// ─── Error parsing ────────────────────────────────────────────────────────────
+
 fn parse_api_error(status: u16, body: &[u8]) -> RemitError {
     #[derive(serde::Deserialize)]
     struct ApiErr {
@@ -210,4 +316,108 @@ fn rand_bytes<const N: usize>() -> [u8; N] {
     let mut out = [0u8; N];
     getrandom::getrandom(&mut out).expect("getrandom failed: system CSPRNG unavailable");
     out
+}
+
+// ─── Golden vector tests ──────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::signer::PrivateKeySigner;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct GvDomain {
+        #[serde(rename = "chain_id")]
+        chain_id: u64,
+        #[serde(rename = "verifying_contract")]
+        verifying_contract: String,
+    }
+
+    #[derive(Deserialize)]
+    struct GvMessage {
+        method: String,
+        path: String,
+        timestamp: u64,
+        nonce: String,
+    }
+
+    #[derive(Deserialize)]
+    struct GvVector {
+        description: String,
+        domain: GvDomain,
+        message: GvMessage,
+        expected_hash: String,
+        expected_signature: String,
+    }
+
+    #[derive(Deserialize)]
+    struct GvFile {
+        vectors: Vec<GvVector>,
+    }
+
+    fn load_vectors() -> Vec<GvVector> {
+        let data = std::fs::read_to_string("../test-vectors/eip712.json")
+            .expect("read ../test-vectors/eip712.json — run `cargo run --bin gen_vectors` first");
+        let f: GvFile = serde_json::from_str(&data).expect("parse test vectors");
+        assert!(!f.vectors.is_empty(), "vectors array must not be empty");
+        f.vectors
+    }
+
+    fn parse_nonce(s: &str) -> [u8; 32] {
+        let hex = s.trim_start_matches("0x");
+        let bytes = hex::decode(hex).expect("valid hex nonce");
+        assert_eq!(bytes.len(), 32, "nonce must be 32 bytes");
+        bytes.try_into().unwrap()
+    }
+
+    #[test]
+    fn golden_vectors_hash() {
+        let vectors = load_vectors();
+        for v in &vectors {
+            let nonce = parse_nonce(&v.message.nonce);
+            let got = compute_eip712_hash(
+                v.domain.chain_id,
+                &v.domain.verifying_contract,
+                &v.message.method,
+                &v.message.path,
+                v.message.timestamp,
+                &nonce,
+            );
+            let got_hex = format!("0x{}", hex::encode(got));
+            assert_eq!(
+                got_hex, v.expected_hash,
+                "EIP-712 hash mismatch for {:?}",
+                v.description
+            );
+        }
+    }
+
+    #[test]
+    fn golden_vectors_signature() {
+        // Anvil test wallet #0 — same key used by gen_vectors in remit-server.
+        const TEST_PRIV_KEY: &str =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+        let signer = PrivateKeySigner::new(TEST_PRIV_KEY).expect("create signer");
+
+        let vectors = load_vectors();
+        for v in &vectors {
+            let nonce = parse_nonce(&v.message.nonce);
+            let digest = compute_eip712_hash(
+                v.domain.chain_id,
+                &v.domain.verifying_contract,
+                &v.message.method,
+                &v.message.path,
+                v.message.timestamp,
+                &nonce,
+            );
+            let sig = signer.sign(&digest).expect("sign");
+            let got_sig = format!("0x{}", hex::encode(&sig));
+            assert_eq!(
+                got_sig, v.expected_signature,
+                "signature mismatch for {:?}",
+                v.description
+            );
+        }
+    }
 }

@@ -15,6 +15,8 @@ internal protocol Transport: Sendable {
 
 internal final class HttpTransport: Transport, @unchecked Sendable {
     private let baseURL: String
+    private let chainId: UInt64
+    private let routerAddress: String
     private let signer: any Signer
     private let session: URLSession
     private let maxRetries = 3
@@ -25,8 +27,10 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
         return d
     }()
 
-    init(baseURL: String, signer: any Signer) {
+    init(baseURL: String, chainId: UInt64, routerAddress: String, signer: any Signer) {
         self.baseURL = baseURL
+        self.chainId = chainId
+        self.routerAddress = routerAddress
         self.signer = signer
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
@@ -44,22 +48,33 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("remitmd-swift/0.1.0", forHTTPHeaderField: "User-Agent")
 
-        let timestamp = String(Int(Date().timeIntervalSince1970))
-        let nonce = UUID().uuidString
-
         if let body {
             req.httpBody = try encodeBody(body)
         }
 
-        // EIP-712-style request signing
-        let bodyHex = req.httpBody.map { "0x" + $0.hexString } ?? "0x"
-        let sigInput = "\(method)\n\(path)\n\(timestamp)\n\(nonce)\n\(bodyHex)"
-        let sigDigest = keccak256(Data(sigInput.utf8))
-        let sig = try signer.sign(digest: sigDigest)
+        // Generate 32-byte random nonce
+        var nonceBytes = [UInt8](repeating: 0, count: 32)
+        arc4random_buf(&nonceBytes, 32)
+        let nonceData = Data(nonceBytes)
+        let nonceHex = "0x" + nonceData.hexString
 
-        req.setValue(signer.address, forHTTPHeaderField: "X-Remit-Address")
-        req.setValue(timestamp, forHTTPHeaderField: "X-Remit-Timestamp")
-        req.setValue(nonce, forHTTPHeaderField: "X-Remit-Nonce")
+        // Unix epoch timestamp in seconds
+        let timestamp = UInt64(Date().timeIntervalSince1970)
+
+        // EIP-712 hash and ECDSA signature
+        let digest = eip712Hash(
+            chainId: chainId,
+            routerAddress: routerAddress,
+            method: method,
+            path: path,
+            timestamp: timestamp,
+            nonce: nonceData
+        )
+        let sig = try signer.sign(digest: digest)
+
+        req.setValue(signer.address, forHTTPHeaderField: "X-Remit-Agent")
+        req.setValue(nonceHex, forHTTPHeaderField: "X-Remit-Nonce")
+        req.setValue(String(timestamp), forHTTPHeaderField: "X-Remit-Timestamp")
         req.setValue(sig, forHTTPHeaderField: "X-Remit-Signature")
 
         return try await withRetry(maxRetries: maxRetries) {
@@ -107,6 +122,83 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
         }
         throw lastError!
     }
+}
+
+// MARK: - EIP-712 hash computation
+
+/// Compute the EIP-712 hash for an APIRequest.
+///
+/// Domain: name="remit.md", version="0.1", chainId, verifyingContract
+/// Struct: APIRequest(string method, string path, uint256 timestamp, bytes32 nonce)
+///
+/// Exposed as `internal` for golden-vector testing via @testable import.
+internal func eip712Hash(
+    chainId: UInt64,
+    routerAddress: String,
+    method: String,
+    path: String,
+    timestamp: UInt64,
+    nonce: Data
+) -> Data {
+    // Type hashes (keccak256 of the type string)
+    let domainTypeHash = keccak256(Data("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".utf8))
+    let requestTypeHash = keccak256(Data("APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)".utf8))
+
+    // Domain separator: keccak256(domainTypeHash || nameHash || versionHash || chainId32 || contract32)
+    let nameHash    = keccak256(Data("remit.md".utf8))
+    let versionHash = keccak256(Data("0.1".utf8))
+    let chainIdEnc  = encodeUint256(chainId)
+    let contractEnc = encodeAddress(routerAddress)
+
+    var domainData = Data()
+    domainData.append(domainTypeHash)
+    domainData.append(nameHash)
+    domainData.append(versionHash)
+    domainData.append(chainIdEnc)
+    domainData.append(contractEnc)
+    let domainSeparator = keccak256(domainData)
+
+    // Struct hash: keccak256(requestTypeHash || methodHash || pathHash || timestamp32 || nonce32)
+    let methodHash   = keccak256(Data(method.utf8))
+    let pathHash     = keccak256(Data(path.utf8))
+    let timestampEnc = encodeUint256(timestamp)
+    var paddedNonce  = Data(repeating: 0, count: 32)
+    let bytesToCopy  = min(nonce.count, 32)
+    paddedNonce.replaceSubrange(0..<bytesToCopy, with: nonce.prefix(bytesToCopy))
+
+    var structData = Data()
+    structData.append(requestTypeHash)
+    structData.append(methodHash)
+    structData.append(pathHash)
+    structData.append(timestampEnc)
+    structData.append(paddedNonce)
+    let structHash = keccak256(structData)
+
+    // Final: keccak256(0x1901 || domainSeparator || structHash)
+    var finalData = Data([0x19, 0x01])
+    finalData.append(domainSeparator)
+    finalData.append(structHash)
+    return keccak256(finalData)
+}
+
+/// Encode a UInt64 as ABI uint256 (32-byte big-endian, zero-padded on the left).
+private func encodeUint256(_ value: UInt64) -> Data {
+    var result = Data(repeating: 0, count: 32)
+    var v = value
+    for i in stride(from: 31, through: 24, by: -1) {
+        result[i] = UInt8(v & 0xFF)
+        v >>= 8
+    }
+    return result
+}
+
+/// Encode an Ethereum address as ABI bytes32 (12 zero bytes + 20 address bytes).
+private func encodeAddress(_ address: String) -> Data {
+    var result = Data(repeating: 0, count: 32)
+    let hex = address.hasPrefix("0x") ? String(address.dropFirst(2)) : address
+    guard hex.count == 40, let addrData = Data(hexString: hex) else { return result }
+    result.replaceSubrange(12..<32, with: addrData)
+    return result
 }
 
 // MARK: - Mock transport

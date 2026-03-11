@@ -22,6 +22,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>RemitMd.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- EIP-712 signing + secp256k1 ECDSA via Nethereum (lightweight signer only) -->
     <PackageReference Include="Nethereum.Signer" Version="4.21.0" />
     <!-- Semantic Kernel integration (optional — no hard dep, uses conditional compile) -->

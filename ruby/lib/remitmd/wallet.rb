@@ -23,7 +23,7 @@ module Remitmd
     # @param chain [String]            chain name — "base", "base_sepolia", "arbitrum", "optimism"
     # @param api_url [String, nil]     override API base URL
     # @param transport [Object, nil]   inject mock transport (used by MockRemit)
-    def initialize(private_key: nil, signer: nil, chain: "base", api_url: nil, transport: nil)
+    def initialize(private_key: nil, signer: nil, chain: "base", api_url: nil, router_address: nil, transport: nil)
       if transport
         # MockRemit path: transport + signer injected directly
         @signer    = signer
@@ -42,18 +42,25 @@ module Remitmd
       cfg     = CHAIN_CONFIG.fetch(chain) do
         raise ArgumentError, "Unknown chain: #{chain}. Valid: #{CHAIN_CONFIG.keys.join(", ")}"
       end
-      base_url  = api_url || cfg[:url]
-      chain_id  = cfg[:chain_id]
-      @transport = HttpTransport.new(base_url: base_url, signer: @signer, chain_id: chain_id)
+      base_url       = api_url || cfg[:url]
+      chain_id       = cfg[:chain_id]
+      router_address ||= ""
+      @transport = HttpTransport.new(
+        base_url:       base_url,
+        signer:         @signer,
+        chain_id:       chain_id,
+        router_address: router_address
+      )
     end
 
     # Build a RemitWallet from environment variables.
-    # Requires: REMITMD_PRIVATE_KEY, optionally REMITMD_CHAIN, REMITMD_API_URL.
+    # Reads: REMITMD_PRIVATE_KEY, REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS.
     def self.from_env
-      key     = ENV.fetch("REMITMD_PRIVATE_KEY") { raise ArgumentError, "REMITMD_PRIVATE_KEY not set" }
-      chain   = ENV.fetch("REMITMD_CHAIN", "base")
-      api_url = ENV["REMITMD_API_URL"]
-      new(private_key: key, chain: chain, api_url: api_url)
+      key            = ENV.fetch("REMITMD_PRIVATE_KEY") { raise ArgumentError, "REMITMD_PRIVATE_KEY not set" }
+      chain          = ENV.fetch("REMITMD_CHAIN", "base")
+      api_url        = ENV["REMITMD_API_URL"]
+      router_address = ENV["REMITMD_ROUTER_ADDRESS"]
+      new(private_key: key, chain: chain, api_url: api_url, router_address: router_address)
     end
 
     # The Ethereum address associated with this wallet.

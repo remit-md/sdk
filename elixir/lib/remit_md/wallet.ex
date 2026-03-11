@@ -77,18 +77,20 @@ defmodule RemitMd.Wallet do
   Build a wallet from environment variables.
 
   Required: `REMITMD_PRIVATE_KEY`
-  Optional: `REMITMD_CHAIN`, `REMITMD_API_URL`
+  Optional: `REMITMD_CHAIN`, `REMITMD_API_URL`, `REMITMD_ROUTER_ADDRESS`
   """
   def from_env do
     key =
       System.get_env("REMITMD_PRIVATE_KEY") ||
         raise Error.new(Error.unauthorized(), "REMITMD_PRIVATE_KEY not set")
 
-    chain   = System.get_env("REMITMD_CHAIN", "base")
-    api_url = System.get_env("REMITMD_API_URL")
+    chain          = System.get_env("REMITMD_CHAIN", "base")
+    api_url        = System.get_env("REMITMD_API_URL")
+    router_address = System.get_env("REMITMD_ROUTER_ADDRESS")
 
     opts = [private_key: key, chain: chain]
     opts = if api_url, do: Keyword.put(opts, :api_url, api_url), else: opts
+    opts = if router_address, do: Keyword.put(opts, :router_address, router_address), else: opts
 
     new(opts)
   end

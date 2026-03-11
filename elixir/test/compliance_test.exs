@@ -105,7 +105,7 @@ defmodule RemitMd.ComplianceTest do
     Wallet.new(
       private_key: private_key,
       chain: "base_sepolia",
-      api_url: @server_url,
+      api_url: @server_url <> "/api/v0",
       router_address: @router_address
     )
   end
@@ -130,8 +130,8 @@ defmodule RemitMd.ComplianceTest do
       IO.puts("SKIP: compliance server not reachable at #{@server_url}")
       :ok
     else
-      {pk, _addr} = register_and_get_key()
-      wallet = make_wallet(pk)
+      # Use funded shared payer so balance endpoint returns 200 (fresh unfunded wallets may return 404).
+      wallet = get_shared_payer()
 
       # balance/1 makes an authenticated GET — will raise on 401
       {:ok, balance} = Wallet.balance(wallet)
@@ -162,7 +162,7 @@ defmodule RemitMd.ComplianceTest do
       payer = get_shared_payer()
       {_pk, payee_addr} = register_and_get_key()
 
-      {:ok, tx} = Wallet.pay(payer, payee_addr, "5.0", memo: "elixir compliance test")
+      {:ok, tx} = Wallet.pay(payer, payee_addr, "5.0", description: "elixir compliance test")
       assert tx.tx_hash != nil
       assert tx.tx_hash != ""
     end

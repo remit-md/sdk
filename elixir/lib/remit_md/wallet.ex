@@ -198,9 +198,9 @@ defmodule RemitMd.Wallet do
          :ok <- validate_amount(amount_usdc) do
       body = %{
         to: to,
-        amount_usdc: amount_usdc,
-        description: Keyword.get(opts, :description),
-        metadata:    Keyword.get(opts, :metadata)
+        amount: amount_usdc,
+        task:   Keyword.get(opts, :description) || "",
+        metadata: Keyword.get(opts, :metadata)
       }
 
       with {:ok, data} <- call_mock_or_http(w, fn pid ->

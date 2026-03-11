@@ -69,7 +69,7 @@ async def register_and_get_wallet(
     from remitmd.wallet import Wallet
 
     email = f"compliance.{int(time.time() * 1000)}@test.remitmd.local"
-    password = "ComplianceTestPass1!"
+    password = "ComplianceTestPass1!"  # noqa: S105
 
     # Register
     resp = await http.post(

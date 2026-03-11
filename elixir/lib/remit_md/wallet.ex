@@ -25,13 +25,14 @@ defmodule RemitMd.Wallet do
 
   @min_amount Decimal.new("0.000001")
 
-  defstruct [:signer, :transport, :mock_pid, :address]
+  defstruct [:signer, :transport, :mock_pid, :address, :chain]
 
   @type t :: %__MODULE__{
     signer:    term(),
     transport: term(),
     mock_pid:  pid() | nil,
-    address:   String.t()
+    address:   String.t(),
+    chain:     String.t() | nil
   }
 
   # ─── Constructors ─────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ defmodule RemitMd.Wallet do
 
     if mock_pid do
       signer = MockSigner.new(Keyword.get(opts, :address, MockSigner.new().address))
-      %__MODULE__{signer: signer, transport: nil, mock_pid: mock_pid, address: signer.address}
+      %__MODULE__{signer: signer, transport: nil, mock_pid: mock_pid, address: signer.address, chain: "base"}
     else
       signer =
         cond do
@@ -69,7 +70,10 @@ defmodule RemitMd.Wallet do
 
       transport = Http.new(opts |> Keyword.put(:signer, signer))
       address = get_address(signer)
-      %__MODULE__{signer: signer, transport: transport, mock_pid: nil, address: address}
+      # Normalize to base chain name (strip testnet suffix) for use in pay body.
+      # The server accepts "base", "arbitrum", "optimism" — not "base_sepolia" etc.
+      chain = opts |> Keyword.get(:chain, "base") |> base_chain_name()
+      %__MODULE__{signer: signer, transport: transport, mock_pid: nil, address: address, chain: chain}
     end
   end
 
@@ -196,11 +200,15 @@ defmodule RemitMd.Wallet do
   def pay(%__MODULE__{} = w, to, amount_usdc, opts \\ []) do
     with :ok <- validate_address(to),
          :ok <- validate_amount(amount_usdc) do
+      nonce = :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
       body = %{
         to: to,
-        amount_usdc: amount_usdc,
-        description: Keyword.get(opts, :description),
-        metadata:    Keyword.get(opts, :metadata)
+        amount: amount_usdc,
+        task:   Keyword.get(opts, :description) || "",
+        chain:  w.chain,
+        nonce:  nonce,
+        signature: "0x",
+        metadata: Keyword.get(opts, :metadata)
       }
 
       with {:ok, data} <- call_mock_or_http(w, fn pid ->
@@ -468,4 +476,11 @@ defmodule RemitMd.Wallet do
   defp get_address(%RemitMd.PrivateKeySigner{} = s), do: s.address
   defp get_address(%{address: addr}), do: addr
   defp get_address(%_{} = s), do: Map.get(s, :address)
+
+  # Strip testnet suffixes so we send "base" not "base_sepolia" in the pay body.
+  defp base_chain_name(chain) do
+    chain
+    |> String.replace_suffix("_sepolia", "")
+    |> String.replace_suffix("-sepolia", "")
+  end
 end

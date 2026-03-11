@@ -49,6 +49,7 @@ pub struct Wallet {
     pub(crate) transport: Arc<dyn Transport>,
     pub(crate) address: String,
     pub(crate) chain_id: ChainId,
+    pub(crate) chain: String,
 }
 
 impl Wallet {
@@ -187,12 +188,19 @@ impl Wallet {
     ) -> Result<Transaction, RemitError> {
         validate_address(to)?;
         validate_amount(amount)?;
+        let mut nb = [0u8; 16];
+        getrandom::getrandom(&mut nb)
+            .map_err(|_| remit_err(codes::SERVER_ERROR, "random generation failed"))?;
+        let nonce = hex::encode(nb);
         self.post(
             "/api/v0/payments/direct",
             json!({
                 "to": to,
                 "amount": amount.to_string(),
-                "memo": memo,
+                "task": memo,
+                "chain": &self.chain,
+                "nonce": nonce,
+                "signature": "0x",
             }),
         )
         .await
@@ -627,6 +635,7 @@ fn build_wallet(
         transport,
         address,
         chain_id: ChainId(cfg.chain_id),
+        chain: chain.to_string(),
     })
 }
 

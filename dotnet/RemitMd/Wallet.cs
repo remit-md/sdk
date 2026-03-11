@@ -15,6 +15,7 @@ public sealed class Wallet
     private readonly IRemitTransport _transport;
     private readonly IRemitSigner _signer;
     private readonly long _chainId;
+    private readonly string _chain;
 
     // Chain → API base URL map
     private static readonly Dictionary<string, (long ChainId, string ApiUrl)> Chains = new()
@@ -59,6 +60,7 @@ public sealed class Wallet
 
         _signer = signer;
         _chainId = cc.ChainId;
+        _chain = chain;
         _transport = new HttpTransport(signer, cc.ChainId, routerAddress ?? string.Empty, baseUrl ?? cc.ApiUrl);
     }
 
@@ -91,6 +93,7 @@ public sealed class Wallet
         _transport = transport;
         _signer = signer;
         _chainId = chainId;
+        _chain = "base";
     }
 
     // ─── Direct payments ──────────────────────────────────────────────────────
@@ -112,11 +115,16 @@ public sealed class Wallet
         ValidateAddress(recipient, nameof(recipient));
         ValidateAmount(amount);
 
+        var nonce = Convert.ToHexString(
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
         return _transport.PostAsync<Transaction>("/api/v0/payments/direct", new
         {
-            to     = recipient,
-            amount = amount.ToString("F6"),
-            memo,
+            to        = recipient,
+            amount    = amount.ToString("F6"),
+            task      = memo,
+            chain     = _chain,
+            nonce     = nonce,
+            signature = "0x",
         }, ct);
     }
 

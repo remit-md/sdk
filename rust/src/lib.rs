@@ -68,6 +68,7 @@
 
 #![deny(warnings)]
 
+mod compliance;
 pub mod error;
 mod http;
 mod mock;

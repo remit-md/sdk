@@ -84,6 +84,7 @@ impl MockRemit {
             }),
             address: "0xMockWallet0000000000000000000000000001".to_string(),
             chain_id: ChainId::BASE_SEPOLIA,
+            chain: "base".to_string(),
         }
     }
 
@@ -180,7 +181,7 @@ impl MockTransport {
             ("POST", "/api/v0/payments/direct") => {
                 let to = str_field(&b, "to")?;
                 let amount = decimal_field(&b, "amount")?;
-                let memo = b["memo"].as_str().unwrap_or("").to_string();
+                let memo = b["task"].as_str().unwrap_or("").to_string();
 
                 let mut s = self.state.lock().await;
                 check_balance(s.balance, amount)?;

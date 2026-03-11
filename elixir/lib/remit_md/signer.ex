@@ -238,7 +238,6 @@ defmodule RemitMd.PrivateKeySigner do
   end
 
   defp ec_mul(0, _p), do: :infinity
-  defp ec_mul(_k, :infinity), do: :infinity
   defp ec_mul(k, point), do: do_ec_mul(k, point, :infinity)
 
   defp do_ec_mul(0, _p, acc), do: acc

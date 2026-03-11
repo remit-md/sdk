@@ -137,7 +137,7 @@ public final class RemitMd {
             String apiUrl = baseUrl != null ? baseUrl : API_URLS.get(chainKey);
             long chainId = CHAIN_IDS.get(chainKey);
             ApiClient client = new ApiClient(apiUrl, chainId, routerAddress, signer);
-            return new Wallet(client, signer, chainId);
+            return new Wallet(client, signer, chainId, chain);
         }
     }
 }

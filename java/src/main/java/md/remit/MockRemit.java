@@ -57,7 +57,7 @@ public class MockRemit {
     public Wallet wallet() {
         MockApiClient mockClient = new MockApiClient(this);
         Signer mockSigner = new MockSigner();
-        return new Wallet(mockClient, mockSigner, MOCK_CHAIN_ID);
+        return new Wallet(mockClient, mockSigner, MOCK_CHAIN_ID, "base");
     }
 
     /** Overrides the mock's simulated USDC balance. */
@@ -396,7 +396,7 @@ public class MockRemit {
             if ("POST".equals(method) && "/api/v0/payments/direct".equals(path)) {
                 String to = (String) b.get("to");
                 BigDecimal amount = new BigDecimal((String) b.get("amount"));
-                String memo = (String) b.getOrDefault("memo", "");
+                String memo = (String) b.getOrDefault("task", "");
                 return (T) mock.mockPay(to, amount, memo);
             }
             if ("POST".equals(method) && "/api/v0/escrows".equals(path)) {

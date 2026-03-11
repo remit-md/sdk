@@ -37,10 +37,11 @@ public final class PrivateKeySigner: Signer {
         }
         let key = try secp256k1.Recovery.PrivateKey(dataRepresentation: keyData)
         self.privateKey = key
-        // Use Signing key to get compressed pubkey as Data (Recovery.PublicKey.rawRepresentation
-        // returns a C struct, but Signing.PublicKey.rawRepresentation returns Data).
+        // Use Signing key to get compressed pubkey as Data.
+        // rawRepresentation returns the C struct secp256k1_pubkey for all key types,
+        // but dataRepresentation returns the serialized bytes.
         let signingKey = try secp256k1.Signing.PrivateKey(dataRepresentation: keyData)
-        self.address = PrivateKeySigner.deriveAddress(compressedPubKey: signingKey.publicKey.rawRepresentation)
+        self.address = PrivateKeySigner.deriveAddress(compressedPubKey: signingKey.publicKey.dataRepresentation)
     }
 
     /// Sign a 32-byte EIP-712 digest using ECDSA, returning hex-encoded 65-byte signature (r+s+v).

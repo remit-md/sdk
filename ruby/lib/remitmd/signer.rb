@@ -117,7 +117,9 @@ module Remitmd
       rhs = x3 + OpenSSL::BN.new("7")
       y_squared = rhs % p
       # Tonelli–Shanks: since p ≡ 3 mod 4, sqrt = y²^((p+1)/4) mod p
+      # BN division may return Integer on some OpenSSL versions; ensure BN.
       exp = (p + OpenSSL::BN.new("1")) / OpenSSL::BN.new("4")
+      exp = OpenSSL::BN.new(exp.to_s) unless exp.is_a?(OpenSSL::BN)
       y = y_squared.mod_exp(exp, p)
       # Verify that y² ≡ y_squared (mod p) — i.e., a square root exists
       return nil unless y.mod_mul(y, p) == y_squared

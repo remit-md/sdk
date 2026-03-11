@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -124,8 +125,8 @@ func makeWalletC(t *testing.T, privateKey string) *remitmd.Wallet {
 	return w
 }
 
-// requestFundsWithRetry calls the faucet, retrying up to 5 times with 2-second backoff.
-// The server enforces a global rate limit on the faucet (~1 call per 2s).
+// requestFundsWithRetry calls the faucet via the SDK, retrying up to 5 times with 2-second backoff.
+// Used only by TestComplianceAuth_FaucetCredits to verify the faucet endpoint works.
 func requestFundsWithRetry(t *testing.T, w *remitmd.Wallet) {
 	t.Helper()
 	var lastErr error
@@ -143,15 +144,43 @@ func requestFundsWithRetry(t *testing.T, w *remitmd.Wallet) {
 	t.Fatalf("faucet failed after 5 attempts: %v", lastErr)
 }
 
+// ─── Shared funded payer ──────────────────────────────────────────────────────
+
+var (
+	oncePayer   sync.Once
+	sharedPayer *remitmd.Wallet
+)
+
+// getSharedPayer returns (or lazily creates) a single funded test payer wallet
+// with 1000 USDC. All payment tests share this wallet so only one faucet call
+// is needed per test run, avoiding the per-wallet-per-hour rate limit.
+func getSharedPayer(t *testing.T) *remitmd.Wallet {
+	t.Helper()
+	oncePayer.Do(func() {
+		pk, addr := registerAndGetWalletC(t)
+		// Fund with 1000 USDC via direct HTTP — faucet is public (no EIP-712 auth required).
+		resp := doJSONC(t, "POST", compServerURL+"/api/v0/faucet", map[string]any{
+			"wallet": addr,
+			"amount": 1000,
+		}, "")
+		if resp["tx_hash"] == nil {
+			t.Fatalf("faucet: no tx_hash in response (wallet=%s): %v", addr, resp)
+		}
+		sharedPayer = makeWalletC(t, pk)
+	})
+	if sharedPayer == nil {
+		t.Fatalf("shared payer not initialized (previous setup failed)")
+	}
+	return sharedPayer
+}
+
+// makeFundedPairC returns the shared funded payer and a fresh payee wallet.
+// Only one faucet call is made for the entire test run (via getSharedPayer).
 func makeFundedPairC(t *testing.T) (payer *remitmd.Wallet, payee *remitmd.Wallet, payeeAddr string) {
 	t.Helper()
-	pkA, _ := registerAndGetWalletC(t)
 	pkB, addrB := registerAndGetWalletC(t)
-
-	payer = makeWalletC(t, pkA)
 	payee = makeWalletC(t, pkB)
-
-	requestFundsWithRetry(t, payer)
+	payer = getSharedPayer(t)
 	return payer, payee, addrB
 }
 
@@ -166,7 +195,8 @@ func TestComplianceAuth_AuthenticatedRequestSucceeds(t *testing.T) {
 	if wallet.Address() == "" {
 		t.Fatal("wallet address is empty after registration")
 	}
-	if wallet.Address() != addr {
+	// Server returns lowercase addresses; SDK returns EIP-55 checksummed. Compare case-insensitively.
+	if !strings.EqualFold(wallet.Address(), addr) {
 		t.Errorf("address mismatch: sdk=%s server=%s", wallet.Address(), addr)
 	}
 }
@@ -211,10 +241,8 @@ func TestCompliancePayDirect_BelowMinimumReturnsError(t *testing.T) {
 
 func TestCompliancePayDirect_SelfPaymentReturnsError(t *testing.T) {
 	skipIfNoServer(t)
-	pk, _ := registerAndGetWalletC(t)
-	wallet := makeWalletC(t, pk)
-
-	requestFundsWithRetry(t, wallet)
+	// Reuse shared payer — self-payment should be rejected by the server.
+	wallet := getSharedPayer(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

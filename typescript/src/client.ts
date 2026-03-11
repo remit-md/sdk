@@ -100,7 +100,8 @@ export class RemitClient {
   }
 
   getEvents(wallet: string, since?: number): Promise<RemitEvent[]> {
-    const qs = since ? `?since=${since}` : "";
-    return this._fetch<RemitEvent[]>(`/events/${wallet}${qs}`);
+    let qs = `?wallet=${encodeURIComponent(wallet)}`;
+    if (since !== undefined) qs += `&since=${since}`;
+    return this._fetch<RemitEvent[]>(`/events${qs}`);
   }
 }

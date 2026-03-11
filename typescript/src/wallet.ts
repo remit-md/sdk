@@ -238,10 +238,17 @@ export class Wallet extends RemitClient {
     return this.#auth.get<Tab>(`/tabs/${tabId}`);
   }
 
-  /** GET /events/{wallet} — authenticated. */
+  /** GET /events?wallet={wallet} — authenticated. Server uses wallet as query param. */
   override getEvents(wallet: string, since?: number): Promise<RemitEvent[]> {
-    const qs = since ? `?since=${since}` : "";
-    return this.#auth.get<RemitEvent[]>(`/events/${wallet}${qs}`);
+    let qs = `?wallet=${encodeURIComponent(wallet)}`;
+    if (since !== undefined) qs += `&since=${since}`;
+    return this.#auth.get<RemitEvent[]>(`/events${qs}`)
+      .then((data) => {
+        // Server may return { items: [...] } or [...] directly
+        if (Array.isArray(data)) return data;
+        const obj = data as { items?: RemitEvent[] };
+        return obj.items ?? [];
+      });
   }
 
   // ─── Events ─────────────────────────────────────────────────────────────────
@@ -293,6 +300,6 @@ export class Wallet extends RemitClient {
   // ─── Testnet ────────────────────────────────────────────────────────────────
 
   requestTestnetFunds(): Promise<Transaction> {
-    return this.#auth.post<Transaction>("/faucet", { address: this.address });
+    return this.#auth.post<Transaction>("/faucet", { wallet: this.address });
   }
 }

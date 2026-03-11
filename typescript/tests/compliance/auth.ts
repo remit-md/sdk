@@ -31,10 +31,17 @@ describe("TypeScript compliance: authentication", () => {
     if (skip) return t.skip("server not available");
 
     const wallet = await makeWallet();
-    // status() uses #auth.get — if EIP-712 is wrong this returns 401
+    // status() uses #auth.get — if EIP-712 is wrong this returns 401 not 200.
+    // Server returns { wallet, tier, monthly_volume, fee_rate_bps, ... }.
     const status = await wallet.status();
-    assert.equal(status.address.toLowerCase(), wallet.address.toLowerCase());
-    assert.equal(typeof status.usdcBalance, "number");
+    // Server uses "wallet" key (not "address"), cast to access it.
+    const raw = status as unknown as Record<string, unknown>;
+    assert.equal(
+      (raw["wallet"] as string).toLowerCase(),
+      wallet.address.toLowerCase(),
+      "Server must return our wallet address",
+    );
+    assert.ok(typeof status.tier === "string" && status.tier.length > 0, "tier must be set");
   });
 
   it("unauthenticated POST /payments/direct returns 401", async (t) => {

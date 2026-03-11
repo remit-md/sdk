@@ -23,12 +23,15 @@ from remitmd.models.stream import Stream
 from remitmd.models.tab import Tab, TabCharge
 from remitmd.signer import PrivateKeySigner, Signer
 from remitmd.wallet import Wallet
+from remitmd.x402 import AllowanceExceededError, X402Client
 
 __all__ = [
     "RemitClient",
     "Wallet",
     "Signer",
     "PrivateKeySigner",
+    "X402Client",
+    "AllowanceExceededError",
     # enums
     "ChainId",
     "InvoiceStatus",

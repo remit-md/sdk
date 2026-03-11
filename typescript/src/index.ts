@@ -55,6 +55,10 @@ export * from "./models/index.js";
 export { MockRemit, MockWallet } from "./testing/mock.js";
 export { LocalChain } from "./testing/local.js";
 
+// x402 client middleware
+export { X402Client, AllowanceExceededError } from "./x402.js";
+export type { X402ClientOptions } from "./x402.js";
+
 // Integrations
 export { remitTools } from "./integrations/vercel-ai.js";
 export type { RemitToolDescriptor } from "./integrations/vercel-ai.js";

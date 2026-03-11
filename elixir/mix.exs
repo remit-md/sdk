@@ -11,7 +11,10 @@ defmodule RemitMd.MixProject do
       description: "remit.md SDK for Elixir — universal payment protocol for AI agents",
       package: package(),
       source_url: "https://github.com/remit-md/sdk",
-      docs: [main: "RemitMd", extras: ["README.md"]]
+      docs: [main: "RemitMd", extras: ["README.md"]],
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance skipped w/o server).
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [coveralls: :test, "coveralls.detail": :test]
     ]
   end
 
@@ -26,7 +29,8 @@ defmodule RemitMd.MixProject do
     [
       {:jason, "~> 1.4"},
       {:decimal, "~> 2.0"},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 

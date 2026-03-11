@@ -1,5 +1,15 @@
 # frozen_string_literal: true
 
+# Coverage gate — enforced in CI only to avoid slowing local dev.
+# Target from MASTER.md: 50%. Initial gate: 35% (compliance tests skipped without server).
+if ENV["CI"]
+  require "simplecov"
+  SimpleCov.start do
+    add_filter "/spec/"
+    minimum_coverage 35
+  end
+end
+
 require "remitmd"
 
 RSpec.configure do |config|

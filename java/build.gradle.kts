@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     java
+    jacoco
     kotlin("jvm") version "1.9.23"
     `maven-publish`
 }
@@ -52,6 +53,28 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+// Target from MASTER.md: 50%. Initial gate: 35% (compliance tests skipped without server).
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.35".toBigDecimal()
+            }
+        }
+    }
 }
 
 tasks.withType<KotlinCompile> {

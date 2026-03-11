@@ -23,8 +23,9 @@ jobs:
         run: cd python && ruff format --check .
       - name: Type check
         run: cd python && mypy src/
-      - name: Test
-        run: cd python && pytest -v
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      - name: Test with coverage gate
+        run: cd python && pytest -v --cov=remitmd --cov-fail-under=35 --cov-report=term-missing
 
   typescript:
     name: SDK TypeScript
@@ -45,6 +46,9 @@ jobs:
         run: cd typescript && pnpm tsc --noEmit
       - name: Build
         run: cd typescript && pnpm tsc
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      - name: Test with coverage gate
+        run: cd typescript && pnpm dlx c8@10 --reporter=text --lines 35 --branches 35 --functions 35 node --import ./node_modules/tsx/dist/esm/index.cjs --test tests/*.ts
 
   go:
     name: SDK Go
@@ -59,8 +63,12 @@ jobs:
         run: cd go && go mod tidy
       - name: Vet
         run: cd go && go vet ./...
-      - name: Test
-        run: cd go && go test ./... -v -count=1
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      - name: Test with coverage gate
+        working-directory: go
+        run: |
+          go test -coverprofile=coverage.out ./... -v -count=1
+          go tool cover -func=coverage.out | awk '/^total:/{gsub(/%/,"",$3); pct=$3+0; printf "Total coverage: %.1f%%\n", pct; if (pct < 35) {print "ERROR: coverage " pct "% below 35% threshold"; exit 1}}'
 
   rust:
     name: SDK Rust
@@ -69,7 +77,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          components: clippy, rustfmt, llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
@@ -77,8 +88,9 @@ jobs:
         run: cd rust && cargo fmt --check
       - name: Clippy
         run: cd rust && cargo clippy -- -D warnings
-      - name: Test
-        run: cd rust && cargo test
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      - name: Test with coverage gate
+        run: cd rust && cargo llvm-cov --fail-under-lines 35
 
   dotnet:
     name: SDK .NET
@@ -92,8 +104,10 @@ jobs:
         run: cd dotnet && dotnet restore
       - name: Build
         run: cd dotnet && dotnet build --no-restore -c Release
-      - name: Test
-        run: cd dotnet && dotnet test --no-build -c Release --verbosity normal
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      # /p:Threshold=35 fails the test run if line coverage drops below 35%.
+      - name: Test with coverage gate
+        run: cd dotnet && dotnet test --no-build -c Release --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:Threshold=35 /p:ThresholdType=Line
 
   java:
     name: SDK Java/Kotlin
@@ -108,8 +122,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
       - name: Build
         run: cd java && gradle build --no-daemon
-      - name: Test
-        run: cd java && gradle test --no-daemon
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      # jacocoTestCoverageVerification fails the build if line coverage < 35%.
+      - name: Test with coverage gate
+        run: cd java && gradle test jacocoTestReport jacocoTestCoverageVerification --no-daemon
 
   ruby:
     name: SDK Ruby
@@ -123,7 +139,9 @@ jobs:
           working-directory: ruby
       - name: RuboCop
         run: cd ruby && bundle exec rubocop -A --no-color && bundle exec rubocop --no-color
-      - name: RSpec
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% via SimpleCov in spec_helper.rb.
+      # SimpleCov minimum_coverage is enforced only when CI=true (set by GitHub Actions).
+      - name: Test with coverage gate
         run: cd ruby && bundle exec rspec
 
   swift:
@@ -133,8 +151,21 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: cd swift && swift build
-      - name: Test
-        run: cd swift && swift test
+      # Coverage gate: target 50% (MASTER.md); initial gate 35%.
+      - name: Test with coverage gate
+        run: |
+          cd swift && swift test --enable-code-coverage
+          XCTEST=$(find .build/debug -name "*.xctest" -not -path "*/Contents/*" 2>/dev/null | head -1)
+          if [ -n "$XCTEST" ]; then
+            NAME=$(basename "$XCTEST" .xctest)
+            BINARY="$XCTEST/Contents/MacOS/$NAME"
+            PROFDATA=".build/debug/codecov/default.profdata"
+            TOTAL=$(xcrun llvm-cov report "$BINARY" -instr-profile="$PROFDATA" --sources Sources/ 2>/dev/null | grep "^TOTAL" | awk '{gsub(/%/,""); print $4}')
+            echo "Total coverage: ${TOTAL:-0}%"
+            awk "BEGIN { pct=${TOTAL:-0}+0; if (pct < 35) { printf \"ERROR: coverage %.1f%% below 35%%\n\", pct; exit 1 } }"
+          else
+            echo "WARNING: xctest binary not found, skipping coverage check"
+          fi
 
   elixir:
     name: SDK Elixir
@@ -149,5 +180,7 @@ jobs:
         run: cd elixir && mix deps.get
       - name: Compile
         run: cd elixir && mix compile --warnings-as-errors
-      - name: Test
-        run: cd elixir && mix test
+      # Coverage gate: target 50% (MASTER.md); initial gate 35% via .coveralls.json minimum_coverage.
+      # mix coveralls exits non-zero if coverage < minimum_coverage in .coveralls.json.
+      - name: Test with coverage gate
+        run: cd elixir && mix coveralls

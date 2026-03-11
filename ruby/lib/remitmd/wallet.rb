@@ -189,14 +189,14 @@ module Remitmd
     def debit_tab(tab_id, amount, memo = "")
       validate_amount!(amount)
       body = { amount: amount.to_s, memo: memo }
-      TabDebit.new(@transport.post("/tabs/#{tab_id}/debit", body))
+      TabDebit.new(@transport.post("/tabs/#{tab_id}/charge", body))
     end
 
     # Settle a tab on-chain, paying the net balance.
     # @param tab_id [String]
     # @return [Transaction]
     def settle_tab(tab_id)
-      Transaction.new(@transport.post("/tabs/#{tab_id}/settle", {}))
+      Transaction.new(@transport.post("/tabs/#{tab_id}/close", {}))
     end
 
     # ─── Streams (Payment Streaming) ─────────────────────────────────────────

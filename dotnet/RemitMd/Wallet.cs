@@ -19,12 +19,12 @@ public sealed class Wallet
     // Chain → API base URL map
     private static readonly Dictionary<string, (long ChainId, string ApiUrl)> Chains = new()
     {
-        ["base"]               = (8453,  "https://api.remit.md/api/v0"),
-        ["base-sepolia"]       = (84532, "https://api-sepolia.remit.md/api/v0"),
-        ["arbitrum"]           = (42161, "https://api-arb.remit.md/api/v0"),
-        ["arbitrum-sepolia"]   = (421614,"https://api-arb-sepolia.remit.md/api/v0"),
-        ["optimism"]           = (10,    "https://api-op.remit.md/api/v0"),
-        ["optimism-sepolia"]   = (11155420,"https://api-op-sepolia.remit.md/api/v0"),
+        ["base"]               = (8453,  "https://api.remit.md"),
+        ["base-sepolia"]       = (84532, "https://api-sepolia.remit.md"),
+        ["arbitrum"]           = (42161, "https://api-arb.remit.md"),
+        ["arbitrum-sepolia"]   = (421614,"https://api-arb-sepolia.remit.md"),
+        ["optimism"]           = (10,    "https://api-op.remit.md"),
+        ["optimism-sepolia"]   = (11155420,"https://api-op-sepolia.remit.md"),
     };
 
     // ─── Constructors ─────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ public sealed class Wallet
         ValidateAddress(recipient, nameof(recipient));
         ValidateAmount(amount);
 
-        return _transport.PostAsync<Transaction>("/pay", new
+        return _transport.PostAsync<Transaction>("/api/v0/payments/direct", new
         {
             to     = recipient,
             amount = amount.ToString("F6"),
@@ -124,18 +124,18 @@ public sealed class Wallet
 
     /// <summary>Returns the current USDC balance for this wallet.</summary>
     public Task<Balance> BalanceAsync(CancellationToken ct = default) =>
-        _transport.GetAsync<Balance>($"/balance/{Address}", ct);
+        _transport.GetAsync<Balance>($"/api/v0/status/{Address}", ct);
 
     /// <summary>Returns the payment history for this wallet (newest first).</summary>
     /// <param name="page">Page number (1-based).</param>
     /// <param name="perPage">Results per page (max 100).</param>
     public Task<TransactionList> HistoryAsync(int page = 1, int perPage = 20, CancellationToken ct = default) =>
-        _transport.GetAsync<TransactionList>($"/history/{Address}?page={page}&per_page={perPage}", ct);
+        _transport.GetAsync<TransactionList>($"/api/v0/invoices?page={page}&per_page={perPage}", ct);
 
     /// <summary>Returns the reputation score for any Ethereum address.</summary>
     /// <param name="address">Address to look up (defaults to this wallet's address).</param>
     public Task<Reputation> ReputationAsync(string? address = null, CancellationToken ct = default) =>
-        _transport.GetAsync<Reputation>($"/reputation/{address ?? Address}", ct);
+        _transport.GetAsync<Reputation>($"/api/v0/reputation/{address ?? Address}", ct);
 
     // ─── Escrow ───────────────────────────────────────────────────────────────
 
@@ -158,7 +158,7 @@ public sealed class Wallet
         ValidateAddress(payee, nameof(payee));
         ValidateAmount(amount);
 
-        return _transport.PostAsync<Escrow>("/escrow", new
+        return _transport.PostAsync<Escrow>("/api/v0/escrows", new
         {
             payee,
             amount      = amount.ToString("F6"),
@@ -171,15 +171,15 @@ public sealed class Wallet
 
     /// <summary>Releases escrow funds to the payee after work is approved.</summary>
     public Task<Transaction> ReleaseEscrowAsync(string escrowId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/escrow/{escrowId}/release", new { }, ct);
+        _transport.PostAsync<Transaction>($"/api/v0/escrows/{escrowId}/release", new { }, ct);
 
     /// <summary>Cancels an unfunded escrow and returns funds to the payer.</summary>
     public Task<Transaction> CancelEscrowAsync(string escrowId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/escrow/{escrowId}/cancel", new { }, ct);
+        _transport.PostAsync<Transaction>($"/api/v0/escrows/{escrowId}/cancel", new { }, ct);
 
     /// <summary>Retrieves the current state of an escrow.</summary>
     public Task<Escrow> GetEscrowAsync(string escrowId, CancellationToken ct = default) =>
-        _transport.GetAsync<Escrow>($"/escrow/{escrowId}", ct);
+        _transport.GetAsync<Escrow>($"/api/v0/escrows/{escrowId}", ct);
 
     // ─── Tab (micro-payment channel) ──────────────────────────────────────────
 
@@ -196,7 +196,7 @@ public sealed class Wallet
         ValidateAddress(counterpart, nameof(counterpart));
         ValidateAmount(limit);
 
-        return _transport.PostAsync<Tab>("/tab", new
+        return _transport.PostAsync<Tab>("/api/v0/tabs", new
         {
             counterpart,
             limit      = limit.ToString("F6"),
@@ -208,7 +208,7 @@ public sealed class Wallet
     public Task<TabDebit> DebitTabAsync(string tabId, decimal amount, string memo = "", CancellationToken ct = default)
     {
         ValidateAmount(amount);
-        return _transport.PostAsync<TabDebit>($"/tab/{tabId}/debit", new
+        return _transport.PostAsync<TabDebit>($"/api/v0/tabs/{tabId}/charge", new
         {
             amount = amount.ToString("F6"),
             memo,
@@ -217,7 +217,7 @@ public sealed class Wallet
 
     /// <summary>Settles a Tab on-chain, finalizing all debits.</summary>
     public Task<Transaction> SettleTabAsync(string tabId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/tab/{tabId}/settle", new { }, ct);
+        _transport.PostAsync<Transaction>($"/api/v0/tabs/{tabId}/close", new { }, ct);
 
     // ─── Stream (time-based payments) ─────────────────────────────────────────
 
@@ -238,7 +238,7 @@ public sealed class Wallet
         ValidateAmount(ratePerSecond, "ratePerSecond");
         ValidateAmount(deposit, "deposit");
 
-        return _transport.PostAsync<Stream>("/stream", new
+        return _transport.PostAsync<Stream>("/api/v0/streams", new
         {
             recipient,
             rate_per_sec = ratePerSecond.ToString("F9"),
@@ -248,7 +248,7 @@ public sealed class Wallet
 
     /// <summary>Withdraws accrued streaming funds to the recipient.</summary>
     public Task<Transaction> WithdrawStreamAsync(string streamId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/stream/{streamId}/withdraw", new { }, ct);
+        _transport.PostAsync<Transaction>($"/api/v0/streams/{streamId}/withdraw", new { }, ct);
 
     // ─── Bounty ───────────────────────────────────────────────────────────────
 
@@ -263,7 +263,7 @@ public sealed class Wallet
         CancellationToken ct = default)
     {
         ValidateAmount(award, "award");
-        return _transport.PostAsync<Bounty>("/bounty", new
+        return _transport.PostAsync<Bounty>("/api/v0/bounties", new
         {
             award      = award.ToString("F6"),
             description,
@@ -275,7 +275,7 @@ public sealed class Wallet
     public Task<Transaction> AwardBountyAsync(string bountyId, string winner, CancellationToken ct = default)
     {
         ValidateAddress(winner, nameof(winner));
-        return _transport.PostAsync<Transaction>($"/bounty/{bountyId}/award", new { winner }, ct);
+        return _transport.PostAsync<Transaction>($"/api/v0/bounties/{bountyId}/award", new { winner }, ct);
     }
 
     // ─── Deposit (security collateral) ────────────────────────────────────────
@@ -289,7 +289,7 @@ public sealed class Wallet
     {
         ValidateAddress(beneficiary, nameof(beneficiary));
         ValidateAmount(amount);
-        return _transport.PostAsync<Deposit>("/deposit", new
+        return _transport.PostAsync<Deposit>("/api/v0/deposits", new
         {
             beneficiary,
             amount     = amount.ToString("F6"),
@@ -302,11 +302,11 @@ public sealed class Wallet
     /// <summary>Returns spending analytics for the given period.</summary>
     /// <param name="period">"day", "week", or "month".</param>
     public Task<SpendingSummary> SpendingSummaryAsync(string period = "day", CancellationToken ct = default) =>
-        _transport.GetAsync<SpendingSummary>($"/analytics/{Address}?period={period}", ct);
+        _transport.GetAsync<SpendingSummary>($"/api/v0/invoices?period={period}", ct);
 
     /// <summary>Returns remaining spending capacity under operator-set budget limits.</summary>
     public Task<Budget> RemainingBudgetAsync(CancellationToken ct = default) =>
-        _transport.GetAsync<Budget>($"/budget/{Address}", ct);
+        _transport.GetAsync<Budget>($"/api/v0/status/{Address}", ct);
 
     /// <summary>Proposes a payment intent for negotiation with a counterpart.</summary>
     public Task<Intent> ProposeIntentAsync(
@@ -317,7 +317,7 @@ public sealed class Wallet
     {
         ValidateAddress(to, nameof(to));
         ValidateAmount(amount);
-        return _transport.PostAsync<Intent>("/intent", new
+        return _transport.PostAsync<Intent>("/api/v0/invoices", new
         {
             to,
             amount = amount.ToString("F6"),

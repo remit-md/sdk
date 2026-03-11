@@ -156,7 +156,7 @@ final class WalletTests: XCTestCase {
         XCTAssertEqual(stream.status, .active)
         XCTAssertEqual(stream.ratePerSecond, 0.001, accuracy: 0.0001)
 
-        let stopped = try await wallet.stopStream(id: stream.id)
+        let stopped = try await wallet.closeStream(id: stream.id)
         XCTAssertEqual(stopped.status, .ended)
         XCTAssertNotNil(stopped.endedAt)
     }

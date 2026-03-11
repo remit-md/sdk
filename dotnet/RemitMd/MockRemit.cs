@@ -99,34 +99,20 @@ public sealed class MockRemit
         {
             object result = path switch
             {
-                var p when p.StartsWith("/balance/") => (object)new Balance(
+                var p when p.StartsWith("/api/v0/status/") => (object)new Balance(
                     _mock._balance, MockAddress, ChainId.BaseSepolia, DateTimeOffset.UtcNow),
 
-                var p when p.StartsWith("/history/") =>
+                "/api/v0/invoices" =>
                     new TransactionList(_mock._transactions.ToList(), _mock._transactions.Count, 1, 20, false),
 
-                var p when p.StartsWith("/reputation/") => new Reputation(
+                var p when p.StartsWith("/api/v0/reputation/") => new Reputation(
                     MockAddress, 750, _mock._transactions.Sum(t => t.Amount), 0m,
                     _mock._transactions.Count, 0.0, DateTimeOffset.UtcNow.AddDays(-30)),
 
-                var p when p.StartsWith("/escrow/") =>
+                var p when p.StartsWith("/api/v0/escrows/") =>
                     _mock._escrows.TryGetValue(PathId(p), out var e)
                         ? (object)e
                         : throw new RemitError(ErrorCodes.EscrowNotFound, $"Escrow not found: {PathId(p)}"),
-
-                var p when p.StartsWith("/analytics/") => new SpendingSummary(
-                    MockAddress, "day",
-                    _mock._transactions.Sum(t => t.Amount),
-                    _mock._transactions.Sum(t => t.Fee),
-                    _mock._transactions.Count,
-                    []),
-
-                var p when p.StartsWith("/budget/") => new Budget(
-                    1_000m, _mock._transactions.Sum(t => t.Amount),
-                    Math.Max(0, 1_000m - _mock._transactions.Sum(t => t.Amount)),
-                    10_000m, _mock._transactions.Sum(t => t.Amount),
-                    Math.Max(0, 10_000m - _mock._transactions.Sum(t => t.Amount)),
-                    100m),
 
                 _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled GET {path}"),
             };
@@ -141,24 +127,25 @@ public sealed class MockRemit
 
             object result = path switch
             {
-                "/pay" => HandlePay(body, id, now),
+                "/api/v0/payments/direct"              => HandlePay(body, id, now),
 
-                "/escrow"                              => HandleCreateEscrow(body, id, now),
+                "/api/v0/escrows"                      => HandleCreateEscrow(body, id, now),
                 var p when p.EndsWith("/release")      => HandleEscrowAction(p, "released"),
                 var p when p.EndsWith("/cancel")       => HandleEscrowAction(p, "cancelled"),
 
-                "/tab"                                 => HandleCreateTab(body, id, now),
-                var p when p.EndsWith("/debit")        => HandleTabDebit(p, body, id),
-                var p when p.EndsWith("/settle")       => HandleTabSettle(p, id, now),
+                "/api/v0/tabs"                         => HandleCreateTab(body, id, now),
+                var p when p.EndsWith("/charge")       => HandleTabDebit(p, body, id),
+                var p when p.StartsWith("/api/v0/tabs/") && p.EndsWith("/close")
+                                                       => HandleTabSettle(p, id, now),
 
-                "/stream"                              => HandleCreateStream(body, id, now),
+                "/api/v0/streams"                      => HandleCreateStream(body, id, now),
                 var p when p.EndsWith("/withdraw")     => HandleStreamWithdraw(p, id, now),
 
-                "/bounty"                              => HandleCreateBounty(body, id, now),
+                "/api/v0/bounties"                     => HandleCreateBounty(body, id, now),
                 var p when p.EndsWith("/award")        => HandleBountyAward(p, body, id, now),
 
-                "/deposit"                             => HandleCreateDeposit(body, id, now),
-                "/intent"                              => HandleCreateIntent(body, id, now),
+                "/api/v0/deposits"                     => HandleCreateDeposit(body, id, now),
+                "/api/v0/invoices"                     => HandleCreateIntent(body, id, now),
 
                 _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled POST {path}"),
             };
@@ -255,7 +242,7 @@ public sealed class MockRemit
 
         private TabDebit HandleTabDebit(string path, object body, string id)
         {
-            var tabId  = PathId(path.Replace("/debit", ""));
+            var tabId  = PathId(path.Replace("/charge", ""));
             var d      = Deserialize(body);
             var amount = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
             var memo   = d.GetValueOrDefault("memo")?.ToString() ?? "";
@@ -277,7 +264,7 @@ public sealed class MockRemit
 
         private Transaction HandleTabSettle(string path, string id, DateTimeOffset now)
         {
-            var tabId = PathId(path.Replace("/settle", ""));
+            var tabId = PathId(path.Replace("/close", ""));
             lock (_mock._lock)
             {
                 if (!_mock._tabs.TryGetValue(tabId, out var tab))

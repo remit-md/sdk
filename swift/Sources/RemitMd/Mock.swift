@@ -92,16 +92,16 @@ public final class MockRemit: @unchecked Sendable {
         // Route to handler based on path prefix
         let parts = path.split(separator: "/").map(String.init)
 
-        if path == "/api/v0/pay" {
+        if path == "/api/v0/payments/direct" {
             return try cast(handlePay(body: body))
         }
-        if path.hasPrefix("/api/v0/balance/") {
+        if path.hasPrefix("/api/v0/status/") {
             return try cast(handleBalance(address: parts.last ?? walletAddress))
         }
-        if path == "/api/v0/escrow" && method == "POST" {
+        if path == "/api/v0/escrows" && method == "POST" {
             return try cast(handleCreateEscrow(body: body))
         }
-        if path.hasPrefix("/api/v0/escrow/") && method == "GET" {
+        if path.hasPrefix("/api/v0/escrows/") && method == "GET" {
             return try cast(handleGetEscrow(id: parts.last ?? ""))
         }
         if path.hasSuffix("/release") && method == "POST" {
@@ -110,43 +110,37 @@ public final class MockRemit: @unchecked Sendable {
         if path.hasSuffix("/cancel") && method == "POST" {
             return try cast(handleCancelEscrow(id: parts[parts.count - 2]))
         }
-        if path == "/api/v0/tab" && method == "POST" {
+        if path == "/api/v0/tabs" && method == "POST" {
             return try cast(handleCreateTab(body: body))
         }
-        if path.hasSuffix("/debit") && method == "POST" {
+        if path.hasSuffix("/charge") && method == "POST" {
             return try cast(handleDebitTab(id: parts[parts.count - 2], body: body))
         }
-        if path.hasSuffix("/close") && method == "POST" {
+        if path.hasPrefix("/api/v0/tabs/") && path.hasSuffix("/close") && method == "POST" {
             return try cast(handleCloseTab(id: parts[parts.count - 2]))
         }
-        if path == "/api/v0/stream" && method == "POST" {
+        if path == "/api/v0/streams" && method == "POST" {
             return try cast(handleCreateStream(body: body))
         }
-        if path.hasSuffix("/stop") && method == "POST" {
+        if path.hasPrefix("/api/v0/streams/") && path.hasSuffix("/close") && method == "POST" {
             return try cast(handleStopStream(id: parts[parts.count - 2]))
         }
-        if path == "/api/v0/bounty" && method == "POST" {
+        if path == "/api/v0/bounties" && method == "POST" {
             return try cast(handleCreateBounty(body: body))
         }
         if path.hasSuffix("/award") && method == "POST" {
             return try cast(handleAwardBounty(id: parts[parts.count - 2], body: body))
         }
-        if path == "/api/v0/deposit" && method == "POST" {
+        if path == "/api/v0/deposits" && method == "POST" {
             return try cast(handleCreateDeposit(body: body))
         }
         if path.hasPrefix("/api/v0/reputation/") {
             return try cast(handleReputation(address: parts.last ?? walletAddress))
         }
-        if path.hasPrefix("/api/v0/spending/") {
-            return try cast(handleSpendingSummary(address: parts.last ?? walletAddress))
+        if path == "/api/v0/invoices" && method == "GET" {
+            return try cast(handleHistory(address: walletAddress))
         }
-        if path.hasPrefix("/api/v0/history/") {
-            return try cast(handleHistory(address: parts.last ?? walletAddress))
-        }
-        if path.hasPrefix("/api/v0/budget/") {
-            return try cast(handleBudget(address: parts.last ?? walletAddress))
-        }
-        if path == "/api/v0/intent" && method == "POST" {
+        if path == "/api/v0/invoices" && method == "POST" {
             return try cast(handleIntent(body: body))
         }
         throw RemitError(RemitError.serverError, "MockRemit: unhandled route \(method) \(path)")

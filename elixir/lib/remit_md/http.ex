@@ -95,13 +95,18 @@ defmodule RemitMd.Http do
 
     body_json = if body, do: Jason.encode!(body), else: ""
 
-    # EIP-712 hash and signature
+    # EIP-712 must sign the full URL path (including /api/v0 base path).
+    # Extract the path component from the full URL so the signature covers
+    # the same string the server sees when it receives the request.
+    full_path = URI.parse(url).path
+
+    # EIP-712 hash and signature — sign the full path (including /api/v0 prefix).
     digest =
       eip712_hash(
         transport.chain_id,
         transport.router_address,
         method_string(method),
-        path,
+        full_path,
         timestamp,
         nonce_bytes
       )

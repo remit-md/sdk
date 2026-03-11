@@ -198,9 +198,9 @@ module Remitmd
         @state[:tabs][tab.id] = tab
         tab_hash(tab)
 
-      # Tab debit
-      in ["POST", path] if path.end_with?("/debit") && path.include?("/tabs/")
-        id     = extract_id(path, "/tabs/", "/debit")
+      # Tab charge (debit)
+      in ["POST", path] if path.end_with?("/charge") && path.include?("/tabs/")
+        id     = extract_id(path, "/tabs/", "/charge")
         amount = decimal!(b, :amount)
         tab    = @state[:tabs].fetch(id) { raise not_found(RemitError::TAB_NOT_FOUND, id) }
         new_tab = update_tab(tab, used: tab.used + amount, remaining: tab.remaining - amount)
@@ -213,9 +213,9 @@ module Remitmd
           "signature" => "0x00",
         }
 
-      # Tab settle
-      in ["POST", path] if path.end_with?("/settle") && path.include?("/tabs/")
-        id  = extract_id(path, "/tabs/", "/settle")
+      # Tab close (settle)
+      in ["POST", path] if path.end_with?("/close") && path.include?("/tabs/")
+        id  = extract_id(path, "/tabs/", "/close")
         tab = @state[:tabs].fetch(id) { raise not_found(RemitError::TAB_NOT_FOUND, id) }
         new_tab = update_tab(tab, status: TabStatus::SETTLED)
         @state[:tabs][id] = new_tab

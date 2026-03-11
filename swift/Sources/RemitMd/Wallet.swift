@@ -41,7 +41,7 @@ public final class RemitWallet: Sendable {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
-            method: "POST", path: "/api/v0/pay",
+            method: "POST", path: "/api/v0/payments/direct",
             body: PayBody(to: recipient, amount: amount, memo: memo)
         )
     }
@@ -52,26 +52,26 @@ public final class RemitWallet: Sendable {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
-            method: "POST", path: "/api/v0/escrow",
+            method: "POST", path: "/api/v0/escrows",
             body: EscrowBody(recipient: recipient, amount: amount, conditions: conditions)
         )
     }
 
     public func getEscrow(id: String) async throws -> Escrow {
         return try await transport.request(
-            method: "GET", path: "/api/v0/escrow/\(id)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/escrows/\(id)", body: Optional<EmptyBody>.none
         )
     }
 
     public func releaseEscrow(id: String) async throws -> Escrow {
         return try await transport.request(
-            method: "POST", path: "/api/v0/escrow/\(id)/release", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v0/escrows/\(id)/release", body: Optional<EmptyBody>.none
         )
     }
 
     public func cancelEscrow(id: String) async throws -> Escrow {
         return try await transport.request(
-            method: "POST", path: "/api/v0/escrow/\(id)/cancel", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v0/escrows/\(id)/cancel", body: Optional<EmptyBody>.none
         )
     }
 
@@ -81,7 +81,7 @@ public final class RemitWallet: Sendable {
         try validateAddress(recipient)
         try validateAmount(limit)
         return try await transport.request(
-            method: "POST", path: "/api/v0/tab",
+            method: "POST", path: "/api/v0/tabs",
             body: TabBody(recipient: recipient, limit: limit)
         )
     }
@@ -89,14 +89,14 @@ public final class RemitWallet: Sendable {
     public func debitTab(id: String, amount: Double, memo: String? = nil) async throws -> TabDebit {
         try validateAmount(amount)
         return try await transport.request(
-            method: "POST", path: "/api/v0/tab/\(id)/debit",
+            method: "POST", path: "/api/v0/tabs/\(id)/charge",
             body: DebitBody(amount: amount, memo: memo)
         )
     }
 
     public func closeTab(id: String) async throws -> Tab {
         return try await transport.request(
-            method: "POST", path: "/api/v0/tab/\(id)/close", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v0/tabs/\(id)/close", body: Optional<EmptyBody>.none
         )
     }
 
@@ -108,14 +108,14 @@ public final class RemitWallet: Sendable {
             throw RemitError(RemitError.invalidAmount, "ratePerSecond must be positive")
         }
         return try await transport.request(
-            method: "POST", path: "/api/v0/stream",
+            method: "POST", path: "/api/v0/streams",
             body: StreamBody(recipient: recipient, ratePerSecond: ratePerSecond)
         )
     }
 
-    public func stopStream(id: String) async throws -> Stream {
+    public func closeStream(id: String) async throws -> Stream {
         return try await transport.request(
-            method: "POST", path: "/api/v0/stream/\(id)/stop", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v0/streams/\(id)/close", body: Optional<EmptyBody>.none
         )
     }
 
@@ -127,7 +127,7 @@ public final class RemitWallet: Sendable {
             throw RemitError(RemitError.serverError, "bounty description must not be empty")
         }
         return try await transport.request(
-            method: "POST", path: "/api/v0/bounty",
+            method: "POST", path: "/api/v0/bounties",
             body: BountyBody(amount: amount, description: description)
         )
     }
@@ -135,7 +135,7 @@ public final class RemitWallet: Sendable {
     public func awardBounty(id: String, winner: String) async throws -> Bounty {
         try validateAddress(winner)
         return try await transport.request(
-            method: "POST", path: "/api/v0/bounty/\(id)/award",
+            method: "POST", path: "/api/v0/bounties/\(id)/award",
             body: AwardBody(winner: winner)
         )
     }
@@ -146,7 +146,7 @@ public final class RemitWallet: Sendable {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
-            method: "POST", path: "/api/v0/deposit",
+            method: "POST", path: "/api/v0/deposits",
             body: DepositBody(recipient: recipient, amount: amount, reason: reason)
         )
     }
@@ -157,7 +157,7 @@ public final class RemitWallet: Sendable {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
-            method: "POST", path: "/api/v0/intent",
+            method: "POST", path: "/api/v0/invoices",
             body: IntentBody(to: recipient, amount: amount, model: model)
         )
     }
@@ -167,7 +167,7 @@ public final class RemitWallet: Sendable {
     public func balance(of address: String? = nil) async throws -> Balance {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/balance/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/status/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
@@ -181,21 +181,21 @@ public final class RemitWallet: Sendable {
     public func spendingSummary(of address: String? = nil) async throws -> SpendingSummary {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/spending/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/invoices", body: Optional<EmptyBody>.none
         )
     }
 
     public func history(of address: String? = nil) async throws -> TransactionList {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/history/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/invoices", body: Optional<EmptyBody>.none
         )
     }
 
     public func budget(of address: String? = nil) async throws -> Budget {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/budget/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/status/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 

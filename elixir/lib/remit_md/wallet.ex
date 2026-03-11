@@ -206,7 +206,7 @@ defmodule RemitMd.Wallet do
       with {:ok, data} <- call_mock_or_http(w, fn pid ->
              MockRemit.do_pay(pid, w.address, to, amount_usdc, opts)
            end, fn ->
-             do_http_post(w, "/pay", body)
+             do_http_post(w, "/payments/direct", body)
            end) do
         {:ok, Transaction.from_map(data)}
       end
@@ -245,7 +245,7 @@ defmodule RemitMd.Wallet do
       with {:ok, data} <- call_mock_or_http(w, fn pid ->
              MockRemit.do_create_escrow(pid, w.address, to, amount_usdc, opts)
            end, fn ->
-             do_http_post(w, "/escrow", body)
+             do_http_post(w, "/escrows", body)
            end) do
         {:ok, Escrow.from_map(data)}
       end
@@ -261,7 +261,7 @@ defmodule RemitMd.Wallet do
     with {:ok, data} <- call_mock_or_http(w, fn pid ->
            MockRemit.do_pay_milestone(pid, w.address, escrow_id, milestone_id)
          end, fn ->
-           do_http_post(w, "/escrow/#{escrow_id}/milestone", body)
+           do_http_post(w, "/escrows/#{escrow_id}/claim-start", body)
          end) do
       {:ok, Escrow.from_map(data)}
     end
@@ -272,7 +272,7 @@ defmodule RemitMd.Wallet do
     with {:ok, data} <- call_mock_or_http(w, fn pid ->
            MockRemit.do_cancel_escrow(pid, w.address, escrow_id)
          end, fn ->
-           do_http_post(w, "/escrow/#{escrow_id}/cancel", %{})
+           do_http_post(w, "/escrows/#{escrow_id}/cancel", %{})
          end) do
       {:ok, Escrow.from_map(data)}
     end
@@ -297,7 +297,7 @@ defmodule RemitMd.Wallet do
 
       body = %{to: to, credit_limit_usdc: credit_limit_usdc, expires_in: expires_in}
 
-      with {:ok, data} <- do_call(w, :post, "/tab", body) do
+      with {:ok, data} <- do_call(w, :post, "/tabs", body) do
         {:ok, Tab.from_map(data)}
       end
     end
@@ -308,7 +308,7 @@ defmodule RemitMd.Wallet do
     with :ok <- validate_amount(amount_usdc) do
       body = %{amount_usdc: amount_usdc, description: Keyword.get(opts, :description)}
 
-      with {:ok, data} <- do_call(w, :post, "/tab/#{tab_id}/debit", body) do
+      with {:ok, data} <- do_call(w, :post, "/tabs/#{tab_id}/charge", body) do
         {:ok, data}
       end
     end
@@ -316,7 +316,7 @@ defmodule RemitMd.Wallet do
 
   @doc "Settle a tab (triggers on-chain USDC transfer for the accumulated balance)."
   def settle_tab(%__MODULE__{} = w, tab_id) do
-    with {:ok, data} <- do_call(w, :post, "/tab/#{tab_id}/settle", %{}) do
+    with {:ok, data} <- do_call(w, :post, "/tabs/#{tab_id}/close", %{}) do
       {:ok, Tab.from_map(data)}
     end
   end
@@ -339,7 +339,7 @@ defmodule RemitMd.Wallet do
       duration = Keyword.get(opts, :duration)
       body = %{to: to, rate_per_second_usdc: rate_per_second_usdc, duration: duration}
 
-      with {:ok, data} <- do_call(w, :post, "/stream", body) do
+      with {:ok, data} <- do_call(w, :post, "/streams", body) do
         {:ok, Stream.from_map(data)}
       end
     end
@@ -347,7 +347,7 @@ defmodule RemitMd.Wallet do
 
   @doc "Stop a running payment stream."
   def cancel_stream(%__MODULE__{} = w, stream_id) do
-    with {:ok, data} <- do_call(w, :post, "/stream/#{stream_id}/cancel", %{}) do
+    with {:ok, data} <- do_call(w, :post, "/streams/#{stream_id}/close", %{}) do
       {:ok, Stream.from_map(data)}
     end
   end
@@ -369,7 +369,7 @@ defmodule RemitMd.Wallet do
         expires_in:  Keyword.get(opts, :expires_in, 86_400)
       }
 
-      with {:ok, data} <- do_call(w, :post, "/bounty", body) do
+      with {:ok, data} <- do_call(w, :post, "/bounties", body) do
         {:ok, Bounty.from_map(data)}
       end
     end
@@ -380,7 +380,7 @@ defmodule RemitMd.Wallet do
     with :ok <- validate_address(winner_address) do
       body = %{winner: winner_address}
 
-      with {:ok, data} <- do_call(w, :post, "/bounty/#{bounty_id}/award", body) do
+      with {:ok, data} <- do_call(w, :post, "/bounties/#{bounty_id}/award", body) do
         {:ok, Bounty.from_map(data)}
       end
     end

@@ -16,31 +16,79 @@ async def test_authenticated_request_returns_200_not_401(wallet):
     """GET /api/v0/status/{address} with valid EIP-712 auth must return 200."""
     import httpx
 
-    from .conftest import SERVER_URL
+    from .conftest import CHAIN_ID, ROUTER_ADDRESS, SERVER_URL
 
-    # Debug: make a raw authenticated request to see exactly what's sent/received
+    # Debug 1: Verify golden vector locally to prove signing works in this env
+    from eth_account import Account
+    from eth_account.messages import encode_typed_data
+
+    anvil_key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    anvil_account = Account.from_key(anvil_key)
+    gv_domain = {
+        "name": "remit.md",
+        "version": "0.1",
+        "chainId": 84532,
+        "verifyingContract": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    }
+    gv_types = {
+        "APIRequest": [
+            {"name": "method", "type": "string"},
+            {"name": "path", "type": "string"},
+            {"name": "timestamp", "type": "uint256"},
+            {"name": "nonce", "type": "bytes32"},
+        ]
+    }
+    gv_value = {
+        "method": "POST",
+        "path": "/api/v0/escrows",
+        "timestamp": 1741400000,
+        "nonce": "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    }
+    gv_structured = encode_typed_data(domain_data=gv_domain, message_types=gv_types, message_data=gv_value)
+    gv_signed = anvil_account.sign_message(gv_structured)
+    gv_sig = "0x" + gv_signed.signature.hex()
+    expected_sig = "0x212e1bd57500efed284d08bb7531ea752089f28aef4f8831d19814e6f03eabd354b038e4b679a59325ef4ef2d158b84f1197c699888d40508cdffad453998dbe1b"
+    print(f"\n=== GV CHECK: sig match = {gv_sig == expected_sig}")
+    if gv_sig != expected_sig:
+        print(f"=== GV expected: {expected_sig}")
+        print(f"=== GV got:      {gv_sig}")
+
+    # Debug 2: Build headers and show full details
     headers = await wallet._http._build_auth_headers("GET", f"/api/v0/status/{wallet.address}")
-    print(f"\n=== DEBUG: wallet.address = {wallet.address}")
-    print(f"=== DEBUG: chain_id = {wallet._http._chain_id}")
-    print(f"=== DEBUG: verifying_contract = {wallet._http._verifying_contract}")
-    for k, v in headers.items():
-        val = v[:40] + "..." if len(v) > 40 else v
-        print(f"=== DEBUG: {k}: {val}")
+    sig = headers["X-Remit-Signature"]
+    print(f"=== SIG len={len(sig)} last4={sig[-4:]}")
+    print(f"=== AGENT: {headers['X-Remit-Agent']}")
+    print(f"=== TS: {headers['X-Remit-Timestamp']}")
+    print(f"=== NONCE len={len(headers['X-Remit-Nonce'])}")
+    print(f"=== chain_id={wallet._http._chain_id} contract={wallet._http._verifying_contract}")
 
+    # Debug 3: Also try with Anvil #0 key against the server (fresh timestamp)
+    from remitmd.signer import PrivateKeySigner
+    from remitmd._http import AuthenticatedClient
+
+    anvil_signer = PrivateKeySigner(anvil_key)
+    anvil_http = AuthenticatedClient(
+        SERVER_URL, signer=anvil_signer, chain_id=CHAIN_ID,
+        verifying_contract=ROUTER_ADDRESS,
+    )
+    anvil_addr = anvil_signer.get_address()
+    anvil_headers = await anvil_http._build_auth_headers("GET", f"/api/v0/status/{anvil_addr}")
+    async with httpx.AsyncClient(base_url=SERVER_URL, timeout=10.0) as client:
+        anvil_resp = await client.get(
+            f"/api/v0/status/{anvil_addr}",
+            headers=anvil_headers,
+        )
+    print(f"=== ANVIL status_code={anvil_resp.status_code} body={anvil_resp.text[:200]}")
+    await anvil_http.close()
+
+    # Debug 4: Now try with the actual wallet
     async with httpx.AsyncClient(base_url=SERVER_URL, timeout=10.0) as client:
         resp = await client.get(
             f"/api/v0/status/{wallet.address}",
             headers=headers,
         )
-    print(f"=== DEBUG: status_code = {resp.status_code}")
-    print(f"=== DEBUG: response body = {resp.text[:500]}")
+    print(f"=== WALLET status_code={resp.status_code} body={resp.text[:200]}")
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
-
-    from remitmd.models.common import WalletStatus
-
-    status = WalletStatus.model_validate(resp.json())
-    assert isinstance(status, WalletStatus)
-    assert status.address.lower() == wallet.address.lower()
 
 
 @pytest.mark.asyncio

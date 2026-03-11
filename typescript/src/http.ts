@@ -38,6 +38,23 @@ function newIdempotencyKey(): string {
   return randomBytes(16).toString("hex");
 }
 
+/** Convert a snake_case key to camelCase (e.g. "tx_hash" → "txHash"). */
+function toCamel(key: string): string {
+  return key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+/** Recursively transform all object keys from snake_case to camelCase.
+ *  The server (Rust/serde) emits snake_case; TypeScript SDK uses camelCase. */
+function camelizeKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(camelizeKeys);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [toCamel(k), camelizeKeys(v)]),
+    );
+  }
+  return value;
+}
+
 const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 const DELAY_MS = [200, 600, 1800]; // exponential-ish
 
@@ -99,9 +116,11 @@ export class AuthenticatedClient {
       verifyingContract: this.#verifyingContract,
     };
 
-    // Sign the full path (prefix + relative) so it matches OriginalUri on the server.
-    // e.g. baseUrl "http://…/api/v0" + path "/payments/direct" → signed "/api/v0/payments/direct"
-    const signedPath = `${this.#signPathPrefix}${path}`;
+    // Sign the full path (prefix + relative path only, no query string) so it matches
+    // the path OriginalUri on the server. The server verifies only the path component.
+    // e.g. baseUrl "http://…/api/v0" + path "/events?wallet=0x…" → signed "/api/v0/events"
+    const pathOnly = path.split("?")[0];
+    const signedPath = `${this.#signPathPrefix}${pathOnly}`;
 
     // Sign the request metadata (never body — body may be large)
     const signature = await this.#signer.signTypedData(
@@ -136,7 +155,7 @@ export class AuthenticatedClient {
 
     if (response.ok) {
       if (response.status === 204) return undefined as T;
-      return (await response.json()) as T;
+      return camelizeKeys(await response.json()) as T;
     }
 
     // Retryable errors

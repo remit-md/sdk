@@ -95,9 +95,7 @@ class X402Paywall:
             "maxTimeoutSeconds": self._max_timeout_seconds,
         }
 
-    async def check(
-        self, payment_sig: str | None
-    ) -> tuple[bool, str | None]:
+    async def check(self, payment_sig: str | None) -> tuple[bool, str | None]:
         """
         Check whether a ``PAYMENT-SIGNATURE`` header represents a valid payment.
 
@@ -160,8 +158,7 @@ class X402Paywall:
             from starlette.requests import Request as StarletteRequest  # type: ignore[import]
         except ImportError as exc:
             raise ImportError(
-                "fastapi_dependency() requires FastAPI to be installed."
-                " Run: pip install fastapi"
+                "fastapi_dependency() requires FastAPI to be installed. Run: pip install fastapi"
             ) from exc
 
         if not isinstance(request, StarletteRequest):

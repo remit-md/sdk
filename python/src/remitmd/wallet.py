@@ -122,8 +122,8 @@ class Wallet(RemitClient):
         inv_body: dict[str, Any] = {
             "id": invoice_id,
             "chain": invoice.chain or self.chain,
-            "from_agent": self.address,
-            "to_agent": invoice.to,
+            "from_agent": self.address.lower(),
+            "to_agent": invoice.to.lower(),
             "amount": invoice.amount,
             "type": invoice.payment_model or "escrow",
             "task": invoice.memo,

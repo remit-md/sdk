@@ -84,9 +84,10 @@ module Remitmd
         r_point = recover_r_point(group, bn_r, parity)
         next unless r_point
 
-        # group.generator.mul(scalar_for_G, [scalar_for_R], [R_point])
-        # computes: scalar_for_G * G + scalar_for_R * R_point
-        q = group.generator.mul(b, [a], [r_point])
+        # Q = b*G + a*R (separate mul + add for OpenSSL 3.x compatibility)
+        bg = group.generator.mul(b)
+        ar = r_point.mul(a)
+        q = bg.add(ar)
         candidate = derive_address(q)
         if candidate.downcase == @address.downcase
           v = 27 + parity

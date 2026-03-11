@@ -40,9 +40,6 @@ defmodule RemitMd.Error do
   @doc "The escrow or bounty milestone validation failed."
   def validation_failed, do: "VALIDATION_FAILED"
 
-  @doc "The payment was disputed by one of the parties."
-  def dispute_raised, do: "DISPUTE_RAISED"
-
   @doc "On-chain transaction failed or reverted."
   def transaction_failed, do: "TRANSACTION_FAILED"
 

@@ -78,6 +78,6 @@ mock.reset
 puts "7. Reputation"
 rep = wallet.reputation(RECIPIENT)
 puts "   Address: #{rep.address}"
-puts "   Score: #{rep.score} | Disputes: #{rep.dispute_rate}\n\n"
+puts "   Score: #{rep.score}\n\n"
 
 puts "All payment models demonstrated successfully."

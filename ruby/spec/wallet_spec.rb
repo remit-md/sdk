@@ -167,7 +167,6 @@ RSpec.describe "Remitmd MockRemit" do
       rep = wallet.reputation(RECIPIENT)
       expect(rep).to be_a(Remitmd::Reputation)
       expect(rep.score).to eq(750)
-      expect(rep.dispute_rate).to eq(0.0)
     end
   end
 

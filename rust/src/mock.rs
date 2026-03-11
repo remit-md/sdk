@@ -463,7 +463,6 @@ impl MockTransport {
                     "total_paid": "1000.0",
                     "total_received": "500.0",
                     "transaction_count": 42u64,
-                    "dispute_rate": 0.0f64,
                     "member_since": Utc::now(),
                 }))
             }
@@ -796,7 +795,6 @@ mod tests {
         let wallet = mock.wallet();
         let rep = wallet.reputation(RECIPIENT).await.unwrap();
         assert_eq!(rep.score, 750);
-        assert!(rep.dispute_rate == 0.0);
     }
 
     #[tokio::test]

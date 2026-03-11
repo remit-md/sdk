@@ -176,20 +176,6 @@ export class BountyNotFoundError extends RemitError {
   }
 }
 
-// ─── Dispute errors ───────────────────────────────────────────────────────────
-
-export class DisputeWindowClosedError extends RemitError {
-  constructor(msg = "The dispute window for this escrow has closed.") {
-    super(msg, "DISPUTE_WINDOW_CLOSED", 410);
-  }
-}
-
-export class DisputeAlreadyFiledError extends RemitError {
-  constructor(msg = "A dispute has already been filed for this invoice.") {
-    super(msg, "DISPUTE_ALREADY_FILED", 409);
-  }
-}
-
 // ─── Chain errors ─────────────────────────────────────────────────────────────
 
 export class ChainMismatchError extends RemitError {
@@ -266,8 +252,6 @@ const ERROR_MAP: Record<string, new (msg?: string) => RemitError> = {
   BOUNTY_CLAIMED: BountyClaimedError,
   BOUNTY_MAX_ATTEMPTS: BountyMaxAttemptsError,
   BOUNTY_NOT_FOUND: BountyNotFoundError,
-  DISPUTE_WINDOW_CLOSED: DisputeWindowClosedError,
-  DISPUTE_ALREADY_FILED: DisputeAlreadyFiledError,
   CHAIN_MISMATCH: ChainMismatchError,
   CHAIN_UNSUPPORTED: ChainUnsupportedError,
   RATE_LIMITED: RateLimitedError,

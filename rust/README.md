@@ -117,7 +117,7 @@ let deposit = wallet.lock_deposit("0xBeneficiary...", dec!(20.00), 86_400).await
 ```rust
 // On-chain reputation (0-1000 score)
 let rep = wallet.reputation("0xAgent...").await?;
-println!("score: {}/1000, disputes: {:.2}%", rep.score, rep.dispute_rate * 100.0);
+println!("score: {}/1000", rep.score);
 
 // Spending analytics
 let summary = wallet.spending_summary("month").await?;   // "day", "week", "month", "all"

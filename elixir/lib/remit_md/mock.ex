@@ -181,7 +181,6 @@ defmodule RemitMd.MockRemit do
       "score"               => score,
       "total_volume_usdc"   => "0.00",
       "successful_txns"     => count,
-      "disputed_txns"       => 0,
       "avg_settlement_secs" => 1,
       "member_since"        => "2026-01-01T00:00:00Z"
     }

@@ -89,7 +89,6 @@ type Reputation struct {
 	TotalPaid        decimal.Decimal `json:"total_paid"`
 	TotalReceived    decimal.Decimal `json:"total_received"`
 	TransactionCount int             `json:"transaction_count"`
-	DisputeRate      float64         `json:"dispute_rate"`
 	MemberSince      time.Time       `json:"member_since"`
 }
 

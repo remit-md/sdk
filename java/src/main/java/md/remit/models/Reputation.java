@@ -25,9 +25,6 @@ public class Reputation {
     @JsonProperty("transaction_count")
     public int transactionCount;
 
-    @JsonProperty("dispute_rate")
-    public double disputeRate;
-
     @JsonProperty("member_since")
     public Instant memberSince;
 }

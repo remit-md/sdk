@@ -206,7 +206,7 @@ func (t *CheckEscrowTool) Name() string { return "remitmd_check_escrow" }
 
 func (t *CheckEscrowTool) Description() string {
 	return "Check the status of an existing escrow payment. " +
-		"Returns the current status (funded/released/cancelled/disputed), amount, and parties."
+		"Returns the current status (funded/released/cancelled), amount, and parties."
 }
 
 func (t *CheckEscrowTool) Schema() map[string]any {

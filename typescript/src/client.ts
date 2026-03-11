@@ -9,7 +9,6 @@ import type { Tab } from "./models/tab.js";
 import type { Stream } from "./models/stream.js";
 import type { Bounty } from "./models/bounty.js";
 import type { Deposit } from "./models/deposit.js";
-import type { Dispute } from "./models/dispute.js";
 const DEFAULT_API_URLS: Record<string, string> = {
   base: "https://api.remit.md/api/v0",
   "base-sepolia": "https://testnet.remit.md/api/v0",
@@ -77,10 +76,6 @@ export class RemitClient {
 
   getDeposit(depositId: string): Promise<Deposit> {
     return this._fetch<Deposit>(`/deposits/${depositId}`);
-  }
-
-  getDispute(disputeId: string): Promise<Dispute> {
-    return this._fetch<Dispute>(`/disputes/${disputeId}`);
   }
 
   getStatus(wallet: string): Promise<WalletStatus> {

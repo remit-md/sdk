@@ -36,8 +36,6 @@ export type BountyStatus = "open" | "closed" | "awarded" | "expired" | "cancelle
 
 export type DepositStatus = "locked" | "returned" | "forfeited" | "expired";
 
-export type DisputeStatus = "open" | "under_review" | "resolved" | "closed";
-
 export type ReputationTier = "new" | "trusted" | "verified" | "elite";
 
 /** Result of a write operation. */
@@ -66,8 +64,6 @@ export interface Reputation {
   totalPaid: number;
   totalReceived: number;
   escrowsCompleted: number;
-  escrowsDisputed: number;
-  disputeRate: number;
   memberSince: number; // unix timestamp
 }
 

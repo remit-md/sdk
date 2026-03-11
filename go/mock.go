@@ -342,7 +342,6 @@ func (m *MockRemit) mockReputation(address string) *Reputation {
 		TotalPaid:        decimal.NewFromInt(1000),
 		TotalReceived:    decimal.NewFromInt(500),
 		TransactionCount: 42,
-		DisputeRate:      0.0,
 		MemberSince:      time.Now().Add(-30 * 24 * time.Hour),
 	}
 }

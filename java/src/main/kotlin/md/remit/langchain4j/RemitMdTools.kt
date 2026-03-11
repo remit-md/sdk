@@ -116,7 +116,6 @@ class RemitMdTools(private val wallet: Wallet) {
     @Tool("Look up the reputation score for an Ethereum address. Higher = more trustworthy.")
     fun checkReputation(@P("Ethereum address to check") address: String): String {
         val r = wallet.reputation(address)
-        return "Reputation for ${address}: score ${r.score}/1000, ${r.transactionCount} transactions, " +
-               "${r.disputeRate * 100}% dispute rate"
+        return "Reputation for ${address}: score ${r.score}/1000, ${r.transactionCount} transactions"
     }
 }

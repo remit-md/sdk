@@ -209,23 +209,5 @@ export function remitTools(wallet: Wallet): Record<string, RemitToolDescriptor> 
           expires: Number(expires),
         }),
     },
-
-    remit_file_dispute: {
-      description:
-        "File a dispute against an escrow. Freezes funds for arbitration review.",
-      parameters: {
-        invoice_id: { type: "string", description: "Invoice ID to dispute" },
-        reason: { type: "string", description: "Dispute category (non_delivery, quality, etc.)" },
-        details: { type: "string", description: "Detailed description of the dispute" },
-        evidence_uri: { type: "string", description: "URI to supporting evidence (IPFS, URL)" },
-      },
-      execute: async (invoice_id: unknown, reason: unknown, details: unknown, evidence_uri: unknown) =>
-        wallet.fileDispute({
-          invoiceId: String(invoice_id),
-          reason: String(reason),
-          details: String(details),
-          evidenceUri: String(evidence_uri),
-        }),
-    },
   };
 }

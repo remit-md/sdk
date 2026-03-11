@@ -241,9 +241,9 @@ impl Wallet {
 
     /// Create and fund an escrow for work to be done.
     ///
-    /// Funds are locked until the payer calls `release_escrow`, the payee
-    /// disputes, or the escrow expires. Use for high-value tasks where delivery
-    /// must be verified before payment.
+    /// Funds are locked until the payer calls `release_escrow` or the escrow
+    /// expires. Use for high-value tasks where delivery must be verified before
+    /// payment.
     ///
     /// # Arguments
     /// - `payee` — the agent that will receive funds on release

@@ -69,13 +69,6 @@ class DepositStatus(str, Enum):
     expired = "expired"
 
 
-class DisputeStatus(str, Enum):
-    open = "open"
-    under_review = "under_review"
-    resolved = "resolved"
-    closed = "closed"
-
-
 class Transaction(BaseModel):
     """Result of a write operation.
 
@@ -111,8 +104,6 @@ class Reputation(BaseModel):
     total_paid: float
     total_received: float
     escrows_completed: int
-    escrows_disputed: int
-    dispute_rate: float
     member_since: int
 
 

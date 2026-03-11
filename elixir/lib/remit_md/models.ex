@@ -47,7 +47,7 @@ defmodule RemitMd.Models do
     @moduledoc "Reputation score and statistics for an agent address."
     @enforce_keys [:address, :score]
     defstruct [:address, :score, :total_volume_usdc, :successful_txns,
-               :disputed_txns, :avg_settlement_secs, :member_since]
+               :avg_settlement_secs, :member_since]
 
     @doc false
     def from_map(m) do
@@ -56,7 +56,6 @@ defmodule RemitMd.Models do
         score:                Map.get(m, "score"),
         total_volume_usdc:    Map.get(m, "total_volume_usdc"),
         successful_txns:      Map.get(m, "successful_txns"),
-        disputed_txns:        Map.get(m, "disputed_txns"),
         avg_settlement_secs:  Map.get(m, "avg_settlement_secs"),
         member_since:         Map.get(m, "member_since")
       }

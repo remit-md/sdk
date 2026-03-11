@@ -7,7 +7,6 @@ export type {
   OpenStreamOptions,
   PostBountyOptions,
   PlaceDepositOptions,
-  FileDisputeOptions,
 } from "./wallet.js";
 
 // Signers
@@ -41,8 +40,6 @@ export {
   BountyClaimedError,
   BountyMaxAttemptsError,
   BountyNotFoundError,
-  DisputeWindowClosedError,
-  DisputeAlreadyFiledError,
   ChainMismatchError,
   ChainUnsupportedError,
   RateLimitedError,

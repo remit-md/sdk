@@ -12,7 +12,6 @@ import {
   BountyNotFoundError,
   RateLimitedError,
   ChainMismatchError,
-  DisputeAlreadyFiledError,
 } from "../src/errors.js";
 
 describe("Error classes", () => {
@@ -33,7 +32,6 @@ describe("Error classes", () => {
     assert.equal(new BountyNotFoundError().code, "BOUNTY_NOT_FOUND");
     assert.equal(new RateLimitedError().code, "RATE_LIMITED");
     assert.equal(new ChainMismatchError().code, "CHAIN_MISMATCH");
-    assert.equal(new DisputeAlreadyFiledError().code, "DISPUTE_ALREADY_FILED");
   });
 
   it("typed subclasses are instanceof RemitError", () => {

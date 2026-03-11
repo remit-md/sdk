@@ -79,7 +79,6 @@ public struct Reputation: Codable, Sendable {
     public let score: Double
     public let totalVolume: Double
     public let transactionCount: Int
-    public let disputeRate: Double
     public let counterpartyCount: Int
     public let agedays: Int
     public let escrowRate: Double
@@ -88,7 +87,6 @@ public struct Reputation: Codable, Sendable {
         case address, score
         case totalVolume = "total_volume"
         case transactionCount = "transaction_count"
-        case disputeRate = "dispute_rate"
         case counterpartyCount = "counterparty_count"
         case agedays = "age_days"
         case escrowRate = "escrow_rate"

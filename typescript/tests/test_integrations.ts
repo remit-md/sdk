@@ -28,7 +28,6 @@ describe("Vercel AI integration", () => {
       "remit_close_stream",
       "remit_post_bounty",
       "remit_place_deposit",
-      "remit_file_dispute",
     ];
 
     for (const name of expected) {

@@ -5,5 +5,4 @@ export * from "./tab.js";
 export * from "./stream.js";
 export * from "./bounty.js";
 export * from "./deposit.js";
-export * from "./dispute.js";
 export * from "./reputation.js";

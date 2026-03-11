@@ -13,7 +13,6 @@ from remitmd.client import RemitClient
 from remitmd.models.bounty import Bounty
 from remitmd.models.common import Transaction, WalletStatus, Webhook
 from remitmd.models.deposit import Deposit
-from remitmd.models.dispute import Dispute
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
 from remitmd.models.stream import Stream
@@ -264,26 +263,6 @@ class Wallet(RemitClient):
             {"to": to, "amount": amount, "expires": expires},
         )
         return Deposit.model_validate(data)
-
-    # ─── Disputes ─────────────────────────────────────────────────────────────
-
-    async def file_dispute(
-        self,
-        invoice_id: str,
-        reason: str,
-        details: str,
-        evidence_uri: str,
-    ) -> Dispute:
-        data = await self._http.post(
-            "/api/v0/disputes",
-            {
-                "invoice_id": invoice_id,
-                "reason": reason,
-                "details": details,
-                "evidence_uri": evidence_uri,
-            },
-        )
-        return Dispute.model_validate(data)
 
     # ─── Events ───────────────────────────────────────────────────────────────
 

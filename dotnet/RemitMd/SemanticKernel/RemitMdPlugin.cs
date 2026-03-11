@@ -71,8 +71,7 @@ public sealed class RemitMdPlugin
         var rep = await _wallet.ReputationAsync(address, cancellationToken);
         return $"Reputation for {rep.Address}: {rep.Score}/1000. " +
                $"Total paid: {rep.TotalPaid:F2} USDC. " +
-               $"Transactions: {rep.TransactionCount}. " +
-               $"Dispute rate: {rep.DisputeRate:P1}.";
+               $"Transactions: {rep.TransactionCount}.";
     }
 
     /// <summary>Creates an escrow contract that holds funds until work is approved.</summary>

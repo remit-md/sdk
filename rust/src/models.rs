@@ -1,21 +1,6 @@
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use serde::{Deserialize, Deserializer, Serialize};
-
-/// Deserializes a field that may arrive as either a JSON number or a JSON string.
-/// Used for `dispute_rate` which the server serializes as a BigDecimal string ("0").
-fn deser_f64_or_str<'de, D: Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum F64OrStr {
-        Float(f64),
-        Str(String),
-    }
-    match F64OrStr::deserialize(d)? {
-        F64OrStr::Float(f) => Ok(f),
-        F64OrStr::Str(s) => s.parse::<f64>().map_err(serde::de::Error::custom),
-    }
-}
+use serde::{Deserialize, Serialize};
 
 /// EVM chain IDs supported by remit.md.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -143,9 +128,6 @@ pub struct Reputation {
     pub total_received: Decimal,
     #[serde(default)]
     pub transaction_count: u64,
-    /// Dispute rate (0.0–1.0).  May be serialized as a decimal string by the server.
-    #[serde(default, deserialize_with = "deser_f64_or_str")]
-    pub dispute_rate: f64,
     #[serde(default)]
     pub member_since: DateTime<Utc>,
 }

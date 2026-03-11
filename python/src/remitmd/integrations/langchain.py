@@ -50,7 +50,6 @@ class RemitToolkit(BaseToolkit):
             RemitOpenStreamTool(wallet=self.wallet),
             RemitCheckBalanceTool(wallet=self.wallet),
             RemitGetReputationTool(wallet=self.wallet),
-            RemitFileDisputeTool(wallet=self.wallet),
         ]
 
 
@@ -89,13 +88,6 @@ class _OpenStreamInput(BaseModel):
     to: str = Field(description="Payee wallet address")
     rate: float = Field(description="Rate per second in USD")
     max_duration: int = Field(default=3600, description="Maximum duration in seconds")
-
-
-class _FileDisputeInput(BaseModel):
-    invoice_id: str
-    reason: str
-    details: str
-    evidence_uri: str = Field(description="URL to supporting evidence")
 
 
 # ─── Tool implementations ─────────────────────────────────────────────────────
@@ -244,32 +236,8 @@ class RemitGetReputationTool(BaseTool):
 
     def _run(self, wallet: str) -> str:
         rep = asyncio.run(self.wallet.get_reputation(wallet))
-        return (
-            f"Reputation for {wallet[:10]}...: score={rep.score:.2f}, "
-            f"dispute_rate={rep.dispute_rate:.1%}"
-        )
+        return f"Reputation for {wallet[:10]}...: score={rep.score:.2f}"
 
     async def _arun(self, wallet: str) -> str:
         rep = await self.wallet.get_reputation(wallet)
-        return (
-            f"Reputation for {wallet[:10]}...: score={rep.score:.2f}, "
-            f"dispute_rate={rep.dispute_rate:.1%}"
-        )
-
-
-class RemitFileDisputeTool(BaseTool):
-    name: str = "remit_file_dispute"
-    description: str = "File a dispute for an escrow payment."
-    args_schema: type[BaseModel] = _FileDisputeInput
-    wallet: Any
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    def _run(self, invoice_id: str, reason: str, details: str, evidence_uri: str) -> str:
-        dispute = asyncio.run(self.wallet.file_dispute(invoice_id, reason, details, evidence_uri))
-        return f"Dispute filed. dispute_id={dispute.id}"
-
-    async def _arun(self, invoice_id: str, reason: str, details: str, evidence_uri: str) -> str:
-        dispute = await self.wallet.file_dispute(invoice_id, reason, details, evidence_uri)
-        return f"Dispute filed. dispute_id={dispute.id}"
+        return f"Reputation for {wallet[:10]}...: score={rep.score:.2f}"

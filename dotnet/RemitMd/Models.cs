@@ -64,7 +64,6 @@ public record Reputation(
     [property: JsonPropertyName("total_paid")] decimal TotalPaid,
     [property: JsonPropertyName("total_received")] decimal TotalReceived,
     [property: JsonPropertyName("transaction_count")] int TransactionCount,
-    [property: JsonPropertyName("dispute_rate")] double DisputeRate,
     [property: JsonPropertyName("member_since")] DateTimeOffset MemberSince
 );
 

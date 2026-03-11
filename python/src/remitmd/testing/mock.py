@@ -34,7 +34,6 @@ from remitmd.models.bounty import Bounty, BountySubmission
 from remitmd.models.common import (
     BountyStatus,
     DepositStatus,
-    DisputeStatus,
     EscrowStatus,
     Reputation,
     StreamStatus,
@@ -44,7 +43,6 @@ from remitmd.models.common import (
     Webhook,
 )
 from remitmd.models.deposit import Deposit
-from remitmd.models.dispute import Dispute
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
 from remitmd.models.stream import Stream
@@ -75,7 +73,6 @@ class _MockState:
     streams: dict[str, Stream] = field(default_factory=dict)
     bounties: dict[str, Bounty] = field(default_factory=dict)
     deposits: dict[str, Deposit] = field(default_factory=dict)
-    disputes: dict[str, Dispute] = field(default_factory=dict)
     forced_errors: dict[str, str] = field(default_factory=dict)  # address → error code
     time_offset: int = 0  # seconds added to _now()
 
@@ -181,8 +178,6 @@ class MockWallet:
             total_paid=0.0,
             total_received=0.0,
             escrows_completed=0,
-            escrows_disputed=0,
-            dispute_rate=0.0,
             member_since=self._mock.now(),
         )
 
@@ -478,29 +473,6 @@ class MockWallet:
         self._mock._credit(deposit.payee, deposit.amount)
         deposit.status = DepositStatus.forfeited
         return self._mock._make_tx()
-
-    # ─── Disputes ─────────────────────────────────────────────────────────────
-
-    async def file_dispute(
-        self, invoice_id: str, reason: str, details: str, evidence_uri: str
-    ) -> Dispute:
-        self._mock._check_forced_error(self.address)
-        did = _id("dsp")
-        dispute = Dispute(
-            id=did,
-            invoice_id=invoice_id,
-            filer=self.address,
-            reason=reason,
-            details=details,
-            evidence_uri=evidence_uri,
-            response=None,
-            status=DisputeStatus.open,
-            resolution=None,
-            created_at=self._mock.now(),
-            resolved_at=None,
-        )
-        self._mock._state.disputes[did] = dispute
-        return dispute
 
     # ─── Testnet faucet ───────────────────────────────────────────────────────
 

@@ -19,7 +19,6 @@ import type { Tab } from "./models/tab.js";
 import type { Stream } from "./models/stream.js";
 import type { Bounty } from "./models/bounty.js";
 import type { Deposit } from "./models/deposit.js";
-import type { Dispute } from "./models/dispute.js";
 export interface WalletOptions extends RemitClientOptions {
   privateKey?: string;
   signer?: Signer;
@@ -53,13 +52,6 @@ export interface PlaceDepositOptions {
   to: string;
   amount: number;
   expires: number; // seconds
-}
-
-export interface FileDisputeOptions {
-  invoiceId: string;
-  reason: string;
-  details: string;
-  evidenceUri: string;
 }
 
 export class Wallet extends RemitClient {
@@ -239,17 +231,6 @@ export class Wallet extends RemitClient {
       to: options.to,
       amount: options.amount,
       expires: options.expires,
-    });
-  }
-
-  // ─── Disputes ───────────────────────────────────────────────────────────────
-
-  fileDispute(options: FileDisputeOptions): Promise<Dispute> {
-    return this.#auth.post<Dispute>("/disputes", {
-      invoiceId: options.invoiceId,
-      reason: options.reason,
-      details: options.details,
-      evidenceUri: options.evidenceUri,
     });
   }
 

@@ -12,7 +12,6 @@ from remitmd.errors import (
 from remitmd.models.common import (
     BountyStatus,
     DepositStatus,
-    DisputeStatus,
     EscrowStatus,
     StreamStatus,
     TabStatus,
@@ -202,23 +201,6 @@ async def test_deposit_forfeited(mock, payer, payee):
     await payee.forfeit_deposit(deposit.id)
     assert await payee.balance() == 20.0
     assert mock._state.deposits[deposit.id].status == DepositStatus.forfeited
-
-
-# ─── Disputes ─────────────────────────────────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_file_dispute(mock, payer, payee):
-    invoice = Invoice(to=payee.address, amount=100.0)
-    tx = await payer.pay(invoice)
-    dispute = await payer.file_dispute(
-        invoice_id=tx.invoice_id,
-        reason="non_delivery",
-        details="Work was not completed",
-        evidence_uri="ipfs://Qm...",
-    )
-    assert dispute.status == DisputeStatus.open
-    assert dispute.invoice_id == tx.invoice_id
 
 
 # ─── Forced errors ────────────────────────────────────────────────────────────

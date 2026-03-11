@@ -82,7 +82,7 @@ def remit_tools(wallet: Wallet) -> list[Any]:
     async def remit_get_reputation(wallet_address: str) -> str:
         """Get reputation score for a wallet address."""
         rep = await wallet.get_reputation(wallet_address)
-        return f"Score: {rep.score:.2f}, dispute_rate: {rep.dispute_rate:.1%}"
+        return f"Score: {rep.score:.2f}"
 
     return [
         remit_pay_direct,

@@ -306,7 +306,6 @@ public class MockRemit {
         r.totalPaid = BigDecimal.valueOf(1000);
         r.totalReceived = BigDecimal.valueOf(500);
         r.transactionCount = 42;
-        r.disputeRate = 0.0;
         r.memberSince = Instant.now().minusSeconds(30L * 24 * 3600);
         return r;
     }

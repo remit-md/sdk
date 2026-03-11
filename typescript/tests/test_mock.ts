@@ -141,33 +141,6 @@ describe("MockRemit", () => {
     assert.equal(await payer.balance(), 70);
   });
 
-  it("dispute: freezes escrow", async () => {
-    const payer = mock.createWallet(200);
-    const payee = mock.createWallet(0);
-
-    await payer.pay({
-      id: "inv-dispute",
-      from: payer.address,
-      to: payee.address,
-      amount: 100,
-      chain: "base",
-      status: "pending",
-      paymentType: "escrow",
-      createdAt: Math.floor(Date.now() / 1000),
-    });
-
-    const dispute = await payer.fileDispute({
-      invoiceId: "inv-dispute",
-      reason: "non_delivery",
-      details: "Work was not delivered",
-      evidenceUri: "ipfs://evidence",
-    });
-
-    assert.equal(dispute.status, "open");
-    const escrow = mock.getEscrow("inv-dispute");
-    assert.equal(escrow.status, "disputed");
-  });
-
   it("status includes balance and tier", async () => {
     const wallet = mock.createWallet(555);
     const status = await wallet.status();

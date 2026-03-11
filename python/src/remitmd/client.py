@@ -6,7 +6,6 @@ from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.models.bounty import Bounty
 from remitmd.models.common import Event, Reputation, WalletStatus, Webhook
 from remitmd.models.deposit import Deposit
-from remitmd.models.dispute import Dispute
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
 from remitmd.models.stream import Stream
@@ -76,12 +75,6 @@ class RemitClient:
     async def get_deposit(self, deposit_id: str) -> Deposit:
         data = await self._http.get(f"/api/v0/deposits/{deposit_id}")
         return Deposit.model_validate(data)
-
-    # ─── Disputes ─────────────────────────────────────────────────────────────
-
-    async def get_dispute(self, dispute_id: str) -> Dispute:
-        data = await self._http.get(f"/api/v0/disputes/{dispute_id}")
-        return Dispute.model_validate(data)
 
     # ─── Wallet status ────────────────────────────────────────────────────────
 

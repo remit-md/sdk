@@ -282,7 +282,6 @@ module Remitmd
           "total_paid"        => "1000.0",
           "total_received"    => "500.0",
           "transaction_count" => 42,
-          "dispute_rate"      => 0.0,
           "member_since"      => now,
         }
 

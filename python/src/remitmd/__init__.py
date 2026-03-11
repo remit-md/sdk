@@ -6,7 +6,6 @@ from remitmd.models.common import (
     BountyStatus,
     ChainId,
     DepositStatus,
-    DisputeStatus,
     EscrowStatus,
     Event,
     InvoiceStatus,
@@ -18,7 +17,6 @@ from remitmd.models.common import (
     Webhook,
 )
 from remitmd.models.deposit import Deposit
-from remitmd.models.dispute import Dispute
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice, Milestone, Split
 from remitmd.models.stream import Stream
@@ -39,7 +37,6 @@ __all__ = [
     "StreamStatus",
     "BountyStatus",
     "DepositStatus",
-    "DisputeStatus",
     # models
     "Transaction",
     "WalletStatus",
@@ -56,5 +53,4 @@ __all__ = [
     "Bounty",
     "BountySubmission",
     "Deposit",
-    "Dispute",
 ]

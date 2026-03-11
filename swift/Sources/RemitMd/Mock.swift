@@ -46,7 +46,7 @@ public final class MockRemit: @unchecked Sendable {
             _reputations[address] = Reputation(
                 address: address, score: score,
                 totalVolume: 0, transactionCount: 0,
-                disputeRate: 0, counterpartyCount: 0,
+                counterpartyCount: 0,
                 agedays: 0, escrowRate: 0
             )
         }
@@ -340,7 +340,7 @@ public final class MockRemit: @unchecked Sendable {
         return lock.remitLock {
             _reputations[address] ?? Reputation(
                 address: address, score: 0.72, totalVolume: 1500.0,
-                transactionCount: 47, disputeRate: 0.0,
+                transactionCount: 47,
                 counterpartyCount: 12, agedays: 90, escrowRate: 0.15
             )
         }

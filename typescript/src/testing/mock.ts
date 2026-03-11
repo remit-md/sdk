@@ -29,7 +29,6 @@ import type { Tab } from "../models/tab.js";
 import type { Stream } from "../models/stream.js";
 import type { Bounty } from "../models/bounty.js";
 import type { Deposit } from "../models/deposit.js";
-import type { Dispute } from "../models/dispute.js";
 let _idCounter = 1;
 function nextId(): string {
   return `mock-${_idCounter++}`;
@@ -62,7 +61,6 @@ export class MockRemit {
   readonly #streams: Map<string, Stream> = new Map();
   readonly #bounties: Map<string, Bounty> = new Map();
   readonly #deposits: Map<string, Deposit> = new Map();
-  readonly #disputes: Map<string, Dispute> = new Map();
   #timeOffset = 0;
 
   static _now(): number {
@@ -152,12 +150,6 @@ export class MockRemit {
     return { ...d };
   }
 
-  getDispute(id: string): Dispute {
-    const d = this.#disputes.get(id);
-    if (!d) throw new Error("DISPUTE_NOT_FOUND");
-    return { ...d };
-  }
-
   getStatus(address: string): WalletStatus {
     const state = this._getState(address);
     return {
@@ -177,8 +169,6 @@ export class MockRemit {
       totalPaid: 0,
       totalReceived: 0,
       escrowsCompleted: 0,
-      escrowsDisputed: 0,
-      disputeRate: 0,
       memberSince: this._now() - 86400 * 30,
     };
   }
@@ -358,25 +348,6 @@ export class MockRemit {
     return { ...deposit };
   }
 
-  fileDispute(from: string, invoiceId: string, reason: string, details: string, evidenceUri: string): Dispute {
-    this._checkForced(from);
-    const id = nextId();
-    const dispute: Dispute = {
-      id,
-      invoiceId,
-      filer: from,
-      reason,
-      details,
-      evidenceUri,
-      chain: "base",
-      status: "open",
-      createdAt: this._now(),
-    };
-    this.#disputes.set(id, dispute);
-    const escrow = this.#escrows.get(invoiceId);
-    if (escrow) escrow.status = "disputed";
-    return { ...dispute };
-  }
 }
 
 /**
@@ -458,16 +429,6 @@ export class MockWallet extends Wallet {
       options.to,
       options.amount,
       options.expires,
-    );
-  }
-
-  override async fileDispute(options: Parameters<Wallet["fileDispute"]>[0]): Promise<Dispute> {
-    return this.#mock.fileDispute(
-      this.address,
-      options.invoiceId,
-      options.reason,
-      options.details,
-      options.evidenceUri,
     );
   }
 

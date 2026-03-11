@@ -129,12 +129,11 @@ module Remitmd
       @total_paid        = decimal(h["total_paid"])
       @total_received    = decimal(h["total_received"])
       @transaction_count = h["transaction_count"]&.to_i || 0
-      @dispute_rate      = h["dispute_rate"]&.to_f || 0.0
       @member_since      = parse_time(h["member_since"])
     end
 
     attr_reader :address, :score, :total_paid, :total_received,
-                :transaction_count, :dispute_rate, :member_since
+                :transaction_count, :member_since
 
     private :decimal, :parse_time
   end

@@ -70,7 +70,7 @@ public class Wallet {
         validateAddress(to);
         validateAmount(amount);
         return client.post("/api/v0/payments/direct",
-            Map.of("to", to, "amount", amount.toPlainString(), "memo", memo != null ? memo : ""),
+            Map.of("to", to, "amount", amount.toPlainString(), "task", memo != null ? memo : ""),
             Transaction.class);
     }
 

@@ -147,7 +147,10 @@ mod compliance_tests {
         let (pk, _addr) = register_and_get_key(&client).await;
         let wallet = make_wallet(&pk);
 
-        let balance = wallet.balance().await.expect("balance() must not fail with valid auth");
+        let balance = wallet
+            .balance()
+            .await
+            .expect("balance() must not fail with valid auth");
         // Server returns a balance object — we just verify the call succeeded (no 401).
         let _ = balance;
     }

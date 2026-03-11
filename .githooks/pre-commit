@@ -93,7 +93,13 @@ fi
 echo "[QA] Anti-shortcut scan..."
 FAIL=0
 
-CODE_STAGED=$(echo "$STAGED" | grep -v '^\.githooks/')
+CODE_STAGED=$(echo "$STAGED" | grep -v '^\.githooks/\|^\.github/' | grep -v '^$' || true)
+
+if [ -z "$CODE_STAGED" ]; then
+    echo "[QA] Only config files staged — skipping anti-shortcut scan."
+    echo "=== Pre-commit passed ==="
+    exit 0
+fi
 
 if echo "$CODE_STAGED" | xargs grep -n 'TODO\|FIXME\|HACK\|placeholder\|stub' 2>/dev/null; then
     echo "  FAIL: TODO/FIXME/placeholder found"

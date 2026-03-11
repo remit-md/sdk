@@ -59,6 +59,10 @@ export { LocalChain } from "./testing/local.js";
 export { X402Client, AllowanceExceededError } from "./x402.js";
 export type { X402ClientOptions } from "./x402.js";
 
+// x402 provider middleware
+export { X402Paywall } from "./provider.js";
+export type { PaywallOptions, CheckResult } from "./provider.js";
+
 // Integrations
 export { remitTools } from "./integrations/vercel-ai.js";
 export type { RemitToolDescriptor } from "./integrations/vercel-ai.js";

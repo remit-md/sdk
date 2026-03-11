@@ -541,9 +541,9 @@ func (w *Wallet) ProposeIntent(ctx context.Context, to string, amount decimal.De
 
 // FaucetResponse is returned by RequestTestnetFunds.
 type FaucetResponse struct {
-	TxHash    string  `json:"tx_hash"`
-	Amount    float64 `json:"amount"`
-	Recipient string  `json:"recipient"`
+	TxHash    string          `json:"tx_hash"`
+	Amount    decimal.Decimal `json:"amount"` // bigdecimal serializes as JSON string on the server side
+	Recipient string          `json:"recipient"`
 }
 
 // RequestTestnetFunds requests test USDC from the testnet faucet.

@@ -3,6 +3,7 @@ package md.remit.signer;
 import md.remit.ErrorCodes;
 import md.remit.RemitError;
 import org.web3j.crypto.Credentials;
+import org.web3j.crypto.ECDSASignature;
 import org.web3j.crypto.Sign;
 import org.web3j.utils.Numeric;
 
@@ -49,12 +50,9 @@ public class PrivateKeySigner implements Signer {
         // Sign the hash. ECKeyPair.sign() uses RFC-6979 deterministic k and normalises
         // s to low-s form via toCanonicalised(), which is required by the server's k256
         // verifier (Signature::from_slice rejects high-s signatures).
-        Sign.ECDSASignature sig = credentials.getEcKeyPair().sign(hash);
+        ECDSASignature sig = credentials.getEcKeyPair().sign(hash);
 
         // Find the correct recovery ID (0 or 1) for the *canonicalized* signature.
-        // We cannot use Sign.signMessage's built-in recId: web3j computes the recId
-        // before calling toCanonicalised(), so when s is flipped the stored recId is
-        // wrong, causing the server to recover the wrong address and return 401.
         BigInteger publicKey = credentials.getEcKeyPair().getPublicKey();
         int recId = -1;
         for (int i = 0; i < 2; i++) {

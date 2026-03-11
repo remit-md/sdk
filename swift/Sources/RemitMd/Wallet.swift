@@ -157,7 +157,7 @@ public final class RemitWallet: Sendable {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
-            method: "POST", path: "/api/v0/invoices",
+            method: "POST", path: "/api/v0/intent",
             body: IntentBody(to: recipient, amount: amount, model: model)
         )
     }
@@ -167,7 +167,7 @@ public final class RemitWallet: Sendable {
     public func balance(of address: String? = nil) async throws -> Balance {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/status/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/balance/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
@@ -181,21 +181,21 @@ public final class RemitWallet: Sendable {
     public func spendingSummary(of address: String? = nil) async throws -> SpendingSummary {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/invoices", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/spending/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
     public func history(of address: String? = nil) async throws -> TransactionList {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/invoices", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/history/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
     public func budget(of address: String? = nil) async throws -> Budget {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/status/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v0/budget/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 

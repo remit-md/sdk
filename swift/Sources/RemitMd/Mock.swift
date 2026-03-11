@@ -95,7 +95,7 @@ public final class MockRemit: @unchecked Sendable {
         if path == "/api/v0/payments/direct" {
             return try cast(handlePay(body: body))
         }
-        if path.hasPrefix("/api/v0/status/") {
+        if path.hasPrefix("/api/v0/balance/") {
             return try cast(handleBalance(address: parts.last ?? walletAddress))
         }
         if path == "/api/v0/escrows" && method == "POST" {
@@ -137,10 +137,16 @@ public final class MockRemit: @unchecked Sendable {
         if path.hasPrefix("/api/v0/reputation/") {
             return try cast(handleReputation(address: parts.last ?? walletAddress))
         }
-        if path == "/api/v0/invoices" && method == "GET" {
-            return try cast(handleHistory(address: walletAddress))
+        if path.hasPrefix("/api/v0/spending/") {
+            return try cast(handleSpendingSummary(address: parts.last ?? walletAddress))
         }
-        if path == "/api/v0/invoices" && method == "POST" {
+        if path.hasPrefix("/api/v0/history/") {
+            return try cast(handleHistory(address: parts.last ?? walletAddress))
+        }
+        if path.hasPrefix("/api/v0/budget/") {
+            return try cast(handleBudget(address: parts.last ?? walletAddress))
+        }
+        if path == "/api/v0/intent" && method == "POST" {
             return try cast(handleIntent(body: body))
         }
         throw RemitError(RemitError.serverError, "MockRemit: unhandled route \(method) \(path)")

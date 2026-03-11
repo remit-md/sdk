@@ -68,12 +68,12 @@ func TestMockEscrowLifecycle(t *testing.T) {
 		t.Errorf("expected status %s, got %s", remitmd.EscrowStatusFunded, escrow.Status)
 	}
 
-	tx, err := wallet.ReleaseEscrow(ctx, escrow.ID)
+	released, err := wallet.ReleaseEscrow(ctx, escrow.InvoiceID)
 	if err != nil {
 		t.Fatalf("ReleaseEscrow failed: %v", err)
 	}
-	if !tx.Amount.Equal(amount) {
-		t.Errorf("release amount mismatch: got %s, want %s", tx.Amount.String(), amount.String())
+	if !released.Amount.Equal(amount) {
+		t.Errorf("release amount mismatch: got %s, want %s", released.Amount.String(), amount.String())
 	}
 }
 
@@ -86,7 +86,7 @@ func TestMockEscrowCancel(t *testing.T) {
 
 	amount := decimal.NewFromFloat(50.00)
 	escrow, _ := wallet.CreateEscrow(ctx, "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", amount)
-	_, err := wallet.CancelEscrow(ctx, escrow.ID)
+	_, err := wallet.CancelEscrow(ctx, escrow.InvoiceID)
 	if err != nil {
 		t.Fatalf("CancelEscrow failed: %v", err)
 	}

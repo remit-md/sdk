@@ -108,31 +108,39 @@ type Split struct {
 }
 
 // Escrow holds funds until conditions are met.
+// Field names match the server's models::escrow::Escrow struct (snake_case JSON).
 type Escrow struct {
-	ID          string          `json:"id"`
-	Payer       string          `json:"payer"`
-	Payee       string          `json:"payee"`
-	Amount      decimal.Decimal `json:"amount"`
-	Fee         decimal.Decimal `json:"fee"`
-	Status      EscrowStatus    `json:"status"`
-	Memo        string          `json:"memo"`
-	Milestones  []Milestone     `json:"milestones,omitempty"`
-	Splits      []Split         `json:"splits,omitempty"`
-	ExpiresAt   *time.Time      `json:"expires_at,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
+	InvoiceID    string          `json:"invoice_id"`
+	Chain        string          `json:"chain"`
+	TxHash       string          `json:"tx_hash"`
+	Status       EscrowStatus    `json:"status"`
+	Payer        string          `json:"payer"`
+	Payee        string          `json:"payee"`
+	Amount       decimal.Decimal `json:"amount"`
+	Fee          decimal.Decimal `json:"fee"`
+	Timeout      string          `json:"timeout,omitempty"`
+	ClaimStarted bool            `json:"claim_started"`
+	CreatedAt    string          `json:"created_at"`
+	UpdatedAt    string          `json:"updated_at,omitempty"`
 }
 
-// Tab is an off-chain payment channel for batched micro-payments.
+// Tab is a metered payment channel (payer pre-funds, provider charges per call).
+// Field names match the server's models::tab::Tab struct (snake_case JSON).
 type Tab struct {
-	ID          string          `json:"id"`
-	Opener      string          `json:"opener"`
-	Counterpart string          `json:"counterpart"`
-	Limit       decimal.Decimal `json:"limit"`
-	Used        decimal.Decimal `json:"used"`
-	Remaining   decimal.Decimal `json:"remaining"`
-	Status      TabStatus       `json:"status"`
-	CreatedAt   time.Time       `json:"created_at"`
-	ClosesAt    *time.Time      `json:"closes_at,omitempty"`
+	ID            string          `json:"id"`
+	Chain         string          `json:"chain"`
+	Payer         string          `json:"payer"`
+	Provider      string          `json:"provider"`
+	LimitAmount   decimal.Decimal `json:"limit_amount"`
+	PerUnit       decimal.Decimal `json:"per_unit"`
+	TotalCharged  decimal.Decimal `json:"total_charged"`
+	CallCount     int             `json:"call_count"`
+	Status        TabStatus       `json:"status"`
+	Expiry        string          `json:"expiry"`
+	TxHash        string          `json:"tx_hash"`
+	ClosedTxHash  string          `json:"closed_tx_hash,omitempty"`
+	CreatedAt     string          `json:"created_at"`
+	UpdatedAt     string          `json:"updated_at,omitempty"`
 }
 
 // TabDebit records a single charge against a Tab.

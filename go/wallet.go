@@ -190,9 +190,12 @@ func (w *Wallet) Pay(ctx context.Context, to string, amount decimal.Decimal, opt
 
 	var tx Transaction
 	err := w.http.post(ctx, "/api/v0/payments/direct", map[string]any{
-		"to":     to,
-		"amount": amount.String(),
-		"memo":   cfg.Memo,
+		"to":        to,
+		"amount":    amount.InexactFloat64(),
+		"task":      cfg.Memo,
+		"chain":     w.chain,
+		"nonce":     randomHex(16),
+		"signature": "0x",
 	}, &tx)
 	if err != nil {
 		return nil, err
@@ -285,48 +288,54 @@ func (w *Wallet) CreateEscrow(ctx context.Context, payee string, amount decimal.
 		o(cfg)
 	}
 
-	body := map[string]any{
-		"payee":  payee,
-		"amount": amount.String(),
-		"memo":   cfg.Memo,
-	}
-	if len(cfg.Milestones) > 0 {
-		body["milestones"] = cfg.Milestones
-	}
-	if len(cfg.Splits) > 0 {
-		body["splits"] = cfg.Splits
+	// Step 1: create the invoice.
+	invoiceID := randomHex(16)
+	invBody := map[string]any{
+		"id":         invoiceID,
+		"chain":      w.chain,
+		"from_agent": w.Address(),
+		"to_agent":   payee,
+		"amount":     amount.InexactFloat64(),
+		"type":       "escrow",
+		"task":       cfg.Memo,
+		"nonce":      randomHex(16),
+		"signature":  "0x",
 	}
 	if cfg.ExpiresIn > 0 {
-		body["expires_in_seconds"] = int(cfg.ExpiresIn.Seconds())
+		invBody["escrow_timeout"] = int(cfg.ExpiresIn.Seconds())
+	}
+	if err := w.http.post(ctx, "/api/v0/invoices", invBody, nil); err != nil {
+		return nil, err
 	}
 
+	// Step 2: fund the escrow.
 	var escrow Escrow
-	if err := w.http.post(ctx, "/api/v0/escrows", body, &escrow); err != nil {
+	if err := w.http.post(ctx, "/api/v0/escrows", map[string]any{"invoice_id": invoiceID}, &escrow); err != nil {
 		return nil, err
 	}
 	return &escrow, nil
 }
 
-// ReleaseEscrow releases funds to the payee, optionally releasing a specific milestone.
-func (w *Wallet) ReleaseEscrow(ctx context.Context, escrowID string, milestoneID ...string) (*Transaction, error) {
-	body := map[string]any{"escrow_id": escrowID}
-	if len(milestoneID) > 0 {
-		body["milestone_id"] = milestoneID[0]
+// ReleaseEscrow releases funds to the payee, optionally releasing specific milestones.
+func (w *Wallet) ReleaseEscrow(ctx context.Context, escrowID string, milestoneIDs ...string) (*Escrow, error) {
+	body := map[string]any{}
+	if len(milestoneIDs) > 0 {
+		body["milestone_ids"] = milestoneIDs
 	}
-	var tx Transaction
-	if err := w.http.post(ctx, "/api/v0/escrows/"+escrowID+"/release", body, &tx); err != nil {
+	var escrow Escrow
+	if err := w.http.post(ctx, "/api/v0/escrows/"+escrowID+"/release", body, &escrow); err != nil {
 		return nil, err
 	}
-	return &tx, nil
+	return &escrow, nil
 }
 
 // CancelEscrow cancels an escrow and returns funds to the payer.
-func (w *Wallet) CancelEscrow(ctx context.Context, escrowID string) (*Transaction, error) {
-	var tx Transaction
-	if err := w.http.post(ctx, "/api/v0/escrows/"+escrowID+"/cancel", nil, &tx); err != nil {
+func (w *Wallet) CancelEscrow(ctx context.Context, escrowID string) (*Escrow, error) {
+	var escrow Escrow
+	if err := w.http.post(ctx, "/api/v0/escrows/"+escrowID+"/cancel", map[string]any{}, &escrow); err != nil {
 		return nil, err
 	}
-	return &tx, nil
+	return &escrow, nil
 }
 
 // GetEscrow returns the current state of an escrow.
@@ -340,18 +349,22 @@ func (w *Wallet) GetEscrow(ctx context.Context, escrowID string) (*Escrow, error
 
 // ─── Tab ──────────────────────────────────────────────────────────────────────
 
-// CreateTab opens a payment channel for batched micro-payments.
-// The opener deposits up to limit USDC into the channel.
-func (w *Wallet) CreateTab(ctx context.Context, counterpart string, limit decimal.Decimal, expiresIn ...time.Duration) (*Tab, error) {
-	if err := validateAddress(counterpart); err != nil {
+// CreateTab opens a metered payment tab. The payer pre-funds up to limit USDC;
+// the provider charges perUnit USDC per API call.
+func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.Decimal, perUnit decimal.Decimal, expiresIn ...time.Duration) (*Tab, error) {
+	if err := validateAddress(provider); err != nil {
 		return nil, err
 	}
-	body := map[string]any{
-		"counterpart": counterpart,
-		"limit":       limit.String(),
-	}
+	expires := 86400 // default 24h
 	if len(expiresIn) > 0 {
-		body["expires_in_seconds"] = int(expiresIn[0].Seconds())
+		expires = int(expiresIn[0].Seconds())
+	}
+	body := map[string]any{
+		"chain":        w.chain,
+		"provider":     provider,
+		"limit_amount": limit.InexactFloat64(),
+		"per_unit":     perUnit.InexactFloat64(),
+		"expiry":       int(time.Now().Unix()) + expires,
 	}
 	var tab Tab
 	if err := w.http.post(ctx, "/api/v0/tabs", body, &tab); err != nil {
@@ -364,7 +377,7 @@ func (w *Wallet) CreateTab(ctx context.Context, counterpart string, limit decima
 func (w *Wallet) DebitTab(ctx context.Context, tabID string, amount decimal.Decimal, memo string) (*TabDebit, error) {
 	body := map[string]any{
 		"tab_id": tabID,
-		"amount": amount.String(),
+		"amount": amount.InexactFloat64(),
 		"memo":   memo,
 	}
 	var debit TabDebit
@@ -374,13 +387,30 @@ func (w *Wallet) DebitTab(ctx context.Context, tabID string, amount decimal.Deci
 	return &debit, nil
 }
 
-// SettleTab closes the tab and settles all charges on-chain.
-func (w *Wallet) SettleTab(ctx context.Context, tabID string) (*Transaction, error) {
-	var tx Transaction
-	if err := w.http.post(ctx, "/api/v0/tabs/"+tabID+"/settle", nil, &tx); err != nil {
+// GetTab returns the current state of a tab.
+func (w *Wallet) GetTab(ctx context.Context, tabID string) (*Tab, error) {
+	var tab Tab
+	if err := w.http.get(ctx, "/api/v0/tabs/"+tabID, &tab); err != nil {
 		return nil, err
 	}
-	return &tx, nil
+	return &tab, nil
+}
+
+// CloseTab settles all charges on-chain and closes the tab.
+func (w *Wallet) CloseTab(ctx context.Context, tabID string) (*Tab, error) {
+	var tab Tab
+	if err := w.http.post(ctx, "/api/v0/tabs/"+tabID+"/close", map[string]any{
+		"final_amount": 0,
+		"provider_sig": "0x",
+	}, &tab); err != nil {
+		return nil, err
+	}
+	return &tab, nil
+}
+
+// SettleTab is an alias for CloseTab for backward compatibility.
+func (w *Wallet) SettleTab(ctx context.Context, tabID string) (*Tab, error) {
+	return w.CloseTab(ctx, tabID)
 }
 
 // ─── Stream ───────────────────────────────────────────────────────────────────
@@ -505,6 +535,25 @@ func (w *Wallet) ProposeIntent(ctx context.Context, to string, amount decimal.De
 		return nil, err
 	}
 	return &intent, nil
+}
+
+// ─── Testnet ──────────────────────────────────────────────────────────────────
+
+// FaucetResponse is returned by RequestTestnetFunds.
+type FaucetResponse struct {
+	TxHash    string  `json:"tx_hash"`
+	Amount    float64 `json:"amount"`
+	Recipient string  `json:"recipient"`
+}
+
+// RequestTestnetFunds requests test USDC from the testnet faucet.
+// Only available when connected to a testnet.
+func (w *Wallet) RequestTestnetFunds(ctx context.Context) (*FaucetResponse, error) {
+	var resp FaucetResponse
+	if err := w.http.post(ctx, "/api/v0/faucet", map[string]any{"wallet": w.Address()}, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────

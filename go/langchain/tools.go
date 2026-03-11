@@ -191,7 +191,7 @@ func (t *CreateEscrowTool) Call(ctx context.Context, input string) (string, erro
 	return fmt.Sprintf(
 		"Escrow created: %s USDC locked for %s (escrow_id: %s). "+
 			"Call remitmd_release_escrow with escrow_id=%s when work is verified complete.",
-		amount.String(), in.Payee, escrow.ID, escrow.ID,
+		amount.String(), in.Payee, escrow.InvoiceID, escrow.InvoiceID,
 	), nil
 }
 
@@ -237,6 +237,6 @@ func (t *CheckEscrowTool) Call(ctx context.Context, input string) (string, error
 	}
 	return fmt.Sprintf(
 		"Escrow %s: status=%s, amount=%s USDC, payer=%s, payee=%s",
-		escrow.ID, escrow.Status, escrow.Amount.String(), escrow.Payer, escrow.Payee,
+		escrow.InvoiceID, escrow.Status, escrow.Amount.String(), escrow.Payer, escrow.Payee,
 	), nil
 }

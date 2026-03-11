@@ -24,14 +24,22 @@ import (
 //	require.NoError(t, err)
 //	assert.True(t, mock.WasPaid("0xRecipient", decimal.NewFromFloat(1.50)))
 type MockRemit struct {
-	mu           sync.Mutex
-	transactions []Transaction
-	escrows      map[string]*Escrow
-	tabs         map[string]*Tab
-	streams      map[string]*Stream
-	bounties     map[string]*Bounty
-	deposits     map[string]*Deposit
-	balance      decimal.Decimal
+	mu              sync.Mutex
+	transactions    []Transaction
+	escrows         map[string]*Escrow
+	pendingInvoices map[string]mockPendingInvoice
+	tabs            map[string]*Tab
+	streams         map[string]*Stream
+	bounties        map[string]*Bounty
+	deposits        map[string]*Deposit
+	balance         decimal.Decimal
+}
+
+// mockPendingInvoice holds invoice data between POST /invoices and POST /escrows.
+type mockPendingInvoice struct {
+	Payee  string
+	Amount decimal.Decimal
+	Memo   string
 }
 
 // NewMockRemit creates a MockRemit with a default starting balance of 10,000 USDC.
@@ -41,12 +49,13 @@ func NewMockRemit(startingBalance ...decimal.Decimal) *MockRemit {
 		bal = startingBalance[0]
 	}
 	return &MockRemit{
-		balance:  bal,
-		escrows:  make(map[string]*Escrow),
-		tabs:     make(map[string]*Tab),
-		streams:  make(map[string]*Stream),
-		bounties: make(map[string]*Bounty),
-		deposits: make(map[string]*Deposit),
+		balance:         bal,
+		escrows:         make(map[string]*Escrow),
+		pendingInvoices: make(map[string]mockPendingInvoice),
+		tabs:            make(map[string]*Tab),
+		streams:         make(map[string]*Stream),
+		bounties:        make(map[string]*Bounty),
+		deposits:        make(map[string]*Deposit),
 	}
 }
 
@@ -67,6 +76,7 @@ func (m *MockRemit) Reset() {
 	defer m.mu.Unlock()
 	m.transactions = nil
 	m.escrows = make(map[string]*Escrow)
+	m.pendingInvoices = make(map[string]mockPendingInvoice)
 	m.tabs = make(map[string]*Tab)
 	m.streams = make(map[string]*Stream)
 	m.bounties = make(map[string]*Bounty)
@@ -140,19 +150,37 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 		b := mustBody(body)
 		to := b["to"].(string)
 		amount := mustDecimal(b["amount"])
-		memo, _ := b["memo"].(string)
+		memo, _ := b["task"].(string)
 		tx, err := m.mockPay(to, amount, memo)
 		if err != nil {
 			return err
 		}
 		return t.respond(dst, tx)
 
+	case method == "POST" && path == "/api/v0/invoices":
+		b := mustBody(body)
+		id, _ := b["id"].(string)
+		payee, _ := b["to_agent"].(string)
+		amount := mustDecimal(b["amount"])
+		memo, _ := b["task"].(string)
+		m.mu.Lock()
+		m.pendingInvoices[id] = mockPendingInvoice{Payee: payee, Amount: amount, Memo: memo}
+		m.mu.Unlock()
+		return nil
+
 	case method == "POST" && path == "/api/v0/escrows":
 		b := mustBody(body)
-		payee := b["payee"].(string)
-		amount := mustDecimal(b["amount"])
-		memo, _ := b["memo"].(string)
-		escrow, err := m.mockCreateEscrow(payee, amount, memo)
+		invoiceID, _ := b["invoice_id"].(string)
+		m.mu.Lock()
+		inv, ok := m.pendingInvoices[invoiceID]
+		if ok {
+			delete(m.pendingInvoices, invoiceID)
+		}
+		m.mu.Unlock()
+		if !ok {
+			return remitErr(ErrCodeEscrowNotFound, "invoice not found in mock", nil)
+		}
+		escrow, err := m.mockCreateEscrow(inv.Payee, inv.Amount, inv.Memo)
 		if err != nil {
 			return err
 		}
@@ -160,19 +188,19 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 
 	case method == "POST" && strings.HasSuffix(path, "/release"):
 		escrowID := extractID(path, "/api/v0/escrows/", "/release")
-		tx, err := m.mockReleaseEscrow(escrowID)
+		escrow, err := m.mockReleaseEscrow(escrowID)
 		if err != nil {
 			return err
 		}
-		return t.respond(dst, tx)
+		return t.respond(dst, escrow)
 
 	case method == "POST" && strings.HasSuffix(path, "/cancel"):
 		escrowID := extractID(path, "/api/v0/escrows/", "/cancel")
-		tx, err := m.mockCancelEscrow(escrowID)
+		escrow, err := m.mockCancelEscrow(escrowID)
 		if err != nil {
 			return err
 		}
-		return t.respond(dst, tx)
+		return t.respond(dst, escrow)
 
 	case method == "GET" && strings.HasPrefix(path, "/api/v0/escrows/"):
 		escrowID := strings.TrimPrefix(path, "/api/v0/escrows/")
@@ -256,20 +284,20 @@ func (m *MockRemit) mockCreateEscrow(payee string, amount decimal.Decimal, memo 
 	}
 	m.balance = m.balance.Sub(amount)
 	escrow := &Escrow{
-		ID:        newID("esc"),
+		InvoiceID: newID("esc"),
+		Chain:     "base-sepolia",
+		TxHash:    "0x" + randomHex(32),
 		Payer:     "0xMockWallet0000000000000000000000000000001",
 		Payee:     payee,
 		Amount:    amount,
 		Fee:       decimal.NewFromFloat(0.001),
 		Status:    EscrowStatusFunded,
-		Memo:      memo,
-		CreatedAt: time.Now(),
 	}
-	m.escrows[escrow.ID] = escrow
+	m.escrows[escrow.InvoiceID] = escrow
 	return escrow, nil
 }
 
-func (m *MockRemit) mockReleaseEscrow(escrowID string) (*Transaction, error) {
+func (m *MockRemit) mockReleaseEscrow(escrowID string) (*Escrow, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -281,20 +309,10 @@ func (m *MockRemit) mockReleaseEscrow(escrowID string) (*Transaction, error) {
 		)
 	}
 	escrow.Status = EscrowStatusReleased
-	tx := Transaction{
-		ID:        newID("tx"),
-		TxHash:    "0x" + randomHex(32),
-		From:      escrow.Payer,
-		To:        escrow.Payee,
-		Amount:    escrow.Amount,
-		ChainID:   ChainBaseSep,
-		CreatedAt: time.Now(),
-	}
-	m.transactions = append(m.transactions, tx)
-	return &tx, nil
+	return escrow, nil
 }
 
-func (m *MockRemit) mockCancelEscrow(escrowID string) (*Transaction, error) {
+func (m *MockRemit) mockCancelEscrow(escrowID string) (*Escrow, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -308,17 +326,7 @@ func (m *MockRemit) mockCancelEscrow(escrowID string) (*Transaction, error) {
 	escrow.Status = EscrowStatusCancelled
 	// Return funds to payer's balance
 	m.balance = m.balance.Add(escrow.Amount)
-	tx := Transaction{
-		ID:        newID("tx"),
-		TxHash:    "0x" + randomHex(32),
-		From:      escrow.Payer,
-		To:        escrow.Payer,
-		Amount:    escrow.Amount,
-		ChainID:   ChainBaseSep,
-		CreatedAt: time.Now(),
-	}
-	m.transactions = append(m.transactions, tx)
-	return &tx, nil
+	return escrow, nil
 }
 
 func (m *MockRemit) mockGetEscrow(escrowID string) *Escrow {

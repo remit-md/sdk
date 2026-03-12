@@ -86,6 +86,7 @@ class WalletStatus(BaseModel):
     """Wallet status as returned by the server."""
 
     wallet: str
+    balance: str = "0.00"
     tier: str
     monthly_volume: float
     fee_rate_bps: int  # basis points

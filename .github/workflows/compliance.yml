@@ -8,6 +8,10 @@ on:
   # Allow manual trigger (e.g., after a server image update)
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   python-compliance:
     name: Python Compliance (real server)

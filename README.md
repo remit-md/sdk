@@ -5,14 +5,9 @@ Let AI agents pay for tools, data, and services — one env var, no crypto exper
 
 ## Quickstart (3 steps)
 
-### Step 1 — Create an account
+### Step 1 — Get your agent key
 
-Sign up at [dashboard.remit.md](https://dashboard.remit.md). A wallet is generated automatically.
-Fund it with a credit card, Apple Pay, or bank transfer through the Setup Wizard.
-
-### Step 2 — Set your agent key
-
-After signup, copy your agent key from the dashboard and set it as an environment variable:
+The SDK generates a wallet keypair automatically. Set it as an environment variable:
 
 ```bash
 export REMITMD_KEY=0xYourAgentKey
@@ -24,7 +19,7 @@ Or in a `.env` file:
 REMITMD_KEY=0xYourAgentKey
 ```
 
-### Step 3 — Install the SDK and pay
+### Step 2 — Install the SDK and pay
 
 #### Python
 
@@ -196,9 +191,8 @@ const tx = await wallet.payDirect('0xAnyone', 1.00, 'test');
 | Error Code | Meaning | Fix |
 |------------|---------|-----|
 | `MISSING_KEY` | `REMITMD_KEY` not set | Set the env var: `export REMITMD_KEY=0x...` |
-| `INSUFFICIENT_BALANCE` | Not enough funds | Top up at [dashboard.remit.md/fund](https://dashboard.remit.md/fund) |
-| `BUDGET_EXCEEDED` | Spending limit reached | Raise limits at [dashboard.remit.md/spending-controls](https://dashboard.remit.md/spending-controls) |
-| `INVALID_KEY` | Key format invalid | Copy the full key from the dashboard (starts with `0x`) |
+| `INSUFFICIENT_BALANCE` | Not enough funds | Ask your operator to fund via one-time link |
+| `INVALID_KEY` | Key format invalid | Ensure key starts with `0x` and is 66 hex characters |
 | `RATE_LIMITED` | Too many requests | Back off and retry — the SDK handles this automatically |
 
 ---
@@ -207,7 +201,7 @@ const tx = await wallet.payDirect('0xAnyone', 1.00, 'test');
 
 | Environment Variable | Required | Default | Description |
 |---------------------|----------|---------|-------------|
-| `REMITMD_KEY` | Yes | — | Agent key from the operator dashboard |
+| `REMITMD_KEY` | Yes | — | Agent wallet private key (auto-generated or from registration) |
 | `REMITMD_API_URL` | No | `https://api.remit.md` | API server URL |
 | `REMITMD_CHAIN` | No | `base` | Chain name (`base` or `base-sepolia` for testnet) |
 | `REMITMD_TESTNET` | No | `false` | Set to `true` to use testnet |

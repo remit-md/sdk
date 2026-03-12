@@ -95,6 +95,15 @@ class WalletStatus(BaseModel):
     active_streams: int = 0
 
 
+class LinkResponse(BaseModel):
+    """One-time operator link returned by create_fund_link / create_withdraw_link."""
+
+    url: str
+    token: str
+    expires_at: str
+    wallet_address: str
+
+
 class Reputation(BaseModel):
     """On-chain reputation profile."""
 

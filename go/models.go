@@ -220,6 +220,14 @@ type Budget struct {
 	PerTxLimit       decimal.Decimal `json:"per_tx_limit"`
 }
 
+// LinkResponse is a one-time operator link for funding or withdrawing.
+type LinkResponse struct {
+	URL           string `json:"url"`
+	Token         string `json:"token"`
+	ExpiresAt     string `json:"expires_at"`
+	WalletAddress string `json:"wallet_address"`
+}
+
 // TransactionList is a paginated list of transactions.
 type TransactionList struct {
 	Items      []Transaction `json:"items"`

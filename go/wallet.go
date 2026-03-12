@@ -556,6 +556,26 @@ func (w *Wallet) RequestTestnetFunds(ctx context.Context) (*FaucetResponse, erro
 	return &resp, nil
 }
 
+// ─── One-time operator links ──────────────────────────────────────────────────
+
+// CreateFundLink generates a one-time URL for the operator to fund this wallet.
+func (w *Wallet) CreateFundLink(ctx context.Context) (*LinkResponse, error) {
+	var lr LinkResponse
+	if err := w.http.post(ctx, "/api/v0/links/fund", map[string]any{}, &lr); err != nil {
+		return nil, err
+	}
+	return &lr, nil
+}
+
+// CreateWithdrawLink generates a one-time URL for the operator to withdraw funds.
+func (w *Wallet) CreateWithdrawLink(ctx context.Context) (*LinkResponse, error) {
+	var lr LinkResponse
+	if err := w.http.post(ctx, "/api/v0/links/withdraw", map[string]any{}, &lr); err != nil {
+		return nil, err
+	}
+	return &lr, nil
+}
+
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 func validateAddress(addr string) error {

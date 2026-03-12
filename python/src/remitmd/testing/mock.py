@@ -35,6 +35,7 @@ from remitmd.models.common import (
     BountyStatus,
     DepositStatus,
     EscrowStatus,
+    LinkResponse,
     Reputation,
     StreamStatus,
     TabStatus,
@@ -493,6 +494,26 @@ class MockWallet:
             chains=chains or ["mock"],
             active=True,
             created_at=self._mock.now(),
+        )
+
+    # ─── One-time operator links ───────────────────────────────────────────────
+
+    async def create_fund_link(self) -> LinkResponse:
+        token = secrets.token_hex(16)
+        return LinkResponse(
+            url=f"https://remit.md/fund/{token}",
+            token=token,
+            expires_at=_iso(self._mock.now() + 3600),
+            wallet_address=self.address,
+        )
+
+    async def create_withdraw_link(self) -> LinkResponse:
+        token = secrets.token_hex(16)
+        return LinkResponse(
+            url=f"https://remit.md/withdraw/{token}",
+            token=token,
+            expires_at=_iso(self._mock.now() + 3600),
+            wallet_address=self.address,
         )
 
     def on(self, event: str, callback: Callable[..., Any]) -> None:

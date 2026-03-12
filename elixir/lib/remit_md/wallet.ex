@@ -394,6 +394,26 @@ defmodule RemitMd.Wallet do
     end
   end
 
+  @doc """
+  Generate a one-time URL for the operator to fund this wallet.
+  Returns `{:ok, %RemitMd.Models.LinkResponse{}}` or `{:error, %RemitMd.Error{}}`.
+  """
+  def create_fund_link(%__MODULE__{} = w) do
+    with {:ok, data} <- do_call(w, :post, "/links/fund", %{}) do
+      {:ok, RemitMd.Models.LinkResponse.from_map(data)}
+    end
+  end
+
+  @doc """
+  Generate a one-time URL for the operator to withdraw funds.
+  Returns `{:ok, %RemitMd.Models.LinkResponse{}}` or `{:error, %RemitMd.Error{}}`.
+  """
+  def create_withdraw_link(%__MODULE__{} = w) do
+    with {:ok, data} <- do_call(w, :post, "/links/withdraw", %{}) do
+      {:ok, RemitMd.Models.LinkResponse.from_map(data)}
+    end
+  end
+
   @doc false
   def inspect_address(%__MODULE__{address: addr}), do: addr
 

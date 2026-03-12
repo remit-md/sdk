@@ -527,6 +527,18 @@ impl Wallet {
         )
         .await
     }
+
+    // ─── One-time operator links ──────────────────────────────────────────────
+
+    /// Generate a one-time URL for the operator to fund this wallet.
+    pub async fn create_fund_link(&self) -> Result<LinkResponse, RemitError> {
+        self.post("/api/v0/links/fund", json!({})).await
+    }
+
+    /// Generate a one-time URL for the operator to withdraw funds.
+    pub async fn create_withdraw_link(&self) -> Result<LinkResponse, RemitError> {
+        self.post("/api/v0/links/withdraw", json!({})).await
+    }
 }
 
 // ─── WalletBuilder ────────────────────────────────────────────────────────────

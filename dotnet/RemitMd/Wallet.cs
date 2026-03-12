@@ -333,6 +333,16 @@ public sealed class Wallet
         }, ct);
     }
 
+    // ─── One-time operator links ──────────────────────────────────────────────
+
+    /// <summary>Generates a one-time URL for the operator to fund this wallet.</summary>
+    public Task<LinkResponse> CreateFundLinkAsync(CancellationToken ct = default)
+        => _transport.PostAsync<LinkResponse>("/api/v0/links/fund", new { }, ct);
+
+    /// <summary>Generates a one-time URL for the operator to withdraw funds.</summary>
+    public Task<LinkResponse> CreateWithdrawLinkAsync(CancellationToken ct = default)
+        => _transport.PostAsync<LinkResponse>("/api/v0/links/withdraw", new { }, ct);
+
     // ─── Validation helpers ───────────────────────────────────────────────────
 
     private static void ValidateAddress(string address, string paramName)

@@ -294,6 +294,18 @@ public class Wallet {
         }
     }
 
+    // ─── One-time operator links ──────────────────────────────────────────────
+
+    /** Generates a one-time URL for the operator to fund this wallet. */
+    public LinkResponse createFundLink() {
+        return client.post("/api/v0/links/fund", Map.of(), LinkResponse.class);
+    }
+
+    /** Generates a one-time URL for the operator to withdraw funds. */
+    public LinkResponse createWithdrawLink() {
+        return client.post("/api/v0/links/withdraw", Map.of(), LinkResponse.class);
+    }
+
     static void validateAmount(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.valueOf(0.000001)) < 0) {
             throw new RemitError(

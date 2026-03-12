@@ -208,6 +208,20 @@ public final class RemitWallet: Sendable {
         }
     }
 
+    // MARK: - One-time operator links
+
+    public func createFundLink() async throws -> LinkResponse {
+        return try await transport.request(
+            method: "POST", path: "/api/v0/links/fund", body: Optional<EmptyBody>.none
+        )
+    }
+
+    public func createWithdrawLink() async throws -> LinkResponse {
+        return try await transport.request(
+            method: "POST", path: "/api/v0/links/withdraw", body: Optional<EmptyBody>.none
+        )
+    }
+
     private func validateAmount(_ amount: Double) throws {
         guard amount > 0 else {
             throw RemitError.invalidAmount(amount, reason: "amount must be positive")

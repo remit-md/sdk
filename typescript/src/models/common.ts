@@ -85,3 +85,11 @@ export interface Webhook {
   active: boolean;
   createdAt: number;
 }
+
+/** One-time operator link returned by createFundLink / createWithdrawLink. */
+export interface LinkResponse {
+  url: string;
+  token: string;
+  expiresAt: string;
+  walletAddress: string;
+}

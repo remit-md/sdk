@@ -12,6 +12,7 @@ import type {
   Transaction,
   WalletStatus,
   Webhook,
+  LinkResponse,
   RemitEvent,
 } from "./models/index.js";
 import type { Invoice } from "./models/invoice.js";
@@ -304,6 +305,18 @@ export class Wallet extends RemitClient {
       events,
       chains: chains ?? [this._chain],
     });
+  }
+
+  // ─── One-time operator links ─────────────────────────────────────────────────
+
+  /** Generate a one-time URL for the operator to fund this wallet. */
+  createFundLink(): Promise<LinkResponse> {
+    return this.#auth.post<LinkResponse>("/links/fund", {});
+  }
+
+  /** Generate a one-time URL for the operator to withdraw funds. */
+  createWithdrawLink(): Promise<LinkResponse> {
+    return this.#auth.post<LinkResponse>("/links/withdraw", {});
   }
 
   // ─── Testnet ────────────────────────────────────────────────────────────────

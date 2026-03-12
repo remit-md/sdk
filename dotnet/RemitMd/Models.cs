@@ -49,6 +49,14 @@ public record Transaction(
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
 
+/// <summary>One-time operator link for funding or withdrawing a wallet.</summary>
+public record LinkResponse(
+    [property: JsonPropertyName("url")]            string Url,
+    [property: JsonPropertyName("token")]          string Token,
+    [property: JsonPropertyName("expires_at")]     string ExpiresAt,
+    [property: JsonPropertyName("wallet_address")] string WalletAddress
+);
+
 /// <summary>Current USDC balance for a wallet address.</summary>
 public record Balance(
     [property: JsonPropertyName("usdc")] decimal Usdc,

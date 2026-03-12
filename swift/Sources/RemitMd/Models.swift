@@ -254,3 +254,16 @@ public struct TransactionList: Codable, Sendable {
         case perPage = "per_page"
     }
 }
+
+public struct LinkResponse: Codable, Sendable {
+    public let url: String
+    public let token: String
+    public let expiresAt: String
+    public let walletAddress: String
+
+    enum CodingKeys: String, CodingKey {
+        case url, token
+        case expiresAt = "expires_at"
+        case walletAddress = "wallet_address"
+    }
+}

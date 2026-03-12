@@ -275,6 +275,20 @@ module Remitmd
       Intent.new(@transport.post("/intents", body))
     end
 
+    # ─── One-time operator links ───────────────────────────────────────────────
+
+    # Generate a one-time URL for the operator to fund this wallet.
+    # @return [LinkResponse]
+    def create_fund_link
+      LinkResponse.new(@transport.post("/links/fund", {}))
+    end
+
+    # Generate a one-time URL for the operator to withdraw funds.
+    # @return [LinkResponse]
+    def create_withdraw_link
+      LinkResponse.new(@transport.post("/links/withdraw", {}))
+    end
+
     private
 
     ADDRESS_RE = /\A0x[0-9a-fA-F]{40}\z/

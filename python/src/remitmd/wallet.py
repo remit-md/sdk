@@ -11,7 +11,7 @@ from typing import Any
 from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.client import RemitClient
 from remitmd.models.bounty import Bounty
-from remitmd.models.common import Transaction, WalletStatus, Webhook
+from remitmd.models.common import LinkResponse, Transaction, WalletStatus, Webhook
 from remitmd.models.deposit import Deposit
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
@@ -278,6 +278,18 @@ class Wallet(RemitClient):
     async def balance(self) -> float:
         # Server does not track on-chain USDC balance — requires direct chain query.
         raise NotImplementedError("balance() requires on-chain query (not yet implemented)")
+
+    # ─── One-time operator links ───────────────────────────────────────────────
+
+    async def create_fund_link(self) -> LinkResponse:
+        """Generate a one-time URL for the operator to fund this wallet."""
+        data = await self._http.post("/api/v0/links/fund", {})
+        return LinkResponse.model_validate(data)
+
+    async def create_withdraw_link(self) -> LinkResponse:
+        """Generate a one-time URL for the operator to withdraw funds."""
+        data = await self._http.post("/api/v0/links/withdraw", {})
+        return LinkResponse.model_validate(data)
 
     # ─── Webhooks ─────────────────────────────────────────────────────────────
 

@@ -303,6 +303,19 @@ module Remitmd
     private :decimal
   end
 
+  # One-time operator link for funding or withdrawing.
+  class LinkResponse < Model
+    def initialize(attrs)
+      h = attrs.transform_keys(&:to_s)
+      @url            = h["url"]
+      @token          = h["token"]
+      @expires_at     = h["expires_at"]
+      @wallet_address = h["wallet_address"]
+    end
+
+    attr_reader :url, :token, :expires_at, :wallet_address
+  end
+
   class TransactionList < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)

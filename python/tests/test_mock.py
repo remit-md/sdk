@@ -250,3 +250,24 @@ async def test_register_webhook(mock, payer):
     )
     assert wh.active is True
     assert "escrow.funded" in wh.events
+
+
+# ─── One-time operator links ───────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_create_fund_link(mock, payer):
+    link = await payer.create_fund_link()
+    assert link.url.startswith("https://remit.md/fund/")
+    assert len(link.token) == 32
+    assert link.wallet_address == payer.address
+    assert link.expires_at != ""
+
+
+@pytest.mark.asyncio
+async def test_create_withdraw_link(mock, payer):
+    link = await payer.create_withdraw_link()
+    assert link.url.startswith("https://remit.md/withdraw/")
+    assert len(link.token) == 32
+    assert link.wallet_address == payer.address
+    assert link.expires_at != ""

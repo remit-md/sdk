@@ -75,6 +75,15 @@ pub enum DepositStatus {
     Forfeited,
 }
 
+/// One-time operator link for funding or withdrawing a wallet.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkResponse {
+    pub url: String,
+    pub token: String,
+    pub expires_at: String,
+    pub wallet_address: String,
+}
+
 // ─── Core types ──────────────────────────────────────────────────────────────
 
 /// Result of any payment operation.

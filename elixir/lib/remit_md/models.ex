@@ -186,6 +186,22 @@ defmodule RemitMd.Models do
     end
   end
 
+  defmodule LinkResponse do
+    @moduledoc "One-time operator link for funding or withdrawing a wallet."
+    @enforce_keys [:url, :token]
+    defstruct [:url, :token, :expires_at, :wallet_address]
+
+    @doc false
+    def from_map(m) do
+      %__MODULE__{
+        url:            Map.get(m, "url"),
+        token:          Map.get(m, "token"),
+        expires_at:     Map.get(m, "expires_at"),
+        wallet_address: Map.get(m, "wallet_address")
+      }
+    end
+  end
+
   defmodule TransactionList do
     @moduledoc "Paginated list of transactions."
     @enforce_keys [:items, :total, :limit, :offset]

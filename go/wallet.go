@@ -478,6 +478,48 @@ func (w *Wallet) AwardBounty(ctx context.Context, bountyID string, winner string
 	return &tx, nil
 }
 
+// BountyListOptions controls filtering for ListBounties.
+type BountyListOptions struct {
+	Status    string // Filter by status (open, claimed, awarded, expired).
+	Poster    string // Filter by poster wallet address.
+	Submitter string // Filter by submitter wallet address.
+	Limit     int    // Max results (default 20, max 100).
+	Offset    int    // Pagination offset.
+}
+
+// ListBounties returns bounties matching the given filters.
+func (w *Wallet) ListBounties(ctx context.Context, opts *BountyListOptions) ([]Bounty, error) {
+	path := "/api/v0/bounties"
+	params := make([]string, 0, 5)
+	if opts != nil {
+		if opts.Status != "" {
+			params = append(params, "status="+opts.Status)
+		}
+		if opts.Poster != "" {
+			params = append(params, "poster="+opts.Poster)
+		}
+		if opts.Submitter != "" {
+			params = append(params, "submitter="+opts.Submitter)
+		}
+		if opts.Limit > 0 {
+			params = append(params, fmt.Sprintf("limit=%d", opts.Limit))
+		}
+		if opts.Offset > 0 {
+			params = append(params, fmt.Sprintf("offset=%d", opts.Offset))
+		}
+	}
+	if len(params) > 0 {
+		path += "?" + strings.Join(params, "&")
+	}
+	var resp struct {
+		Data []Bounty `json:"data"`
+	}
+	if err := w.http.get(ctx, path, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Data, nil
+}
+
 // ─── Deposit ──────────────────────────────────────────────────────────────────
 
 // LockDeposit locks a security deposit with a beneficiary.

@@ -86,10 +86,12 @@ export class RemitClient {
     return this._fetch<Reputation>(`/reputation/${wallet}`);
   }
 
-  listBounties(options: { status?: string; limit?: number } = {}): Promise<Bounty[]> {
+  listBounties(options: { status?: string; limit?: number; poster?: string; submitter?: string } = {}): Promise<Bounty[]> {
     const params = new URLSearchParams();
     if (options.status) params.set("status", options.status);
     if (options.limit) params.set("limit", String(options.limit));
+    if (options.poster) params.set("poster", options.poster);
+    if (options.submitter) params.set("submitter", options.submitter);
     const qs = params.toString();
     return this._fetch<Bounty[]>(`/bounties${qs ? `?${qs}` : ""}`);
   }

@@ -246,6 +246,28 @@ public class Wallet {
             Map.of("bounty_id", bountyId, "winner", winner), Transaction.class);
     }
 
+    /**
+     * Lists bounties, optionally filtering by status, poster, or submitter.
+     *
+     * @param status    filter by status (open, claimed, awarded, expired) — may be null
+     * @param poster    filter by poster wallet address — may be null
+     * @param submitter filter by submitter wallet address — may be null
+     * @param limit     max results (default 20, max 100)
+     */
+    public java.util.List<Bounty> listBounties(String status, String poster, String submitter, int limit) {
+        StringBuilder sb = new StringBuilder("/api/v0/bounties?limit=").append(limit);
+        if (status != null && !status.isEmpty()) sb.append("&status=").append(status);
+        if (poster != null && !poster.isEmpty()) sb.append("&poster=").append(poster);
+        if (submitter != null && !submitter.isEmpty()) sb.append("&submitter=").append(submitter);
+        BountyList resp = client.get(sb.toString(), BountyList.class);
+        return resp.data != null ? resp.data : java.util.List.of();
+    }
+
+    /** Lists open bounties (convenience overload). */
+    public java.util.List<Bounty> listBounties() {
+        return listBounties("open", null, null, 20);
+    }
+
     // ─── Deposit ──────────────────────────────────────────────────────────────
 
     /**

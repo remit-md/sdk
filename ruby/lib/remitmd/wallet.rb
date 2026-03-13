@@ -247,6 +247,22 @@ module Remitmd
       Transaction.new(@transport.post("/bounties/#{bounty_id}/award", { winner: winner }))
     end
 
+    # List bounties with optional filters.
+    # @param status [String, nil] filter by status (open, claimed, awarded, expired)
+    # @param poster [String, nil] filter by poster wallet address
+    # @param submitter [String, nil] filter by submitter wallet address
+    # @param limit [Integer] max results (default 20, max 100)
+    # @return [Array<Bounty>]
+    def list_bounties(status: "open", poster: nil, submitter: nil, limit: 20)
+      params = ["limit=#{limit}"]
+      params << "status=#{status}" if status
+      params << "poster=#{poster}" if poster
+      params << "submitter=#{submitter}" if submitter
+      data = @transport.get("/bounties?#{params.join('&')}")
+      items = data.is_a?(Hash) ? (data["data"] || []) : data
+      items.map { |d| Bounty.new(d) }
+    end
+
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
     # Lock a security deposit.

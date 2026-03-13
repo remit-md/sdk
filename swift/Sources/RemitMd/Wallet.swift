@@ -140,6 +140,24 @@ public final class RemitWallet: Sendable {
         )
     }
 
+    public func listBounties(
+        status: String? = "open",
+        poster: String? = nil,
+        submitter: String? = nil,
+        limit: Int = 20
+    ) async throws -> [Bounty] {
+        var params: [String] = ["limit=\(limit)"]
+        if let s = status { params.append("status=\(s)") }
+        if let p = poster { params.append("poster=\(p)") }
+        if let s = submitter { params.append("submitter=\(s)") }
+        let qs = params.joined(separator: "&")
+        let resp: BountyListResponse = try await transport.request(
+            method: "GET", path: "/api/v0/bounties?\(qs)",
+            body: Optional<EmptyBody>.none
+        )
+        return resp.data
+    }
+
     // MARK: - Deposits
 
     public func lockDeposit(recipient: String, amount: Double, reason: String? = nil) async throws -> Deposit {
@@ -247,6 +265,7 @@ private struct StreamBody: Codable {
     }
 }
 private struct BountyBody: Codable { let amount: Double; let description: String }
+private struct BountyListResponse: Codable { let data: [Bounty] }
 private struct AwardBody: Codable { let winner: String }
 private struct DepositBody: Codable { let recipient: String; let amount: Double; let reason: String? }
 private struct IntentBody: Codable { let to: String; let amount: Double; let model: String }

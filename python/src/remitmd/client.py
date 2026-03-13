@@ -65,8 +65,19 @@ class RemitClient:
         data = await self._http.get(f"/api/v0/bounties/{bounty_id}")
         return Bounty.model_validate(data)
 
-    async def list_bounties(self, status: str = "open", limit: int = 20) -> list[Bounty]:
-        data = await self._http.get("/api/v0/bounties", status=status, limit=limit)
+    async def list_bounties(
+        self,
+        status: str = "open",
+        limit: int = 20,
+        poster: str | None = None,
+        submitter: str | None = None,
+    ) -> list[Bounty]:
+        kwargs: dict[str, object] = {"status": status, "limit": limit}
+        if poster is not None:
+            kwargs["poster"] = poster
+        if submitter is not None:
+            kwargs["submitter"] = submitter
+        data = await self._http.get("/api/v0/bounties", **kwargs)
         items: list[dict[str, object]] = data.get("items", []) if isinstance(data, dict) else data
         return [Bounty.model_validate(d) for d in items]
 

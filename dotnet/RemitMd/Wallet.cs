@@ -286,6 +286,32 @@ public sealed class Wallet
         return _transport.PostAsync<Transaction>($"/api/v0/bounties/{bountyId}/award", new { winner }, ct);
     }
 
+    /// <summary>Lists bounties, optionally filtered by status, poster, or submitter.</summary>
+    /// <param name="status">Filter by status (open, claimed, awarded, expired).</param>
+    /// <param name="poster">Filter by poster wallet address.</param>
+    /// <param name="submitter">Filter by submitter wallet address.</param>
+    /// <param name="limit">Max results (default 20, max 100).</param>
+    public async Task<Bounty[]> ListBountiesAsync(
+        string? status = "open",
+        string? poster = null,
+        string? submitter = null,
+        int limit = 20,
+        CancellationToken ct = default)
+    {
+        var sb = new System.Text.StringBuilder($"/api/v0/bounties?limit={limit}");
+        if (!string.IsNullOrEmpty(status)) sb.Append($"&status={status}");
+        if (!string.IsNullOrEmpty(poster)) sb.Append($"&poster={poster}");
+        if (!string.IsNullOrEmpty(submitter)) sb.Append($"&submitter={submitter}");
+        var resp = await _transport.GetAsync<BountyListResponse>(sb.ToString(), ct);
+        return resp?.Data ?? Array.Empty<Bounty>();
+    }
+
+    private sealed class BountyListResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("data")]
+        public Bounty[]? Data { get; set; }
+    }
+
     // ─── Deposit (security collateral) ────────────────────────────────────────
 
     /// <summary>Locks a security deposit held as collateral for a service agreement.</summary>

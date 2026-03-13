@@ -477,6 +477,47 @@ impl Wallet {
         .await
     }
 
+    /// List bounties with optional filters.
+    ///
+    /// # Arguments
+    /// - `status` — filter by status (open, claimed, awarded, expired)
+    /// - `poster` — filter by poster wallet address
+    /// - `submitter` — filter by submitter wallet address
+    /// - `limit` — max results (default 20, max 100)
+    pub async fn list_bounties(
+        &self,
+        status: Option<&str>,
+        poster: Option<&str>,
+        submitter: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Vec<Bounty>, RemitError> {
+        let mut params = vec![];
+        if let Some(s) = status {
+            params.push(format!("status={s}"));
+        }
+        if let Some(p) = poster {
+            params.push(format!("poster={p}"));
+        }
+        if let Some(s) = submitter {
+            params.push(format!("submitter={s}"));
+        }
+        if let Some(l) = limit {
+            params.push(format!("limit={l}"));
+        }
+        let qs = if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params.join("&"))
+        };
+
+        #[derive(serde::Deserialize)]
+        struct Resp {
+            data: Vec<Bounty>,
+        }
+        let resp: Resp = self.get(&format!("/api/v0/bounties{qs}")).await?;
+        Ok(resp.data)
+    }
+
     // ─── Deposit ─────────────────────────────────────────────────────────────
 
     /// Lock a security deposit with a beneficiary.

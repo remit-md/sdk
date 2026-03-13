@@ -395,6 +395,35 @@ defmodule RemitMd.Wallet do
   end
 
   @doc """
+  List bounties with optional filters.
+
+  ## Options
+
+  - `:status` — filter by status (open, claimed, awarded, expired). Default: `"open"`.
+  - `:poster` — filter by poster wallet address.
+  - `:submitter` — filter by submitter wallet address.
+  - `:limit` — max results (default 20, max 100).
+  """
+  def list_bounties(%__MODULE__{} = w, opts \\ []) do
+    status    = Keyword.get(opts, :status, "open")
+    poster    = Keyword.get(opts, :poster)
+    submitter = Keyword.get(opts, :submitter)
+    limit     = Keyword.get(opts, :limit, 20)
+
+    params = ["limit=#{limit}"]
+    if status,    do: params = ["status=#{status}" | params]
+    if poster,    do: params = ["poster=#{poster}" | params]
+    if submitter, do: params = ["submitter=#{submitter}" | params]
+    qs = Enum.join(Enum.reverse(params), "&")
+
+    with {:ok, data} <- do_call(w, :get, "/bounties?#{qs}", nil) do
+      items = if is_map(data) && Map.has_key?(data, "data"), do: data["data"], else: data
+      bounties = Enum.map(items || [], &Bounty.from_map/1)
+      {:ok, bounties}
+    end
+  end
+
+  @doc """
   Generate a one-time URL for the operator to fund this wallet.
   Returns `{:ok, %RemitMd.Models.LinkResponse{}}` or `{:error, %RemitMd.Error{}}`.
   """

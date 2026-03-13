@@ -206,6 +206,7 @@ public sealed class Wallet
 
         return _transport.PostAsync<Tab>("/api/v0/tabs", new
         {
+            chain      = _chain,
             counterpart,
             limit      = limit.ToString("F6"),
             closes_at  = closesAt,
@@ -248,6 +249,7 @@ public sealed class Wallet
 
         return _transport.PostAsync<Stream>("/api/v0/streams", new
         {
+            chain        = _chain,
             recipient,
             rate_per_sec = ratePerSecond.ToString("F9"),
             deposit      = deposit.ToString("F6"),
@@ -273,6 +275,7 @@ public sealed class Wallet
         ValidateAmount(award, "award");
         return _transport.PostAsync<Bounty>("/api/v0/bounties", new
         {
+            chain      = _chain,
             award      = award.ToString("F6"),
             description,
             expires_at = expiresAt,

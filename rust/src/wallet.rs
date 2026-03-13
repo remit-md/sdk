@@ -329,6 +329,7 @@ impl Wallet {
         self.post(
             "/api/v0/tabs",
             json!({
+                "chain": &self.chain,
                 "counterpart": counterpart,
                 "limit": limit.to_string(),
             }),
@@ -347,6 +348,7 @@ impl Wallet {
         self.post(
             "/api/v0/tabs",
             json!({
+                "chain": &self.chain,
                 "counterpart": counterpart,
                 "limit": limit.to_string(),
                 "expires_in_seconds": expires_in_secs,
@@ -402,6 +404,7 @@ impl Wallet {
         self.post(
             "/api/v0/streams",
             json!({
+                "chain": &self.chain,
                 "recipient": recipient,
                 "rate_per_sec": rate_per_sec.to_string(),
                 "deposit": deposit.to_string(),
@@ -434,6 +437,7 @@ impl Wallet {
         self.post(
             "/api/v0/bounties",
             json!({
+                "chain": &self.chain,
                 "award": award.to_string(),
                 "description": description,
             }),
@@ -452,6 +456,7 @@ impl Wallet {
         self.post(
             "/api/v0/bounties",
             json!({
+                "chain": &self.chain,
                 "award": award.to_string(),
                 "description": description,
                 "expires_in_seconds": expires_in_secs,

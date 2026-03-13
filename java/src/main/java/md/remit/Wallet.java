@@ -177,6 +177,7 @@ public class Wallet {
     public Tab createTab(String counterpart, BigDecimal limit, Duration expiresIn) {
         validateAddress(counterpart);
         Map<String, Object> body = new java.util.HashMap<>();
+        body.put("chain", chain);
         body.put("counterpart", counterpart);
         body.put("limit", limit.toPlainString());
         if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());
@@ -207,7 +208,7 @@ public class Wallet {
     public Stream createStream(String recipient, BigDecimal ratePerSec, BigDecimal deposit) {
         validateAddress(recipient);
         return client.post("/api/v0/streams",
-            Map.of("recipient", recipient, "rate_per_sec", ratePerSec.toPlainString(),
+            Map.of("chain", chain, "recipient", recipient, "rate_per_sec", ratePerSec.toPlainString(),
                    "deposit", deposit.toPlainString()),
             Stream.class);
     }
@@ -233,6 +234,7 @@ public class Wallet {
     public Bounty createBounty(BigDecimal award, String description, Duration expiresIn) {
         validateAmount(award);
         Map<String, Object> body = new java.util.HashMap<>();
+        body.put("chain", chain);
         body.put("award", award.toPlainString());
         body.put("description", description);
         if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());

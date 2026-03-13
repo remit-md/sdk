@@ -209,7 +209,7 @@ class Wallet(RemitClient):
         max_duration: int = 3600,
         max_total: float | None = None,
     ) -> Stream:
-        body: dict[str, Any] = {"to": to, "rate": rate, "max_duration": max_duration}
+        body: dict[str, Any] = {"chain": self.chain, "to": to, "rate": rate, "max_duration": max_duration}
         if max_total is not None:
             body["max_total"] = max_total
         data = await self._http.post("/api/v0/streams", body)
@@ -232,6 +232,7 @@ class Wallet(RemitClient):
         data = await self._http.post(
             "/api/v0/bounties",
             {
+                "chain": self.chain,
                 "amount": amount,
                 "task": task,
                 "deadline": deadline,

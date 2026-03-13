@@ -16,6 +16,16 @@ public enum RemitChain: Int, Codable, Sendable {
         case .optimism:    return "https://optimism.remit.md"
         }
     }
+
+    /// The chain name string sent in API request bodies.
+    public var chainName: String {
+        switch self {
+        case .base:        return "base"
+        case .baseSepolia: return "base-sepolia"
+        case .arbitrum:    return "arbitrum"
+        case .optimism:    return "optimism"
+        }
+    }
 }
 
 // MARK: - Status enums

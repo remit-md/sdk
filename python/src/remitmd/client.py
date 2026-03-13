@@ -101,8 +101,8 @@ class RemitClient:
 
     # ─── Events ───────────────────────────────────────────────────────────────
 
-    async def get_events(self, wallet: str, since: int | None = None) -> list[Event]:
-        params: dict[str, object] = {"wallet": wallet}
+    async def get_events(self, since: int | None = None) -> list[Event]:
+        params: dict[str, object] = {}
         if since is not None:
             params["since"] = since
         data = await self._http.get("/api/v0/events", **params)

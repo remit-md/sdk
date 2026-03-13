@@ -195,6 +195,7 @@ export class Wallet extends RemitClient {
 
   openStream(options: OpenStreamOptions): Promise<Stream> {
     return this.#auth.post<Stream>("/streams", {
+      chain: this._chain,
       to: options.to,
       rate: options.rate,
       maxDuration: options.maxDuration ?? 3600,
@@ -210,6 +211,7 @@ export class Wallet extends RemitClient {
 
   postBounty(options: PostBountyOptions): Promise<Bounty> {
     return this.#auth.post<Bounty>("/bounties", {
+      chain: this._chain,
       amount: options.amount,
       task: options.task,
       deadline: options.deadline,
@@ -290,7 +292,7 @@ export class Wallet extends RemitClient {
 
   async balance(): Promise<number> {
     const s = await this.status();
-    return s.usdcBalance;
+    return parseFloat(s.balance);
   }
 
   // ─── Webhooks ───────────────────────────────────────────────────────────────

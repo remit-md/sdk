@@ -153,12 +153,14 @@ export class MockRemit {
   getStatus(address: string): WalletStatus {
     const state = this._getState(address);
     return {
-      address,
-      chain: "base",
-      usdcBalance: state.balance,
+      wallet: address,
+      balance: String(state.balance),
+      monthly_volume: "0",
       tier: "trusted",
-      monthlyVolume: 0,
-      feeRateBps: 50,
+      fee_rate_bps: 50,
+      active_escrows: 0,
+      active_tabs: 0,
+      active_streams: 0,
     };
   }
 
@@ -437,7 +439,7 @@ export class MockWallet extends Wallet {
   }
 
   override async balance(): Promise<number> {
-    return (await this.status()).usdcBalance;
+    return parseFloat((await this.status()).balance);
   }
 
   override registerWebhook(url: string, events: string[]): Promise<Webhook> {

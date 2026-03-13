@@ -303,7 +303,7 @@ defmodule RemitMd.Wallet do
          :ok <- validate_amount(credit_limit_usdc) do
       expires_in = Keyword.get(opts, :expires_in, 30 * 86_400)
 
-      body = %{to: to, credit_limit_usdc: credit_limit_usdc, expires_in: expires_in}
+      body = %{chain: w.chain, to: to, credit_limit_usdc: credit_limit_usdc, expires_in: expires_in}
 
       with {:ok, data} <- do_call(w, :post, "/tabs", body) do
         {:ok, Tab.from_map(data)}
@@ -345,7 +345,7 @@ defmodule RemitMd.Wallet do
     with :ok <- validate_address(to),
          :ok <- validate_amount(rate_per_second_usdc) do
       duration = Keyword.get(opts, :duration)
-      body = %{to: to, rate_per_second_usdc: rate_per_second_usdc, duration: duration}
+      body = %{chain: w.chain, to: to, rate_per_second_usdc: rate_per_second_usdc, duration: duration}
 
       with {:ok, data} <- do_call(w, :post, "/streams", body) do
         {:ok, Stream.from_map(data)}
@@ -372,6 +372,7 @@ defmodule RemitMd.Wallet do
   def post_bounty(%__MODULE__{} = w, amount_usdc, opts \\ []) do
     with :ok <- validate_amount(amount_usdc) do
       body = %{
+        chain:       w.chain,
         amount_usdc: amount_usdc,
         description: Keyword.get(opts, :description),
         expires_in:  Keyword.get(opts, :expires_in, 86_400)

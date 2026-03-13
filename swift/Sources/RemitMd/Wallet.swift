@@ -4,6 +4,7 @@ import Foundation
 public final class RemitWallet: Sendable {
     private let transport: any Transport
     private let signerAddress: String
+    private let chainName: String
 
     public init(privateKey: String, chain: RemitChain = .baseSepolia, baseURL: String? = nil, routerAddress: String? = nil) throws {
         let signer = try PrivateKeySigner(privateKey: privateKey)
@@ -14,11 +15,13 @@ public final class RemitWallet: Sendable {
             signer: signer
         )
         self.signerAddress = signer.address
+        self.chainName = chain.chainName
     }
 
     public init(mock: MockRemit) {
         self.transport = MockTransport(mock: mock)
         self.signerAddress = mock.walletAddress
+        self.chainName = "base"
     }
 
     public static func fromEnvironment() throws -> RemitWallet {
@@ -82,7 +85,7 @@ public final class RemitWallet: Sendable {
         try validateAmount(limit)
         return try await transport.request(
             method: "POST", path: "/api/v0/tabs",
-            body: TabBody(recipient: recipient, limit: limit)
+            body: TabBody(chain: chainName, recipient: recipient, limit: limit)
         )
     }
 
@@ -109,7 +112,7 @@ public final class RemitWallet: Sendable {
         }
         return try await transport.request(
             method: "POST", path: "/api/v0/streams",
-            body: StreamBody(recipient: recipient, ratePerSecond: ratePerSecond)
+            body: StreamBody(chain: chainName, recipient: recipient, ratePerSecond: ratePerSecond)
         )
     }
 
@@ -128,7 +131,7 @@ public final class RemitWallet: Sendable {
         }
         return try await transport.request(
             method: "POST", path: "/api/v0/bounties",
-            body: BountyBody(amount: amount, description: description)
+            body: BountyBody(chain: chainName, amount: amount, description: description)
         )
     }
 
@@ -255,16 +258,16 @@ public final class RemitWallet: Sendable {
 private struct EmptyBody: Codable {}
 private struct PayBody: Codable { let to: String; let amount: Double; let memo: String? }
 private struct EscrowBody: Codable { let recipient: String; let amount: Double; let conditions: String? }
-private struct TabBody: Codable { let recipient: String; let limit: Double }
+private struct TabBody: Codable { let chain: String; let recipient: String; let limit: Double }
 private struct DebitBody: Codable { let amount: Double; let memo: String? }
 private struct StreamBody: Codable {
-    let recipient: String; let ratePerSecond: Double
+    let chain: String; let recipient: String; let ratePerSecond: Double
     enum CodingKeys: String, CodingKey {
-        case recipient
+        case chain, recipient
         case ratePerSecond = "rate_per_second"
     }
 }
-private struct BountyBody: Codable { let amount: Double; let description: String }
+private struct BountyBody: Codable { let chain: String; let amount: Double; let description: String }
 private struct BountyListResponse: Codable { let data: [Bounty] }
 private struct AwardBody: Codable { let winner: String }
 private struct DepositBody: Codable { let recipient: String; let amount: Double; let reason: String? }

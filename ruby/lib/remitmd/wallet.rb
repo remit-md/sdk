@@ -179,7 +179,7 @@ module Remitmd
     def create_tab(counterpart, limit, closes_in_secs: nil)
       validate_address!(counterpart)
       validate_amount!(limit)
-      body = { counterpart: counterpart, limit: limit.to_s }
+      body = { chain: @chain, counterpart: counterpart, limit: limit.to_s }
       body[:closes_in_secs] = closes_in_secs if closes_in_secs
       Tab.new(@transport.post("/tabs", body))
     end
@@ -213,7 +213,7 @@ module Remitmd
       validate_address!(recipient)
       validate_amount!(rate_per_sec)
       validate_amount!(deposit)
-      body = { recipient: recipient, rate_per_sec: rate_per_sec.to_s, deposit: deposit.to_s }
+      body = { chain: @chain, recipient: recipient, rate_per_sec: rate_per_sec.to_s, deposit: deposit.to_s }
       Stream.new(@transport.post("/streams", body))
     end
 
@@ -233,7 +233,7 @@ module Remitmd
     # @return [Bounty]
     def create_bounty(award, description, expires_in_secs: nil)
       validate_amount!(award)
-      body = { award: award.to_s, description: description }
+      body = { chain: @chain, award: award.to_s, description: description }
       body[:expires_in_secs] = expires_in_secs if expires_in_secs
       Bounty.new(@transport.post("/bounties", body))
     end

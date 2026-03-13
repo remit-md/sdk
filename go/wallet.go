@@ -421,6 +421,7 @@ func (w *Wallet) CreateStream(ctx context.Context, recipient string, ratePerSec 
 		return nil, err
 	}
 	body := map[string]any{
+		"chain":        w.chain,
 		"recipient":    recipient,
 		"rate_per_sec": ratePerSec.String(),
 		"deposit":      deposit.String(),
@@ -449,6 +450,7 @@ func (w *Wallet) CreateBounty(ctx context.Context, award decimal.Decimal, descri
 		return nil, err
 	}
 	body := map[string]any{
+		"chain":       w.chain,
 		"award":       award.String(),
 		"description": description,
 	}

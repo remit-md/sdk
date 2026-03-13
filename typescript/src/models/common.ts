@@ -47,12 +47,14 @@ export interface Transaction {
 
 /** Wallet status including balance and tier info. */
 export interface WalletStatus {
-  address: string;
-  chain: string;
-  usdcBalance: number;
+  wallet: string;
+  balance: string;
+  monthly_volume: string;
   tier: string;
-  monthlyVolume: number;
-  feeRateBps: number; // basis points
+  fee_rate_bps: number; // basis points
+  active_escrows: number;
+  active_tabs: number;
+  active_streams: number;
 }
 
 /** On-chain reputation profile. */

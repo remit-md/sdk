@@ -411,9 +411,9 @@ defmodule RemitMd.Wallet do
     limit     = Keyword.get(opts, :limit, 20)
 
     params = ["limit=#{limit}"]
-    if status,    do: params = ["status=#{status}" | params]
-    if poster,    do: params = ["poster=#{poster}" | params]
-    if submitter, do: params = ["submitter=#{submitter}" | params]
+    params = if status,    do: ["status=#{status}" | params],    else: params
+    params = if poster,    do: ["poster=#{poster}" | params],    else: params
+    params = if submitter, do: ["submitter=#{submitter}" | params], else: params
     qs = Enum.join(Enum.reverse(params), "&")
 
     with {:ok, data} <- do_call(w, :get, "/bounties?#{qs}", nil) do

@@ -210,7 +210,10 @@ class Wallet(RemitClient):
         max_total: float | None = None,
     ) -> Stream:
         body: dict[str, Any] = {
-            "chain": self.chain, "to": to, "rate": rate, "max_duration": max_duration,
+            "chain": self.chain,
+            "to": to,
+            "rate": rate,
+            "max_duration": max_duration,
         }
         if max_total is not None:
             body["max_total"] = max_total

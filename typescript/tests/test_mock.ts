@@ -144,7 +144,7 @@ describe("MockRemit", () => {
   it("status includes balance and tier", async () => {
     const wallet = mock.createWallet(555);
     const status = await wallet.status();
-    assert.equal(status.usdcBalance, 555);
+    assert.equal(parseFloat(status.balance), 555);
     assert(status.tier.length > 0);
   });
 

@@ -221,10 +221,8 @@ wallet = Remitmd::RemitWallet.new(signer: MyHsmSigner.new)
 ## Chains
 
 ```ruby
-Remitmd::RemitWallet.new(private_key: key, chain: "base")          # Base (default)
-Remitmd::RemitWallet.new(private_key: key, chain: "base_sepolia")  # Testnet
-Remitmd::RemitWallet.new(private_key: key, chain: "arbitrum")      # Arbitrum
-Remitmd::RemitWallet.new(private_key: key, chain: "optimism")      # Optimism
+Remitmd::RemitWallet.new(private_key: key, chain: "base")          # Base mainnet (default)
+Remitmd::RemitWallet.new(private_key: key, chain: "base_sepolia")  # Base Sepolia testnet
 ```
 
 ## License

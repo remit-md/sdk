@@ -1,8 +1,8 @@
 //! # remitmd — Rust SDK for the remit.md universal AI payment protocol
 //!
-//! remit.md enables AI agents to send and receive USDC payments on EVM L2 chains
-//! (Base, Arbitrum, Optimism) with support for direct payments, escrow, streaming,
-//! payment channels (tabs), bounties, and security deposits.
+//! remit.md enables AI agents to send and receive USDC payments on Base (EVM L2)
+//! with support for direct payments, escrow, streaming, payment channels (tabs),
+//! bounties, and security deposits.
 //!
 //! ## Quick start
 //!

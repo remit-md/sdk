@@ -10,10 +10,8 @@ import (
 type ChainID int
 
 const (
-	ChainBase     ChainID = 8453
-	ChainBaseSep  ChainID = 84532 // Base Sepolia testnet
-	ChainArbitrum ChainID = 42161
-	ChainOptimism ChainID = 10
+	ChainBase    ChainID = 8453
+	ChainBaseSep ChainID = 84532 // Base Sepolia testnet
 )
 
 // Status values for payment primitives.

@@ -31,16 +31,12 @@ public final class RemitMd {
     // API endpoints per chain
     private static final Map<String, String> API_URLS = Map.of(
         "base",           "https://api.remit.md",
-        "base-sepolia",   "https://testnet.remit.md",
-        "arbitrum",       "https://arb.remit.md",
-        "optimism",       "https://op.remit.md"
+        "base-sepolia",   "https://testnet.remit.md"
     );
 
     private static final Map<String, Long> CHAIN_IDS = Map.of(
         "base",           8453L,
-        "base-sepolia",   84532L,
-        "arbitrum",       42161L,
-        "optimism",       10L
+        "base-sepolia",   84532L
     );
 
     private RemitMd() {}
@@ -50,7 +46,7 @@ public final class RemitMd {
      *
      * <ul>
      *   <li>{@code REMITMD_KEY} — hex-encoded private key (required)</li>
-     *   <li>{@code REMITMD_CHAIN} — chain name, default "base"</li>
+     *   <li>{@code REMITMD_CHAIN} — chain name, default "base" (only "base" supported)</li>
      *   <li>{@code REMITMD_TESTNET} — "1", "true", or "yes" for testnet</li>
      *   <li>{@code REMITMD_ROUTER_ADDRESS} — EIP-712 verifying contract address</li>
      * </ul>
@@ -100,7 +96,7 @@ public final class RemitMd {
             this.signer = signer;
         }
 
-        /** Sets the target chain. Supported: "base", "arbitrum", "optimism". Default: "base". */
+        /** Sets the target chain. Supported: "base". Default: "base". */
         public Builder chain(String chain) {
             this.chain = chain;
             return this;
@@ -129,7 +125,7 @@ public final class RemitMd {
             String chainKey = testnet ? chain + "-sepolia" : chain;
             if (!API_URLS.containsKey(chainKey)) {
                 throw new RemitError(ErrorCodes.INVALID_CHAIN,
-                    "Unsupported chain \"" + chain + "\". Valid chains: base, arbitrum, optimism. " +
+                    "Unsupported chain \"" + chain + "\". Valid chains: base. " +
                     "For testnet, call .testnet(true).",
                     Map.of("chain", chain)
                 );

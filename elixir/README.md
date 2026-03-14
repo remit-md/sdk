@@ -1,5 +1,7 @@
 # remit.md Elixir SDK
 
+[![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
+
 Universal payment protocol for AI agents — Elixir client.
 
 ## Installation
@@ -83,7 +85,7 @@ wallet = RemitMd.Wallet.from_env()
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `REMITMD_PRIVATE_KEY` | — | secp256k1 private key (required for production) |
-| `REMITMD_CHAIN` | `"base"` | Chain: `base`, `base_sepolia`, `arbitrum`, `optimism` |
+| `REMITMD_CHAIN` | `"base"` | Chain: `base`, `base_sepolia` |
 | `REMITMD_API_URL` | _(chain default)_ | Override API base URL |
 
 ## Custom Signer

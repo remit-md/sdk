@@ -59,7 +59,6 @@ impl Wallet {
     /// - `private_key` — 32-byte private key as hex (with or without `0x` prefix)
     ///
     /// # Options
-    /// - `.chain("arbitrum")` — select chain (default: `"base"`)
     /// - `.testnet()` — use testnet
     /// - `.base_url("http://localhost:3000")` — override API URL
     #[allow(clippy::new_ret_no_self)]
@@ -604,7 +603,7 @@ pub struct WalletBuilder<S> {
 }
 
 impl<S> WalletBuilder<S> {
-    /// Set the target chain. Valid values: `"base"`, `"arbitrum"`, `"optimism"`.
+    /// Set the target chain. Currently only `"base"` is supported.
     /// Default: `"base"`.
     pub fn chain(mut self, chain: &str) -> Self {
         self.chain = chain.to_string();
@@ -674,7 +673,7 @@ fn build_wallet(
         remit_err(
             codes::CHAIN_MISMATCH,
             format!(
-                "unsupported chain: {chain:?}. Valid chains: base, arbitrum, optimism. For testnet, use .testnet()."
+                "unsupported chain: {chain:?}. Valid chains: base. For testnet, use .testnet()."
             ),
         )
     })?;

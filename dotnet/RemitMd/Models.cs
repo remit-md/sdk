@@ -9,8 +9,6 @@ public enum ChainId
 {
     Base = 8453,
     BaseSepolia = 84532,
-    Arbitrum = 42161,
-    Optimism = 10,
 }
 
 // ─── Status enums ─────────────────────────────────────────────────────────────

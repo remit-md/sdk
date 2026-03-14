@@ -39,7 +39,7 @@ type walletConfig struct {
 	routerAddress common.Address
 }
 
-// WithChain sets the target chain ("base", "arbitrum", "optimism"). Default: "base".
+// WithChain sets the target chain. Currently only "base" is supported. Default: "base".
 func WithChain(chain string) Option {
 	return func(c *walletConfig) { c.chain = chain }
 }
@@ -88,7 +88,7 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 	cc, ok := chainConfig[chainKey]
 	if !ok {
 		return nil, remitErr("INVALID_CHAIN",
-			fmt.Sprintf("unsupported chain: %q. Valid chains: base, arbitrum, optimism. For testnet, use WithTestnet().", cfg.chain),
+			fmt.Sprintf("unsupported chain: %q. Valid chains: base. For testnet, use WithTestnet().", cfg.chain),
 			map[string]any{"chain": cfg.chain},
 		)
 	}

@@ -36,8 +36,6 @@ var chainConfig = map[string]struct {
 }{
 	"base":         {ChainID: ChainBase, APIURL: "https://api.remit.md", Testnet: false},
 	"base-sepolia": {ChainID: ChainBaseSep, APIURL: "https://testnet.remit.md", Testnet: true},
-	"arbitrum":     {ChainID: ChainArbitrum, APIURL: "https://arb.remit.md", Testnet: false},
-	"optimism":     {ChainID: ChainOptimism, APIURL: "https://op.remit.md", Testnet: false},
 }
 
 // httpClient is the authenticated HTTP client used by Wallet.

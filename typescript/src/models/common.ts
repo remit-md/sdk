@@ -2,13 +2,7 @@
 
 export type ChainId =
   | "base"
-  | "base-sepolia"
-  | "arbitrum"
-  | "arbitrum-sepolia"
-  | "optimism"
-  | "optimism-sepolia"
-  | "ethereum"
-  | "sepolia";
+  | "base-sepolia";
 
 export type InvoiceStatus =
   | "pending"

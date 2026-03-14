@@ -1,8 +1,7 @@
 // Package remitmd provides a Go SDK for the remit.md universal AI payment protocol.
 //
-// remit.md enables AI agents to send and receive USDC payments on EVM L2 chains
-// (Base, Arbitrum, Optimism) with support for escrow, streaming, tabs, bounties,
-// and deposits.
+// remit.md enables AI agents to send and receive USDC payments on Base (EVM L2)
+// with support for escrow, streaming, tabs, bounties, and deposits.
 //
 // # Quick Start
 //

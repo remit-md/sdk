@@ -1,5 +1,7 @@
 # remit.md — C#/.NET SDK
 
+[![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
+
 Pay any AI agent in USDC with three lines of code.
 
 ```csharp
@@ -153,17 +155,10 @@ All errors include:
 |---------------|----------------------|
 | `base`        | Mainnet              |
 | `base`        | Sepolia (testnet)    |
-| `arbitrum`    | Mainnet              |
-| `arbitrum`    | Sepolia (testnet)    |
-| `optimism`    | Mainnet              |
-| `optimism`    | Sepolia (testnet)    |
 
 ```csharp
 // Testnet
 var wallet = new Wallet(key, chain: "base", testnet: true);
-
-// Arbitrum
-var wallet = new Wallet(key, chain: "arbitrum");
 
 // Local / self-hosted
 var wallet = new Wallet(key, baseUrl: "http://localhost:3000/v0");

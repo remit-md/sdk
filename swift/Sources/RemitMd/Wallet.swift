@@ -30,10 +30,7 @@ public final class RemitWallet: Sendable {
             throw RemitError(RemitError.unauthorized, "REMITMD_PRIVATE_KEY environment variable not set")
         }
         let chainStr = env["REMITMD_CHAIN"] ?? "base-sepolia"
-        let chain: RemitChain = chainStr == "base" ? .base
-            : chainStr == "arbitrum" ? .arbitrum
-            : chainStr == "optimism" ? .optimism
-            : .baseSepolia
+        let chain: RemitChain = chainStr == "base" ? .base : .baseSepolia
         let routerAddress = env["REMITMD_ROUTER_ADDRESS"]
         return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress)
     }

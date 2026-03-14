@@ -12,16 +12,12 @@ import type { Deposit } from "./models/deposit.js";
 const DEFAULT_API_URLS: Record<string, string> = {
   base: "https://api.remit.md/api/v0",
   "base-sepolia": "https://testnet.remit.md/api/v0",
-  arbitrum: "https://api.remit.md/api/v0",
-  "arbitrum-sepolia": "https://testnet.remit.md/api/v0",
   localhost: "http://localhost:3000/api/v0",
 };
 
 export const CHAIN_IDS: Record<string, number> = {
   base: 8453,
   "base-sepolia": 84532,
-  arbitrum: 42161,
-  "arbitrum-sepolia": 421614,
   localhost: 31337,
 };
 

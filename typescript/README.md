@@ -197,10 +197,8 @@ try {
 ## Chains
 
 ```typescript
-new Wallet({ privateKey: key, chain: "base" })          // Base (default)
-new Wallet({ privateKey: key, chain: "base-sepolia" })   // Testnet
-new Wallet({ privateKey: key, chain: "arbitrum" })        // Arbitrum
-new Wallet({ privateKey: key, chain: "optimism" })        // Optimism
+new Wallet({ privateKey: key, chain: "base" })          // Base mainnet (default)
+new Wallet({ privateKey: key, chain: "base-sepolia" })   // Base Sepolia testnet
 ```
 
 ## License

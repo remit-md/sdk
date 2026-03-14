@@ -44,7 +44,7 @@ defmodule RemitMd.Wallet do
 
   - `:private_key` — 0x-prefixed 32-byte secp256k1 private key (required unless `:signer` given)
   - `:signer` — custom `RemitMd.Signer` implementation
-  - `:chain` — `"base"` | `"base_sepolia"` | `"arbitrum"` | `"optimism"` (default: `"base"`)
+  - `:chain` — `"base"` | `"base_sepolia"` (default: `"base"`)
   - `:api_url` — override API base URL
   - `:mock` — pid of a running `RemitMd.MockRemit` (disables real HTTP)
   - `:address` — address to use when in mock mode (optional, defaults to MockSigner address)
@@ -71,7 +71,7 @@ defmodule RemitMd.Wallet do
       transport = Http.new(opts |> Keyword.put(:signer, signer))
       address = get_address(signer)
       # Normalize to base chain name (strip testnet suffix) for use in pay body.
-      # The server accepts "base", "arbitrum", "optimism" — not "base_sepolia" etc.
+      # The server accepts "base" — not "base_sepolia" etc.
       chain = opts |> Keyword.get(:chain, "base") |> base_chain_name()
       %__MODULE__{signer: signer, transport: transport, mock_pid: nil, address: address, chain: chain}
     end

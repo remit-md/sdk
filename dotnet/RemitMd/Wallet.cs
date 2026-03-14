@@ -22,10 +22,6 @@ public sealed class Wallet
     {
         ["base"]               = (8453,  "https://api.remit.md"),
         ["base-sepolia"]       = (84532, "https://api-sepolia.remit.md"),
-        ["arbitrum"]           = (42161, "https://api-arb.remit.md"),
-        ["arbitrum-sepolia"]   = (421614,"https://api-arb-sepolia.remit.md"),
-        ["optimism"]           = (10,    "https://api-op.remit.md"),
-        ["optimism-sepolia"]   = (11155420,"https://api-op-sepolia.remit.md"),
     };
 
     // ─── Constructors ─────────────────────────────────────────────────────────
@@ -34,7 +30,7 @@ public sealed class Wallet
     /// Creates a Wallet from a hex-encoded private key.
     /// </summary>
     /// <param name="privateKeyHex">64-character hex private key (0x prefix optional).</param>
-    /// <param name="chain">Target chain name: "base", "arbitrum", "optimism". Default: "base".</param>
+    /// <param name="chain">Target chain name: "base". Default: "base".</param>
     /// <param name="testnet">When true, targets the testnet variant of <paramref name="chain"/>.</param>
     /// <param name="baseUrl">Override the API base URL (useful for local or self-hosted setups).</param>
     public Wallet(string privateKeyHex, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null)

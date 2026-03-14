@@ -1,5 +1,7 @@
 # remitmd-go — Go SDK for remit.md
 
+[![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
+
 Universal AI payment protocol for agents on EVM L2 chains.
 
 ## Install
@@ -79,5 +81,3 @@ if errors.As(err, &remitErr) {
 |-------|-----------|--------|
 | Base | `"base"` | Mainnet |
 | Base Sepolia | `"base"` + `WithTestnet()` | Testnet |
-| Arbitrum | `"arbitrum"` | Coming soon |
-| Optimism | `"optimism"` | Coming soon |

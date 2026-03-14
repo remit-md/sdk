@@ -5,15 +5,11 @@ import Foundation
 public enum RemitChain: Int, Codable, Sendable {
     case base        = 8453
     case baseSepolia = 84532
-    case arbitrum    = 42161
-    case optimism    = 10
 
     var baseURL: String {
         switch self {
         case .base:        return "https://api.remit.md"
         case .baseSepolia: return "https://testnet.remit.md"
-        case .arbitrum:    return "https://arbitrum.remit.md"
-        case .optimism:    return "https://optimism.remit.md"
         }
     }
 
@@ -22,8 +18,6 @@ public enum RemitChain: Int, Codable, Sendable {
         switch self {
         case .base:        return "base"
         case .baseSepolia: return "base-sepolia"
-        case .arbitrum:    return "arbitrum"
-        case .optimism:    return "optimism"
         }
     }
 }

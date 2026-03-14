@@ -179,10 +179,8 @@ except RemitError as e:
 ## Chains
 
 ```python
-Wallet(private_key=key, chain="base")          # Base (default)
-Wallet(private_key=key, chain="base-sepolia")  # Testnet
-Wallet(private_key=key, chain="arbitrum")       # Arbitrum
-Wallet(private_key=key, chain="optimism")       # Optimism
+Wallet(private_key=key, chain="base")          # Base mainnet (default)
+Wallet(private_key=key, chain="base-sepolia")  # Base Sepolia testnet
 ```
 
 ## License

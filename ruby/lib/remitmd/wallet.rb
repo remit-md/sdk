@@ -20,7 +20,7 @@ module Remitmd
 
     # @param private_key [String, nil] 0x-prefixed hex private key
     # @param signer [Signer, nil]      custom signer (pass instead of private_key)
-    # @param chain [String]            chain name — "base", "base_sepolia", "arbitrum", "optimism"
+    # @param chain [String]            chain name — "base", "base_sepolia"
     # @param api_url [String, nil]     override API base URL
     # @param transport [Object, nil]   inject mock transport (used by MockRemit)
     def initialize(private_key: nil, signer: nil, chain: "base", api_url: nil, router_address: nil, transport: nil)
@@ -40,7 +40,7 @@ module Remitmd
 
       @signer = signer || PrivateKeySigner.new(private_key)
       # Normalize to the base chain name (strip testnet suffix) for use in pay body.
-      # The server accepts "base", "arbitrum", "optimism" — not "base_sepolia" etc.
+      # The server accepts "base" — not "base_sepolia" etc.
       @chain  = chain.sub(/_sepolia\z/, "").sub(/-sepolia\z/, "")
       cfg     = CHAIN_CONFIG.fetch(chain) do
         raise ArgumentError, "Unknown chain: #{chain}. Valid: #{CHAIN_CONFIG.keys.join(", ")}"

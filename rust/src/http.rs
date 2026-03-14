@@ -29,16 +29,6 @@ pub(crate) fn chain_config(chain_key: &str) -> Option<ChainConfig> {
             api_url: "https://testnet.remit.md",
             testnet: true,
         }),
-        "arbitrum" => Some(ChainConfig {
-            chain_id: 42161,
-            api_url: "https://arb.remit.md",
-            testnet: false,
-        }),
-        "optimism" => Some(ChainConfig {
-            chain_id: 10,
-            api_url: "https://op.remit.md",
-            testnet: false,
-        }),
         _ => None,
     }
 }

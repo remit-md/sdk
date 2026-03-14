@@ -11,12 +11,6 @@ from pydantic import BaseModel
 class ChainId(str, Enum):
     base = "base"
     base_sepolia = "base-sepolia"
-    arbitrum = "arbitrum"
-    arbitrum_sepolia = "arbitrum-sepolia"
-    optimism = "optimism"
-    optimism_sepolia = "optimism-sepolia"
-    ethereum = "ethereum"
-    sepolia = "sepolia"
 
 
 class InvoiceStatus(str, Enum):

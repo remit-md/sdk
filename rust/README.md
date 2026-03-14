@@ -1,6 +1,8 @@
 # remitmd — Rust SDK
 
-Rust SDK for the [remit.md](https://remit.md) universal AI payment protocol. Send and receive USDC payments from AI agents on Base, Arbitrum, and Optimism using Tokio async.
+[![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
+
+Rust SDK for the [remit.md](https://remit.md) universal AI payment protocol. Send and receive USDC payments from AI agents on Base using Tokio async.
 
 ## Install
 
@@ -34,7 +36,7 @@ let wallet = Wallet::from_env()?;
 
 // Builder pattern
 let wallet = Wallet::new("0x<private-key>")
-    .chain("base")          // "base", "arbitrum", "optimism"
+    .chain("base")          // "base" (only supported chain)
     .testnet()              // use testnet
     .base_url("http://localhost:3000")  // self-hosted
     .build()?;

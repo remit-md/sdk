@@ -8,9 +8,7 @@ defmodule RemitMd.Http do
 
   @chain_config %{
     "base"         => %{url: "https://api.remit.md/api/v0",         chain_id: 8453},
-    "base_sepolia" => %{url: "https://testnet-api.remit.md/api/v0", chain_id: 84532},
-    "arbitrum"     => %{url: "https://api.remit.md/api/v0",         chain_id: 42161},
-    "optimism"     => %{url: "https://api.remit.md/api/v0",         chain_id: 10}
+    "base_sepolia" => %{url: "https://testnet-api.remit.md/api/v0", chain_id: 84532}
   }
 
   @max_retries 3

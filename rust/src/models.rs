@@ -12,10 +12,6 @@ impl ChainId {
     pub const BASE: ChainId = ChainId(8453);
     /// Base Sepolia testnet
     pub const BASE_SEPOLIA: ChainId = ChainId(84532);
-    /// Arbitrum One
-    pub const ARBITRUM: ChainId = ChainId(42161);
-    /// Optimism
-    pub const OPTIMISM: ChainId = ChainId(10);
 }
 
 impl std::fmt::Display for ChainId {

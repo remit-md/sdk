@@ -1,5 +1,7 @@
 # remit.md Swift SDK
 
+[![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
+
 Universal payment protocol for AI agents — Swift 5.7+, macOS 12+, iOS 15+.
 
 ## Installation

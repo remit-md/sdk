@@ -9,8 +9,6 @@ module Remitmd
   module ChainId
     BASE         = 8453
     BASE_SEPOLIA = 84532
-    ARBITRUM     = 42161
-    OPTIMISM     = 10
   end
 
   # ─── Status types ─────────────────────────────────────────────────────────

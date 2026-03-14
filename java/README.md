@@ -1,5 +1,7 @@
 # remit.md Java/Kotlin SDK
 
+[![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
+
 Java and Kotlin SDK for [remit.md](https://remit.md) — the universal USDC payment protocol for AI agents.
 
 ## Installation
@@ -54,7 +56,7 @@ wallet.pay("0xRecipient...", 1.50.usdc)
 // From environment variables (recommended)
 Wallet wallet = RemitMd.fromEnv();
 // REMITMD_KEY   — hex-encoded private key (required)
-// REMITMD_CHAIN — chain name: "base", "arbitrum", "optimism" (default: "base")
+// REMITMD_CHAIN — chain name: "base" (default: "base")
 // REMITMD_TESTNET — "1" or "true" for testnet
 
 // Explicit configuration

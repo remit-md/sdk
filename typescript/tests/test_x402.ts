@@ -16,8 +16,11 @@ function makePaymentRequired(opts: {
   network?: string;
   payTo?: string;
   maxTimeoutSeconds?: number;
+  resource?: string;
+  description?: string;
+  mimeType?: string;
 }): string {
-  const payload = {
+  const payload: Record<string, unknown> = {
     scheme: opts.scheme ?? "exact",
     network: opts.network ?? "eip155:31337",
     amount: opts.amount ?? "100000",
@@ -25,6 +28,9 @@ function makePaymentRequired(opts: {
     payTo: opts.payTo ?? PROVIDER,
     maxTimeoutSeconds: opts.maxTimeoutSeconds ?? 30,
   };
+  if (opts.resource !== undefined) payload["resource"] = opts.resource;
+  if (opts.description !== undefined) payload["description"] = opts.description;
+  if (opts.mimeType !== undefined) payload["mimeType"] = opts.mimeType;
   return Buffer.from(JSON.stringify(payload)).toString("base64");
 }
 
@@ -240,6 +246,34 @@ describe("X402Client.fetch — 402 handling", () => {
     assert.equal(retryHeaders.get("authorization"), "Bearer abc123");
     assert.equal(retryHeaders.get("x-custom"), "hello");
     assert.ok(retryHeaders.get("payment-signature"));
+  });
+
+  it("exposes V2 resource/description/mimeType via lastPayment", async () => {
+    const signer = new PrivateKeySigner(TEST_KEY);
+    const header402 = makePaymentRequired({
+      amount: "1000",
+      resource: "/api/v0/premium",
+      description: "Access to premium data",
+      mimeType: "application/json",
+    });
+    const { fetchFn } = makeMockFetch([
+      { status: 402, headers: { "payment-required": header402 } },
+      { status: 200 },
+    ]);
+    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0 });
+
+    const orig = globalThis.fetch;
+    try {
+      (globalThis as Record<string, unknown>)["fetch"] = fetchFn;
+      await client.fetch("http://example.com/api/v0/premium");
+    } finally {
+      globalThis.fetch = orig;
+    }
+
+    assert.ok(client.lastPayment, "lastPayment must be set after payment");
+    assert.equal(client.lastPayment!.resource, "/api/v0/premium");
+    assert.equal(client.lastPayment!.description, "Access to premium data");
+    assert.equal(client.lastPayment!.mimeType, "application/json");
   });
 
   it("parses chainId correctly from CAIP-2 network string", async () => {

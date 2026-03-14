@@ -67,6 +67,10 @@ class X402Client:
     4. Base64-encodes the ``PAYMENT-SIGNATURE`` header
     5. Retries the original request with payment attached
 
+    V2 note: the decoded ``PAYMENT-REQUIRED`` header may include optional
+    ``resource``, ``description``, and ``mimeType`` fields. After a payment
+    is made, access them via ``client.last_payment["resource"]`` etc.
+
     Args:
         wallet: remit.md ``Wallet`` (provides address and signing capability).
         max_auto_pay_usdc: Maximum USDC amount to auto-pay per request.
@@ -83,6 +87,8 @@ class X402Client:
         self._address: str = wallet.address
         self._max_auto_pay_usdc = max_auto_pay_usdc
         self._http = httpx.AsyncClient(timeout=timeout)
+        # Set after each payment; contains V2 fields (resource, description, mimeType) if provided.
+        self.last_payment: dict[str, Any] | None = None
 
     # ─── Public request methods ────────────────────────────────────────────────
 
@@ -120,6 +126,10 @@ class X402Client:
         # 2. Only the "exact" scheme is supported in V5.
         if required.get("scheme") != "exact":
             raise ValueError(f"Unsupported x402 scheme: {required.get('scheme')!r}")
+
+        # Store for caller inspection. V2 fields (resource, description, mimeType) are
+        # included here when the resource server sends them.
+        self.last_payment: dict[str, Any] = required
 
         # 3. Check auto-pay limit.
         amount_base_units = int(required["amount"])

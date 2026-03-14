@@ -62,14 +62,21 @@ export interface X402ClientOptions {
   maxAutoPayUsdc?: number;
 }
 
-/** Shape of the base64-decoded PAYMENT-REQUIRED header. */
-interface PaymentRequired {
+/** Shape of the base64-decoded PAYMENT-REQUIRED header (V2). */
+export interface PaymentRequired {
   scheme: string;
   network: string;
   amount: string;
   asset: string;
   payTo: string;
   maxTimeoutSeconds?: number;
+  // V2 optional fields — informational metadata about the resource being paid for.
+  /** URL or path of the resource being protected (e.g. "/api/v0/data"). */
+  resource?: string;
+  /** Human-readable description of what the payment is for. */
+  description?: string;
+  /** MIME type of the resource (e.g. "application/json"). */
+  mimeType?: string;
 }
 
 /**
@@ -81,11 +88,16 @@ interface PaymentRequired {
  * 3. Builds and signs an EIP-3009 `transferWithAuthorization`
  * 4. Base64-encodes the `PAYMENT-SIGNATURE` header
  * 5. Retries the original request with payment attached
+ *
+ * V2: The decoded `PAYMENT-REQUIRED` may include `resource`, `description`,
+ * and `mimeType` fields. Access the last payment via `lastPayment`.
  */
 export class X402Client {
   readonly #signer: Signer;
   readonly #address: string;
   readonly #maxAutoPayUsdc: number;
+  /** The last PAYMENT-REQUIRED decoded before payment. Useful for logging/display. */
+  lastPayment: PaymentRequired | null = null;
 
   constructor({ signer, address, maxAutoPayUsdc = 0.1 }: X402ClientOptions) {
     this.#signer = signer;
@@ -114,6 +126,9 @@ export class X402Client {
     if (required.scheme !== "exact") {
       throw new Error(`Unsupported x402 scheme: ${required.scheme}`);
     }
+
+    // Store for caller inspection (V2 fields: resource, description, mimeType).
+    this.lastPayment = required;
 
     // 3. Check auto-pay limit.
     const amountBaseUnits = BigInt(required.amount);

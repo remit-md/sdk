@@ -30,9 +30,12 @@ def _make_payment_required(
     network: str = "eip155:31337",
     pay_to: str = _PROVIDER,
     max_timeout: int = 30,
+    resource: str | None = None,
+    description: str | None = None,
+    mime_type: str | None = None,
 ) -> str:
     """Return a base64-encoded PAYMENT-REQUIRED header value."""
-    payload = {
+    payload: dict[str, object] = {
         "scheme": scheme,
         "network": network,
         "amount": amount,
@@ -40,6 +43,12 @@ def _make_payment_required(
         "payTo": pay_to,
         "maxTimeoutSeconds": max_timeout,
     }
+    if resource is not None:
+        payload["resource"] = resource
+    if description is not None:
+        payload["description"] = description
+    if mime_type is not None:
+        payload["mimeType"] = mime_type
     return base64.b64encode(json.dumps(payload).encode()).decode()
 
 
@@ -211,3 +220,33 @@ async def test_payment_chainid_parsed_from_network() -> None:
 
     payload = json.loads(base64.b64decode(captured_headers["PAYMENT-SIGNATURE"]))
     assert payload["network"] == "eip155:84532"
+
+
+@pytest.mark.asyncio
+async def test_v2_fields_available_via_last_payment() -> None:
+    """V2 optional fields (resource, description, mimeType) are exposed via last_payment."""
+    wallet = _make_wallet()
+    client = X402Client(wallet=wallet, max_auto_pay_usdc=1.0)
+    header_402 = _make_payment_required(
+        amount="1000",
+        resource="/api/v0/premium",
+        description="Access to premium data",
+        mime_type="application/json",
+    )
+    r402 = _mock_response(402, headers={"payment-required": header_402})
+    r200 = _mock_response(200)
+
+    call_count = 0
+
+    async def mock_request(method: str, url: str, **kwargs: object) -> MagicMock:
+        nonlocal call_count
+        call_count += 1
+        return r402 if call_count == 1 else r200
+
+    with patch.object(client._http, "request", new=mock_request):
+        await client.get("http://example.com/api/v0/premium")
+
+    assert client.last_payment is not None
+    assert client.last_payment["resource"] == "/api/v0/premium"
+    assert client.last_payment["description"] == "Access to premium data"
+    assert client.last_payment["mimeType"] == "application/json"

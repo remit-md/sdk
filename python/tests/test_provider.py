@@ -67,6 +67,32 @@ def test_payment_required_header_structure() -> None:
     assert isinstance(payload["maxTimeoutSeconds"], int)
 
 
+def test_payment_required_header_v2_fields() -> None:
+    from remitmd.provider import X402Paywall
+
+    pw = X402Paywall(
+        wallet_address=_WALLET,
+        amount_usdc=0.001,
+        network=_NETWORK,
+        asset=_USDC,
+        resource="/v1/data",
+        description="Market data feed",
+        mime_type="application/json",
+    )
+    payload = json.loads(base64.b64decode(pw.payment_required_header()))
+    assert payload["resource"] == "/v1/data"
+    assert payload["description"] == "Market data feed"
+    assert payload["mimeType"] == "application/json"
+
+
+def test_payment_required_header_v2_fields_absent_by_default() -> None:
+    pw = _make_paywall()
+    payload = json.loads(base64.b64decode(pw.payment_required_header()))
+    assert "resource" not in payload
+    assert "description" not in payload
+    assert "mimeType" not in payload
+
+
 # ─── check — no signature ─────────────────────────────────────────────────────
 
 

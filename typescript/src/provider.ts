@@ -15,12 +15,20 @@
  *   network: "eip155:84532",
  *   asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
  *   facilitatorToken: "your-bearer-jwt",
+ *   resource: "/v1/data",
+ *   description: "Realtime market data feed",
+ *   mimeType: "application/json",
  * });
  *
  * // Returns a 402 Response if payment is absent/invalid, null if payment ok.
  * const block = await paywall.handle(request);
  * if (block) return block;
  * return new Response("here is your data");
+ * ```
+ *
+ * Usage (Hono):
+ * ```typescript
+ * app.use("/v1/*", paywall.honoMiddleware());
  * ```
  *
  * Usage (Express-style):
@@ -47,6 +55,12 @@ export interface PaywallOptions {
   facilitatorToken?: string;
   /** How long the payment authorization remains valid in seconds (default: 60). */
   maxTimeoutSeconds?: number;
+  /** V2 — URL or path of the resource being protected (e.g. `"/v1/data"`). */
+  resource?: string;
+  /** V2 — Human-readable description of what the payment is for. */
+  description?: string;
+  /** V2 — MIME type of the resource (e.g. `"application/json"`). */
+  mimeType?: string;
 }
 
 /** Result of {@link X402Paywall.check}. */
@@ -65,6 +79,9 @@ export class X402Paywall {
   readonly #facilitatorUrl: string;
   readonly #facilitatorToken: string;
   readonly #maxTimeoutSeconds: number;
+  readonly #resource: string | undefined;
+  readonly #description: string | undefined;
+  readonly #mimeType: string | undefined;
 
   constructor({
     walletAddress,
@@ -74,6 +91,9 @@ export class X402Paywall {
     facilitatorUrl = "https://remit.md",
     facilitatorToken = "",
     maxTimeoutSeconds = 60,
+    resource,
+    description,
+    mimeType,
   }: PaywallOptions) {
     this.#walletAddress = walletAddress;
     this.#amountBaseUnits = String(Math.round(amountUsdc * 1_000_000));
@@ -82,11 +102,14 @@ export class X402Paywall {
     this.#facilitatorUrl = facilitatorUrl.replace(/\/$/, "");
     this.#facilitatorToken = facilitatorToken;
     this.#maxTimeoutSeconds = maxTimeoutSeconds;
+    this.#resource = resource;
+    this.#description = description;
+    this.#mimeType = mimeType;
   }
 
-  /** Return the base64-encoded JSON ``PAYMENT-REQUIRED`` header value. */
+  /** Return the base64-encoded JSON `PAYMENT-REQUIRED` header value. */
   paymentRequiredHeader(): string {
-    const payload = {
+    const payload: Record<string, unknown> = {
       scheme: "exact",
       network: this.#network,
       amount: this.#amountBaseUnits,
@@ -94,6 +117,9 @@ export class X402Paywall {
       payTo: this.#walletAddress,
       maxTimeoutSeconds: this.#maxTimeoutSeconds,
     };
+    if (this.#resource !== undefined) payload["resource"] = this.#resource;
+    if (this.#description !== undefined) payload["description"] = this.#description;
+    if (this.#mimeType !== undefined) payload["mimeType"] = this.#mimeType;
     return Buffer.from(JSON.stringify(payload)).toString("base64");
   }
 
@@ -213,6 +239,38 @@ export class X402Paywall {
         return;
       }
       next();
+    };
+  }
+
+  /**
+   * Hono middleware factory.
+   *
+   * Compatible with Hono v3/v4 and any framework that uses the same
+   * `(c, next) => Promise<void>` middleware signature.
+   *
+   * @example
+   * ```typescript
+   * import { Hono } from "hono";
+   * app.use("/v1/*", paywall.honoMiddleware());
+   * ```
+   */
+  honoMiddleware(): (
+    c: {
+      req: { raw: Request };
+      header(name: string, value: string): void;
+      body(content: string, status?: number): Response;
+    },
+    next: () => Promise<void>,
+  ) => Promise<Response | void> {
+    return async (c, next) => {
+      const paymentSig = c.req.raw.headers.get("payment-signature");
+      const result = await this.check(paymentSig);
+      if (!result.isValid) {
+        c.header("PAYMENT-REQUIRED", this.paymentRequiredHeader());
+        c.header("Content-Type", "application/json");
+        return c.body(JSON.stringify({ error: "Payment required", invalidReason: result.invalidReason }), 402);
+      }
+      await next();
     };
   }
 

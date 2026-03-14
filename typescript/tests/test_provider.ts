@@ -92,6 +92,28 @@ describe("X402Paywall.paymentRequiredHeader", () => {
     const payload = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as { amount: string };
     assert.equal(payload.amount, "1000");
   });
+
+  it("includes V2 resource/description/mimeType when configured", () => {
+    const pw = makePaywall({
+      resource: "/v1/data",
+      description: "Market data feed",
+      mimeType: "application/json",
+    });
+    const raw = pw.paymentRequiredHeader();
+    const payload = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as Record<string, unknown>;
+    assert.equal(payload["resource"], "/v1/data");
+    assert.equal(payload["description"], "Market data feed");
+    assert.equal(payload["mimeType"], "application/json");
+  });
+
+  it("omits V2 fields when not configured", () => {
+    const pw = makePaywall();
+    const raw = pw.paymentRequiredHeader();
+    const payload = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as Record<string, unknown>;
+    assert.ok(!("resource" in payload), "resource must be absent");
+    assert.ok(!("description" in payload), "description must be absent");
+    assert.ok(!("mimeType" in payload), "mimeType must be absent");
+  });
 });
 
 // ─── check ─────────────────────────────────────────────────────────────────────
@@ -226,6 +248,55 @@ describe("X402Paywall.handle", () => {
       (globalThis as Record<string, unknown>)["fetch"] = mockFetch({ ok: true, json: () => ({ isValid: true }) });
       const resp = await pw.handle(req);
       assert.equal(resp, null);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+});
+
+// ─── honoMiddleware ────────────────────────────────────────────────────────────
+
+describe("X402Paywall.honoMiddleware", () => {
+  function makeHonoContext(paymentSig?: string): {
+    req: { raw: Request };
+    header(name: string, value: string): void;
+    body(content: string, status?: number): Response;
+  } {
+    const headers = new Headers();
+    if (paymentSig) headers.set("payment-signature", paymentSig);
+    const raw = new Request("http://example.com/v1/data", { headers });
+    const resHeaders: Record<string, string> = {};
+    return {
+      req: { raw },
+      header(name: string, value: string) { resHeaders[name] = value; },
+      body(content: string, status = 200): Response {
+        return new Response(content, { status, headers: resHeaders });
+      },
+    };
+  }
+
+  it("returns 402 Response when payment is absent", async () => {
+    const pw = makePaywall();
+    const middleware = pw.honoMiddleware();
+    const c = makeHonoContext();
+    let nextCalled = false;
+    const resp = await middleware(c, async () => { nextCalled = true; });
+    assert.ok(resp instanceof Response, "should return a Response");
+    assert.equal((resp as Response).status, 402);
+    assert.ok(!nextCalled, "next should not be called");
+  });
+
+  it("calls next when payment is valid", async () => {
+    const pw = makePaywall();
+    const middleware = pw.honoMiddleware();
+    const c = makeHonoContext(makeDummyPaymentSig());
+    let nextCalled = false;
+    const orig = globalThis.fetch;
+    try {
+      (globalThis as Record<string, unknown>)["fetch"] = mockFetch({ ok: true, json: () => ({ isValid: true }) });
+      const resp = await middleware(c, async () => { nextCalled = true; });
+      assert.equal(resp, undefined);
+      assert.ok(nextCalled, "next must be called when payment is valid");
     } finally {
       globalThis.fetch = orig;
     }

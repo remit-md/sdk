@@ -129,7 +129,7 @@ class X402Client:
 
         # Store for caller inspection. V2 fields (resource, description, mimeType) are
         # included here when the resource server sends them.
-        self.last_payment: dict[str, Any] = required
+        self.last_payment = required
 
         # 3. Check auto-pay limit.
         amount_base_units = int(required["amount"])

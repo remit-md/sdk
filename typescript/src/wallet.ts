@@ -7,7 +7,7 @@ import { generatePrivateKey } from "viem/accounts";
 import { RemitClient, type RemitClientOptions } from "./client.js";
 import { AuthenticatedClient } from "./http.js";
 import { PrivateKeySigner, type Signer } from "./signer.js";
-import { X402Client } from "./x402.js";
+import { X402Client, type PaymentRequired } from "./x402.js";
 import type {
   Transaction,
   WalletStatus,
@@ -330,8 +330,13 @@ export class Wallet extends RemitClient {
   // ─── x402 ───────────────────────────────────────────────────────────────────
 
   /** Make a fetch request, auto-paying any x402 402 responses within maxAutoPayUsdc. */
-  x402Fetch(url: string, maxAutoPayUsdc = 0.1, init?: RequestInit): Promise<Response> {
+  async x402Fetch(
+    url: string,
+    maxAutoPayUsdc = 0.1,
+    init?: RequestInit,
+  ): Promise<{ response: Response; lastPayment: PaymentRequired | null }> {
     const client = new X402Client({ signer: this.#signer, address: this.address, maxAutoPayUsdc });
-    return client.fetch(url, init);
+    const response = await client.fetch(url, init);
+    return { response, lastPayment: client.lastPayment };
   }
 }

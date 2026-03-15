@@ -151,12 +151,10 @@ wallet.placeDeposit({ to, amount, expires })             // Promise<Deposit>
 wallet.status()                                          // Promise<WalletStatus>
 wallet.balance()                                         // Promise<number>
 
-// Events
-wallet.getEvents(wallet, since?)                         // Promise<RemitEvent[]>
-wallet.on(event, callback)                               // void (polling)
-
 // Webhooks
 wallet.registerWebhook(url, events, chains?)             // Promise<Webhook>
+wallet.listWebhooks()                                    // Promise<Webhook[]>
+wallet.deleteWebhook(id)                                 // Promise<void>
 
 // Operator links
 wallet.createFundLink()                                  // Promise<LinkResponse>

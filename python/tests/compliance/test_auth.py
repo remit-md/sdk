@@ -52,5 +52,3 @@ async def test_faucet_credits_testnet_funds(wallet):
     """POST /api/v0/faucet must return a tx_hash."""
     tx = await wallet.request_testnet_funds()
     assert tx.tx_hash is not None
-
-

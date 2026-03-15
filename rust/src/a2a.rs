@@ -83,7 +83,10 @@ impl AgentCard {
     /// # });
     /// ```
     pub async fn discover(base_url: &str) -> Result<Self, crate::error::RemitError> {
-        let url = format!("{}/.well-known/agent-card.json", base_url.trim_end_matches('/'));
+        let url = format!(
+            "{}/.well-known/agent-card.json",
+            base_url.trim_end_matches('/')
+        );
         let resp = reqwest::get(&url).await.map_err(|e| {
             crate::error::RemitError::new(
                 crate::error::codes::NETWORK_ERROR,

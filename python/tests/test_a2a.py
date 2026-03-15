@@ -8,13 +8,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from remitmd.a2a import (
-    A2ACapabilities,
     A2AClient,
-    A2AExtension,
-    A2ASkill,
     A2ATask,
     AgentCard,
-    IntentMandate,
     _parse_task,
 )
 
@@ -100,7 +96,9 @@ def test_agent_card_from_dict_x402():
 
 
 def test_agent_card_from_dict_empty_capabilities():
-    card = AgentCard._from_dict({"name": "x", "url": "https://x.com/a2a", "description": "", "version": ""})
+    card = AgentCard._from_dict(
+        {"name": "x", "url": "https://x.com/a2a", "description": "", "version": ""},
+    )
     assert card.capabilities.streaming is False
     assert card.capabilities.extensions == []
     assert card.skills == []

@@ -1,3 +1,25 @@
+// A2A / AP2
+export {
+  discoverAgent,
+  A2AClient,
+  getTaskTxHash,
+} from "./a2a.js";
+export type {
+  AgentCard,
+  A2ACapabilities,
+  A2AExtension,
+  A2ASkill,
+  A2AX402,
+  A2AFees,
+  A2ATask,
+  A2ATaskStatus,
+  A2AArtifact,
+  A2AArtifactPart,
+  IntentMandate,
+  SendOptions,
+  A2AClientOptions,
+} from "./a2a.js";
+
 // Core classes
 export { RemitClient } from "./client.js";
 export { Wallet } from "./wallet.js";

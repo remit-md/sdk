@@ -68,6 +68,7 @@
 
 #![deny(warnings)]
 
+pub mod a2a;
 mod compliance;
 pub mod error;
 mod http;

@@ -1,5 +1,6 @@
 """remitmd — Python SDK for the remit.md universal AI payment protocol."""
 
+from remitmd.a2a import A2AClient, A2ATask, AgentCard, IntentMandate
 from remitmd.client import RemitClient
 from remitmd.models.bounty import Bounty, BountySubmission
 from remitmd.models.common import (
@@ -27,6 +28,12 @@ from remitmd.wallet import Wallet
 from remitmd.x402 import AllowanceExceededError, X402Client
 
 __all__ = [
+    # A2A / AP2
+    "AgentCard",
+    "A2AClient",
+    "A2ATask",
+    "IntentMandate",
+    # Core
     "RemitClient",
     "Wallet",
     "Signer",

@@ -20,14 +20,9 @@ jobs:
 
   vectors-python:
     name: Vectors · Python
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: python/pyproject.toml
       - name: Install
         run: cd python && pip install -e ".[dev]"
       - name: Golden vectors
@@ -35,17 +30,9 @@ jobs:
 
   vectors-typescript:
     name: Vectors · TypeScript
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-          cache-dependency-path: typescript/pnpm-lock.yaml
       - name: Install
         run: cd typescript && pnpm install --frozen-lockfile
       - name: Golden vectors
@@ -53,12 +40,9 @@ jobs:
 
   vectors-go:
     name: Vectors · Go
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
       - name: Tidy
         run: cd go && go mod tidy
       - name: Golden vectors
@@ -66,24 +50,17 @@ jobs:
 
   vectors-rust:
     name: Vectors · Rust
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
       - name: Golden vectors
         run: cd rust && cargo test golden_vectors -- --nocapture
 
   vectors-dotnet:
     name: Vectors · .NET
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
       - name: Restore
         run: cd dotnet && dotnet restore
       - name: Build
@@ -93,33 +70,26 @@ jobs:
 
   vectors-java:
     name: Vectors · Java
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: "17"
-          distribution: temurin
-      - uses: gradle/actions/setup-gradle@v3
       - name: Golden vectors
         run: cd java && gradle test --tests "md.remit.GoldenVectorTest" --no-daemon
 
   vectors-ruby:
     name: Vectors · Ruby
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.2"
-          bundler-cache: true
-          working-directory: ruby
+      - name: Install dependencies
+        run: cd ruby && bundle install
       - name: Golden vectors
         run: cd ruby && bundle exec rspec spec/golden_vectors_spec.rb
 
   vectors-swift:
     name: Vectors · Swift
     runs-on: macos-latest
+    # macOS runners are Swift-only across SDK workflows (10× cost). See CI Cost Policy.
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -129,13 +99,9 @@ jobs:
 
   vectors-elixir:
     name: Vectors · Elixir
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
-        with:
-          elixir-version: "1.16"
-          otp-version: "26"
       - name: Install deps
         run: cd elixir && mix deps.get
       - name: Compile

@@ -226,6 +226,20 @@ public final class RemitWallet: Sendable {
         }
     }
 
+    // MARK: - Webhooks
+
+    /// Registers a webhook endpoint to receive event notifications.
+    /// - Parameters:
+    ///   - url: The HTTPS endpoint that will receive POST notifications.
+    ///   - events: Event types to subscribe to (e.g. ["payment.sent", "escrow.funded"]).
+    ///   - chains: Optional chain names to filter by. Pass nil for all chains.
+    public func registerWebhook(url: String, events: [String], chains: [String]? = nil) async throws -> Webhook {
+        return try await transport.request(
+            method: "POST", path: "/api/v0/webhooks",
+            body: WebhookBody(url: url, events: events, chains: chains)
+        )
+    }
+
     // MARK: - One-time operator links
 
     public func createFundLink() async throws -> LinkResponse {
@@ -269,3 +283,4 @@ private struct BountyListResponse: Codable { let data: [Bounty] }
 private struct AwardBody: Codable { let winner: String }
 private struct DepositBody: Codable { let recipient: String; let amount: Double; let reason: String? }
 private struct IntentBody: Codable { let to: String; let amount: Double; let model: String }
+private struct WebhookBody: Codable { let url: String; let events: [String]; let chains: [String]? }

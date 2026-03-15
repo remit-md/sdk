@@ -234,3 +234,15 @@ type TransactionList struct {
 	PerPage    int           `json:"per_page"`
 	HasMore    bool          `json:"has_more"`
 }
+
+// Webhook is a registered webhook endpoint.
+type Webhook struct {
+	ID        string    `json:"id"`
+	Wallet    string    `json:"wallet"`
+	URL       string    `json:"url"`
+	Events    []string  `json:"events"`
+	Chains    []string  `json:"chains"`
+	Active    bool      `json:"active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

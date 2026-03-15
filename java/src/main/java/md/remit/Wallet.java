@@ -318,6 +318,28 @@ public class Wallet {
         }
     }
 
+    // ─── Webhooks ─────────────────────────────────────────────────────────────
+
+    /**
+     * Registers a webhook endpoint to receive event notifications.
+     *
+     * @param url    the HTTPS endpoint that will receive POST notifications
+     * @param events event types to subscribe to (e.g. "payment.sent", "escrow.funded")
+     * @param chains optional chain names to filter by — pass null for all chains
+     */
+    public Webhook registerWebhook(String url, List<String> events, List<String> chains) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("url", url);
+        body.put("events", events);
+        if (chains != null) body.put("chains", chains);
+        return client.post("/api/v0/webhooks", body, Webhook.class);
+    }
+
+    /** Registers a webhook for all chains. */
+    public Webhook registerWebhook(String url, List<String> events) {
+        return registerWebhook(url, events, null);
+    }
+
     // ─── One-time operator links ──────────────────────────────────────────────
 
     /** Generates a one-time URL for the operator to fund this wallet. */

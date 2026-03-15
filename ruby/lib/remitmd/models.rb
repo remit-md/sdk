@@ -314,6 +314,24 @@ module Remitmd
     attr_reader :url, :token, :expires_at, :wallet_address
   end
 
+  class Webhook < Model
+    def initialize(attrs)
+      h = attrs.transform_keys(&:to_s)
+      @id         = h["id"]
+      @wallet     = h["wallet"]
+      @url        = h["url"]
+      @events     = h["events"] || []
+      @chains     = h["chains"] || []
+      @active     = h["active"] == true
+      @created_at = parse_time(h["created_at"])
+      @updated_at = parse_time(h["updated_at"])
+    end
+
+    attr_reader :id, :wallet, :url, :events, :chains, :active, :created_at, :updated_at
+
+    private :parse_time
+  end
+
   class TransactionList < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)

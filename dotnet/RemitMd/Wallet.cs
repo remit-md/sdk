@@ -358,6 +358,25 @@ public sealed class Wallet
         }, ct);
     }
 
+    // ─── Webhooks ─────────────────────────────────────────────────────────────
+
+    /// <summary>Registers a webhook endpoint to receive event notifications.</summary>
+    /// <param name="url">The HTTPS endpoint that will receive POST notifications.</param>
+    /// <param name="events">Event types to subscribe to (e.g. "payment.sent", "escrow.funded").</param>
+    /// <param name="chains">Optional chain names to filter by (e.g. "base"). Pass null for all chains.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public Task<Webhook> RegisterWebhookAsync(
+        string url,
+        IEnumerable<string> events,
+        IEnumerable<string>? chains = null,
+        CancellationToken ct = default)
+        => _transport.PostAsync<Webhook>("/api/v0/webhooks", new
+        {
+            url,
+            events = events.ToList(),
+            chains = chains?.ToList(),
+        }, ct);
+
     // ─── One-time operator links ──────────────────────────────────────────────
 
     /// <summary>Generates a one-time URL for the operator to fund this wallet.</summary>

@@ -2,7 +2,7 @@
  * RemitClient — read-only operations, no private key required.
  */
 
-import type { WalletStatus, Reputation, RemitEvent } from "./models/index.js";
+import type { WalletStatus, Reputation } from "./models/index.js";
 import type { Invoice } from "./models/invoice.js";
 import type { Escrow } from "./models/escrow.js";
 import type { Tab } from "./models/tab.js";
@@ -92,9 +92,4 @@ export class RemitClient {
     return this._fetch<Bounty[]>(`/bounties${qs ? `?${qs}` : ""}`);
   }
 
-  getEvents(wallet: string, since?: number): Promise<RemitEvent[]> {
-    let qs = `?wallet=${encodeURIComponent(wallet)}`;
-    if (since !== undefined) qs += `&since=${since}`;
-    return this._fetch<RemitEvent[]>(`/events${qs}`);
-  }
 }

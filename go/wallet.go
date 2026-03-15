@@ -620,6 +620,22 @@ func (w *Wallet) CreateWithdrawLink(ctx context.Context) (*LinkResponse, error) 
 	return &lr, nil
 }
 
+// ─── Webhooks ─────────────────────────────────────────────────────────────────
+
+// RegisterWebhook registers a webhook endpoint to receive real-time event notifications.
+// events must contain at least one valid event type (e.g. "payment.sent", "escrow.funded").
+func (w *Wallet) RegisterWebhook(ctx context.Context, url string, events []string, chains ...string) (*Webhook, error) {
+	body := map[string]any{"url": url, "events": events}
+	if len(chains) > 0 {
+		body["chains"] = chains
+	}
+	var wh Webhook
+	if err := w.http.post(ctx, "/api/v0/webhooks", body, &wh); err != nil {
+		return nil, err
+	}
+	return &wh, nil
+}
+
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 func validateAddress(addr string) error {

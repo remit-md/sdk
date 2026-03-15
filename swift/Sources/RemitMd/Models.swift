@@ -271,3 +271,20 @@ public struct LinkResponse: Codable, Sendable {
         case walletAddress = "wallet_address"
     }
 }
+
+public struct Webhook: Codable, Sendable {
+    public let id: String
+    public let wallet: String
+    public let url: String
+    public let events: [String]
+    public let chains: [String]
+    public let active: Bool
+    public let createdAt: String
+    public let updatedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, wallet, url, events, chains, active
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}

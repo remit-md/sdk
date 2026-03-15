@@ -20,7 +20,8 @@ defmodule RemitMd.Wallet do
 
   alias RemitMd.{Error, Http, MockRemit, MockSigner, PrivateKeySigner}
   alias RemitMd.Models.{
-    Balance, Bounty, Budget, Escrow, Reputation, SpendingSummary, Stream, Tab, Transaction, TransactionList
+    Balance, Bounty, Budget, Escrow, Reputation, SpendingSummary, Stream, Tab, Transaction, TransactionList,
+    Webhook
   }
 
   @min_amount Decimal.new("0.000001")
@@ -421,6 +422,34 @@ defmodule RemitMd.Wallet do
       items = if is_map(data) && Map.has_key?(data, "data"), do: data["data"], else: data
       bounties = Enum.map(items || [], &Bounty.from_map/1)
       {:ok, bounties}
+    end
+  end
+
+  @doc """
+  Register a webhook endpoint to receive event notifications.
+
+  ## Parameters
+
+  - `url` — the HTTPS endpoint that will receive POST notifications
+  - `events` — list of event types to subscribe to (e.g. `["payment.sent", "escrow.funded"]`)
+
+  ## Options
+
+  - `:chains` — list of chain names to filter by (e.g. `["base"]`). Omit for all chains.
+
+  ## Example
+
+      {:ok, webhook} = RemitMd.Wallet.register_webhook(wallet,
+        "https://example.com/webhooks",
+        ["payment.sent", "escrow.funded"])
+  """
+  def register_webhook(%__MODULE__{} = w, url, events, opts \\ []) do
+    chains = Keyword.get(opts, :chains)
+    body = %{url: url, events: events}
+    body = if chains, do: Map.put(body, :chains, chains), else: body
+
+    with {:ok, data} <- do_call(w, :post, "/webhooks", body) do
+      {:ok, Webhook.from_map(data)}
     end
   end
 

@@ -13,7 +13,6 @@ import type {
   WalletStatus,
   Webhook,
   LinkResponse,
-  RemitEvent,
 } from "./models/index.js";
 import type { Invoice } from "./models/invoice.js";
 import type { Escrow } from "./models/escrow.js";
@@ -248,40 +247,6 @@ export class Wallet extends RemitClient {
   /** GET /tabs/{id} — authenticated; server requires auth to access tab details. */
   override getTab(tabId: string): Promise<Tab> {
     return this.#auth.get<Tab>(`/tabs/${tabId}`);
-  }
-
-  /** GET /events?wallet={wallet} — authenticated. Server uses wallet as query param. */
-  override getEvents(wallet: string, since?: number): Promise<RemitEvent[]> {
-    let qs = `?wallet=${encodeURIComponent(wallet)}`;
-    if (since !== undefined) qs += `&since=${since}`;
-    return this.#auth.get<RemitEvent[]>(`/events${qs}`)
-      .then((data) => {
-        // Server may return { items: [...] } or [...] directly
-        if (Array.isArray(data)) return data;
-        const obj = data as { items?: RemitEvent[] };
-        return obj.items ?? [];
-      });
-  }
-
-  // ─── Events ─────────────────────────────────────────────────────────────────
-
-  /** Register a callback for a named event type. Uses polling when no webhook is active. */
-  on(event: string, callback: (data: RemitEvent) => void): void {
-    // Polling fallback: check events every 5s
-    const poll = async (): Promise<void> => {
-      try {
-        const events = await this.getEvents(this.address);
-        for (const ev of events) {
-          if (ev.type === event || event === "*") {
-            callback(ev);
-          }
-        }
-      } catch {
-        // Swallow poll errors; retry on next interval
-      }
-      setTimeout(() => void poll(), 5000);
-    };
-    void poll();
   }
 
   // ─── Status ─────────────────────────────────────────────────────────────────

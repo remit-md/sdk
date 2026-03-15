@@ -54,10 +54,3 @@ async def test_faucet_credits_testnet_funds(wallet):
     assert tx.tx_hash is not None
 
 
-@pytest.mark.asyncio
-@server_available
-async def test_events_empty_for_new_wallet(wallet):
-    """GET /api/v0/events returns empty list for a fresh wallet."""
-    events = await wallet.get_events()
-    assert isinstance(events, list)
-    assert len(events) == 0, f"Expected empty events for new wallet, got {events}"

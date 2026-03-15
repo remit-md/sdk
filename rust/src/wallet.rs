@@ -575,6 +575,30 @@ impl Wallet {
 
     // ─── One-time operator links ──────────────────────────────────────────────
 
+    // ─── Webhooks ────────────────────────────────────────────────────────────
+
+    /// Register a webhook endpoint to receive event notifications.
+    ///
+    /// # Arguments
+    /// - `url` — the HTTPS endpoint that will receive POST notifications
+    /// - `events` — event types to subscribe to (e.g. `["payment.sent", "escrow.funded"]`)
+    /// - `chains` — optional list of chain names to filter by (e.g. `["base"]`)
+    pub async fn register_webhook(
+        &self,
+        url: &str,
+        events: &[&str],
+        chains: Option<&[&str]>,
+    ) -> Result<Webhook, RemitError> {
+        let mut body = json!({
+            "url": url,
+            "events": events,
+        });
+        if let Some(chains) = chains {
+            body["chains"] = json!(chains);
+        }
+        self.post("/api/v0/webhooks", body).await
+    }
+
     /// Generate a one-time URL for the operator to fund this wallet.
     pub async fn create_fund_link(&self) -> Result<LinkResponse, RemitError> {
         self.post("/api/v0/links/fund", json!({})).await

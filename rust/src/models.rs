@@ -310,6 +310,20 @@ pub struct Budget {
     pub per_tx_limit: Decimal,
 }
 
+/// A registered webhook endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Webhook {
+    pub id: String,
+    pub wallet: String,
+    pub url: String,
+    pub events: Vec<String>,
+    #[serde(default)]
+    pub chains: Vec<String>,
+    pub active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 /// Paginated list of transactions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionList {

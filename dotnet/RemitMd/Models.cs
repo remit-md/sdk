@@ -198,6 +198,18 @@ public record Budget(
     [property: JsonPropertyName("per_tx_limit")] decimal PerTxLimit
 );
 
+/// <summary>A registered webhook endpoint.</summary>
+public record Webhook(
+    [property: JsonPropertyName("id")]         string Id,
+    [property: JsonPropertyName("wallet")]     string Wallet,
+    [property: JsonPropertyName("url")]        string Url,
+    [property: JsonPropertyName("events")]     IReadOnlyList<string> Events,
+    [property: JsonPropertyName("chains")]     IReadOnlyList<string> Chains,
+    [property: JsonPropertyName("active")]     bool Active,
+    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt
+);
+
 /// <summary>A paginated list of transactions.</summary>
 public record TransactionList(
     [property: JsonPropertyName("items")] IReadOnlyList<Transaction> Items,

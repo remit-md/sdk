@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.models.bounty import Bounty
-from remitmd.models.common import Event, Reputation, WalletStatus, Webhook
+from remitmd.models.common import Reputation, WalletStatus, Webhook
 from remitmd.models.deposit import Deposit
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
@@ -98,16 +98,6 @@ class RemitClient:
     async def get_reputation(self, wallet: str) -> Reputation:
         data = await self._http.get(f"/api/v0/reputation/{wallet}")
         return Reputation.model_validate(data)
-
-    # ─── Events ───────────────────────────────────────────────────────────────
-
-    async def get_events(self, since: int | None = None) -> list[Event]:
-        params: dict[str, object] = {}
-        if since is not None:
-            params["since"] = since
-        data = await self._http.get("/api/v0/events", **params)
-        items: list[dict[str, object]] = data.get("items", []) if isinstance(data, dict) else data
-        return [Event.model_validate(d) for d in items]
 
     # ─── Webhooks (read-only) ─────────────────────────────────────────────────
 

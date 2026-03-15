@@ -202,6 +202,26 @@ defmodule RemitMd.Models do
     end
   end
 
+  defmodule Webhook do
+    @moduledoc "A registered webhook endpoint."
+    @enforce_keys [:id, :wallet, :url, :events, :active]
+    defstruct [:id, :wallet, :url, :events, :chains, :active, :created_at, :updated_at]
+
+    @doc false
+    def from_map(m) do
+      %__MODULE__{
+        id:         Map.get(m, "id"),
+        wallet:     Map.get(m, "wallet"),
+        url:        Map.get(m, "url"),
+        events:     Map.get(m, "events") || [],
+        chains:     Map.get(m, "chains") || [],
+        active:     Map.get(m, "active") == true,
+        created_at: Map.get(m, "created_at"),
+        updated_at: Map.get(m, "updated_at")
+      }
+    end
+  end
+
   defmodule TransactionList do
     @moduledoc "Paginated list of transactions."
     @enforce_keys [:items, :total, :limit, :offset]

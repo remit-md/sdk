@@ -291,6 +291,19 @@ module Remitmd
       Intent.new(@transport.post("/intents", body))
     end
 
+    # ─── Webhooks ─────────────────────────────────────────────────────────────
+
+    # Register a webhook endpoint to receive event notifications.
+    # @param url [String] the HTTPS endpoint that will receive POST notifications
+    # @param events [Array<String>] event types to subscribe to (e.g. ["payment.sent", "escrow.funded"])
+    # @param chains [Array<String>, nil] optional chain names to filter by
+    # @return [Webhook]
+    def register_webhook(url, events, chains: nil)
+      body = { url: url, events: events }
+      body[:chains] = chains if chains
+      Webhook.new(@transport.post("/webhooks", body))
+    end
+
     # ─── One-time operator links ───────────────────────────────────────────────
 
     # Generate a one-time URL for the operator to fund this wallet.

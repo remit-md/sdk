@@ -155,9 +155,7 @@ def test_parse_task_completed():
         "result": {
             "id": "task_abc123",
             "status": {"state": "completed"},
-            "artifacts": [
-                {"parts": [{"kind": "data", "data": {"txHash": "0xdeadbeef"}}]}
-            ],
+            "artifacts": [{"parts": [{"kind": "data", "data": {"txHash": "0xdeadbeef"}}]}],
         }
     }
     task = _parse_task(data)

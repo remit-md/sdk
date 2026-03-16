@@ -15,13 +15,18 @@ concurrency:
 jobs:
   python-compliance:
     name: Python Compliance (real server)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read   # required to pull ghcr.io/remit-md/server from private registry
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -63,13 +68,23 @@ jobs:
 
   typescript-compliance:
     name: TypeScript Compliance (real server)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 'latest'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: typescript/pnpm-lock.yaml
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -111,13 +126,18 @@ jobs:
 
   go-compliance:
     name: Go Compliance (real server)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: go/go.sum
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -159,13 +179,22 @@ jobs:
 
   java-compliance:
     name: Java Compliance (real server)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -203,13 +232,19 @@ jobs:
 
   ruby-compliance:
     name: Ruby Compliance (real server)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: ruby
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -231,9 +266,6 @@ jobs:
           echo "Server is healthy"
           curl -sf http://localhost:3000/health | python3 -m json.tool
 
-      - name: Install dependencies
-        run: cd ruby && bundle install
-
       - name: Run Ruby compliance tests
         env:
           REMIT_TEST_SERVER_URL: http://localhost:3000
@@ -250,13 +282,19 @@ jobs:
 
   rust-compliance:
     name: Rust Compliance (real server)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -294,13 +332,17 @@ jobs:
 
   dotnet-compliance:
     name: .NET Compliance (real server)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -341,13 +383,18 @@ jobs:
 
   elixir-compliance:
     name: Elixir Compliance (real server)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.16'
+          otp-version: '26'
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

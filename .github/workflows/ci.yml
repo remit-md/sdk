@@ -13,10 +13,13 @@ concurrency:
 jobs:
   python:
     name: SDK Python
-    runs-on: [self-hosted, linux, x64]
-    # Python 3.12 + pip are pre-installed on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
       - name: Install dependencies
         run: cd python && pip install -e ".[dev]"
       - name: Lint
@@ -31,10 +34,17 @@ jobs:
 
   typescript:
     name: SDK TypeScript
-    runs-on: [self-hosted, linux, x64]
-    # Node.js 20 + pnpm are pre-installed on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 'latest'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: typescript/pnpm-lock.yaml
       - name: Install
         run: cd typescript && pnpm install --frozen-lockfile
       - name: Typecheck
@@ -47,10 +57,13 @@ jobs:
 
   go:
     name: SDK Go
-    runs-on: [self-hosted, linux, x64]
-    # Go 1.22 is pre-installed on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: go/go.sum
       - name: Tidy modules
         run: cd go && go mod tidy
       - name: Vet
@@ -64,10 +77,18 @@ jobs:
 
   rust:
     name: SDK Rust
-    runs-on: [self-hosted, linux, x64]
-    # Rust stable + clippy + rustfmt + cargo-llvm-cov are pre-installed on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
       - name: Format check
         run: cd rust && cargo fmt --check
       - name: Clippy
@@ -78,10 +99,12 @@ jobs:
 
   dotnet:
     name: SDK .NET
-    runs-on: [self-hosted, linux, x64]
-    # .NET 8.0 SDK is pre-installed on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
       - name: Restore
         run: cd dotnet && dotnet restore
       - name: Build
@@ -93,10 +116,16 @@ jobs:
 
   java:
     name: SDK Java/Kotlin
-    runs-on: [self-hosted, linux, x64]
-    # Java 17 Temurin + Gradle are pre-installed on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
       # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
       # jacocoTestCoverageVerification fails the build if line coverage < 35%.
       # Single build+test step avoids double compilation.
@@ -105,12 +134,14 @@ jobs:
 
   ruby:
     name: SDK Ruby
-    runs-on: [self-hosted, linux, x64]
-    # Ruby 3.2 + bundler are pre-installed on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: cd ruby && bundle install
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: ruby
       - name: RuboCop
         run: cd ruby && bundle exec rubocop -A --no-color && bundle exec rubocop --no-color
       # Coverage gate: target 50% (MASTER.md); initial gate 35% via SimpleCov in spec_helper.rb.
@@ -121,7 +152,6 @@ jobs:
   swift:
     name: SDK Swift
     runs-on: macos-latest
-    # macOS runners are Swift-only across SDK workflows (10× cost). See CI Cost Policy.
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -144,10 +174,13 @@ jobs:
 
   elixir:
     name: SDK Elixir
-    runs-on: [self-hosted, linux, x64]
-    # Erlang/OTP 26 + Elixir 1.16 are pre-installed on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.16'
+          otp-version: '26'
       - name: Install dependencies
         run: cd elixir && mix deps.get
       - name: Compile

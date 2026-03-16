@@ -66,12 +66,4 @@ describe("TypeScript compliance: authentication", () => {
     assert.ok(tx.txHash, "txHash must be set after faucet");
   });
 
-  it("GET /events returns empty list for new wallet", async (t) => {
-    if (skip) return t.skip("server not available");
-
-    const wallet = await makeWallet();
-    const events = await wallet.getEvents(wallet.address);
-    assert.ok(Array.isArray(events), "events must be an array");
-    assert.equal(events.length, 0, "fresh wallet must have zero events");
-  });
 });

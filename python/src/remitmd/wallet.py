@@ -20,6 +20,30 @@ from remitmd.models.tab import Tab
 from remitmd.signer import PrivateKeySigner, Signer
 
 
+class PermitSignature:
+    """EIP-2612 permit signature for gasless USDC approval."""
+
+    __slots__ = ("value", "deadline", "v", "r", "s")
+
+    def __init__(self, value: int, deadline: int, v: int, r: str, s: str) -> None:
+        self.value = value
+        self.deadline = deadline
+        self.v = v
+        self.r = r
+        self.s = s
+
+    def to_dict(self) -> dict[str, object]:
+        return {"value": self.value, "deadline": self.deadline, "v": self.v, "r": self.r, "s": self.s}
+
+
+# Default USDC contract addresses per chain.
+USDC_ADDRESSES: dict[str, str] = {
+    "base-sepolia": "0xb6302F6aF30bA13d51CEd27ACF0279AD3c4e4497",
+    "base": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+}
+
+
 class Wallet(RemitClient):
     """
     Full remit.md wallet with signing capability.
@@ -53,6 +77,7 @@ class Wallet(RemitClient):
         chain_id, url = get_chain_config(chain, testnet, api_url)
         self.chain = chain
         self.testnet = testnet
+        self._chain_id = chain_id
 
         # Router contract address for EIP-712 domain — must match server's ROUTER_ADDRESS.
         verifying_contract = router_address or os.environ.get("REMITMD_ROUTER_ADDRESS", "")
@@ -89,6 +114,62 @@ class Wallet(RemitClient):
     def address(self) -> str:
         """Checksummed Ethereum address for this wallet."""
         return self._signer.get_address()
+
+    # ─── EIP-2612 Permit ─────────────────────────────────────────────────────
+
+    async def sign_usdc_permit(
+        self,
+        spender: str,
+        value: int,
+        deadline: int,
+        nonce: int = 0,
+        usdc_address: str | None = None,
+    ) -> PermitSignature:
+        """Sign an EIP-2612 permit for USDC approval.
+
+        Args:
+            spender: Contract address that will be approved.
+            value: Amount in USDC base units (6 decimals).
+            deadline: Permit deadline (Unix timestamp).
+            nonce: Current permit nonce for this wallet (default: 0).
+            usdc_address: Override the USDC contract address.
+
+        Returns:
+            A PermitSignature that can be passed to post_bounty() or place_deposit().
+        """
+        usdc_addr = usdc_address or USDC_ADDRESSES.get(self.chain, "")
+
+        domain = {
+            "name": "USD Coin",
+            "version": "2",
+            "chainId": self._chain_id,
+            "verifyingContract": usdc_addr,
+        }
+        types = {
+            "Permit": [
+                {"name": "owner", "type": "address"},
+                {"name": "spender", "type": "address"},
+                {"name": "value", "type": "uint256"},
+                {"name": "nonce", "type": "uint256"},
+                {"name": "deadline", "type": "uint256"},
+            ],
+        }
+        message = {
+            "owner": self.address,
+            "spender": spender,
+            "value": str(value),
+            "nonce": nonce,
+            "deadline": deadline,
+        }
+
+        sig = await self._signer.sign_typed_data(domain, types, message)
+        sig_hex = sig if sig.startswith("0x") else f"0x{sig}"
+        sig_bytes = sig_hex[2:]
+        r = f"0x{sig_bytes[:64]}"
+        s = f"0x{sig_bytes[64:128]}"
+        v = int(sig_bytes[128:130], 16)
+
+        return PermitSignature(value=value, deadline=deadline, v=v, r=r, s=s)
 
     # ─── Direct payment ───────────────────────────────────────────────────────
 
@@ -233,18 +314,19 @@ class Wallet(RemitClient):
         deadline: int,
         validation: str = "poster",
         max_attempts: int = 10,
+        permit: PermitSignature | None = None,
     ) -> Bounty:
-        data = await self._http.post(
-            "/api/v0/bounties",
-            {
-                "chain": self.chain,
-                "amount": amount,
-                "task": task,
-                "deadline": deadline,
-                "validation": validation,
-                "max_attempts": max_attempts,
-            },
-        )
+        body: dict[str, Any] = {
+            "chain": self.chain,
+            "amount": amount,
+            "task": task,
+            "deadline": deadline,
+            "validation": validation,
+            "max_attempts": max_attempts,
+        }
+        if permit is not None:
+            body["permit"] = permit.to_dict()
+        data = await self._http.post("/api/v0/bounties", body)
         return Bounty.model_validate(data)
 
     async def submit_bounty(self, bounty_id: str, evidence_uri: str) -> Transaction:
@@ -263,11 +345,17 @@ class Wallet(RemitClient):
 
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
-    async def place_deposit(self, to: str, amount: float, expires: int) -> Deposit:
-        data = await self._http.post(
-            "/api/v0/deposits",
-            {"to": to, "amount": amount, "expires": expires},
-        )
+    async def place_deposit(
+        self,
+        to: str,
+        amount: float,
+        expires: int,
+        permit: PermitSignature | None = None,
+    ) -> Deposit:
+        body: dict[str, Any] = {"to": to, "amount": amount, "expires": expires}
+        if permit is not None:
+            body["permit"] = permit.to_dict()
+        data = await self._http.post("/api/v0/deposits", body)
         return Deposit.model_validate(data)
 
     # ─── Events ───────────────────────────────────────────────────────────────

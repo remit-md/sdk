@@ -29,6 +29,8 @@ export type {
   OpenStreamOptions,
   PostBountyOptions,
   PlaceDepositOptions,
+  PermitSignature,
+  SignPermitOptions,
 } from "./wallet.js";
 
 // Signers

@@ -41,18 +41,45 @@ export interface OpenStreamOptions {
   maxTotal?: number;
 }
 
+/** EIP-2612 permit signature for gasless USDC approval. */
+export interface PermitSignature {
+  value: number;
+  deadline: number;
+  v: number;
+  r: string;
+  s: string;
+}
+
+/** Options for signing an EIP-2612 USDC permit. */
+export interface SignPermitOptions {
+  /** Contract address that will be approved as spender. */
+  spender: string;
+  /** Amount in USDC base units (6 decimals). */
+  value: bigint;
+  /** Permit deadline (Unix timestamp). */
+  deadline: number;
+  /** Current permit nonce for this wallet (default: 0). */
+  nonce?: number;
+  /** USDC contract address (defaults to Base Sepolia MockUSDC). */
+  usdcAddress?: string;
+}
+
 export interface PostBountyOptions {
   amount: number;
   task: string;
   deadline: number; // unix timestamp
   validation?: "poster" | "oracle" | "multisig";
   maxAttempts?: number;
+  /** Optional EIP-2612 permit for gasless USDC approval. */
+  permit?: PermitSignature;
 }
 
 export interface PlaceDepositOptions {
   to: string;
   amount: number;
   expires: number; // seconds
+  /** Optional EIP-2612 permit for gasless USDC approval. */
+  permit?: PermitSignature;
 }
 
 export class Wallet extends RemitClient {
@@ -112,6 +139,64 @@ export class Wallet extends RemitClient {
 
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return `Wallet { address: '${this.address}', chain: '${this._chain}' }`;
+  }
+
+  // ─── EIP-2612 Permit ─────────────────────────────────────────────────────────
+
+  /** Default USDC addresses per chain. */
+  static readonly USDC_ADDRESSES: Record<string, string> = {
+    "base-sepolia": "0xb6302F6aF30bA13d51CEd27ACF0279AD3c4e4497",
+    base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    localhost: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  };
+
+  /**
+   * Sign an EIP-2612 permit for USDC approval.
+   * Returns a PermitSignature object that can be passed to postBounty() or placeDeposit().
+   */
+  async signUsdcPermit(options: SignPermitOptions): Promise<PermitSignature> {
+    const usdcAddress = options.usdcAddress ?? Wallet.USDC_ADDRESSES[this._chain] ?? "";
+
+    const domain = {
+      name: "USD Coin",
+      version: "2",
+      chainId: this._chainId,
+      verifyingContract: usdcAddress,
+    };
+
+    const types = {
+      Permit: [
+        { name: "owner", type: "address" },
+        { name: "spender", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" },
+      ],
+    };
+
+    const value = {
+      owner: this.address,
+      spender: options.spender,
+      value: options.value.toString(),
+      nonce: options.nonce ?? 0,
+      deadline: options.deadline,
+    };
+
+    const sig = await this.#signer.signTypedData(domain, types, value);
+
+    // Split signature into v, r, s
+    const sigBytes = sig.startsWith("0x") ? sig.slice(2) : sig;
+    const r = `0x${sigBytes.slice(0, 64)}`;
+    const s = `0x${sigBytes.slice(64, 128)}`;
+    const v = parseInt(sigBytes.slice(128, 130), 16);
+
+    return {
+      value: Number(options.value),
+      deadline: options.deadline,
+      v,
+      r,
+      s,
+    };
   }
 
   // ─── Direct Payment ─────────────────────────────────────────────────────────
@@ -216,6 +301,7 @@ export class Wallet extends RemitClient {
       deadline: options.deadline,
       validation: options.validation ?? "poster",
       maxAttempts: options.maxAttempts ?? 10,
+      ...(options.permit ? { permit: options.permit } : {}),
     });
   }
 
@@ -234,6 +320,7 @@ export class Wallet extends RemitClient {
       to: options.to,
       amount: options.amount,
       expires: options.expires,
+      ...(options.permit ? { permit: options.permit } : {}),
     });
   }
 

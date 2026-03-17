@@ -4,12 +4,14 @@ import assert from "node:assert/strict";
 import { X402Paywall } from "../src/provider.js";
 
 const WALLET = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+const ROUTER = "0x887536bD817B758f99F090a80F48032a24f50916";
 const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 const NETWORK = "eip155:31337";
 
 function makePaywall(overrides: Partial<ConstructorParameters<typeof X402Paywall>[0]> = {}): X402Paywall {
   return new X402Paywall({
     walletAddress: WALLET,
+    routerAddress: ROUTER,
     amountUsdc: 0.001,
     network: NETWORK,
     asset: USDC,
@@ -82,7 +84,7 @@ describe("X402Paywall.paymentRequiredHeader", () => {
     assert.equal(payload.network, NETWORK);
     assert.equal(payload.amount, "5000"); // 0.005 USDC * 1_000_000
     assert.equal(payload.asset, USDC);
-    assert.equal(payload.payTo, WALLET);
+    assert.equal(payload.payTo, ROUTER);
     assert.ok(typeof payload.maxTimeoutSeconds === "number");
   });
 
@@ -204,7 +206,7 @@ describe("X402Paywall.check", () => {
   });
 
   it("omits Authorization header when no token", async () => {
-    const pw = new X402Paywall({ walletAddress: WALLET, amountUsdc: 0.001, network: NETWORK, asset: USDC });
+    const pw = new X402Paywall({ walletAddress: WALLET, routerAddress: ROUTER, amountUsdc: 0.001, network: NETWORK, asset: USDC });
     let capturedHeaders: Record<string, string> = {};
     const orig = globalThis.fetch;
     try {

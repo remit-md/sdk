@@ -10,6 +10,7 @@ Usage (FastAPI)::
 
     paywall = X402Paywall(
         wallet_address="0xYourProviderWallet",
+        router_address="0x887536bD817B758f99F090a80F48032a24f50916",
         amount_usdc=0.001,
         network="eip155:84532",
         asset="0x036CbD53842c5426634e7929541eC2318f3dCF7e",
@@ -55,7 +56,10 @@ class X402Paywall:
     ``PAYMENT-SIGNATURE`` headers by calling the remit.md facilitator.
 
     Args:
-        wallet_address: Provider's checksummed Ethereum address (``payTo``).
+        wallet_address: Provider's checksummed Ethereum address.
+        router_address: RemitRouter contract address. The agent signs the EIP-3009
+            authorization to this address. The Router deducts the protocol fee and
+            forwards the net amount to ``wallet_address``.
         amount_usdc: Price per request in USDC (e.g. ``0.001``).
         network: CAIP-2 network string (e.g. ``"eip155:84532"`` for Base Sepolia).
         asset: USDC contract address on the target network.
@@ -70,6 +74,7 @@ class X402Paywall:
     def __init__(
         self,
         wallet_address: str,
+        router_address: str,
         amount_usdc: float,
         network: str,
         asset: str,
@@ -81,6 +86,7 @@ class X402Paywall:
         mime_type: str | None = None,
     ) -> None:
         self._wallet_address = wallet_address
+        self._router_address = router_address
         self._amount_base_units = str(int(amount_usdc * 1_000_000))
         self._network = network
         self._asset = asset
@@ -98,7 +104,8 @@ class X402Paywall:
             "network": self._network,
             "amount": self._amount_base_units,
             "asset": self._asset,
-            "payTo": self._wallet_address,
+            "payTo": self._router_address,
+            "recipient": self._wallet_address,
             "maxTimeoutSeconds": self._max_timeout_seconds,
         }
         if self._resource is not None:
@@ -116,7 +123,8 @@ class X402Paywall:
             "network": self._network,
             "amount": self._amount_base_units,
             "asset": self._asset,
-            "payTo": self._wallet_address,
+            "payTo": self._router_address,
+            "recipient": self._wallet_address,
             "maxTimeoutSeconds": self._max_timeout_seconds,
         }
 

@@ -14,6 +14,7 @@ import (
 
 const (
 	_testWallet  = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+	_testRouter  = "0x887536bD817B758f99F090a80F48032a24f50916"
 	_testNetwork = "eip155:84532"
 	_testAsset   = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 )
@@ -22,6 +23,7 @@ func makePaywall(t *testing.T, opts ...func(*remitmd.PaywallOptions)) *remitmd.X
 	t.Helper()
 	o := remitmd.PaywallOptions{
 		WalletAddress: _testWallet,
+		RouterAddress: _testRouter,
 		AmountUsdc:    0.001,
 		Network:       _testNetwork,
 		Asset:         _testAsset,
@@ -80,21 +82,26 @@ func TestNewX402Paywall_Validation(t *testing.T) {
 	}{
 		{
 			name: "valid",
-			opts: remitmd.PaywallOptions{WalletAddress: _testWallet, AmountUsdc: 0.001, Network: _testNetwork, Asset: _testAsset},
+			opts: remitmd.PaywallOptions{WalletAddress: _testWallet, RouterAddress: _testRouter, AmountUsdc: 0.001, Network: _testNetwork, Asset: _testAsset},
 		},
 		{
 			name:    "missing wallet",
-			opts:    remitmd.PaywallOptions{AmountUsdc: 0.001, Network: _testNetwork, Asset: _testAsset},
+			opts:    remitmd.PaywallOptions{RouterAddress: _testRouter, AmountUsdc: 0.001, Network: _testNetwork, Asset: _testAsset},
+			wantErr: true,
+		},
+		{
+			name:    "missing router",
+			opts:    remitmd.PaywallOptions{WalletAddress: _testWallet, AmountUsdc: 0.001, Network: _testNetwork, Asset: _testAsset},
 			wantErr: true,
 		},
 		{
 			name:    "zero amount",
-			opts:    remitmd.PaywallOptions{WalletAddress: _testWallet, AmountUsdc: 0, Network: _testNetwork, Asset: _testAsset},
+			opts:    remitmd.PaywallOptions{WalletAddress: _testWallet, RouterAddress: _testRouter, AmountUsdc: 0, Network: _testNetwork, Asset: _testAsset},
 			wantErr: true,
 		},
 		{
 			name:    "missing network",
-			opts:    remitmd.PaywallOptions{WalletAddress: _testWallet, AmountUsdc: 0.001, Asset: _testAsset},
+			opts:    remitmd.PaywallOptions{WalletAddress: _testWallet, RouterAddress: _testRouter, AmountUsdc: 0.001, Asset: _testAsset},
 			wantErr: true,
 		},
 	}
@@ -128,8 +135,11 @@ func TestPaymentRequiredHeader_Structure(t *testing.T) {
 	if m["amount"] != "1000" { // 0.001 USDC * 1_000_000
 		t.Errorf("amount = %v, want 1000", m["amount"])
 	}
-	if m["payTo"] != _testWallet {
-		t.Errorf("payTo = %v, want %v", m["payTo"], _testWallet)
+	if m["payTo"] != _testRouter {
+		t.Errorf("payTo = %v, want %v", m["payTo"], _testRouter)
+	}
+	if m["recipient"] != _testWallet {
+		t.Errorf("recipient = %v, want %v", m["recipient"], _testWallet)
 	}
 }
 

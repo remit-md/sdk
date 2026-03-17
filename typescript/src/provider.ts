@@ -11,6 +11,7 @@
  *
  * const paywall = new X402Paywall({
  *   walletAddress: "0xYourProviderWallet",
+ *   routerAddress: "0x887536bD817B758f99F090a80F48032a24f50916",
  *   amountUsdc: 0.001,
  *   network: "eip155:84532",
  *   asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
@@ -41,8 +42,12 @@
 
 /** Configuration for {@link X402Paywall}. */
 export interface PaywallOptions {
-  /** Provider's checksummed Ethereum address (the `payTo` field). */
+  /** Provider's checksummed Ethereum address. */
   walletAddress: string;
+  /** RemitRouter contract address. The agent signs the EIP-3009 authorization to this address.
+   *  The Router deducts the protocol fee and forwards the net amount to `walletAddress`.
+   *  Required for fee-enforced x402 payments. */
+  routerAddress: string;
   /** Price per request in USDC (e.g. `0.001`). */
   amountUsdc: number;
   /** CAIP-2 network string (e.g. `"eip155:84532"` for Base Sepolia). */
@@ -73,6 +78,7 @@ export interface CheckResult {
 /** x402 paywall for service providers. */
 export class X402Paywall {
   readonly #walletAddress: string;
+  readonly #routerAddress: string;
   readonly #amountBaseUnits: string;
   readonly #network: string;
   readonly #asset: string;
@@ -85,6 +91,7 @@ export class X402Paywall {
 
   constructor({
     walletAddress,
+    routerAddress,
     amountUsdc,
     network,
     asset,
@@ -96,6 +103,7 @@ export class X402Paywall {
     mimeType,
   }: PaywallOptions) {
     this.#walletAddress = walletAddress;
+    this.#routerAddress = routerAddress;
     this.#amountBaseUnits = String(Math.round(amountUsdc * 1_000_000));
     this.#network = network;
     this.#asset = asset;
@@ -114,7 +122,8 @@ export class X402Paywall {
       network: this.#network,
       amount: this.#amountBaseUnits,
       asset: this.#asset,
-      payTo: this.#walletAddress,
+      payTo: this.#routerAddress,
+      recipient: this.#walletAddress,
       maxTimeoutSeconds: this.#maxTimeoutSeconds,
     };
     if (this.#resource !== undefined) payload["resource"] = this.#resource;
@@ -129,7 +138,8 @@ export class X402Paywall {
       network: this.#network,
       amount: this.#amountBaseUnits,
       asset: this.#asset,
-      payTo: this.#walletAddress,
+      payTo: this.#routerAddress,
+      recipient: this.#walletAddress,
       maxTimeoutSeconds: this.#maxTimeoutSeconds,
     };
   }

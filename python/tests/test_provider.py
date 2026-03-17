@@ -11,6 +11,7 @@ import pytest
 from remitmd.provider import X402Paywall
 
 _WALLET = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+_ROUTER = "0x887536bD817B758f99F090a80F48032a24f50916"
 _USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 _NETWORK = "eip155:31337"
 
@@ -18,6 +19,7 @@ _NETWORK = "eip155:31337"
 def _make_paywall(**kwargs: object) -> X402Paywall:
     return X402Paywall(
         wallet_address=_WALLET,
+        router_address=kwargs.pop("router_address", _ROUTER),  # type: ignore[arg-type]
         amount_usdc=kwargs.pop("amount_usdc", 0.001),  # type: ignore[arg-type]
         network=kwargs.pop("network", _NETWORK),  # type: ignore[arg-type]
         asset=kwargs.pop("asset", _USDC),  # type: ignore[arg-type]
@@ -43,6 +45,7 @@ def test_paywall_repr() -> None:
 def test_amount_converted_to_base_units() -> None:
     pw = X402Paywall(
         wallet_address=_WALLET,
+        router_address=_ROUTER,
         amount_usdc=0.001,
         network=_NETWORK,
         asset=_USDC,
@@ -63,7 +66,8 @@ def test_payment_required_header_structure() -> None:
     assert payload["network"] == _NETWORK
     assert payload["amount"] == "5000"  # 0.005 USDC
     assert payload["asset"] == _USDC
-    assert payload["payTo"] == _WALLET
+    assert payload["payTo"] == _ROUTER
+    assert payload["recipient"] == _WALLET
     assert isinstance(payload["maxTimeoutSeconds"], int)
 
 
@@ -72,6 +76,7 @@ def test_payment_required_header_v2_fields() -> None:
 
     pw = X402Paywall(
         wallet_address=_WALLET,
+        router_address=_ROUTER,
         amount_usdc=0.001,
         network=_NETWORK,
         asset=_USDC,
@@ -171,7 +176,7 @@ async def test_check_calls_facilitator_and_returns_valid() -> None:
     call_kwargs = mock_client.post.call_args
     assert "/api/v0/x402/verify" in call_kwargs.args[0]
     body = call_kwargs.kwargs["json"]
-    assert body["paymentRequired"]["payTo"] == _WALLET
+    assert body["paymentRequired"]["payTo"] == _ROUTER
     assert body["paymentRequired"]["amount"] == "1000"
     assert body["paymentRequired"]["network"] == _NETWORK
     assert call_kwargs.kwargs["headers"].get("Authorization") == "Bearer test-token"
@@ -221,6 +226,7 @@ async def test_check_returns_facilitator_error_on_exception() -> None:
 async def test_check_omits_auth_header_when_no_token() -> None:
     pw = X402Paywall(
         wallet_address=_WALLET,
+        router_address=_ROUTER,
         amount_usdc=0.001,
         network=_NETWORK,
         asset=_USDC,

@@ -30,6 +30,7 @@ import (
 //	http.Handle("/v1/data", paywall.Middleware()(yourHandler))
 type X402Paywall struct {
 	walletAddress    string
+	routerAddress    string
 	amountBaseUnits  string
 	network          string
 	asset            string
@@ -44,8 +45,12 @@ type X402Paywall struct {
 
 // PaywallOptions configures an [X402Paywall].
 type PaywallOptions struct {
-	// WalletAddress is the provider's checksummed Ethereum address (payTo).
+	// WalletAddress is the provider's checksummed Ethereum address.
 	WalletAddress string
+	// RouterAddress is the RemitRouter contract address. The agent signs the
+	// EIP-3009 authorization to this address. The Router deducts the protocol
+	// fee and forwards the net amount to WalletAddress.
+	RouterAddress string
 	// AmountUsdc is the price per request in USDC (e.g. 0.001).
 	AmountUsdc float64
 	// Network is the CAIP-2 network string (e.g. "eip155:84532" for Base Sepolia).
@@ -71,6 +76,9 @@ func NewX402Paywall(opts PaywallOptions) (*X402Paywall, error) {
 	if opts.WalletAddress == "" {
 		return nil, fmt.Errorf("remitmd: WalletAddress is required")
 	}
+	if opts.RouterAddress == "" {
+		return nil, fmt.Errorf("remitmd: RouterAddress is required")
+	}
 	if opts.AmountUsdc <= 0 {
 		return nil, fmt.Errorf("remitmd: AmountUsdc must be positive")
 	}
@@ -95,6 +103,7 @@ func NewX402Paywall(opts PaywallOptions) (*X402Paywall, error) {
 
 	return &X402Paywall{
 		walletAddress:    opts.WalletAddress,
+		routerAddress:    opts.RouterAddress,
 		amountBaseUnits:  fmt.Sprintf("%d", baseUnits),
 		network:          opts.Network,
 		asset:            opts.Asset,
@@ -115,7 +124,8 @@ func (p *X402Paywall) PaymentRequiredHeader() string {
 		"network":           p.network,
 		"amount":            p.amountBaseUnits,
 		"asset":             p.asset,
-		"payTo":             p.walletAddress,
+		"payTo":             p.routerAddress,
+		"recipient":         p.walletAddress,
 		"maxTimeoutSeconds": p.maxTimeoutSecs,
 	}
 	if p.resource != "" {
@@ -163,7 +173,8 @@ func (p *X402Paywall) Check(ctx context.Context, sig string) (CheckResult, error
 			"network":           p.network,
 			"amount":            p.amountBaseUnits,
 			"asset":             p.asset,
-			"payTo":             p.walletAddress,
+			"payTo":             p.routerAddress,
+			"recipient":         p.walletAddress,
 			"maxTimeoutSeconds": p.maxTimeoutSecs,
 		},
 	}

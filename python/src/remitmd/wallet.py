@@ -41,7 +41,7 @@ class PermitSignature:
 
 # Default USDC contract addresses per chain.
 USDC_ADDRESSES: dict[str, str] = {
-    "base-sepolia": "0xBcD1e2B4e483B6A30313Fa7EC2a10E09A97fbED5",
+    "base-sepolia": "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
     "base": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
 }

@@ -33,7 +33,10 @@ class PermitSignature:
         self.s = s
 
     def to_dict(self) -> dict[str, object]:
-        return {"value": self.value, "deadline": self.deadline, "v": self.v, "r": self.r, "s": self.s}
+        return {
+            "value": self.value, "deadline": self.deadline,
+            "v": self.v, "r": self.r, "s": self.s,
+        }
 
 
 # Default USDC contract addresses per chain.

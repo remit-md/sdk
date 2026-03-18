@@ -16,7 +16,7 @@ import type {
 } from "./models/index.js";
 import type { Invoice } from "./models/invoice.js";
 import type { Escrow } from "./models/escrow.js";
-import type { Tab } from "./models/tab.js";
+import type { Tab, TabCharge } from "./models/tab.js";
 import type { Stream } from "./models/stream.js";
 import type { Bounty } from "./models/bounty.js";
 import type { Deposit } from "./models/deposit.js";
@@ -43,6 +43,21 @@ export interface OpenTabOptions {
   expires?: number; // seconds
   /** Optional EIP-2612 permit for gasless USDC approval. */
   permit?: PermitSignature;
+}
+
+export interface CloseTabOptions {
+  /** Final charged amount in USDC. Defaults to 0 (full refund). */
+  finalAmount?: number;
+  /** Provider's EIP-712 TabCharge signature covering the final state. */
+  providerSig?: string;
+}
+
+export interface ChargeTabOptions {
+  amount: number;
+  cumulative: number;
+  callCount: number;
+  /** Provider's EIP-712 TabCharge signature. */
+  providerSig: string;
 }
 
 export interface OpenStreamOptions {
@@ -93,6 +108,18 @@ export interface PlaceDepositOptions {
   expires: number; // seconds
   /** Optional EIP-2612 permit for gasless USDC approval. */
   permit?: PermitSignature;
+}
+
+/**
+ * Convert a UUID string to bytes32 matching the server's id_to_bytes32().
+ * Encodes the UUID's UTF-8 bytes, left-aligned, zero-padded to 32.
+ */
+function uuidToBytes32(uuid: string): `0x${string}` {
+  const padded = new Uint8Array(32);
+  for (let i = 0; i < Math.min(uuid.length, 32); i++) {
+    padded[i] = uuid.charCodeAt(i);
+  }
+  return ("0x" + Array.from(padded, (b) => b.toString(16).padStart(2, "0")).join("")) as `0x${string}`;
 }
 
 export class Wallet extends RemitClient {
@@ -332,10 +359,49 @@ export class Wallet extends RemitClient {
     });
   }
 
-  closeTab(tabId: string): Promise<Transaction> {
+  /** Sign a TabCharge EIP-712 message (provider-side, for charging or closing a tab). */
+  async signTabCharge(
+    tabContract: string,
+    tabId: string,
+    totalCharged: bigint,
+    callCount: number,
+  ): Promise<string> {
+    return this.#signer.signTypedData(
+      {
+        name: "RemitTab",
+        version: "1",
+        chainId: this._chainId,
+        verifyingContract: tabContract,
+      },
+      {
+        TabCharge: [
+          { name: "tabId", type: "bytes32" },
+          { name: "totalCharged", type: "uint96" },
+          { name: "callCount", type: "uint32" },
+        ],
+      },
+      {
+        tabId: uuidToBytes32(tabId),
+        totalCharged,
+        callCount,
+      },
+    );
+  }
+
+  /** Charge a tab (provider-side). Requires a TabCharge EIP-712 signature. */
+  chargeTab(tabId: string, options: ChargeTabOptions): Promise<TabCharge> {
+    return this.#auth.post<TabCharge>(`/tabs/${tabId}/charge`, {
+      amount: options.amount,
+      cumulative: options.cumulative,
+      call_count: options.callCount,
+      provider_sig: options.providerSig,
+    });
+  }
+
+  closeTab(tabId: string, options?: CloseTabOptions): Promise<Transaction> {
     return this.#auth.post<Transaction>(`/tabs/${tabId}/close`, {
-      final_amount: 0,
-      provider_sig: "0x",
+      final_amount: options?.finalAmount ?? 0,
+      provider_sig: options?.providerSig ?? "0x",
     });
   }
 

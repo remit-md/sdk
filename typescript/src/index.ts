@@ -26,6 +26,8 @@ export { Wallet } from "./wallet.js";
 export type {
   WalletOptions,
   OpenTabOptions,
+  CloseTabOptions,
+  ChargeTabOptions,
   OpenStreamOptions,
   PostBountyOptions,
   PlaceDepositOptions,

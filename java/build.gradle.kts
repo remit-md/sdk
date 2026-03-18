@@ -52,8 +52,21 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("acceptance")
+    }
     finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.register<Test>("acceptanceTest") {
+    useJUnitPlatform {
+        includeTags("acceptance")
+    }
+    testLogging {
+        events("passed", "failed", "skipped", "standard_out", "standard_error")
+        showExceptions = true
+        showStandardStreams = true
+    }
 }
 
 tasks.jacocoTestReport {

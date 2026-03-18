@@ -190,6 +190,11 @@ public class Wallet {
         return client.get("/api/v0/escrows/" + escrowId, Escrow.class);
     }
 
+    /** Signals the provider has started work on an escrow. */
+    public Escrow claimStart(String escrowId) {
+        return client.post("/api/v0/escrows/" + escrowId + "/claim_start", null, Escrow.class);
+    }
+
     // ─── Tab ──────────────────────────────────────────────────────────────────
 
     /**

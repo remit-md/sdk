@@ -15,6 +15,7 @@ on:
           - python
           - go
           - rust
+          - java
         default: all
 
 jobs:
@@ -118,3 +119,34 @@ jobs:
           ACCEPTANCE_API_URL: https://remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture
+
+  java:
+    name: Java SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'java'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: java
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: gradle acceptanceTest --no-daemon

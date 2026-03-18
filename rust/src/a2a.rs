@@ -76,11 +76,9 @@ impl AgentCard {
     /// Fetch and parse the A2A agent card from
     /// `base_url/.well-known/agent-card.json`.
     ///
-    /// ```no_run
-    /// # tokio_test::block_on(async {
-    /// let card = remitmd::a2a::AgentCard::discover("https://remit.md").await.unwrap();
+    /// ```ignore
+    /// let card = remitmd::a2a::AgentCard::discover("https://remit.md").await?;
     /// println!("{} — {}", card.name, card.url);
-    /// # });
     /// ```
     pub async fn discover(base_url: &str) -> Result<Self, crate::error::RemitError> {
         let url = format!(

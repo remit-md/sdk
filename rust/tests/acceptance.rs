@@ -60,7 +60,10 @@ fn create_test_wallet(router: &str) -> TestWallet {
         .build()
         .expect("build wallet");
 
-    TestWallet { wallet, signing_key }
+    TestWallet {
+        wallet,
+        signing_key,
+    }
 }
 
 // ─── On-chain balance via RPC ────────────────────────────────────────────────
@@ -179,8 +182,9 @@ fn sign_usdc_permit(
     let domain_sep = keccak256(&domain_data);
 
     // Permit struct hash
-    let permit_type_hash =
-        keccak256(b"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    let permit_type_hash = keccak256(
+        b"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)",
+    );
 
     let mut struct_data = [0u8; 192]; // 6 × 32
     struct_data[0..32].copy_from_slice(&permit_type_hash);
@@ -200,9 +204,7 @@ fn sign_usdc_permit(
     let digest = keccak256(&final_data);
 
     // Sign with k256
-    let (sig, recovery_id) = key
-        .sign_prehash_recoverable(&digest)
-        .expect("sign permit");
+    let (sig, recovery_id) = key.sign_prehash_recoverable(&digest).expect("sign permit");
     let sig_bytes = sig.to_bytes();
     let v = recovery_id.to_byte() + 27;
 
@@ -253,7 +255,12 @@ async fn acceptance_pay_direct_with_permit() {
 
     let tx = agent
         .wallet
-        .pay_full(provider.wallet.address(), Decimal::from_str("1.0").unwrap(), "rust-sdk-acceptance", Some(permit))
+        .pay_full(
+            provider.wallet.address(),
+            Decimal::from_str("1.0").unwrap(),
+            "rust-sdk-acceptance",
+            Some(permit),
+        )
         .await
         .expect("pay_full");
     assert!(

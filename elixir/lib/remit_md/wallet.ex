@@ -20,8 +20,9 @@ defmodule RemitMd.Wallet do
 
   alias RemitMd.{Error, Http, MockRemit, MockSigner, PrivateKeySigner}
   alias RemitMd.Models.{
-    Balance, Bounty, Budget, ContractAddresses, Escrow, MintResponse, PermitSignature,
-    Reputation, SpendingSummary, Stream, Tab, Transaction, TransactionList, Webhook
+    Balance, Bounty, BountySubmission, Budget, ContractAddresses, Deposit, Escrow,
+    MintResponse, PermitSignature, Reputation, SpendingSummary, Stream, Tab, TabCharge,
+    Transaction, TransactionList, Webhook
   }
 
   @min_amount Decimal.new("0.000001")
@@ -278,6 +279,20 @@ defmodule RemitMd.Wallet do
     end
   end
 
+  @doc "Provider claims start on an escrow (begins the escrow timer)."
+  def claim_start(%__MODULE__{} = w, escrow_id) do
+    with {:ok, data} <- do_call(w, :post, "/escrows/#{escrow_id}/claim-start", %{}) do
+      {:ok, Escrow.from_map(data)}
+    end
+  end
+
+  @doc "Release an escrow, transferring funds to the provider."
+  def release_escrow(%__MODULE__{} = w, escrow_id) do
+    with {:ok, data} <- do_call(w, :post, "/escrows/#{escrow_id}/release", %{}) do
+      {:ok, Escrow.from_map(data)}
+    end
+  end
+
   @doc "Cancel an escrow and return funds to payer."
   def cancel_escrow(%__MODULE__{} = w, escrow_id) do
     with {:ok, data} <- call_mock_or_http(w, fn pid ->
@@ -290,23 +305,36 @@ defmodule RemitMd.Wallet do
   end
 
   @doc """
-  Open an off-chain tab (batch payment channel).
+  Create a metered tab (batch payment channel).
+
+  ## Parameters
+
+  - `provider` — 0x-prefixed provider address
+  - `limit_amount` — maximum tab limit (string USDC, e.g. `"10.00"`)
+  - `per_unit` — cost per unit/call (string USDC, e.g. `"0.10"`)
 
   ## Options
 
-  - `:credit_limit_usdc` — maximum balance before mandatory settlement
-  - `:expires_in` — seconds until tab expires (default: 30 days)
+  - `:expires_in` — seconds from now until tab expires (default: 1 day)
+  - `:permit` — `%PermitSignature{}` for gasless approval
 
   ## Example
 
-      {:ok, tab} = RemitMd.Wallet.open_tab(wallet, "0xLLMProvider", "100.00")
+      {:ok, tab} = RemitMd.Wallet.create_tab(wallet, "0xProvider", "10.00", "0.10")
   """
-  def open_tab(%__MODULE__{} = w, to, credit_limit_usdc, opts \\ []) do
-    with :ok <- validate_address(to),
-         :ok <- validate_amount(credit_limit_usdc) do
-      expires_in = Keyword.get(opts, :expires_in, 30 * 86_400)
+  def create_tab(%__MODULE__{} = w, provider, limit_amount, per_unit, opts \\ []) do
+    with :ok <- validate_address(provider),
+         :ok <- validate_amount(limit_amount) do
+      expires_in = Keyword.get(opts, :expires_in, 86_400)
+      expiry = :os.system_time(:second) + expires_in
 
-      body = %{chain: w.chain, to: to, credit_limit_usdc: credit_limit_usdc, expires_in: expires_in}
+      body = %{
+        chain: w.chain,
+        provider: provider,
+        limit_amount: limit_amount,
+        per_unit: per_unit,
+        expiry: expiry
+      }
       body = maybe_add_permit(body, opts)
 
       with {:ok, data} <- do_call(w, :post, "/tabs", body) do
@@ -315,41 +343,120 @@ defmodule RemitMd.Wallet do
     end
   end
 
-  @doc "Debit an open tab (off-chain micro-payment)."
-  def debit_tab(%__MODULE__{} = w, tab_id, amount_usdc, opts \\ []) do
-    with :ok <- validate_amount(amount_usdc) do
-      body = %{amount_usdc: amount_usdc, description: Keyword.get(opts, :description)}
+  @doc """
+  Charge a tab with an EIP-712 TabCharge signature (provider-side).
 
-      with {:ok, data} <- do_call(w, :post, "/tabs/#{tab_id}/charge", body) do
-        {:ok, data}
-      end
+  ## Parameters
+
+  - `tab_id` — tab UUID
+  - `amount` — charge amount (number)
+  - `cumulative` — cumulative total charged so far (number)
+  - `call_count` — total number of charges (integer)
+  - `provider_sig` — EIP-712 TabCharge signature from `sign_tab_charge/4`
+  """
+  def charge_tab(%__MODULE__{} = w, tab_id, amount, cumulative, call_count, provider_sig) do
+    body = %{
+      amount: amount,
+      cumulative: cumulative,
+      call_count: call_count,
+      provider_sig: provider_sig
+    }
+
+    with {:ok, data} <- do_call(w, :post, "/tabs/#{tab_id}/charge", body) do
+      {:ok, TabCharge.from_map(data)}
     end
   end
 
-  @doc "Settle a tab (triggers on-chain USDC transfer for the accumulated balance)."
-  def settle_tab(%__MODULE__{} = w, tab_id) do
-    with {:ok, data} <- do_call(w, :post, "/tabs/#{tab_id}/close", %{}) do
+  @doc """
+  Close a tab with final settlement.
+
+  ## Options
+
+  - `:final_amount` — final settlement amount (number, default 0)
+  - `:provider_sig` — provider's EIP-712 signature (default "0x")
+  """
+  def close_tab(%__MODULE__{} = w, tab_id, opts \\ []) do
+    final_amount = Keyword.get(opts, :final_amount, 0)
+    provider_sig = Keyword.get(opts, :provider_sig, "0x")
+
+    body = %{final_amount: final_amount, provider_sig: provider_sig}
+
+    with {:ok, data} <- do_call(w, :post, "/tabs/#{tab_id}/close", body) do
       {:ok, Tab.from_map(data)}
     end
   end
 
   @doc """
+  Sign a TabCharge EIP-712 message (provider-side).
+
+  ## Parameters
+
+  - `tab_contract` — Tab contract address (verifyingContract for the domain)
+  - `tab_id` — UUID of the tab (will be encoded as bytes32)
+  - `total_charged` — cumulative charged amount in USDC base units (integer, uint96)
+  - `call_count` — number of charges made (integer, uint32)
+
+  Returns a 0x-prefixed hex signature.
+  """
+  def sign_tab_charge(%__MODULE__{} = w, tab_contract, tab_id, total_charged, call_count) do
+    keccak = &RemitMd.Keccak.hash/1
+
+    # Domain separator: RemitTab
+    domain_type_hash =
+      keccak.("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+
+    name_hash = keccak.("RemitTab")
+    version_hash = keccak.("1")
+    chain_id_enc = <<chain_id(w)::unsigned-big-integer-size(256)>>
+    contract_enc = address_to_bytes32(tab_contract)
+
+    domain_separator =
+      keccak.(domain_type_hash <> name_hash <> version_hash <> chain_id_enc <> contract_enc)
+
+    # Struct hash: TabCharge(bytes32 tabId, uint96 totalCharged, uint32 callCount)
+    tab_charge_type_hash =
+      keccak.("TabCharge(bytes32 tabId,uint96 totalCharged,uint32 callCount)")
+
+    # Encode tab_id as bytes32: ASCII chars padded to 32 bytes
+    tab_id_bytes = String.slice(tab_id, 0, 32)
+    padded = tab_id_bytes <> :binary.copy(<<0>>, 32 - byte_size(tab_id_bytes))
+
+    total_enc = <<total_charged::unsigned-big-integer-size(256)>>
+    count_enc = <<call_count::unsigned-big-integer-size(256)>>
+
+    struct_hash = keccak.(tab_charge_type_hash <> padded <> total_enc <> count_enc)
+
+    # Final: keccak256(0x1901 || domainSeparator || structHash)
+    digest = keccak.(<<0x19, 0x01>> <> domain_separator <> struct_hash)
+
+    call_sign(w.signer, digest)
+  end
+
+  @doc """
   Start a payment stream (continuous USDC flow per second).
+
+  ## Parameters
+
+  - `payee` — 0x-prefixed recipient address
+  - `rate_per_second` — USDC per second (string, e.g. `"0.01"`)
+  - `max_total` — maximum total USDC for the stream (string, e.g. `"5.00"`)
 
   ## Options
 
-  - `:duration` — stream duration in seconds
+  - `:permit` — `%PermitSignature{}` for gasless approval
 
   ## Example
 
-      {:ok, stream} = RemitMd.Wallet.create_stream(wallet, "0xWorker", "0.001",
-        duration: 3_600)  # 1 hour at 0.001 USDC/s = 3.60 USDC total
+      {:ok, stream} = RemitMd.Wallet.create_stream(wallet, "0xWorker", "0.01", "5.00")
   """
-  def create_stream(%__MODULE__{} = w, to, rate_per_second_usdc, opts \\ []) do
-    with :ok <- validate_address(to),
-         :ok <- validate_amount(rate_per_second_usdc) do
-      duration = Keyword.get(opts, :duration)
-      body = %{chain: w.chain, to: to, rate_per_second_usdc: rate_per_second_usdc, duration: duration}
+  def create_stream(%__MODULE__{} = w, payee, rate_per_second, max_total, opts \\ []) do
+    with :ok <- validate_address(payee) do
+      body = %{
+        chain: w.chain,
+        payee: payee,
+        rate_per_second: rate_per_second,
+        max_total: max_total
+      }
       body = maybe_add_permit(body, opts)
 
       with {:ok, data} <- do_call(w, :post, "/streams", body) do
@@ -358,29 +465,41 @@ defmodule RemitMd.Wallet do
     end
   end
 
-  @doc "Stop a running payment stream."
-  def cancel_stream(%__MODULE__{} = w, stream_id) do
+  @doc "Close a running payment stream."
+  def close_stream(%__MODULE__{} = w, stream_id) do
     with {:ok, data} <- do_call(w, :post, "/streams/#{stream_id}/close", %{}) do
       {:ok, Stream.from_map(data)}
     end
   end
 
   @doc """
-  Post a bounty — any agent that completes the task earns the reward.
+  Create a bounty — any agent that completes the task earns the reward.
+
+  ## Parameters
+
+  - `amount` — reward amount (string USDC, e.g. `"5.00"`)
+  - `task_description` — description of the task
+  - `deadline` — unix timestamp when the bounty expires
+
+  ## Options
+
+  - `:max_attempts` — maximum number of submissions (default: 10)
+  - `:permit` — `%PermitSignature{}` for gasless approval
 
   ## Example
 
-      {:ok, bounty} = RemitMd.Wallet.post_bounty(wallet, "10.00",
-        description: "Summarize this 100-page PDF",
-        expires_in: 3600)
+      deadline = :os.system_time(:second) + 3600
+      {:ok, bounty} = RemitMd.Wallet.create_bounty(wallet, "10.00",
+        "Summarize this 100-page PDF", deadline)
   """
-  def post_bounty(%__MODULE__{} = w, amount_usdc, opts \\ []) do
-    with :ok <- validate_amount(amount_usdc) do
+  def create_bounty(%__MODULE__{} = w, amount, task_description, deadline, opts \\ []) do
+    with :ok <- validate_amount(amount) do
       body = %{
-        chain:       w.chain,
-        amount_usdc: amount_usdc,
-        description: Keyword.get(opts, :description),
-        expires_in:  Keyword.get(opts, :expires_in, 86_400)
+        chain:            w.chain,
+        amount:           amount,
+        task_description: task_description,
+        deadline:         deadline,
+        max_attempts:     Keyword.get(opts, :max_attempts, 10)
       }
       body = maybe_add_permit(body, opts)
 
@@ -390,14 +509,37 @@ defmodule RemitMd.Wallet do
     end
   end
 
-  @doc "Award a bounty to a specific winner."
-  def award_bounty(%__MODULE__{} = w, bounty_id, winner_address) do
-    with :ok <- validate_address(winner_address) do
-      body = %{winner: winner_address}
+  @doc """
+  Submit evidence for a bounty.
 
-      with {:ok, data} <- do_call(w, :post, "/bounties/#{bounty_id}/award", body) do
-        {:ok, Bounty.from_map(data)}
-      end
+  ## Parameters
+
+  - `bounty_id` — bounty UUID
+  - `evidence_hash` — 0x-prefixed keccak256 hash of the evidence
+
+  Returns `{:ok, %BountySubmission{}}`.
+  """
+  def submit_bounty(%__MODULE__{} = w, bounty_id, evidence_hash) do
+    body = %{evidence_hash: evidence_hash}
+
+    with {:ok, data} <- do_call(w, :post, "/bounties/#{bounty_id}/submit", body) do
+      {:ok, BountySubmission.from_map(data)}
+    end
+  end
+
+  @doc """
+  Award a bounty to a specific submission.
+
+  ## Parameters
+
+  - `bounty_id` — bounty UUID
+  - `submission_id` — integer ID of the winning submission
+  """
+  def award_bounty(%__MODULE__{} = w, bounty_id, submission_id) when is_integer(submission_id) do
+    body = %{submission_id: submission_id}
+
+    with {:ok, data} <- do_call(w, :post, "/bounties/#{bounty_id}/award", body) do
+      {:ok, Bounty.from_map(data)}
     end
   end
 
@@ -475,6 +617,54 @@ defmodule RemitMd.Wallet do
   def create_withdraw_link(%__MODULE__{} = w) do
     with {:ok, data} <- do_call(w, :post, "/links/withdraw", %{}) do
       {:ok, RemitMd.Models.LinkResponse.from_map(data)}
+    end
+  end
+
+  # ─── Deposits ─────────────────────────────────────────────────────────
+
+  @doc """
+  Place a refundable deposit with a provider.
+
+  ## Parameters
+
+  - `provider` — 0x-prefixed provider address
+  - `amount` — deposit amount (string USDC, e.g. `"5.00"`)
+
+  ## Options
+
+  - `:expires_in` — seconds from now until deposit expires (default: 1 hour)
+  - `:permit` — `%PermitSignature{}` for gasless approval
+
+  ## Example
+
+      {:ok, dep} = RemitMd.Wallet.place_deposit(wallet, "0xProvider", "5.00")
+  """
+  def place_deposit(%__MODULE__{} = w, provider, amount, opts \\ []) do
+    with :ok <- validate_address(provider),
+         :ok <- validate_amount(amount) do
+      expires_in = Keyword.get(opts, :expires_in, 3600)
+      expiry = :os.system_time(:second) + expires_in
+
+      body = %{
+        chain:    w.chain,
+        provider: provider,
+        amount:   amount,
+        expiry:   expiry
+      }
+      body = maybe_add_permit(body, opts)
+
+      with {:ok, data} <- do_call(w, :post, "/deposits", body) do
+        {:ok, Deposit.from_map(data)}
+      end
+    end
+  end
+
+  @doc """
+  Return a deposit (provider-side). Full refund to depositor, no fee.
+  """
+  def return_deposit(%__MODULE__{} = w, deposit_id) do
+    with {:ok, data} <- do_call(w, :post, "/deposits/#{deposit_id}/return", %{}) do
+      {:ok, Deposit.from_map(data)}
     end
   end
 
@@ -604,5 +794,27 @@ defmodule RemitMd.Wallet do
     chain
     |> String.replace_suffix("_sepolia", "")
     |> String.replace_suffix("-sepolia", "")
+  end
+
+  # Return the numeric chain ID for EIP-712 signing.
+  defp chain_id(%__MODULE__{transport: %Http{chain_id: id}}), do: id
+  defp chain_id(%__MODULE__{chain: "base"}), do: 8453
+  defp chain_id(%__MODULE__{chain: "base_sepolia"}), do: 84532
+  defp chain_id(_), do: 84532
+
+  defp address_to_bytes32(nil), do: <<0::256>>
+  defp address_to_bytes32(""), do: <<0::256>>
+  defp address_to_bytes32(address) do
+    hex = String.trim_leading(address, "0x")
+    if String.length(hex) == 40 do
+      addr_bytes = Base.decode16!(hex, case: :mixed)
+      :binary.copy(<<0>>, 12) <> addr_bytes
+    else
+      <<0::256>>
+    end
+  end
+
+  defp call_sign(%{__struct__: mod} = signer, digest) do
+    mod.sign(signer, digest)
   end
 end

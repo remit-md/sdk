@@ -149,6 +149,62 @@ defmodule RemitMd.Models do
     end
   end
 
+  defmodule Deposit do
+    @moduledoc "A refundable deposit held by a provider."
+    @enforce_keys [:deposit_id, :status]
+    defstruct [:deposit_id, :payer, :provider, :amount_usdc,
+               :status, :created_at, :expires_at, :tx_hash]
+
+    @doc false
+    def from_map(m) do
+      %__MODULE__{
+        deposit_id:  Map.get(m, "deposit_id") || Map.get(m, "id"),
+        payer:       Map.get(m, "payer") || Map.get(m, "from"),
+        provider:    Map.get(m, "provider") || Map.get(m, "to"),
+        amount_usdc: Map.get(m, "amount_usdc") || Map.get(m, "amount"),
+        status:      Map.get(m, "status"),
+        created_at:  Map.get(m, "created_at"),
+        expires_at:  Map.get(m, "expires_at"),
+        tx_hash:     Map.get(m, "tx_hash")
+      }
+    end
+  end
+
+  defmodule TabCharge do
+    @moduledoc "A charge against an open tab."
+    @enforce_keys [:tab_id]
+    defstruct [:tab_id, :amount, :cumulative, :call_count, :created_at]
+
+    @doc false
+    def from_map(m) do
+      %__MODULE__{
+        tab_id:     Map.get(m, "tab_id"),
+        amount:     Map.get(m, "amount"),
+        cumulative: Map.get(m, "cumulative"),
+        call_count: Map.get(m, "call_count"),
+        created_at: Map.get(m, "created_at")
+      }
+    end
+  end
+
+  defmodule BountySubmission do
+    @moduledoc "A submission for a bounty."
+    @enforce_keys [:id, :bounty_id]
+    defstruct [:id, :bounty_id, :submitter, :evidence_hash, :status, :created_at]
+
+    @doc false
+    def from_map(m) do
+      %__MODULE__{
+        id:            Map.get(m, "id"),
+        bounty_id:     Map.get(m, "bounty_id"),
+        submitter:     Map.get(m, "submitter"),
+        evidence_hash: Map.get(m, "evidence_hash"),
+        status:        Map.get(m, "status"),
+        created_at:    Map.get(m, "created_at")
+      }
+    end
+  end
+
   defmodule Budget do
     @moduledoc "Spending budget and remaining allowance set by an operator."
     @enforce_keys [:address, :limit_usdc, :spent_usdc, :remaining_usdc, :period]

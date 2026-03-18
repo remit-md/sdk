@@ -19,6 +19,7 @@ on:
           - ruby
           - swift
           - dotnet
+          - elixir
         default: all
 
 jobs:
@@ -231,3 +232,32 @@ jobs:
           ACCEPTANCE_API_URL: https://remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: dotnet test --no-build -c Release --filter "Category=Acceptance" --verbosity normal
+
+  elixir:
+    name: Elixir SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'elixir'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: elixir
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: mix test test/acceptance_test.exs --include acceptance

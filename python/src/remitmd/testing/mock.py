@@ -356,9 +356,10 @@ class MockWallet:
 
             raise StreamNotFound(f"Stream {stream_id!r} not found")
 
-        elapsed = self._mock.now() - stream.started_at
-        streamed = min(stream.rate_per_second * elapsed, stream.max_total or float("inf"))
-        remaining = (stream.max_total or (stream.rate_per_second * stream.max_duration)) - streamed
+        elapsed = self._mock.now() - int(stream.started_at)
+        streamed = min(stream.rate_per_second * elapsed, (stream.max_total or float("inf")))
+        max_total = stream.max_total or (stream.rate_per_second * (stream.max_duration or 0))
+        remaining = max_total - streamed
 
         self._mock._credit(stream.payee, streamed)
         self._mock._credit(self.address, remaining)

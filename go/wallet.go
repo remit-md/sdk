@@ -22,11 +22,12 @@ import (
 //
 //	wallet, err := remitmd.FromEnv()
 type Wallet struct {
-	http    remitTransport
-	signer  Signer
-	chainID ChainID
-	chain   string
-	testnet bool
+	http           remitTransport
+	signer         Signer
+	chainID        ChainID
+	chain          string
+	testnet        bool
+	contractsCache *ContractAddresses
 }
 
 // Option configures a Wallet.
@@ -162,7 +163,8 @@ func (w *Wallet) Balance(ctx context.Context) (*Balance, error) {
 
 // PayOptions configures a direct payment.
 type PayOptions struct {
-	Memo string
+	Memo   string
+	Permit *PermitSignature
 }
 
 // PayOption configures Pay.
@@ -171,6 +173,11 @@ type PayOption func(*PayOptions)
 // WithMemo sets a memo string on a payment.
 func WithMemo(memo string) PayOption {
 	return func(o *PayOptions) { o.Memo = memo }
+}
+
+// WithPayPermit attaches an EIP-2612 permit signature to a direct payment.
+func WithPayPermit(permit *PermitSignature) PayOption {
+	return func(o *PayOptions) { o.Permit = permit }
 }
 
 // Pay sends a direct USDC payment to the given address.
@@ -188,16 +195,19 @@ func (w *Wallet) Pay(ctx context.Context, to string, amount decimal.Decimal, opt
 		o(cfg)
 	}
 
-	var tx Transaction
-	err := w.http.post(ctx, "/api/v0/payments/direct", map[string]any{
+	body := map[string]any{
 		"to":        to,
 		"amount":    amount.InexactFloat64(),
 		"task":      cfg.Memo,
 		"chain":     w.chain,
 		"nonce":     randomHex(16),
 		"signature": "0x",
-	}, &tx)
-	if err != nil {
+	}
+	if cfg.Permit != nil {
+		body["permit"] = cfg.Permit
+	}
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v0/payments/direct", body, &tx); err != nil {
 		return nil, err
 	}
 	return &tx, nil
@@ -248,6 +258,7 @@ type EscrowOptions struct {
 	Milestones []Milestone
 	Splits     []Split
 	ExpiresIn  time.Duration
+	Permit     *PermitSignature
 }
 
 // EscrowOption configures CreateEscrow.
@@ -271,6 +282,11 @@ func WithSplits(splits []Split) EscrowOption {
 // WithEscrowExpiry sets how long the escrow remains claimable.
 func WithEscrowExpiry(d time.Duration) EscrowOption {
 	return func(o *EscrowOptions) { o.ExpiresIn = d }
+}
+
+// WithEscrowPermit attaches an EIP-2612 permit signature to an escrow.
+func WithEscrowPermit(permit *PermitSignature) EscrowOption {
+	return func(o *EscrowOptions) { o.Permit = permit }
 }
 
 // CreateEscrow creates and funds an escrow for work to be done.
@@ -309,8 +325,12 @@ func (w *Wallet) CreateEscrow(ctx context.Context, payee string, amount decimal.
 	}
 
 	// Step 2: fund the escrow.
+	escrowBody := map[string]any{"invoice_id": invoiceID}
+	if cfg.Permit != nil {
+		escrowBody["permit"] = cfg.Permit
+	}
 	var escrow Escrow
-	if err := w.http.post(ctx, "/api/v0/escrows", map[string]any{"invoice_id": invoiceID}, &escrow); err != nil {
+	if err := w.http.post(ctx, "/api/v0/escrows", escrowBody, &escrow); err != nil {
 		return nil, err
 	}
 	return &escrow, nil
@@ -349,22 +369,44 @@ func (w *Wallet) GetEscrow(ctx context.Context, escrowID string) (*Escrow, error
 
 // ─── Tab ──────────────────────────────────────────────────────────────────────
 
+// TabOptions configures tab creation.
+type TabOptions struct {
+	ExpiresIn time.Duration
+	Permit    *PermitSignature
+}
+
+// TabOption configures CreateTab.
+type TabOption func(*TabOptions)
+
+// WithTabExpiry sets how long the tab remains open. Default: 24h.
+func WithTabExpiry(d time.Duration) TabOption {
+	return func(o *TabOptions) { o.ExpiresIn = d }
+}
+
+// WithTabPermit attaches an EIP-2612 permit signature to a tab.
+func WithTabPermit(permit *PermitSignature) TabOption {
+	return func(o *TabOptions) { o.Permit = permit }
+}
+
 // CreateTab opens a metered payment tab. The payer pre-funds up to limit USDC;
 // the provider charges perUnit USDC per API call.
-func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.Decimal, perUnit decimal.Decimal, expiresIn ...time.Duration) (*Tab, error) {
+func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.Decimal, perUnit decimal.Decimal, opts ...TabOption) (*Tab, error) {
 	if err := validateAddress(provider); err != nil {
 		return nil, err
 	}
-	expires := 86400 // default 24h
-	if len(expiresIn) > 0 {
-		expires = int(expiresIn[0].Seconds())
+	cfg := &TabOptions{ExpiresIn: 24 * time.Hour}
+	for _, o := range opts {
+		o(cfg)
 	}
 	body := map[string]any{
 		"chain":        w.chain,
 		"provider":     provider,
 		"limit_amount": limit.InexactFloat64(),
 		"per_unit":     perUnit.InexactFloat64(),
-		"expiry":       int(time.Now().Unix()) + expires,
+		"expiry":       int(time.Now().Unix()) + int(cfg.ExpiresIn.Seconds()),
+	}
+	if cfg.Permit != nil {
+		body["permit"] = cfg.Permit
 	}
 	var tab Tab
 	if err := w.http.post(ctx, "/api/v0/tabs", body, &tab); err != nil {
@@ -415,16 +457,36 @@ func (w *Wallet) SettleTab(ctx context.Context, tabID string) (*Tab, error) {
 
 // ─── Stream ───────────────────────────────────────────────────────────────────
 
+// StreamOptions configures stream creation.
+type StreamOptions struct {
+	Permit *PermitSignature
+}
+
+// StreamOption configures CreateStream.
+type StreamOption func(*StreamOptions)
+
+// WithStreamPermit attaches an EIP-2612 permit signature to a stream.
+func WithStreamPermit(permit *PermitSignature) StreamOption {
+	return func(o *StreamOptions) { o.Permit = permit }
+}
+
 // CreateStream starts a per-second USDC payment stream to a recipient.
-func (w *Wallet) CreateStream(ctx context.Context, recipient string, ratePerSec decimal.Decimal, deposit decimal.Decimal) (*Stream, error) {
+func (w *Wallet) CreateStream(ctx context.Context, recipient string, ratePerSec decimal.Decimal, deposit decimal.Decimal, opts ...StreamOption) (*Stream, error) {
 	if err := validateAddress(recipient); err != nil {
 		return nil, err
+	}
+	cfg := &StreamOptions{}
+	for _, o := range opts {
+		o(cfg)
 	}
 	body := map[string]any{
 		"chain":        w.chain,
 		"recipient":    recipient,
 		"rate_per_sec": ratePerSec.String(),
 		"deposit":      deposit.String(),
+	}
+	if cfg.Permit != nil {
+		body["permit"] = cfg.Permit
 	}
 	var stream Stream
 	if err := w.http.post(ctx, "/api/v0/streams", body, &stream); err != nil {
@@ -579,6 +641,35 @@ func (w *Wallet) ProposeIntent(ctx context.Context, to string, amount decimal.De
 		return nil, err
 	}
 	return &intent, nil
+}
+
+// ─── Contracts ────────────────────────────────────────────────────────────────
+
+// GetContracts returns on-chain contract addresses (cached after first call).
+func (w *Wallet) GetContracts(ctx context.Context) (*ContractAddresses, error) {
+	if w.contractsCache != nil {
+		return w.contractsCache, nil
+	}
+	var contracts ContractAddresses
+	if err := w.http.get(ctx, "/api/v0/contracts", &contracts); err != nil {
+		return nil, err
+	}
+	w.contractsCache = &contracts
+	return w.contractsCache, nil
+}
+
+// ─── Mint ─────────────────────────────────────────────────────────────────────
+
+// Mint mints testnet USDC. Returns the tx hash and new balance.
+func (w *Wallet) Mint(ctx context.Context, amount float64) (*MintResponse, error) {
+	var resp MintResponse
+	if err := w.http.post(ctx, "/api/v0/mint", map[string]any{
+		"wallet": w.Address(),
+		"amount": amount,
+	}, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 // ─── Testnet ──────────────────────────────────────────────────────────────────

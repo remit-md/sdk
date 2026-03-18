@@ -27,6 +27,7 @@ public class Wallet {
     private final Signer signer;
     private final long chainId;
     private final String chain;
+    private volatile ContractAddresses contractsCache;
 
     Wallet(ApiClient client, Signer signer, long chainId, String chain) {
         this.client = client;
@@ -64,20 +65,35 @@ public class Wallet {
      * @throws RemitError INSUFFICIENT_FUNDS if wallet balance is too low
      */
     public Transaction pay(String to, BigDecimal amount) {
-        return pay(to, amount, null);
+        return pay(to, amount, (String) null, null);
     }
 
     /** Sends a direct USDC payment with a memo string. */
     public Transaction pay(String to, BigDecimal amount, String memo) {
+        return pay(to, amount, memo, null);
+    }
+
+    /** Sends a direct USDC payment with a permit for gasless approval. */
+    public Transaction pay(String to, BigDecimal amount, PermitSignature permit) {
+        return pay(to, amount, (String) null, permit);
+    }
+
+    /** Sends a direct USDC payment with an optional memo and permit. */
+    public Transaction pay(String to, BigDecimal amount, String memo, PermitSignature permit) {
         validateAddress(to);
         validateAmount(amount);
         byte[] nb = new byte[16];
         new java.security.SecureRandom().nextBytes(nb);
         String nonce = java.util.HexFormat.of().formatHex(nb);
-        return client.post("/api/v0/payments/direct",
-            Map.of("to", to, "amount", amount.toPlainString(), "task", memo != null ? memo : "",
-                   "chain", chain, "nonce", nonce, "signature", "0x"),
-            Transaction.class);
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("to", to);
+        body.put("amount", amount.toPlainString());
+        body.put("task", memo != null ? memo : "");
+        body.put("chain", chain);
+        body.put("nonce", nonce);
+        body.put("signature", "0x");
+        if (permit != null) body.put("permit", permit);
+        return client.post("/api/v0/payments/direct", body, Transaction.class);
     }
 
     // ─── Transaction History ──────────────────────────────────────────────────
@@ -114,17 +130,29 @@ public class Wallet {
      * @param amount USDC to lock in escrow
      */
     public Escrow createEscrow(String payee, BigDecimal amount) {
-        return createEscrow(payee, amount, null, null, null, null);
+        return createEscrow(payee, amount, null, null, null, null, null);
+    }
+
+    /** Creates an escrow with a permit for gasless approval. */
+    public Escrow createEscrow(String payee, BigDecimal amount, PermitSignature permit) {
+        return createEscrow(payee, amount, null, null, null, null, permit);
     }
 
     /** Creates an escrow with an optional memo and expiry. */
     public Escrow createEscrow(String payee, BigDecimal amount, String memo, Duration expiresIn) {
-        return createEscrow(payee, amount, memo, expiresIn, null, null);
+        return createEscrow(payee, amount, memo, expiresIn, null, null, null);
     }
 
     /** Creates an escrow with milestone-based partial payments. */
     public Escrow createEscrow(String payee, BigDecimal amount, String memo, Duration expiresIn,
                                 List<Escrow.Milestone> milestones, List<Escrow.Split> splits) {
+        return createEscrow(payee, amount, memo, expiresIn, milestones, splits, null);
+    }
+
+    /** Creates an escrow with milestone-based partial payments and optional permit. */
+    public Escrow createEscrow(String payee, BigDecimal amount, String memo, Duration expiresIn,
+                                List<Escrow.Milestone> milestones, List<Escrow.Split> splits,
+                                PermitSignature permit) {
         validateAddress(payee);
         validateAmount(amount);
 
@@ -135,6 +163,7 @@ public class Wallet {
         if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());
         if (milestones != null && !milestones.isEmpty()) body.put("milestones", milestones);
         if (splits != null && !splits.isEmpty()) body.put("splits", splits);
+        if (permit != null) body.put("permit", permit);
 
         return client.post("/api/v0/escrows", body, Escrow.class);
     }
@@ -170,17 +199,28 @@ public class Wallet {
      * @param limit       maximum USDC that can be charged through this tab
      */
     public Tab createTab(String counterpart, BigDecimal limit) {
-        return createTab(counterpart, limit, null);
+        return createTab(counterpart, limit, null, null);
+    }
+
+    /** Opens a tab with a permit for gasless approval. */
+    public Tab createTab(String counterpart, BigDecimal limit, PermitSignature permit) {
+        return createTab(counterpart, limit, null, permit);
     }
 
     /** Opens a tab with an explicit expiry. */
     public Tab createTab(String counterpart, BigDecimal limit, Duration expiresIn) {
+        return createTab(counterpart, limit, expiresIn, null);
+    }
+
+    /** Opens a tab with an optional expiry and permit. */
+    public Tab createTab(String counterpart, BigDecimal limit, Duration expiresIn, PermitSignature permit) {
         validateAddress(counterpart);
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("chain", chain);
         body.put("counterpart", counterpart);
         body.put("limit", limit.toPlainString());
         if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());
+        if (permit != null) body.put("permit", permit);
         return client.post("/api/v0/tabs", body, Tab.class);
     }
 
@@ -206,11 +246,19 @@ public class Wallet {
      * @param deposit    initial deposit locking funds for streaming
      */
     public Stream createStream(String recipient, BigDecimal ratePerSec, BigDecimal deposit) {
+        return createStream(recipient, ratePerSec, deposit, null);
+    }
+
+    /** Starts a per-second USDC payment stream with a permit for gasless approval. */
+    public Stream createStream(String recipient, BigDecimal ratePerSec, BigDecimal deposit, PermitSignature permit) {
         validateAddress(recipient);
-        return client.post("/api/v0/streams",
-            Map.of("chain", chain, "recipient", recipient, "rate_per_sec", ratePerSec.toPlainString(),
-                   "deposit", deposit.toPlainString()),
-            Stream.class);
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("chain", chain);
+        body.put("recipient", recipient);
+        body.put("rate_per_sec", ratePerSec.toPlainString());
+        body.put("deposit", deposit.toPlainString());
+        if (permit != null) body.put("permit", permit);
+        return client.post("/api/v0/streams", body, Stream.class);
     }
 
     /** Claims all vested stream payments (callable by recipient). */
@@ -303,6 +351,36 @@ public class Wallet {
     /** Returns how much the agent can still spend under operator-set limits. */
     public Budget remainingBudget() {
         return client.get("/api/v0/wallet/budget", Budget.class);
+    }
+
+    // ─── Contracts ─────────────────────────────────────────────────────────────
+
+    /**
+     * Returns the on-chain contract addresses for the current deployment.
+     * Results are cached after the first call.
+     */
+    public ContractAddresses getContracts() {
+        ContractAddresses cached = contractsCache;
+        if (cached != null) return cached;
+        synchronized (this) {
+            if (contractsCache != null) return contractsCache;
+            contractsCache = client.get("/api/v0/contracts", ContractAddresses.class);
+            return contractsCache;
+        }
+    }
+
+    // ─── Mint (testnet only) ─────────────────────────────────────────────────
+
+    /**
+     * Mints testnet USDC to this wallet.
+     * Only available on testnet deployments.
+     *
+     * @param amount USDC amount to mint
+     */
+    public MintResponse mint(double amount) {
+        return client.post("/api/v0/mint",
+            Map.of("wallet", address(), "amount", amount),
+            MintResponse.class);
     }
 
     // ─── Validation ───────────────────────────────────────────────────────────

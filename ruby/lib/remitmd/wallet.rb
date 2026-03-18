@@ -77,6 +77,14 @@ module Remitmd
 
     alias to_s inspect
 
+    # ─── Contracts ─────────────────────────────────────────────────────────────
+
+    # Get deployed contract addresses. Cached for the lifetime of this client.
+    # @return [ContractAddresses]
+    def get_contracts
+      @contracts_cache ||= ContractAddresses.new(@transport.get("/contracts"))
+    end
+
     # ─── Balance & Analytics ─────────────────────────────────────────────────
 
     # Fetch the current USDC balance.
@@ -120,12 +128,14 @@ module Remitmd
     # @param to [String] recipient 0x-prefixed address
     # @param amount [Numeric, BigDecimal] amount in USDC (e.g. 1.50)
     # @param memo [String, nil] optional note
+    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Transaction]
-    def pay(to, amount, memo: nil)
+    def pay(to, amount, memo: nil, permit: nil)
       validate_address!(to)
       validate_amount!(amount)
       nonce = SecureRandom.hex(16)
       body = { to: to, amount: amount.to_s, task: memo || "", chain: @chain, nonce: nonce, signature: "0x" }
+      body[:permit] = permit.to_h if permit
       Transaction.new(@transport.post("/payments/direct", body))
     end
 
@@ -136,13 +146,15 @@ module Remitmd
     # @param amount [Numeric] amount in USDC
     # @param memo [String, nil] optional note
     # @param expires_in_secs [Integer, nil] optional expiry in seconds from now
+    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Escrow]
-    def create_escrow(payee, amount, memo: nil, expires_in_secs: nil)
+    def create_escrow(payee, amount, memo: nil, expires_in_secs: nil, permit: nil)
       validate_address!(payee)
       validate_amount!(amount)
       body = { payee: payee, amount: amount.to_s }
       body[:memo] = memo if memo
       body[:expires_in_secs] = expires_in_secs if expires_in_secs
+      body[:permit] = permit.to_h if permit
       Escrow.new(@transport.post("/escrows", body))
     end
 
@@ -175,12 +187,14 @@ module Remitmd
     # @param counterpart [String] 0x-prefixed counterpart address
     # @param limit [Numeric] maximum tab credit in USDC
     # @param closes_in_secs [Integer, nil] optional expiry
+    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Tab]
-    def create_tab(counterpart, limit, closes_in_secs: nil)
+    def create_tab(counterpart, limit, closes_in_secs: nil, permit: nil)
       validate_address!(counterpart)
       validate_amount!(limit)
       body = { chain: @chain, counterpart: counterpart, limit: limit.to_s }
       body[:closes_in_secs] = closes_in_secs if closes_in_secs
+      body[:permit] = permit.to_h if permit
       Tab.new(@transport.post("/tabs", body))
     end
 
@@ -208,12 +222,14 @@ module Remitmd
     # @param recipient [String] 0x-prefixed address
     # @param rate_per_sec [Numeric] USDC per second
     # @param deposit [Numeric] upfront deposit in USDC
+    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Stream]
-    def create_stream(recipient, rate_per_sec, deposit)
+    def create_stream(recipient, rate_per_sec, deposit, permit: nil)
       validate_address!(recipient)
       validate_amount!(rate_per_sec)
       validate_amount!(deposit)
       body = { chain: @chain, recipient: recipient, rate_per_sec: rate_per_sec.to_s, deposit: deposit.to_s }
+      body[:permit] = permit.to_h if permit
       Stream.new(@transport.post("/streams", body))
     end
 
@@ -230,11 +246,13 @@ module Remitmd
     # @param award [Numeric] amount in USDC
     # @param description [String] task description
     # @param expires_in_secs [Integer, nil] optional expiry
+    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Bounty]
-    def create_bounty(award, description, expires_in_secs: nil)
+    def create_bounty(award, description, expires_in_secs: nil, permit: nil)
       validate_amount!(award)
       body = { chain: @chain, award: award.to_s, description: description }
       body[:expires_in_secs] = expires_in_secs if expires_in_secs
+      body[:permit] = permit.to_h if permit
       Bounty.new(@transport.post("/bounties", body))
     end
 
@@ -269,11 +287,13 @@ module Remitmd
     # @param beneficiary [String] 0x-prefixed address
     # @param amount [Numeric] amount in USDC
     # @param lock_secs [Integer] duration to lock in seconds
+    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Deposit]
-    def lock_deposit(beneficiary, amount, lock_secs)
+    def lock_deposit(beneficiary, amount, lock_secs, permit: nil)
       validate_address!(beneficiary)
       validate_amount!(amount)
       body = { beneficiary: beneficiary, amount: amount.to_s, lock_secs: lock_secs }
+      body[:permit] = permit.to_h if permit
       Deposit.new(@transport.post("/deposits", body))
     end
 
@@ -316,6 +336,15 @@ module Remitmd
     # @return [LinkResponse]
     def create_withdraw_link
       LinkResponse.new(@transport.post("/links/withdraw", {}))
+    end
+
+    # ─── Testnet ──────────────────────────────────────────────────────────────
+
+    # Mint testnet USDC. Max $2,500 per call, once per hour per wallet.
+    # @param amount [Numeric] amount in USDC
+    # @return [Hash] { "tx_hash" => "0x...", "balance" => 1234.56 }
+    def mint(amount)
+      @transport.post("/mint", { wallet: address, amount: amount })
     end
 
     private

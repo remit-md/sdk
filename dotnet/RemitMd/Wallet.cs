@@ -16,6 +16,7 @@ public sealed class Wallet
     private readonly IRemitSigner _signer;
     private readonly long _chainId;
     private readonly string _chain;
+    private ContractAddresses? _cachedContracts;
 
     // Chain → API base URL map
     private static readonly Dictionary<string, (long ChainId, string ApiUrl)> Chains = new()
@@ -106,6 +107,7 @@ public sealed class Wallet
         string recipient,
         decimal amount,
         string memo = "",
+        PermitSignature? permit = null,
         CancellationToken ct = default)
     {
         ValidateAddress(recipient, nameof(recipient));
@@ -113,15 +115,17 @@ public sealed class Wallet
 
         var nonce = Convert.ToHexString(
             System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
-        return _transport.PostAsync<Transaction>("/api/v0/payments/direct", new
+        var body = new Dictionary<string, object?>
         {
-            to        = recipient,
-            amount    = amount.ToString("F6"),
-            task      = memo,
-            chain     = _chain,
-            nonce     = nonce,
-            signature = "0x",
-        }, ct);
+            ["to"]        = recipient,
+            ["amount"]    = amount.ToString("F6"),
+            ["task"]      = memo,
+            ["chain"]     = _chain,
+            ["nonce"]     = nonce,
+            ["signature"] = "0x",
+        };
+        if (permit is not null) body["permit"] = permit;
+        return _transport.PostAsync<Transaction>("/api/v0/payments/direct", body, ct);
     }
 
     // ─── Balance & reputation ─────────────────────────────────────────────────
@@ -157,20 +161,23 @@ public sealed class Wallet
         IEnumerable<Milestone>? milestones = null,
         IEnumerable<Split>? splits = null,
         DateTimeOffset? expiresAt = null,
+        PermitSignature? permit = null,
         CancellationToken ct = default)
     {
         ValidateAddress(payee, nameof(payee));
         ValidateAmount(amount);
 
-        return _transport.PostAsync<Escrow>("/api/v0/escrows", new
+        var body = new Dictionary<string, object?>
         {
-            payee,
-            amount      = amount.ToString("F6"),
-            memo,
-            milestones  = milestones?.ToList(),
-            splits      = splits?.ToList(),
-            expires_at  = expiresAt,
-        }, ct);
+            ["payee"]      = payee,
+            ["amount"]     = amount.ToString("F6"),
+            ["memo"]       = memo,
+            ["milestones"] = milestones?.ToList(),
+            ["splits"]     = splits?.ToList(),
+            ["expires_at"] = expiresAt,
+        };
+        if (permit is not null) body["permit"] = permit;
+        return _transport.PostAsync<Escrow>("/api/v0/escrows", body, ct);
     }
 
     /// <summary>Releases escrow funds to the payee after work is approved.</summary>
@@ -195,18 +202,21 @@ public sealed class Wallet
         string counterpart,
         decimal limit,
         DateTimeOffset? closesAt = null,
+        PermitSignature? permit = null,
         CancellationToken ct = default)
     {
         ValidateAddress(counterpart, nameof(counterpart));
         ValidateAmount(limit);
 
-        return _transport.PostAsync<Tab>("/api/v0/tabs", new
+        var body = new Dictionary<string, object?>
         {
-            chain      = _chain,
-            counterpart,
-            limit      = limit.ToString("F6"),
-            closes_at  = closesAt,
-        }, ct);
+            ["chain"]       = _chain,
+            ["counterpart"] = counterpart,
+            ["limit"]       = limit.ToString("F6"),
+            ["closes_at"]   = closesAt,
+        };
+        if (permit is not null) body["permit"] = permit;
+        return _transport.PostAsync<Tab>("/api/v0/tabs", body, ct);
     }
 
     /// <summary>Charges an amount against an open Tab (near-zero latency, gas-free).</summary>
@@ -237,19 +247,22 @@ public sealed class Wallet
         string recipient,
         decimal ratePerSecond,
         decimal deposit,
+        PermitSignature? permit = null,
         CancellationToken ct = default)
     {
         ValidateAddress(recipient, nameof(recipient));
         ValidateAmount(ratePerSecond, "ratePerSecond");
         ValidateAmount(deposit, "deposit");
 
-        return _transport.PostAsync<Stream>("/api/v0/streams", new
+        var body = new Dictionary<string, object?>
         {
-            chain        = _chain,
-            recipient,
-            rate_per_sec = ratePerSecond.ToString("F9"),
-            deposit      = deposit.ToString("F6"),
-        }, ct);
+            ["chain"]        = _chain,
+            ["recipient"]    = recipient,
+            ["rate_per_sec"] = ratePerSecond.ToString("F9"),
+            ["deposit"]      = deposit.ToString("F6"),
+        };
+        if (permit is not null) body["permit"] = permit;
+        return _transport.PostAsync<Stream>("/api/v0/streams", body, ct);
     }
 
     /// <summary>Withdraws accrued streaming funds to the recipient.</summary>
@@ -266,16 +279,19 @@ public sealed class Wallet
         decimal award,
         string description,
         DateTimeOffset? expiresAt = null,
+        PermitSignature? permit = null,
         CancellationToken ct = default)
     {
         ValidateAmount(award, "award");
-        return _transport.PostAsync<Bounty>("/api/v0/bounties", new
+        var body = new Dictionary<string, object?>
         {
-            chain      = _chain,
-            award      = award.ToString("F6"),
-            description,
-            expires_at = expiresAt,
-        }, ct);
+            ["chain"]       = _chain,
+            ["award"]       = award.ToString("F6"),
+            ["description"] = description,
+            ["expires_at"]  = expiresAt,
+        };
+        if (permit is not null) body["permit"] = permit;
+        return _transport.PostAsync<Bounty>("/api/v0/bounties", body, ct);
     }
 
     /// <summary>Awards a bounty to the winning agent address.</summary>
@@ -318,16 +334,19 @@ public sealed class Wallet
         string beneficiary,
         decimal amount,
         DateTimeOffset? expiresAt = null,
+        PermitSignature? permit = null,
         CancellationToken ct = default)
     {
         ValidateAddress(beneficiary, nameof(beneficiary));
         ValidateAmount(amount);
-        return _transport.PostAsync<Deposit>("/api/v0/deposits", new
+        var body = new Dictionary<string, object?>
         {
-            beneficiary,
-            amount     = amount.ToString("F6"),
-            expires_at = expiresAt,
-        }, ct);
+            ["beneficiary"] = beneficiary,
+            ["amount"]      = amount.ToString("F6"),
+            ["expires_at"]  = expiresAt,
+        };
+        if (permit is not null) body["permit"] = permit;
+        return _transport.PostAsync<Deposit>("/api/v0/deposits", body, ct);
     }
 
     // ─── Analytics & budget ───────────────────────────────────────────────────
@@ -386,6 +405,30 @@ public sealed class Wallet
     /// <summary>Generates a one-time URL for the operator to withdraw funds.</summary>
     public Task<LinkResponse> CreateWithdrawLinkAsync(CancellationToken ct = default)
         => _transport.PostAsync<LinkResponse>("/api/v0/links/withdraw", new { }, ct);
+
+    // ─── Contracts ─────────────────────────────────────────────────────────
+
+    /// <summary>Returns contract addresses for the current chain (cached after first call).</summary>
+    public async Task<ContractAddresses> GetContractsAsync(CancellationToken ct = default)
+    {
+        if (_cachedContracts is not null) return _cachedContracts;
+        _cachedContracts = await _transport.GetAsync<ContractAddresses>("/api/v0/contracts", ct);
+        return _cachedContracts;
+    }
+
+    // ─── Mint (testnet only) ──────────────────────────────────────────────
+
+    /// <summary>Mints testnet USDC to this wallet (testnet only).</summary>
+    /// <param name="amount">Amount to mint in USDC.</param>
+    public Task<MintResponse> MintAsync(decimal amount, CancellationToken ct = default)
+    {
+        ValidateAmount(amount);
+        return _transport.PostAsync<MintResponse>("/api/v0/mint", new
+        {
+            wallet = Address,
+            amount = amount.ToString("F6"),
+        }, ct);
+    }
 
     // ─── Validation helpers ───────────────────────────────────────────────────
 

@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
 use crate::http::{chain_config, HttpTransport, Transport};
@@ -50,6 +51,7 @@ pub struct Wallet {
     pub(crate) address: String,
     pub(crate) chain_id: ChainId,
     pub(crate) chain: String,
+    pub(crate) contracts_cache: Mutex<Option<ContractAddresses>>,
 }
 
 impl Wallet {
@@ -178,6 +180,16 @@ impl Wallet {
         self.pay_with_memo(to, amount, "").await
     }
 
+    /// Send a direct USDC payment with a permit for gasless approval.
+    pub async fn pay_with_permit(
+        &self,
+        to: &str,
+        amount: Decimal,
+        permit: PermitSignature,
+    ) -> Result<Transaction, RemitError> {
+        self.pay_full(to, amount, "", Some(permit)).await
+    }
+
     /// Send a direct USDC payment with an optional memo.
     pub async fn pay_with_memo(
         &self,
@@ -185,24 +197,35 @@ impl Wallet {
         amount: Decimal,
         memo: &str,
     ) -> Result<Transaction, RemitError> {
+        self.pay_full(to, amount, memo, None).await
+    }
+
+    /// Send a direct USDC payment with an optional memo and permit.
+    pub async fn pay_full(
+        &self,
+        to: &str,
+        amount: Decimal,
+        memo: &str,
+        permit: Option<PermitSignature>,
+    ) -> Result<Transaction, RemitError> {
         validate_address(to)?;
         validate_amount(amount)?;
         let mut nb = [0u8; 16];
         getrandom::getrandom(&mut nb)
             .map_err(|_| remit_err(codes::SERVER_ERROR, "random generation failed"))?;
         let nonce = hex::encode(nb);
-        self.post(
-            "/api/v0/payments/direct",
-            json!({
-                "to": to,
-                "amount": amount.to_string(),
-                "task": memo,
-                "chain": &self.chain,
-                "nonce": nonce,
-                "signature": "0x",
-            }),
-        )
-        .await
+        let mut body = json!({
+            "to": to,
+            "amount": amount.to_string(),
+            "task": memo,
+            "chain": &self.chain,
+            "nonce": nonce,
+            "signature": "0x",
+        });
+        if let Some(p) = permit {
+            body["permit"] = serde_json::to_value(p).unwrap();
+        }
+        self.post("/api/v0/payments/direct", body).await
     }
 
     /// Return paginated transaction history.
@@ -248,19 +271,22 @@ impl Wallet {
     /// - `payee` — the agent that will receive funds on release
     /// - `amount` — total USDC to lock
     pub async fn create_escrow(&self, payee: &str, amount: Decimal) -> Result<Escrow, RemitError> {
-        validate_address(payee)?;
-        validate_amount(amount)?;
-        self.post(
-            "/api/v0/escrows",
-            json!({
-                "payee": payee,
-                "amount": amount.to_string(),
-            }),
-        )
-        .await
+        self.create_escrow_full(payee, amount, "", &[], &[], None, None)
+            .await
     }
 
-    /// Create an escrow with optional milestones and splits.
+    /// Create an escrow with a permit for gasless approval.
+    pub async fn create_escrow_with_permit(
+        &self,
+        payee: &str,
+        amount: Decimal,
+        permit: PermitSignature,
+    ) -> Result<Escrow, RemitError> {
+        self.create_escrow_full(payee, amount, "", &[], &[], None, Some(permit))
+            .await
+    }
+
+    /// Create an escrow with optional milestones, splits, and permit.
     pub async fn create_escrow_full(
         &self,
         payee: &str,
@@ -269,21 +295,22 @@ impl Wallet {
         milestones: &[Milestone],
         splits: &[Split],
         expires_in_secs: Option<u64>,
+        permit: Option<PermitSignature>,
     ) -> Result<Escrow, RemitError> {
         validate_address(payee)?;
         validate_amount(amount)?;
-        self.post(
-            "/api/v0/escrows",
-            json!({
-                "payee": payee,
-                "amount": amount.to_string(),
-                "memo": memo,
-                "milestones": milestones,
-                "splits": splits,
-                "expires_in_seconds": expires_in_secs,
-            }),
-        )
-        .await
+        let mut body = json!({
+            "payee": payee,
+            "amount": amount.to_string(),
+            "memo": memo,
+            "milestones": milestones,
+            "splits": splits,
+            "expires_in_seconds": expires_in_secs,
+        });
+        if let Some(p) = permit {
+            body["permit"] = serde_json::to_value(p).unwrap();
+        }
+        self.post("/api/v0/escrows", body).await
     }
 
     /// Release escrow funds to the payee.
@@ -324,16 +351,18 @@ impl Wallet {
     /// - `counterpart` — the agent receiving payments
     /// - `limit` — maximum USDC pre-deposited into the channel
     pub async fn create_tab(&self, counterpart: &str, limit: Decimal) -> Result<Tab, RemitError> {
-        validate_address(counterpart)?;
-        self.post(
-            "/api/v0/tabs",
-            json!({
-                "chain": &self.chain,
-                "counterpart": counterpart,
-                "limit": limit.to_string(),
-            }),
-        )
-        .await
+        self.create_tab_full(counterpart, limit, None, None).await
+    }
+
+    /// Open a tab with a permit for gasless approval.
+    pub async fn create_tab_with_permit(
+        &self,
+        counterpart: &str,
+        limit: Decimal,
+        permit: PermitSignature,
+    ) -> Result<Tab, RemitError> {
+        self.create_tab_full(counterpart, limit, None, Some(permit))
+            .await
     }
 
     /// Open a tab with a custom expiry.
@@ -343,17 +372,31 @@ impl Wallet {
         limit: Decimal,
         expires_in_secs: u64,
     ) -> Result<Tab, RemitError> {
+        self.create_tab_full(counterpart, limit, Some(expires_in_secs), None)
+            .await
+    }
+
+    /// Open a tab with optional expiry and permit.
+    pub async fn create_tab_full(
+        &self,
+        counterpart: &str,
+        limit: Decimal,
+        expires_in_secs: Option<u64>,
+        permit: Option<PermitSignature>,
+    ) -> Result<Tab, RemitError> {
         validate_address(counterpart)?;
-        self.post(
-            "/api/v0/tabs",
-            json!({
-                "chain": &self.chain,
-                "counterpart": counterpart,
-                "limit": limit.to_string(),
-                "expires_in_seconds": expires_in_secs,
-            }),
-        )
-        .await
+        let mut body = json!({
+            "chain": &self.chain,
+            "counterpart": counterpart,
+            "limit": limit.to_string(),
+        });
+        if let Some(exp) = expires_in_secs {
+            body["expires_in_seconds"] = json!(exp);
+        }
+        if let Some(p) = permit {
+            body["permit"] = serde_json::to_value(p).unwrap();
+        }
+        self.post("/api/v0/tabs", body).await
     }
 
     /// Debit a charge from an open tab (off-chain, signed).
@@ -398,18 +441,30 @@ impl Wallet {
         rate_per_sec: Decimal,
         deposit: Decimal,
     ) -> Result<Stream, RemitError> {
+        self.create_stream_with_permit(recipient, rate_per_sec, deposit, None)
+            .await
+    }
+
+    /// Start a per-second USDC payment stream with an optional permit.
+    pub async fn create_stream_with_permit(
+        &self,
+        recipient: &str,
+        rate_per_sec: Decimal,
+        deposit: Decimal,
+        permit: Option<PermitSignature>,
+    ) -> Result<Stream, RemitError> {
         validate_address(recipient)?;
         validate_amount(deposit)?;
-        self.post(
-            "/api/v0/streams",
-            json!({
-                "chain": &self.chain,
-                "recipient": recipient,
-                "rate_per_sec": rate_per_sec.to_string(),
-                "deposit": deposit.to_string(),
-            }),
-        )
-        .await
+        let mut body = json!({
+            "chain": &self.chain,
+            "recipient": recipient,
+            "rate_per_sec": rate_per_sec.to_string(),
+            "deposit": deposit.to_string(),
+        });
+        if let Some(p) = permit {
+            body["permit"] = serde_json::to_value(p).unwrap();
+        }
+        self.post("/api/v0/streams", body).await
     }
 
     /// Withdraw all vested stream payments (called by the recipient).
@@ -608,6 +663,45 @@ impl Wallet {
     pub async fn create_withdraw_link(&self) -> Result<LinkResponse, RemitError> {
         self.post("/api/v0/links/withdraw", json!({})).await
     }
+
+    // ─── Contracts ──────────────────────────────────────────────────────────
+
+    /// Return the on-chain contract addresses for the current deployment.
+    ///
+    /// Results are cached after the first call.
+    pub async fn get_contracts(&self) -> Result<ContractAddresses, RemitError> {
+        {
+            let cache = self.contracts_cache.lock().await;
+            if let Some(ref c) = *cache {
+                return Ok(c.clone());
+            }
+        }
+        let contracts: ContractAddresses = self.get("/api/v0/contracts").await?;
+        {
+            let mut cache = self.contracts_cache.lock().await;
+            *cache = Some(contracts.clone());
+        }
+        Ok(contracts)
+    }
+
+    // ─── Mint (testnet only) ────────────────────────────────────────────────
+
+    /// Mint testnet USDC to this wallet.
+    ///
+    /// Only available on testnet deployments. Production calls will return an error.
+    ///
+    /// # Arguments
+    /// - `amount` — USDC amount to mint
+    pub async fn mint(&self, amount: f64) -> Result<MintResponse, RemitError> {
+        self.post(
+            "/api/v0/mint",
+            json!({
+                "wallet": &self.address,
+                "amount": amount,
+            }),
+        )
+        .await
+    }
 }
 
 // ─── WalletBuilder ────────────────────────────────────────────────────────────
@@ -717,6 +811,7 @@ fn build_wallet(
         address,
         chain_id: ChainId(cfg.chain_id),
         chain: chain.to_string(),
+        contracts_cache: Mutex::new(None),
     })
 }
 

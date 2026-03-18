@@ -342,6 +342,31 @@ public class MockRemit {
         return list;
     }
 
+    ContractAddresses mockContracts() {
+        ContractAddresses c = new ContractAddresses();
+        c.chainId = MOCK_CHAIN_ID;
+        c.usdc = "0x0000000000000000000000000000000000000001";
+        c.router = "0x0000000000000000000000000000000000000002";
+        c.escrow = "0x0000000000000000000000000000000000000003";
+        c.tab = "0x0000000000000000000000000000000000000004";
+        c.stream = "0x0000000000000000000000000000000000000005";
+        c.bounty = "0x0000000000000000000000000000000000000006";
+        c.deposit = "0x0000000000000000000000000000000000000007";
+        c.feeCalculator = "0x0000000000000000000000000000000000000008";
+        c.keyRegistry = "0x0000000000000000000000000000000000000009";
+        c.arbitration = "0x000000000000000000000000000000000000000a";
+        return c;
+    }
+
+    MintResponse mockMint(double amount) {
+        BigDecimal current = balance.get();
+        balance.set(current.add(BigDecimal.valueOf(amount)));
+        MintResponse r = new MintResponse();
+        r.txHash = "0x" + "f".repeat(64);
+        r.balance = balance.get();
+        return r;
+    }
+
     // ─── Mock infrastructure ──────────────────────────────────────────────────
 
     /** Internal ApiClient that routes to mock handlers. */
@@ -436,6 +461,13 @@ public class MockRemit {
                 String bountyId = path.replace("/api/v0/bounties/", "").replace("/award", "");
                 String winner = (String) b.get("winner");
                 return (T) mock.mockAwardBounty(bountyId, winner);
+            }
+            if ("GET".equals(method) && "/api/v0/contracts".equals(path)) {
+                return (T) mock.mockContracts();
+            }
+            if ("POST".equals(method) && "/api/v0/mint".equals(path)) {
+                double amount = b.get("amount") instanceof Number ? ((Number) b.get("amount")).doubleValue() : 0.0;
+                return (T) mock.mockMint(amount);
             }
             // Permissive: unrecognized routes succeed with null
             return null;

@@ -210,6 +210,36 @@ public record Webhook(
     [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt
 );
 
+/// <summary>EIP-2612 permit signature for gasless USDC approvals.</summary>
+public record PermitSignature(
+    [property: JsonPropertyName("value")] long Value,
+    [property: JsonPropertyName("deadline")] long Deadline,
+    [property: JsonPropertyName("v")] int V,
+    [property: JsonPropertyName("r")] string R,
+    [property: JsonPropertyName("s")] string S
+);
+
+/// <summary>On-chain contract addresses for the current chain.</summary>
+public record ContractAddresses(
+    [property: JsonPropertyName("chain_id")] long ChainId,
+    [property: JsonPropertyName("usdc")] string Usdc,
+    [property: JsonPropertyName("router")] string Router,
+    [property: JsonPropertyName("escrow")] string Escrow,
+    [property: JsonPropertyName("tab")] string Tab,
+    [property: JsonPropertyName("stream")] string Stream,
+    [property: JsonPropertyName("bounty")] string Bounty,
+    [property: JsonPropertyName("deposit")] string Deposit,
+    [property: JsonPropertyName("fee_calculator")] string FeeCalculator,
+    [property: JsonPropertyName("key_registry")] string KeyRegistry,
+    [property: JsonPropertyName("arbitration")] string Arbitration
+);
+
+/// <summary>Result of a testnet mint operation.</summary>
+public record MintResponse(
+    [property: JsonPropertyName("tx_hash")] string TxHash,
+    [property: JsonPropertyName("balance")] decimal Balance
+);
+
 /// <summary>A paginated list of transactions.</summary>
 public record TransactionList(
     [property: JsonPropertyName("items")] IReadOnlyList<Transaction> Items,

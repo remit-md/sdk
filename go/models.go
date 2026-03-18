@@ -56,6 +56,36 @@ const (
 	DepositStatusForfeited DepositStatus = "forfeited"
 )
 
+// PermitSignature holds an EIP-2612 permit signature for gasless USDC approval.
+type PermitSignature struct {
+	Value    int    `json:"value"`
+	Deadline int    `json:"deadline"`
+	V        int    `json:"v"`
+	R        string `json:"r"`
+	S        string `json:"s"`
+}
+
+// ContractAddresses holds on-chain contract addresses returned by GET /api/v0/contracts.
+type ContractAddresses struct {
+	ChainID       int    `json:"chain_id"`
+	USDC          string `json:"usdc"`
+	Router        string `json:"router"`
+	Escrow        string `json:"escrow"`
+	Tab           string `json:"tab"`
+	Stream        string `json:"stream"`
+	Bounty        string `json:"bounty"`
+	Deposit       string `json:"deposit"`
+	FeeCalculator string `json:"fee_calculator"`
+	KeyRegistry   string `json:"key_registry"`
+	Arbitration   string `json:"arbitration"`
+}
+
+// MintResponse is returned by Mint.
+type MintResponse struct {
+	TxHash  string `json:"tx_hash"`
+	Balance string `json:"balance"`
+}
+
 // Transaction is the result of any payment operation.
 type Transaction struct {
 	ID          string          `json:"id"`

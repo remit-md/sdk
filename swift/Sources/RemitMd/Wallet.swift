@@ -1,10 +1,12 @@
 import Foundation
 
 /// Main entry point for remit.md payments.
-public final class RemitWallet: Sendable {
+public final class RemitWallet: @unchecked Sendable {
     private let transport: any Transport
     private let signerAddress: String
     private let chainName: String
+    private var contractsCache: ContractAddresses?
+    private let cacheLock = NSLock()
 
     public init(privateKey: String, chain: RemitChain = .baseSepolia, baseURL: String? = nil, routerAddress: String? = nil) throws {
         let signer = try PrivateKeySigner(privateKey: privateKey)
@@ -35,25 +37,44 @@ public final class RemitWallet: Sendable {
         return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress)
     }
 
+    // MARK: - Contracts
+
+    /// Get deployed contract addresses. Cached for the lifetime of this client instance.
+    public func getContracts() async throws -> ContractAddresses {
+        cacheLock.lock()
+        if let cached = contractsCache {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+        let contracts: ContractAddresses = try await transport.request(
+            method: "GET", path: "/api/v0/contracts", body: Optional<EmptyBody>.none
+        )
+        cacheLock.lock()
+        contractsCache = contracts
+        cacheLock.unlock()
+        return contracts
+    }
+
     // MARK: - Direct payment
 
-    public func pay(to recipient: String, amount: Double, memo: String? = nil) async throws -> Transaction {
+    public func pay(to recipient: String, amount: Double, memo: String? = nil, permit: PermitSignature? = nil) async throws -> Transaction {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
             method: "POST", path: "/api/v0/payments/direct",
-            body: PayBody(to: recipient, amount: amount, memo: memo)
+            body: PayBody(to: recipient, amount: amount, memo: memo, permit: permit)
         )
     }
 
     // MARK: - Escrow
 
-    public func createEscrow(recipient: String, amount: Double, conditions: String? = nil) async throws -> Escrow {
+    public func createEscrow(recipient: String, amount: Double, conditions: String? = nil, permit: PermitSignature? = nil) async throws -> Escrow {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
             method: "POST", path: "/api/v0/escrows",
-            body: EscrowBody(recipient: recipient, amount: amount, conditions: conditions)
+            body: EscrowBody(recipient: recipient, amount: amount, conditions: conditions, permit: permit)
         )
     }
 
@@ -77,12 +98,12 @@ public final class RemitWallet: Sendable {
 
     // MARK: - Metered tabs
 
-    public func openTab(recipient: String, limit: Double) async throws -> Tab {
+    public func openTab(recipient: String, limit: Double, permit: PermitSignature? = nil) async throws -> Tab {
         try validateAddress(recipient)
         try validateAmount(limit)
         return try await transport.request(
             method: "POST", path: "/api/v0/tabs",
-            body: TabBody(chain: chainName, recipient: recipient, limit: limit)
+            body: TabBody(chain: chainName, recipient: recipient, limit: limit, permit: permit)
         )
     }
 
@@ -102,14 +123,14 @@ public final class RemitWallet: Sendable {
 
     // MARK: - Streaming
 
-    public func startStream(recipient: String, ratePerSecond: Double) async throws -> Stream {
+    public func startStream(recipient: String, ratePerSecond: Double, permit: PermitSignature? = nil) async throws -> Stream {
         try validateAddress(recipient)
         guard ratePerSecond > 0 else {
             throw RemitError(RemitError.invalidAmount, "ratePerSecond must be positive")
         }
         return try await transport.request(
             method: "POST", path: "/api/v0/streams",
-            body: StreamBody(chain: chainName, recipient: recipient, ratePerSecond: ratePerSecond)
+            body: StreamBody(chain: chainName, recipient: recipient, ratePerSecond: ratePerSecond, permit: permit)
         )
     }
 
@@ -121,14 +142,14 @@ public final class RemitWallet: Sendable {
 
     // MARK: - Bounties
 
-    public func postBounty(amount: Double, description: String) async throws -> Bounty {
+    public func postBounty(amount: Double, description: String, permit: PermitSignature? = nil) async throws -> Bounty {
         try validateAmount(amount)
         guard !description.isEmpty else {
             throw RemitError(RemitError.serverError, "bounty description must not be empty")
         }
         return try await transport.request(
             method: "POST", path: "/api/v0/bounties",
-            body: BountyBody(chain: chainName, amount: amount, description: description)
+            body: BountyBody(chain: chainName, amount: amount, description: description, permit: permit)
         )
     }
 
@@ -160,12 +181,12 @@ public final class RemitWallet: Sendable {
 
     // MARK: - Deposits
 
-    public func lockDeposit(recipient: String, amount: Double, reason: String? = nil) async throws -> Deposit {
+    public func lockDeposit(recipient: String, amount: Double, reason: String? = nil, permit: PermitSignature? = nil) async throws -> Deposit {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
             method: "POST", path: "/api/v0/deposits",
-            body: DepositBody(recipient: recipient, amount: amount, reason: reason)
+            body: DepositBody(recipient: recipient, amount: amount, reason: reason, permit: permit)
         )
     }
 
@@ -254,6 +275,16 @@ public final class RemitWallet: Sendable {
         )
     }
 
+    // MARK: - Testnet
+
+    /// Mint testnet USDC via POST /mint. Max $2,500 per call, once per hour per wallet.
+    public func mint(amount: Double) async throws -> MintResponse {
+        return try await transport.request(
+            method: "POST", path: "/api/v0/mint",
+            body: MintBody(wallet: signerAddress, amount: amount)
+        )
+    }
+
     private func validateAmount(_ amount: Double) throws {
         guard amount > 0 else {
             throw RemitError.invalidAmount(amount, reason: "amount must be positive")
@@ -267,20 +298,32 @@ public final class RemitWallet: Sendable {
 // MARK: - Request body structs (private)
 
 private struct EmptyBody: Codable {}
-private struct PayBody: Codable { let to: String; let amount: Double; let memo: String? }
-private struct EscrowBody: Codable { let recipient: String; let amount: Double; let conditions: String? }
-private struct TabBody: Codable { let chain: String; let recipient: String; let limit: Double }
+private struct PayBody: Codable { let to: String; let amount: Double; let memo: String?; let permit: PermitSignature? }
+private struct EscrowBody: Codable { let recipient: String; let amount: Double; let conditions: String?; let permit: PermitSignature? }
+private struct TabBody: Codable { let chain: String; let recipient: String; let limit: Double; let permit: PermitSignature? }
 private struct DebitBody: Codable { let amount: Double; let memo: String? }
 private struct StreamBody: Codable {
-    let chain: String; let recipient: String; let ratePerSecond: Double
+    let chain: String; let recipient: String; let ratePerSecond: Double; let permit: PermitSignature?
     enum CodingKeys: String, CodingKey {
-        case chain, recipient
+        case chain, recipient, permit
         case ratePerSecond = "rate_per_second"
     }
 }
-private struct BountyBody: Codable { let chain: String; let amount: Double; let description: String }
+private struct BountyBody: Codable { let chain: String; let amount: Double; let description: String; let permit: PermitSignature? }
 private struct BountyListResponse: Codable { let data: [Bounty] }
 private struct AwardBody: Codable { let winner: String }
-private struct DepositBody: Codable { let recipient: String; let amount: Double; let reason: String? }
+private struct DepositBody: Codable { let recipient: String; let amount: Double; let reason: String?; let permit: PermitSignature? }
 private struct IntentBody: Codable { let to: String; let amount: Double; let model: String }
 private struct WebhookBody: Codable { let url: String; let events: [String]; let chains: [String]? }
+private struct MintBody: Codable { let wallet: String; let amount: Double }
+
+/// Response from POST /mint.
+public struct MintResponse: Codable, Sendable {
+    public let txHash: String
+    public let balance: Double
+
+    enum CodingKeys: String, CodingKey {
+        case txHash = "tx_hash"
+        case balance
+    }
+}

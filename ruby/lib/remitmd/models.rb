@@ -47,6 +47,46 @@ module Remitmd
     FORFEITED = "forfeited"
   end
 
+  # ─── Permit & Contract Addresses ─────────────────────────────────────────
+
+  # EIP-2612 permit signature for gasless USDC approval.
+  class PermitSignature
+    attr_reader :value, :deadline, :v, :r, :s
+
+    def initialize(value:, deadline:, v:, r:, s:)
+      @value    = value
+      @deadline = deadline
+      @v        = v
+      @r        = r
+      @s        = s
+    end
+
+    def to_h
+      { value: @value, deadline: @deadline, v: @v, r: @r, s: @s }
+    end
+  end
+
+  # Contract addresses returned by GET /contracts.
+  class ContractAddresses < Model
+    def initialize(attrs)
+      h = attrs.transform_keys(&:to_s)
+      @chain_id       = h["chain_id"]&.to_i
+      @usdc           = h["usdc"]
+      @router         = h["router"]
+      @escrow         = h["escrow"]
+      @tab            = h["tab"]
+      @stream         = h["stream"]
+      @bounty         = h["bounty"]
+      @deposit        = h["deposit"]
+      @fee_calculator = h["fee_calculator"]
+      @key_registry   = h["key_registry"]
+      @arbitration    = h["arbitration"]
+    end
+
+    attr_reader :chain_id, :usdc, :router, :escrow, :tab, :stream,
+                :bounty, :deposit, :fee_calculator, :key_registry, :arbitration
+  end
+
   # ─── Value objects ────────────────────────────────────────────────────────
 
   # Immutable model base. Builds from a hash with string or symbol keys.

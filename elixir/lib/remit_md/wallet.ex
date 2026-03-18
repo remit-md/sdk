@@ -20,8 +20,8 @@ defmodule RemitMd.Wallet do
 
   alias RemitMd.{Error, Http, MockRemit, MockSigner, PrivateKeySigner}
   alias RemitMd.Models.{
-    Balance, Bounty, Budget, Escrow, Reputation, SpendingSummary, Stream, Tab, Transaction, TransactionList,
-    Webhook
+    Balance, Bounty, Budget, ContractAddresses, Escrow, MintResponse, PermitSignature,
+    Reputation, SpendingSummary, Stream, Tab, Transaction, TransactionList, Webhook
   }
 
   @min_amount Decimal.new("0.000001")
@@ -211,6 +211,7 @@ defmodule RemitMd.Wallet do
         signature: "0x",
         metadata: Keyword.get(opts, :metadata)
       }
+      body = maybe_add_permit(body, opts)
 
       with {:ok, data} <- call_mock_or_http(w, fn pid ->
              MockRemit.do_pay(pid, w.address, to, amount_usdc, opts)
@@ -250,6 +251,7 @@ defmodule RemitMd.Wallet do
         description: description,
         expires_in:  expires_in
       }
+      body = maybe_add_permit(body, opts)
 
       with {:ok, data} <- call_mock_or_http(w, fn pid ->
              MockRemit.do_create_escrow(pid, w.address, to, amount_usdc, opts)
@@ -305,6 +307,7 @@ defmodule RemitMd.Wallet do
       expires_in = Keyword.get(opts, :expires_in, 30 * 86_400)
 
       body = %{chain: w.chain, to: to, credit_limit_usdc: credit_limit_usdc, expires_in: expires_in}
+      body = maybe_add_permit(body, opts)
 
       with {:ok, data} <- do_call(w, :post, "/tabs", body) do
         {:ok, Tab.from_map(data)}
@@ -347,6 +350,7 @@ defmodule RemitMd.Wallet do
          :ok <- validate_amount(rate_per_second_usdc) do
       duration = Keyword.get(opts, :duration)
       body = %{chain: w.chain, to: to, rate_per_second_usdc: rate_per_second_usdc, duration: duration}
+      body = maybe_add_permit(body, opts)
 
       with {:ok, data} <- do_call(w, :post, "/streams", body) do
         {:ok, Stream.from_map(data)}
@@ -378,6 +382,7 @@ defmodule RemitMd.Wallet do
         description: Keyword.get(opts, :description),
         expires_in:  Keyword.get(opts, :expires_in, 86_400)
       }
+      body = maybe_add_permit(body, opts)
 
       with {:ok, data} <- do_call(w, :post, "/bounties", body) do
         {:ok, Bounty.from_map(data)}
@@ -473,6 +478,37 @@ defmodule RemitMd.Wallet do
     end
   end
 
+  # ─── Contracts ────────────────────────────────────────────────────────
+
+  @doc """
+  Fetch contract addresses for the current chain.
+  Returns `{:ok, %RemitMd.Models.ContractAddresses{}}` or `{:error, %RemitMd.Error{}}`.
+  """
+  def get_contracts(%__MODULE__{} = w) do
+    with {:ok, data} <- do_call(w, :get, "/contracts", nil) do
+      {:ok, ContractAddresses.from_map(data)}
+    end
+  end
+
+  # ─── Mint (testnet only) ─────────────────────────────────────────────
+
+  @doc """
+  Mint testnet USDC to this wallet (testnet only).
+
+  ## Example
+
+      {:ok, resp} = RemitMd.Wallet.mint(wallet, "100.00")
+  """
+  def mint(%__MODULE__{} = w, amount_usdc) do
+    with :ok <- validate_amount(amount_usdc) do
+      body = %{wallet: w.address, amount: amount_usdc}
+
+      with {:ok, data} <- do_call(w, :post, "/mint", body) do
+        {:ok, MintResponse.from_map(data)}
+      end
+    end
+  end
+
   @doc false
   def inspect_address(%__MODULE__{address: addr}), do: addr
 
@@ -555,6 +591,13 @@ defmodule RemitMd.Wallet do
   defp get_address(%RemitMd.PrivateKeySigner{} = s), do: s.address
   defp get_address(%{address: addr}), do: addr
   defp get_address(%_{} = s), do: Map.get(s, :address)
+
+  defp maybe_add_permit(body, opts) do
+    case Keyword.get(opts, :permit) do
+      %PermitSignature{} = p -> Map.put(body, :permit, PermitSignature.to_map(p))
+      _ -> body
+    end
+  end
 
   # Strip testnet suffixes so we send "base" not "base_sepolia" in the pay body.
   defp base_chain_name(chain) do

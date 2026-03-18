@@ -238,4 +238,53 @@ defmodule RemitMd.Models do
       }
     end
   end
+
+  defmodule PermitSignature do
+    @moduledoc "EIP-2612 permit signature for gasless USDC approvals."
+    @enforce_keys [:value, :deadline, :v, :r, :s]
+    defstruct [:value, :deadline, :v, :r, :s]
+
+    @doc false
+    def to_map(%__MODULE__{} = p) do
+      %{value: p.value, deadline: p.deadline, v: p.v, r: p.r, s: p.s}
+    end
+  end
+
+  defmodule ContractAddresses do
+    @moduledoc "On-chain contract addresses for the current chain."
+    @enforce_keys [:chain_id, :usdc, :router]
+    defstruct [:chain_id, :usdc, :router, :escrow, :tab, :stream,
+               :bounty, :deposit, :fee_calculator, :key_registry, :arbitration]
+
+    @doc false
+    def from_map(m) do
+      %__MODULE__{
+        chain_id:       Map.get(m, "chain_id"),
+        usdc:           Map.get(m, "usdc"),
+        router:         Map.get(m, "router"),
+        escrow:         Map.get(m, "escrow"),
+        tab:            Map.get(m, "tab"),
+        stream:         Map.get(m, "stream"),
+        bounty:         Map.get(m, "bounty"),
+        deposit:        Map.get(m, "deposit"),
+        fee_calculator: Map.get(m, "fee_calculator"),
+        key_registry:   Map.get(m, "key_registry"),
+        arbitration:    Map.get(m, "arbitration")
+      }
+    end
+  end
+
+  defmodule MintResponse do
+    @moduledoc "Result of a testnet mint operation."
+    @enforce_keys [:tx_hash, :balance]
+    defstruct [:tx_hash, :balance]
+
+    @doc false
+    def from_map(m) do
+      %__MODULE__{
+        tx_hash: Map.get(m, "tx_hash"),
+        balance: Map.get(m, "balance")
+      }
+    end
+  end
 end

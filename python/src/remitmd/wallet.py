@@ -34,8 +34,11 @@ class PermitSignature:
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "value": self.value, "deadline": self.deadline,
-            "v": self.v, "r": self.r, "s": self.s,
+            "value": self.value,
+            "deadline": self.deadline,
+            "v": self.v,
+            "r": self.r,
+            "s": self.s,
         }
 
 
@@ -138,7 +141,8 @@ class Wallet(RemitClient):
             usdc_address: Override the USDC contract address.
 
         Returns:
-            A PermitSignature that can be passed to post_bounty() or place_deposit().
+            A PermitSignature that can be passed to pay_direct(), pay(),
+            open_tab(), open_stream(), post_bounty(), or place_deposit().
         """
         usdc_addr = usdc_address or USDC_ADDRESSES.get(self.chain, "")
 
@@ -176,25 +180,35 @@ class Wallet(RemitClient):
 
     # ─── Direct payment ───────────────────────────────────────────────────────
 
-    async def pay_direct(self, to: str, amount: float, memo: str = "") -> Transaction:
+    async def pay_direct(
+        self,
+        to: str,
+        amount: float,
+        memo: str = "",
+        permit: PermitSignature | None = None,
+    ) -> Transaction:
         """Send a direct USDC payment (no escrow, no refund)."""
         nonce = secrets.token_hex(16)
-        data = await self._http.post(
-            "/api/v0/payments/direct",
-            {
-                "to": to,
-                "amount": amount,
-                "task": memo,
-                "chain": self.chain,
-                "nonce": nonce,
-                "signature": "0x",
-            },
-        )
+        body: dict[str, Any] = {
+            "to": to,
+            "amount": amount,
+            "task": memo,
+            "chain": self.chain,
+            "nonce": nonce,
+            "signature": "0x",
+        }
+        if permit is not None:
+            body["permit"] = permit.to_dict()
+        data = await self._http.post("/api/v0/payments/direct", body)
         return Transaction.model_validate(data)
 
     # ─── Escrow ───────────────────────────────────────────────────────────────
 
-    async def pay(self, invoice: Invoice) -> Escrow:
+    async def pay(
+        self,
+        invoice: Invoice,
+        permit: PermitSignature | None = None,
+    ) -> Escrow:
         """Fund an escrow: create invoice then fund escrow in one call."""
         import uuid
 
@@ -218,10 +232,10 @@ class Wallet(RemitClient):
         await self._http.post("/api/v0/invoices", inv_body)
 
         # Step 2: fund the escrow.
-        data = await self._http.post(
-            "/api/v0/escrows",
-            {"invoice_id": invoice_id},
-        )
+        escrow_body: dict[str, Any] = {"invoice_id": invoice_id}
+        if permit is not None:
+            escrow_body["permit"] = permit.to_dict()
+        data = await self._http.post("/api/v0/escrows", escrow_body)
         return Escrow.model_validate(data)
 
     async def claim_start(self, invoice_id: str) -> Escrow:
@@ -263,18 +277,19 @@ class Wallet(RemitClient):
         limit: float,
         per_unit: float,
         expires: int = 86400,
+        permit: PermitSignature | None = None,
     ) -> Tab:
         expiry = int(time.time()) + expires
-        data = await self._http.post(
-            "/api/v0/tabs",
-            {
-                "chain": self.chain,
-                "provider": to,
-                "limit_amount": limit,
-                "per_unit": per_unit,
-                "expiry": expiry,
-            },
-        )
+        body: dict[str, Any] = {
+            "chain": self.chain,
+            "provider": to,
+            "limit_amount": limit,
+            "per_unit": per_unit,
+            "expiry": expiry,
+        }
+        if permit is not None:
+            body["permit"] = permit.to_dict()
+        data = await self._http.post("/api/v0/tabs", body)
         return Tab.model_validate(data)
 
     async def close_tab(self, tab_id: str) -> Tab:
@@ -292,6 +307,7 @@ class Wallet(RemitClient):
         rate: float,
         max_duration: int = 3600,
         max_total: float | None = None,
+        permit: PermitSignature | None = None,
     ) -> Stream:
         body: dict[str, Any] = {
             "chain": self.chain,
@@ -301,6 +317,8 @@ class Wallet(RemitClient):
         }
         if max_total is not None:
             body["max_total"] = max_total
+        if permit is not None:
+            body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v0/streams", body)
         return Stream.model_validate(data)
 
@@ -415,6 +433,14 @@ class Wallet(RemitClient):
             status="confirmed",
             created_at=int(time.time()),
         )
+
+    async def mint(self, amount: float) -> dict[str, Any]:
+        """Mint testnet USDC. Returns ``{"tx_hash": "0x…", "balance": "…"}``."""
+        data = await self._http.post(
+            "/api/v0/mint",
+            {"wallet": self.address, "amount": amount},
+        )
+        return data
 
     # ─── Repr (never expose key) ──────────────────────────────────────────────
 

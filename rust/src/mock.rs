@@ -12,6 +12,8 @@ use crate::http::Transport;
 use crate::models::*;
 use crate::wallet::Wallet;
 
+const MOCK_WALLET: &str = "0xMockWallet0000000000000000000000000001";
+
 /// In-memory mock for testing agents that use remit.md.
 ///
 /// Zero network, zero latency, deterministic — the ideal test double.
@@ -82,9 +84,10 @@ impl MockRemit {
             transport: Arc::new(MockTransport {
                 state: self.state.clone(),
             }),
-            address: "0xMockWallet0000000000000000000000000001".to_string(),
+            address: MOCK_WALLET.to_string(),
             chain_id: ChainId::BASE_SEPOLIA,
             chain: "base".to_string(),
+            contracts_cache: Mutex::new(None),
         }
     }
 
@@ -567,6 +570,34 @@ impl MockTransport {
                     created_at: Utc::now(),
                 };
                 Ok(serde_json::to_value(&tx).unwrap())
+            }
+
+            // ─── Contracts ─────────────────────────────────────────────────
+            ("GET", "/api/v0/contracts") => {
+                Ok(json!({
+                    "chain_id": 84532u64,
+                    "usdc": "0x0000000000000000000000000000000000000001",
+                    "router": "0x0000000000000000000000000000000000000002",
+                    "escrow": "0x0000000000000000000000000000000000000003",
+                    "tab": "0x0000000000000000000000000000000000000004",
+                    "stream": "0x0000000000000000000000000000000000000005",
+                    "bounty": "0x0000000000000000000000000000000000000006",
+                    "deposit": "0x0000000000000000000000000000000000000007",
+                    "fee_calculator": "0x0000000000000000000000000000000000000008",
+                    "key_registry": "0x0000000000000000000000000000000000000009",
+                    "arbitration": "0x000000000000000000000000000000000000000a",
+                }))
+            }
+
+            // ─── Mint ─────────────────────────────────────────────────────
+            ("POST", "/api/v0/mint") => {
+                let amount = b["amount"].as_f64().unwrap_or(0.0);
+                let mut s = self.state.lock().await;
+                s.balance += Decimal::from_str_exact(&format!("{amount}")).unwrap_or_default();
+                Ok(json!({
+                    "tx_hash": format!("0x{}", mock_hash()),
+                    "balance": s.balance,
+                }))
             }
 
             // ─── Catch-all: return empty success ──────────────────────────

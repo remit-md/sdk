@@ -44,6 +44,47 @@ public enum DepositStatus: String, Codable, Sendable {
     case locked, returned, forfeited
 }
 
+// MARK: - Permit & Contract Addresses
+
+/// EIP-2612 permit signature for gasless USDC approval.
+public struct PermitSignature: Codable, Sendable {
+    public let value: Double
+    public let deadline: Int
+    public let v: Int
+    public let r: String
+    public let s: String
+
+    public init(value: Double, deadline: Int, v: Int, r: String, s: String) {
+        self.value = value
+        self.deadline = deadline
+        self.v = v
+        self.r = r
+        self.s = s
+    }
+}
+
+/// Contract addresses returned by GET /contracts.
+public struct ContractAddresses: Codable, Sendable {
+    public let chainId: Int
+    public let usdc: String
+    public let router: String
+    public let escrow: String
+    public let tab: String
+    public let stream: String
+    public let bounty: String
+    public let deposit: String
+    public let feeCalculator: String
+    public let keyRegistry: String
+    public let arbitration: String
+
+    enum CodingKeys: String, CodingKey {
+        case usdc, router, escrow, tab, stream, bounty, deposit, arbitration
+        case chainId = "chain_id"
+        case feeCalculator = "fee_calculator"
+        case keyRegistry = "key_registry"
+    }
+}
+
 // MARK: - Core models
 
 public struct Transaction: Codable, Sendable {

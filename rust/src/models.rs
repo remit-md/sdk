@@ -71,6 +71,40 @@ pub enum DepositStatus {
     Forfeited,
 }
 
+/// ERC-2612 permit signature for gasless USDC approvals.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PermitSignature {
+    pub value: u64,
+    pub deadline: u64,
+    pub v: u8,
+    pub r: String,
+    pub s: String,
+}
+
+/// On-chain contract addresses for the current deployment.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContractAddresses {
+    pub chain_id: u64,
+    pub usdc: String,
+    pub router: String,
+    pub escrow: String,
+    pub tab: String,
+    pub stream: String,
+    pub bounty: String,
+    pub deposit: String,
+    pub fee_calculator: String,
+    pub key_registry: String,
+    pub arbitration: String,
+}
+
+/// Result of a testnet mint operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MintResponse {
+    pub tx_hash: String,
+    #[serde(with = "rust_decimal::serde::float")]
+    pub balance: Decimal,
+}
+
 /// One-time operator link for funding or withdrawing a wallet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinkResponse {

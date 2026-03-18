@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.models.bounty import Bounty
 from remitmd.models.common import Reputation, WalletStatus, Webhook
@@ -10,6 +12,22 @@ from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
 from remitmd.models.stream import Stream
 from remitmd.models.tab import Tab
+
+
+class ContractAddresses(TypedDict):
+    """On-chain contract addresses returned by GET /api/v0/contracts."""
+
+    chain_id: int
+    usdc: str
+    router: str
+    escrow: str
+    tab: str
+    stream: str
+    bounty: str
+    deposit: str
+    fee_calculator: str
+    key_registry: str
+    arbitration: str
 
 
 class RemitClient:
@@ -34,6 +52,17 @@ class RemitClient:
         self.chain = chain
         self.testnet = testnet
         self._http = AuthenticatedClient(url, signer=None, chain_id=chain_id)
+        self._contracts_cache: ContractAddresses | None = None
+
+    # ─── Contracts ─────────────────────────────────────────────────────────────
+
+    async def get_contracts(self) -> ContractAddresses:
+        """Return on-chain contract addresses (cached after first call)."""
+        if self._contracts_cache is not None:
+            return self._contracts_cache
+        data = await self._http.get("/api/v0/contracts")
+        self._contracts_cache = ContractAddresses(**data)
+        return self._contracts_cache
 
     # ─── Invoices ─────────────────────────────────────────────────────────────
 

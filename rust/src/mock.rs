@@ -221,7 +221,14 @@ impl MockTransport {
                 let amount = decimal_field(&b, "amount")?;
                 let memo = b["task"].as_str().unwrap_or("").to_string();
                 let mut s = self.state.lock().await;
-                s.pending_invoices.insert(id.clone(), PendingInvoice { payee, amount, memo });
+                s.pending_invoices.insert(
+                    id.clone(),
+                    PendingInvoice {
+                        payee,
+                        amount,
+                        memo,
+                    },
+                );
                 Ok(json!({ "id": id, "status": "pending" }))
             }
 
@@ -640,7 +647,10 @@ fn decimal_field(v: &Value, key: &str) -> Result<Decimal, RemitError> {
     if let Some(n) = val.as_f64() {
         return Ok(Decimal::from_str_exact(&n.to_string()).unwrap_or_default());
     }
-    Err(remit_err(codes::SERVER_ERROR, format!("missing field: {key}")))
+    Err(remit_err(
+        codes::SERVER_ERROR,
+        format!("missing field: {key}"),
+    ))
 }
 
 fn check_balance(balance: Decimal, needed: Decimal) -> Result<(), RemitError> {

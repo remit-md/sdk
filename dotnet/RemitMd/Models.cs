@@ -241,6 +241,7 @@ public record MintResponse(
 )
 {
     /// <summary>Parsed balance as decimal.</summary>
+    [JsonIgnore]
     public decimal Balance => decimal.TryParse(BalanceRaw, out var d) ? d : 0m;
 };
 

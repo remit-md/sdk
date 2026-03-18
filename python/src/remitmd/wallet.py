@@ -152,7 +152,7 @@ class Wallet(RemitClient):
             "chainId": self._chain_id,
             "verifyingContract": usdc_addr,
         }
-        types = {
+        types: dict[str, object] = {
             "Permit": [
                 {"name": "owner", "type": "address"},
                 {"name": "spender", "type": "address"},
@@ -436,7 +436,7 @@ class Wallet(RemitClient):
 
     async def mint(self, amount: float) -> dict[str, Any]:
         """Mint testnet USDC. Returns ``{"tx_hash": "0x…", "balance": "…"}``."""
-        data = await self._http.post(
+        data: dict[str, Any] = await self._http.post(
             "/api/v0/mint",
             {"wallet": self.address, "amount": amount},
         )

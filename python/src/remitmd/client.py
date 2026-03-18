@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Any, TypedDict, cast
 
 from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.models.bounty import Bounty
@@ -61,7 +61,7 @@ class RemitClient:
         if self._contracts_cache is not None:
             return self._contracts_cache
         data = await self._http.get("/api/v0/contracts")
-        self._contracts_cache = ContractAddresses(**data)
+        self._contracts_cache = cast(ContractAddresses, data)
         return self._contracts_cache
 
     # ─── Invoices ─────────────────────────────────────────────────────────────

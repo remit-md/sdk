@@ -30,6 +30,17 @@ wallet = RemitMd.Wallet.from_env()
 IO.puts("tx_hash: #{tx.tx_hash}")
 ```
 
+## Permits (Gasless USDC Approval)
+
+```elixir
+{:ok, contracts} = RemitMd.Wallet.get_contracts(wallet)
+
+# Use permits on any payment method
+{:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "5.00", permit: permit)
+```
+
+Permits are optional on: `pay`, `create_escrow`, `create_tab` (via `open_tab`), `create_stream`, `create_bounty` (via `post_bounty`), `place_deposit`.
+
 ## Payment Models
 
 | Function | Model | Use Case |
@@ -39,6 +50,7 @@ IO.puts("tx_hash: #{tx.tx_hash}")
 | `Wallet.open_tab/4` | Tab | High-frequency micro-payments |
 | `Wallet.create_stream/4` | Stream | Continuous per-second payments |
 | `Wallet.post_bounty/3` | Bounty | Open tasks any agent can claim |
+| `Wallet.place_deposit/4` | Deposit | Refundable collateral |
 
 ## Testing with MockRemit
 
@@ -104,6 +116,42 @@ defmodule MyKmsSigner do
 end
 
 wallet = RemitMd.Wallet.new(signer: MyKmsSigner, chain: "base")
+```
+
+## Additional Methods
+
+```elixir
+# Contract discovery (cached per session)
+{:ok, contracts} = RemitMd.Wallet.get_contracts(wallet)
+
+# Tab provider (signing charges)
+sig = RemitMd.Wallet.sign_tab_charge(wallet, tab_contract, tab_id, total_charged, call_count)
+{:ok, charge} = RemitMd.Wallet.charge_tab(wallet, tab_id, amount, cumulative, call_count, provider_sig)
+{:ok, tab} = RemitMd.Wallet.close_tab(wallet, tab_id)
+
+# Webhooks
+{:ok, wh} = RemitMd.Wallet.register_webhook(wallet, "https://...", ["payment.received"])
+
+# Operator links
+{:ok, link} = RemitMd.Wallet.create_fund_link(wallet)
+{:ok, link} = RemitMd.Wallet.create_withdraw_link(wallet)
+
+# Testnet funding
+{:ok, result} = RemitMd.Wallet.mint(wallet, 100)  # $100 testnet USDC
+```
+
+## Error Handling
+
+Errors return `{:error, %RemitMd.Error{}}` with machine-readable codes and actionable details:
+
+```elixir
+case RemitMd.Wallet.pay(wallet, "0xRecipient", "100.00") do
+  {:ok, tx} -> IO.puts("Paid: #{tx.tx_hash}")
+  {:error, %{code: "INSUFFICIENT_BALANCE"} = err} ->
+    IO.puts("Need more USDC: #{err.message}")
+    # Enriched: "Insufficient USDC balance: have $5.00, need $100.00"
+  {:error, err} -> IO.puts("Error [#{err.code}]: #{err.message}")
+end
 ```
 
 ## Requirements

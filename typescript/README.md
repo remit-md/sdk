@@ -220,15 +220,18 @@ const data = await response.json();
 
 ## Error Handling
 
-All errors are structured with machine-readable codes:
+All errors are structured with machine-readable codes and enriched details:
 
 ```typescript
 try {
-  await wallet.payDirect("invalid", 1.0);
+  await wallet.payDirect("0xRecipient...", 100.0);
 } catch (err) {
   if (err instanceof RemitError) {
-    console.log(err.code);    // "INVALID_ADDRESS"
-    console.log(err.message); // Human-readable description
+    console.log(err.code);    // "INSUFFICIENT_BALANCE"
+    console.log(err.message); // "Insufficient USDC balance: have $5.00, need $100.00"
+    // Enriched errors include actual numbers in details:
+    // err.details = {required: "100.00", available: "5.00",
+    //               required_units: 100000000, available_units: 5000000}
   }
 }
 ```

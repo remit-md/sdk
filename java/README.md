@@ -72,11 +72,23 @@ Wallet wallet = RemitMd.withSigner(hash -> myKmsClient.sign(hash))
 
 ---
 
+## Permits (Gasless USDC Approval)
+
+```java
+ContractAddresses contracts = wallet.getContracts();
+
+// Use permits with any payment method
+Transaction tx = wallet.pay("0xRecipient...", new BigDecimal("1.50"), permit);
+```
+
+Permits are optional on: `pay`, `createEscrow`, `createTab`, `createStream`, `createBounty`, `lockDeposit`.
+
 ## Payment Methods
 
 ### Direct Payment
 ```java
-Transaction tx = wallet.pay("0xRecipient...", new BigDecimal("1.50"), "API call fee");
+PermitSignature permit = wallet.signPermit(contracts.router, new BigDecimal("1.50"));
+Transaction tx = wallet.pay("0xRecipient...", new BigDecimal("1.50"), "API call fee", permit);
 ```
 
 ### Escrow
@@ -94,14 +106,14 @@ wallet.cancelEscrow(escrow.id);
 ### Tabs (Micro-payment Channels)
 ```java
 // Open a channel for high-frequency micro-payments
-Tab tab = wallet.createTab("0xApiService...", new BigDecimal("5.00"));
+Tab tab = wallet.createTab("0xApiService...", new BigDecimal("5.00"), new BigDecimal("0.003"), permit);
 
-// Charge per API call (off-chain, cheap)
-wallet.debitTab(tab.id, new BigDecimal("0.003"), "inference call");
-wallet.debitTab(tab.id, new BigDecimal("0.003"), "inference call");
+// Provider charges with EIP-712 signature
+String sig = wallet.signTabCharge(contracts.tab, tab.id, 3000000L, 1);
+wallet.chargeTab(tab.id, new BigDecimal("0.003"), new BigDecimal("0.003"), 1, sig);
 
-// Settle all charges on-chain when done
-wallet.settleTab(tab.id);
+// Close when done — unused funds return
+wallet.closeTab(tab.id, new BigDecimal("0.003"), sig);
 ```
 
 ### Bounties
@@ -231,14 +243,29 @@ try {
 }
 ```
 
-Error codes are defined in `ErrorCodes`:
-- `INVALID_ADDRESS`, `INVALID_AMOUNT`, `INVALID_CHAIN`, `INVALID_PARAM`
-- `INSUFFICIENT_FUNDS`
-- `ESCROW_NOT_FOUND`, `ESCROW_WRONG_STATE`
-- `TAB_NOT_FOUND`, `TAB_LIMIT_EXCEEDED`
-- `BOUNTY_NOT_FOUND`, `DEPOSIT_NOT_FOUND`
-- `UNAUTHORIZED`, `FORBIDDEN`, `RATE_LIMITED`
-- `SERVER_ERROR`, `CHAIN_ERROR`
+Enriched errors include actual numbers for balance-related failures:
+```java
+// e.getCode() == "INSUFFICIENT_BALANCE"
+// e.getMessage() == "Insufficient USDC balance: have $5.00, need $100.00"
+// e.getDetails() == {"required": "100.00", "available": "5.00", ...}
+```
+
+## Additional Methods
+
+```java
+// Contract discovery (cached per session)
+ContractAddresses contracts = wallet.getContracts();
+
+// Webhooks
+wallet.registerWebhook("https://...", List.of("payment.received"));
+
+// Operator links
+LinkResponse link = wallet.createFundLink();
+LinkResponse link = wallet.createWithdrawLink();
+
+// Testnet funding
+MintResponse result = wallet.mint(100.0);  // $100 testnet USDC
+```
 
 ---
 

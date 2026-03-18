@@ -36,12 +36,41 @@ tx = await wallet.pay_direct("0xRecipient...", 1.50, memo="inference fee")
 print(tx.tx_hash)
 ```
 
+## Permits (Gasless USDC Approval)
+
+Every payment that moves USDC requires on-chain approval. Use `sign_usdc_permit()` to sign an EIP-2612 permit off-chain — no gas, no approve transaction.
+
+```python
+contracts = await wallet.get_contracts()
+
+# sign_usdc_permit(spender, value, deadline, nonce)
+# value is in USDC base units (6 decimals): $5.00 = 5_000_000
+permit = await wallet.sign_usdc_permit(
+    spender=contracts["router"],
+    value=5_000_000,
+    deadline=9999999999,
+    nonce=0,
+)
+
+# Use the permit with any payment method
+tx = await wallet.pay_direct("0xRecipient...", 5.00, permit=permit)
+```
+
+The `spender` must match the contract handling the payment:
+- Direct payment: `contracts["router"]`
+- Escrow: `contracts["escrow"]`
+- Tab: `contracts["tab"]`
+- Stream: `contracts["stream"]`
+- Bounty: `contracts["bounty"]`
+- Deposit: `contracts["deposit"]`
+
 ## Payment Models
 
 ### Direct Payment
 
 ```python
-tx = await wallet.pay_direct("0xRecipient...", 5.00, memo="AI task")
+permit = await wallet.sign_usdc_permit(contracts["router"], 5_000_000, 9999999999, 0)
+tx = await wallet.pay_direct("0xRecipient...", 5.00, memo="AI task", permit=permit)
 ```
 
 ### Escrow
@@ -120,60 +149,77 @@ async def test_agent_pays(wallet):
 ## All Methods
 
 ```python
+# Contract discovery (cached per session)
+contracts = await wallet.get_contracts()                     # dict
+
+# Permits (gasless USDC approval)
+permit = await wallet.sign_usdc_permit(                      # PermitSignature
+    spender, value, deadline, nonce, usdc_address=None)
+
 # Direct payment
-await wallet.pay_direct(to, amount, memo="")              # Transaction
+await wallet.pay_direct(to, amount, memo="", permit=None)    # Transaction
 
 # Escrow
-await wallet.pay(invoice)                                   # Escrow
-await wallet.claim_start(invoice_id)                        # Escrow
-await wallet.submit_evidence(invoice_id, uri, milestone=0)  # Transaction
-await wallet.release_escrow(invoice_id)                     # Escrow
-await wallet.release_milestone(invoice_id, index)           # Escrow
-await wallet.cancel_escrow(invoice_id)                      # Escrow
+await wallet.pay(invoice, permit=None)                       # Escrow
+await wallet.claim_start(invoice_id)                         # Escrow
+await wallet.submit_evidence(invoice_id, uri)                # Escrow
+await wallet.release_escrow(invoice_id)                      # Escrow
+await wallet.release_milestone(invoice_id, index)            # Escrow
+await wallet.cancel_escrow(invoice_id)                       # Escrow
 
 # Tabs
-await wallet.open_tab(to, limit, per_unit, expires=86400)   # Tab
-await wallet.close_tab(tab_id)                              # Tab
+await wallet.open_tab(to, limit, per_unit, expires=86400, permit=None)  # Tab
+await wallet.close_tab(tab_id, final_amount=0, provider_sig="0x")      # Tab
+await wallet.charge_tab(tab_id, amount, cumulative, call_count, provider_sig)  # TabCharge
+
+# Tab provider (signing charges)
+sig = await wallet.sign_tab_charge(tab_contract, tab_id, total_charged, call_count)  # str
 
 # Streams
-await wallet.open_stream(to, rate, max_duration=3600)       # Stream
-await wallet.close_stream(stream_id)                        # Transaction
+await wallet.open_stream(to, rate, max_total, permit=None)   # Stream
+await wallet.close_stream(stream_id)                         # Transaction
 
 # Bounties
-await wallet.post_bounty(amount, task, deadline, ...)       # Bounty
-await wallet.submit_bounty(bounty_id, evidence_uri)         # Transaction
-await wallet.award_bounty(bounty_id, winner)                # Transaction
+await wallet.post_bounty(amount, task, deadline, max_attempts=10, permit=None)  # Bounty
+await wallet.submit_bounty(bounty_id, evidence_hash, evidence_uri=None)         # dict
+await wallet.award_bounty(bounty_id, submission_id)          # Bounty
 
 # Deposits
-await wallet.place_deposit(to, amount, expires)             # Deposit
+await wallet.place_deposit(to, amount, expires, permit=None) # Deposit
+await wallet.return_deposit(deposit_id)                      # Transaction
 
 # Status & analytics
-await wallet.status()                                       # WalletStatus
-await wallet.balance()                                      # float
+await wallet.status()                                        # WalletStatus
 
 # Webhooks
-await wallet.register_webhook(url, events, chains=None)     # Webhook
+await wallet.register_webhook(url, events, chains=None)      # Webhook
 
 # Operator links
-await wallet.create_fund_link()                             # LinkResponse
-await wallet.create_withdraw_link()                         # LinkResponse
+await wallet.create_fund_link()                              # LinkResponse
+await wallet.create_withdraw_link()                          # LinkResponse
 
 # Testnet
-await wallet.request_testnet_funds()                        # Transaction
+await wallet.mint(amount)                                    # dict {tx_hash, balance}
+
+# x402 (HTTP 402 auto-pay)
+response, payment = await wallet.x402_fetch(url, max_auto_pay_usdc=0.10)
 ```
 
 ## Error Handling
 
-All errors are `RemitError` with machine-readable codes:
+All errors are `RemitError` with machine-readable codes and actionable details:
 
 ```python
 from remitmd import RemitError
 
 try:
-    await wallet.pay_direct("invalid", 1.00)
+    await wallet.pay_direct("0xRecipient...", 100.00)
 except RemitError as e:
-    print(e.code)     # "INVALID_ADDRESS"
-    print(e.message)  # Human-readable description
+    print(e.code)     # "INSUFFICIENT_BALANCE"
+    print(e.message)  # "Insufficient USDC balance: have $5.00, need $100.00"
+    # Enriched errors include details with actual numbers:
+    # e.details = {"required": "100.00", "available": "5.00",
+    #              "required_units": 100000000, "available_units": 5000000}
 ```
 
 ## Chains

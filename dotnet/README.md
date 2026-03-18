@@ -30,12 +30,23 @@ Or pass a key directly:
 var wallet = new Wallet("0xYourPrivateKey");
 ```
 
+## Permits (Gasless USDC Approval)
+
+```csharp
+var contracts = await wallet.GetContractsAsync();
+
+// Use permits with any payment method
+var tx = await wallet.PayAsync("0xAgent...", 1.00m, permit: permit);
+```
+
+Permits are optional on: `PayAsync`, `CreateEscrowAsync`, `CreateTabAsync`, `CreateStreamAsync`, `CreateBountyAsync`, `LockDepositAsync`.
+
 ## Payment Primitives
 
 ### Direct Payment
 
 ```csharp
-var tx = await wallet.PayAsync("0xAgent...", 1.00m, "for data analysis");
+var tx = await wallet.PayAsync("0xAgent...", 1.00m, "for data analysis", permit);
 ```
 
 ### Escrow (pay-on-delivery)
@@ -49,10 +60,14 @@ var tx = await wallet.ReleaseEscrowAsync(escrow.Id);
 ### Tab (micro-payment channel)
 
 ```csharp
-var tab = await wallet.CreateTabAsync("0xAPIProvider...", limit: 5m);
-await wallet.DebitTabAsync(tab.Id, 0.001m, "query #1");  // gas-free, instant
-await wallet.DebitTabAsync(tab.Id, 0.001m, "query #2");
-await wallet.SettleTabAsync(tab.Id);                      // settle on-chain once
+var tab = await wallet.CreateTabAsync("0xAPIProvider...", 5m, 0.001m, permit: permit);
+
+// Provider charges with EIP-712 signature
+var sig = wallet.SignTabCharge(contracts.Tab, tab.Id, 1000000L, 1);
+await wallet.ChargeTabAsync(tab.Id, 0.001m, 0.001m, 1, sig);
+
+// Close when done — unused funds return
+await wallet.CloseTabAsync(tab.Id);
 ```
 
 ### Stream (pay-per-second)
@@ -145,9 +160,26 @@ catch (RemitError ex)
 
 All errors include:
 - `Code` — machine-readable constant from `ErrorCodes`
-- `Message` — human-readable description with fix suggestion
-- `Context` — structured data (e.g. `balance`, `required`, `address`)
+- `Message` — human-readable description with actual numbers (e.g. "have $5.00, need $100.00")
+- `Context` — structured data (e.g. `required`, `available`, `required_units`, `available_units`)
 - `HttpStatus` — HTTP status code (null for client-side validation errors)
+
+## Additional Methods
+
+```csharp
+// Contract discovery (cached per session)
+var contracts = await wallet.GetContractsAsync();
+
+// Webhooks
+var wh = await wallet.RegisterWebhookAsync("https://...", new[] { "payment.received" });
+
+// Operator links
+var fundLink = await wallet.CreateFundLinkAsync();
+var withdrawLink = await wallet.CreateWithdrawLinkAsync();
+
+// Testnet funding
+var result = await wallet.MintAsync(100m);  // $100 testnet USDC
+```
 
 ## Supported Chains
 

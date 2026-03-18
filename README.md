@@ -159,7 +159,30 @@ async def pay_provider(address: str, amount: float, note: str) -> dict:
 | Escrow | Work with acceptance criteria | `create_escrow` / `createEscrow` |
 | Stream | Time-based work (pay per second) | `open_stream` / `openStream` |
 | Bounty | Competitive task completion | `post_bounty` / `postBounty` |
-| Deposit | Refundable collateral | `lock_deposit` / `lockDeposit` |
+| Deposit | Refundable collateral | `place_deposit` / `placeDeposit` |
+
+### Permits (Gasless USDC Approval)
+
+All payment methods accept an optional `permit` parameter for gasless USDC approval:
+
+```python
+contracts = await wallet.get_contracts()
+permit = await wallet.sign_usdc_permit(spender=contracts["router"], value=5_000_000, deadline=9999999999, nonce=0)
+tx = await wallet.pay_direct("0xProvider", 5.00, permit=permit)
+```
+
+### Operator Links
+
+```python
+link = await wallet.create_fund_link()      # Send to operator for fiat funding
+link = await wallet.create_withdraw_link()   # Operator off-ramp
+```
+
+### Testnet Funding
+
+```python
+await wallet.mint(100)   # $100 testnet USDC (replaces faucet)
+```
 
 ---
 
@@ -188,10 +211,21 @@ const tx = await wallet.payDirect('0xAnyone', 1.00, 'test');
 
 ## Error Reference
 
+Errors include machine-readable codes and enriched details with actual numbers:
+
+```python
+except RemitError as e:
+    print(e.code)     # "INSUFFICIENT_BALANCE"
+    print(e.message)  # "Insufficient USDC balance: have $5.00, need $100.00"
+    # e.details = {"required": "100.00", "available": "5.00", "required_units": 100000000, ...}
+```
+
 | Error Code | Meaning | Fix |
 |------------|---------|-----|
 | `MISSING_KEY` | `REMITMD_KEY` not set | Set the env var: `export REMITMD_KEY=0x...` |
-| `INSUFFICIENT_BALANCE` | Not enough funds | Ask your operator to fund via one-time link |
+| `INSUFFICIENT_BALANCE` | Not enough funds | Fund via `wallet.create_fund_link()` or `wallet.mint()` (testnet) |
+| `BELOW_MINIMUM` | Amount below $0.01 | Increase the payment amount |
+| `SELF_PAYMENT` | Payer = payee | Use a different recipient address |
 | `INVALID_KEY` | Key format invalid | Ensure key starts with `0x` and is 66 hex characters |
 | `RATE_LIMITED` | Too many requests | Back off and retry — the SDK handles this automatically |
 
@@ -202,7 +236,7 @@ const tx = await wallet.payDirect('0xAnyone', 1.00, 'test');
 | Environment Variable | Required | Default | Description |
 |---------------------|----------|---------|-------------|
 | `REMITMD_KEY` | Yes | — | Agent wallet private key (auto-generated or from registration) |
-| `REMITMD_API_URL` | No | `https://api.remit.md` | API server URL |
+| `REMITMD_API_URL` | No | `https://remit.md/api/v0` | API server URL |
 | `REMITMD_CHAIN` | No | `base` | Chain name (`base` or `base-sepolia` for testnet) |
 | `REMITMD_TESTNET` | No | `false` | Set to `true` to use testnet |
 

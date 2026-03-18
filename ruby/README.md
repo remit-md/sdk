@@ -41,12 +41,23 @@ wallet = Remitmd::RemitWallet.from_env
 # Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL
 ```
 
+## Permits (Gasless USDC Approval)
+
+```ruby
+contracts = wallet.get_contracts
+
+# Use permits on any payment method
+tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
+```
+
+Permits are optional on: `pay`, `create_escrow`, `create_tab`, `create_stream`, `create_bounty`, `place_deposit`.
+
 ## Payment Models
 
 ### Direct Payment
 
 ```ruby
-tx = wallet.pay("0xRecipient...", 5.00, memo: "AI inference fee")
+tx = wallet.pay("0xRecipient...", 5.00, memo: "AI inference fee", permit: permit)
 ```
 
 ### Escrow
@@ -62,14 +73,14 @@ tx = wallet.cancel_escrow(escrow.id)    # refund yourself
 ### Metered Tab (off-chain billing)
 
 ```ruby
-tab = wallet.create_tab("0xProvider...", 50.00)  # $50 credit limit
+tab = wallet.create_tab("0xProvider...", 50.00, 0.003, permit: permit)
 
-# Hundreds of off-chain debits — zero gas, instant
-wallet.debit_tab(tab.id, 0.003, "API call #1")
-wallet.debit_tab(tab.id, 0.003, "API call #2")
+# Provider charges with EIP-712 signature
+sig = wallet.sign_tab_charge(contracts["tab"], tab.id, 3_000_000, 1)
+wallet.charge_tab(tab.id, 0.003, 0.003, 1, sig)
 
-# One on-chain settlement when done
-tx = wallet.settle_tab(tab.id)
+# Close when done — unused funds return
+wallet.close_tab(tab.id)
 ```
 
 ### Payment Stream
@@ -93,8 +104,8 @@ tx = wallet.award_bounty(bounty.id, "0xWinner...")
 ### Security Deposit
 
 ```ruby
-# Lock funds; beneficiary can claim if conditions are violated
-dep = wallet.lock_deposit("0xCounterpart...", 100.00, 86_400)  # 24h lock
+dep = wallet.place_deposit("0xCounterpart...", 100.00, expires_in_secs: 86_400, permit: permit)
+wallet.return_deposit(dep.id)
 ```
 
 ### Payment Intent
@@ -142,60 +153,73 @@ mock.reset                        # Clear all state
 ## All Methods
 
 ```ruby
+# Contract discovery (cached per session)
+wallet.get_contracts                                        # Hash
+
 # Balance & analytics
-wallet.balance                          # Balance
-wallet.history(limit: 50, offset: 0)   # TransactionList
-wallet.reputation(address)             # Reputation
-wallet.spending_summary                 # SpendingSummary
-wallet.remaining_budget                 # Budget
+wallet.balance                                              # Balance
+wallet.history(limit: 50, offset: 0)                       # TransactionList
+wallet.reputation(address)                                  # Reputation
+wallet.spending_summary                                     # SpendingSummary
+wallet.remaining_budget                                     # Budget
 
 # Direct payment
-wallet.pay(to, amount, memo: nil)       # Transaction
+wallet.pay(to, amount, memo: nil, permit: nil)              # Transaction
 
 # Escrow
-wallet.create_escrow(payee, amount, memo: nil, expires_in_secs: nil)  # Escrow
-wallet.release_escrow(escrow_id, memo: nil)                            # Transaction
-wallet.cancel_escrow(escrow_id)                                        # Transaction
-wallet.get_escrow(escrow_id)                                           # Escrow
+wallet.create_escrow(payee, amount, memo: nil, expires_in_secs: nil, permit: nil)  # Escrow
+wallet.claim_start(escrow_id)                               # Escrow
+wallet.release_escrow(escrow_id, memo: nil)                 # Transaction
+wallet.cancel_escrow(escrow_id)                             # Transaction
+wallet.get_escrow(escrow_id)                                # Escrow
 
 # Tabs
-wallet.create_tab(counterpart, limit, closes_in_secs: nil)  # Tab
-wallet.debit_tab(tab_id, amount, memo = "")                  # TabDebit
-wallet.settle_tab(tab_id)                                    # Transaction
+wallet.create_tab(provider, limit, per_unit, expires_in_secs: 86_400, permit: nil)  # Tab
+wallet.charge_tab(tab_id, amount, cumulative, call_count, provider_sig)              # TabCharge
+wallet.close_tab(tab_id, final_amount: nil, provider_sig: nil)                       # Tab
+
+# Tab provider (signing charges)
+wallet.sign_tab_charge(tab_contract, tab_id, total_charged, call_count)  # String
 
 # Streams
-wallet.create_stream(recipient, rate_per_sec, deposit)  # Stream
-wallet.withdraw_stream(stream_id)                        # Transaction
+wallet.create_stream(payee, rate_per_second, max_total, permit: nil)  # Stream
+wallet.close_stream(stream_id)                              # Stream
+wallet.withdraw_stream(stream_id)                           # Transaction
 
 # Bounties
-wallet.create_bounty(award, description, expires_in_secs: nil)  # Bounty
-wallet.award_bounty(bounty_id, winner)                           # Transaction
+wallet.create_bounty(amount, task, deadline, max_attempts: 10, permit: nil)  # Bounty
+wallet.submit_bounty(bounty_id, evidence_hash)              # BountySubmission
+wallet.award_bounty(bounty_id, submission_id)               # Bounty
 
 # Deposits
-wallet.lock_deposit(beneficiary, amount, lock_secs)  # Deposit
+wallet.place_deposit(provider, amount, expires_in_secs: 3600, permit: nil)  # Deposit
+wallet.return_deposit(deposit_id)                           # Transaction
 
-# Intents
-wallet.propose_intent(to, amount, type: "direct")  # Intent
+# Webhooks
+wallet.register_webhook(url, events, chains: nil)           # Webhook
+
+# Operator links
+wallet.create_fund_link                                     # LinkResponse
+wallet.create_withdraw_link                                 # LinkResponse
+
+# Testnet
+wallet.mint(amount)                                         # Hash {tx_hash, balance}
 ```
 
 ## Error Handling
 
-All errors are `Remitmd::RemitError` with structured fields:
+All errors are `Remitmd::RemitError` with structured fields and enriched details:
 
 ```ruby
 begin
-  wallet.pay("invalid", 1.00)
+  wallet.pay("0xRecipient...", 100.00)
 rescue Remitmd::RemitError => e
-  puts e.code     # "INVALID_ADDRESS"
-  puts e.message  # "[INVALID_ADDRESS] expected 0x-prefixed ... — https://remit.md/..."
+  puts e.code     # "INSUFFICIENT_BALANCE"
+  puts e.message  # "Insufficient USDC balance: have $5.00, need $100.00"
   puts e.doc_url  # Direct link to error documentation
-  puts e.context  # Hash with the bad value
+  puts e.context  # Hash: {"required" => "100.00", "available" => "5.00", ...}
 end
 ```
-
-Error codes: `INVALID_ADDRESS`, `INVALID_AMOUNT`, `INSUFFICIENT_FUNDS`, `ESCROW_NOT_FOUND`,
-`TAB_NOT_FOUND`, `STREAM_NOT_FOUND`, `BOUNTY_NOT_FOUND`, `DEPOSIT_NOT_FOUND`, `UNAUTHORIZED`,
-`RATE_LIMITED`, `NETWORK_ERROR`, `SERVER_ERROR`, and more.
 
 ## Custom Signer
 

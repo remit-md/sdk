@@ -56,11 +56,22 @@ final class PaymentTests: XCTestCase {
 }
 ```
 
+## Permits (Gasless USDC Approval)
+
+```swift
+let contracts = try await wallet.getContracts()
+
+// Use permits on any payment method
+let tx = try await wallet.pay(to: "0xRecipient...", amount: 5.0, permit: permit)
+```
+
+Permits are optional on: `pay`, `createEscrow`, `openTab`, `startStream`, `postBounty`, `placeDeposit`.
+
 ## Payment models
 
 ### Direct payment
 ```swift
-let tx = try await wallet.pay(to: "0xRecipient...", amount: 0.10, memo: "API call")
+let tx = try await wallet.pay(to: "0xRecipient...", amount: 0.10, memo: "API call", permit: permit)
 ```
 
 ### Escrow (conditional release)
@@ -74,11 +85,16 @@ let released = try await wallet.releaseEscrow(id: escrow.id)
 
 ### Metered tab (pay-as-you-go)
 ```swift
-let tab = try await wallet.openTab(recipient: "0xService...", limit: 10.0)
-_ = try await wallet.debitTab(id: tab.id, amount: 0.001, memo: "token 1")
-_ = try await wallet.debitTab(id: tab.id, amount: 0.002, memo: "token 2")
+let tab = try await wallet.openTab(provider: "0xService...", limitAmount: 10.0, perUnit: 0.001, permit: permit)
+
+// Provider charges with EIP-712 signature
+let sig = try RemitWallet.signTabCharge(
+    signer: signer, tabContract: contracts.tab, tabId: tab.id,
+    totalCharged: 1000000, callCount: 1
+)
+let charge = try await wallet.chargeTab(id: tab.id, amount: 0.001, cumulative: 0.001, callCount: 1, providerSig: sig)
+
 let closed = try await wallet.closeTab(id: tab.id)
-print("Total:", closed.spent, "USDC")
 ```
 
 ### Streaming (per-second payments)
@@ -99,9 +115,8 @@ let awarded = try await wallet.awardBounty(id: bounty.id, winner: "0xWinner...")
 
 ### Security deposit
 ```swift
-let deposit = try await wallet.lockDeposit(
-    recipient: "0xOperator...", amount: 100.0, reason: "API access collateral"
-)
+let deposit = try await wallet.placeDeposit(provider: "0xOperator...", amount: 100.0, permit: permit)
+let returned = try await wallet.returnDeposit(id: deposit.id)
 ```
 
 ## Analytics
@@ -114,17 +129,33 @@ let history = try await wallet.history()
 let budget = try await wallet.budget()
 ```
 
+## Additional Methods
+
+```swift
+// Contract discovery (cached per session)
+let contracts = try await wallet.getContracts()
+
+// Webhooks
+let wh = try await wallet.registerWebhook(url: "https://...", events: ["payment.received"])
+
+// Operator links
+let fundLink = try await wallet.createFundLink()
+let withdrawLink = try await wallet.createWithdrawLink()
+
+// Testnet funding
+let result = try await wallet.mint(amount: 100.0)  // $100 testnet USDC
+```
+
 ## Error handling
 
-All errors are `RemitError` with a machine-readable code, actionable message, and doc URL.
+All errors are `RemitError` with a machine-readable code, actionable message, and doc URL. Enriched errors include actual numbers:
 
 ```swift
 do {
-    try await wallet.pay(to: "bad-address", amount: 1.0)
+    try await wallet.pay(to: "0xRecipient...", amount: 100.0)
 } catch let e as RemitError {
-    print(e.code)    // "INVALID_ADDRESS"
-    print(e.message) // "[INVALID_ADDRESS] expected 0x-prefixed 42-char hex string..."
-    print(e.docURL)  // "https://remit.md/docs/api-reference/error-codes#invalid_address"
+    print(e.code)    // "INSUFFICIENT_BALANCE"
+    print(e.message) // "Insufficient USDC balance: have $5.00, need $100.00"
 }
 ```
 

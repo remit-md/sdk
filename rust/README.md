@@ -47,6 +47,20 @@ let wallet = Wallet::with_signer(my_kms_signer)
     .build()?;
 ```
 
+## Permits (Gasless USDC Approval)
+
+```rust
+let contracts = wallet.get_contracts().await?;
+
+// Use permits on any payment method
+let tx = wallet.pay_with_permit("0xAgent...", dec!(0.003), permit).await?;
+
+// Or via full variants with optional permit
+let tx = wallet.pay_full("0xAgent...", dec!(0.003), "memo", Some(permit)).await?;
+```
+
+Permit variants available: `pay_with_permit`, `create_escrow_with_permit`, `create_tab_with_permit`, `create_stream_with_permit`, `create_bounty_with_permit`, `lock_deposit_with_permit`.
+
 ## Payment Models
 
 ### Direct Payment
@@ -80,13 +94,13 @@ let state = wallet.get_escrow(&escrow.id).await?;  // check status
 ### Tab (Payment Channel)
 ```rust
 // Batch micro-payments off-chain, settle once on-chain
-let tab = wallet.create_tab("0xService...", dec!(10.00)).await?;
+let tab = wallet.create_tab("0xService...", dec!(10.00), dec!(0.003)).await?;
 
-// Debit multiple times off-chain (zero gas per debit)
-wallet.debit_tab(&tab.id, dec!(0.003), "token batch #1").await?;
-wallet.debit_tab(&tab.id, dec!(0.003), "token batch #2").await?;
+// Provider charges the tab (with EIP-712 signature)
+wallet.charge_tab(&tab.id, 0.003, 0.009, 3, &provider_sig).await?;
 
-wallet.settle_tab(&tab.id).await?;  // one on-chain transaction
+// Close when done — unused funds return
+wallet.close_tab(&tab.id, 0.009, &provider_sig).await?;
 ```
 
 ### Stream
@@ -178,24 +192,38 @@ async fn full_escrow_lifecycle() {
 }
 ```
 
+## Additional Methods
+
+```rust
+// Contract discovery (cached per session)
+let contracts = wallet.get_contracts().await?;
+
+// Webhooks
+wallet.register_webhook("https://...", &["payment.received"], None).await?;
+
+// Operator links
+let link = wallet.create_fund_link().await?;
+let link = wallet.create_withdraw_link().await?;
+
+// Testnet funding
+let result = wallet.mint(100.0).await?;  // $100 testnet USDC
+```
+
 ## Error Handling
 
-All errors are typed `RemitError` with a stable `code`, an actionable `message`, and a `doc_url`.
+All errors are typed `RemitError` with a stable `code`, an actionable `message`, and a `doc_url`. Enriched errors include actual numbers:
 
 ```rust
 use remitmd::error::codes;
 
 match wallet.pay(address, amount).await {
     Ok(tx) => println!("paid: {}", tx.tx_hash),
-    Err(e) if e.code == codes::INVALID_ADDRESS => {
-        eprintln!("fix the address: {}", e.message);
-        // e.message: "invalid address \"0xbad\": expected 0x-prefixed 40-character hex string"
-    }
     Err(e) if e.code == codes::INSUFFICIENT_FUNDS => {
+        // e.message: "Insufficient USDC balance: have $5.00, need $100.00"
         eprintln!("need more USDC: {}", e.message);
     }
-    Err(e) if e.code == codes::RATE_LIMITED => {
-        // Back off and retry
+    Err(e) if e.code == codes::INVALID_ADDRESS => {
+        eprintln!("fix the address: {}", e.message);
     }
     Err(e) => eprintln!("error [{}]: {} (see: {})", e.code, e.message, e.doc_url),
 }

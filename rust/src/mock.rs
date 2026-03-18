@@ -280,55 +280,24 @@ impl MockTransport {
                     )
                 })?;
                 escrow.status = EscrowStatus::Released;
-
-                let tx = Transaction {
-                    id: new_id("tx"),
-                    tx_hash: format!("0x{}", mock_hash()),
-                    from: escrow.payer.clone(),
-                    to: escrow.payee.clone(),
-                    amount: escrow.amount,
-                    fee: Decimal::ZERO,
-                    memo: String::new(),
-                    chain_id: ChainId::BASE_SEPOLIA,
-                    block_number: 0,
-                    created_at: Utc::now(),
-                };
-                s.transactions.push(tx.clone());
-                Ok(serde_json::to_value(&tx).unwrap())
+                Ok(serde_json::to_value(&*escrow).unwrap())
             }
 
             // ─── Escrow cancel ────────────────────────────────────────────
             (method, path) if method == "POST" && path.ends_with("/cancel") => {
                 let escrow_id = extract_id(path, "/api/v0/escrows/", "/cancel");
                 let mut s = self.state.lock().await;
-
-                // Extract values before releasing the mutable borrow of `escrow`
-                let (payer, amount) = {
-                    let escrow = s.escrows.get_mut(escrow_id).ok_or_else(|| {
-                        remit_err(
-                            codes::ESCROW_NOT_FOUND,
-                            format!("escrow {escrow_id:?} not found"),
-                        )
-                    })?;
-                    escrow.status = EscrowStatus::Cancelled;
-                    (escrow.payer.clone(), escrow.amount)
-                };
+                let escrow = s.escrows.get_mut(escrow_id).ok_or_else(|| {
+                    remit_err(
+                        codes::ESCROW_NOT_FOUND,
+                        format!("escrow {escrow_id:?} not found"),
+                    )
+                })?;
+                escrow.status = EscrowStatus::Cancelled;
+                let amount = escrow.amount;
+                let result = serde_json::to_value(&*escrow).unwrap();
                 s.balance += amount; // refund to payer
-
-                let tx = Transaction {
-                    id: new_id("tx"),
-                    tx_hash: format!("0x{}", mock_hash()),
-                    from: payer.clone(),
-                    to: payer,
-                    amount,
-                    fee: Decimal::ZERO,
-                    memo: "escrow cancelled".to_string(),
-                    chain_id: ChainId::BASE_SEPOLIA,
-                    block_number: 0,
-                    created_at: Utc::now(),
-                };
-                s.transactions.push(tx.clone());
-                Ok(serde_json::to_value(&tx).unwrap())
+                Ok(result)
             }
 
             // ─── Escrow get ───────────────────────────────────────────────
@@ -758,9 +727,10 @@ mod tests {
         let fetched = wallet.get_escrow(&escrow.id).await.unwrap();
         assert_eq!(fetched.id, escrow.id);
 
-        let tx = wallet.release_escrow(&escrow.id, None).await.unwrap();
-        assert_eq!(tx.to, PAYEE);
-        assert_eq!(tx.amount, dec!(100.00));
+        let released = wallet.release_escrow(&escrow.id, None).await.unwrap();
+        assert_eq!(released.payee, PAYEE);
+        assert_eq!(released.amount, dec!(100.00));
+        assert_eq!(released.status, EscrowStatus::Released);
     }
 
     #[tokio::test]

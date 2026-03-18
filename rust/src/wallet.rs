@@ -352,7 +352,7 @@ impl Wallet {
         &self,
         escrow_id: &str,
         milestone_id: Option<&str>,
-    ) -> Result<Transaction, RemitError> {
+    ) -> Result<Escrow, RemitError> {
         let mut body = json!({ "escrow_id": escrow_id });
         if let Some(mid) = milestone_id {
             body["milestone_id"] = json!(mid);
@@ -362,7 +362,7 @@ impl Wallet {
     }
 
     /// Cancel the escrow and return funds to the payer.
-    pub async fn cancel_escrow(&self, escrow_id: &str) -> Result<Transaction, RemitError> {
+    pub async fn cancel_escrow(&self, escrow_id: &str) -> Result<Escrow, RemitError> {
         self.post(&format!("/api/v0/escrows/{escrow_id}/cancel"), json!({}))
             .await
     }

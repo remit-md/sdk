@@ -28,6 +28,8 @@ impl std::fmt::Display for ChainId {
 pub enum EscrowStatus {
     Pending,
     Funded,
+    Active,
+    Completed,
     Released,
     Cancelled,
     Expired,

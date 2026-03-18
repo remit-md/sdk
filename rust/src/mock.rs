@@ -329,7 +329,11 @@ impl MockTransport {
                     .to_string();
                 let limit = b["limit_amount"]
                     .as_f64()
-                    .or_else(|| decimal_field(&b, "limit").ok().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)))
+                    .or_else(|| {
+                        decimal_field(&b, "limit")
+                            .ok()
+                            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0))
+                    })
                     .unwrap_or(0.0);
                 let limit = Decimal::from_str_exact(&format!("{limit}")).unwrap_or_default();
                 let per_unit = b["per_unit"].as_f64().unwrap_or(0.0);
@@ -356,7 +360,9 @@ impl MockTransport {
             }
 
             // ─── Tab close ────────────────────────────────────────────────
-            (method, path) if method == "POST" && path.ends_with("/close") && path.contains("/tabs/") => {
+            (method, path)
+                if method == "POST" && path.ends_with("/close") && path.contains("/tabs/") =>
+            {
                 let tab_id = extract_id(path, "/api/v0/tabs/", "/close");
                 let mut s = self.state.lock().await;
                 let tab = s.tabs.get_mut(tab_id).ok_or_else(|| {
@@ -375,14 +381,24 @@ impl MockTransport {
                     .to_string();
                 let rate_per_second = b["rate_per_second"]
                     .as_f64()
-                    .or_else(|| decimal_field(&b, "rate_per_sec").ok().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)))
+                    .or_else(|| {
+                        decimal_field(&b, "rate_per_sec")
+                            .ok()
+                            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0))
+                    })
                     .unwrap_or(0.0);
-                let rate_per_second = Decimal::from_str_exact(&format!("{rate_per_second}")).unwrap_or_default();
+                let rate_per_second =
+                    Decimal::from_str_exact(&format!("{rate_per_second}")).unwrap_or_default();
                 let max_total = b["max_total"]
                     .as_f64()
-                    .or_else(|| decimal_field(&b, "deposit").ok().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)))
+                    .or_else(|| {
+                        decimal_field(&b, "deposit")
+                            .ok()
+                            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0))
+                    })
                     .unwrap_or(0.0);
-                let max_total = Decimal::from_str_exact(&format!("{max_total}")).unwrap_or_default();
+                let max_total =
+                    Decimal::from_str_exact(&format!("{max_total}")).unwrap_or_default();
 
                 let mut s = self.state.lock().await;
                 check_balance(s.balance, max_total)?;
@@ -409,7 +425,11 @@ impl MockTransport {
             ("POST", "/api/v0/bounties") => {
                 let amount = b["amount"]
                     .as_f64()
-                    .or_else(|| decimal_field(&b, "award").ok().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)))
+                    .or_else(|| {
+                        decimal_field(&b, "award")
+                            .ok()
+                            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0))
+                    })
                     .unwrap_or(0.0);
                 let amount = Decimal::from_str_exact(&format!("{amount}")).unwrap_or_default();
                 let task_description = b["task_description"]
@@ -442,7 +462,9 @@ impl MockTransport {
             }
 
             // ─── Bounty award ─────────────────────────────────────────────
-            (method, path) if method == "POST" && path.ends_with("/award") && path.contains("/bounties/") => {
+            (method, path)
+                if method == "POST" && path.ends_with("/award") && path.contains("/bounties/") =>
+            {
                 let bounty_id = extract_id(path, "/api/v0/bounties/", "/award");
 
                 let mut s = self.state.lock().await;
@@ -581,7 +603,9 @@ impl MockTransport {
             }
 
             // ─── Stream close ─────────────────────────────────────────────
-            (method, path) if method == "POST" && path.contains("/streams/") && path.ends_with("/close") => {
+            (method, path)
+                if method == "POST" && path.contains("/streams/") && path.ends_with("/close") =>
+            {
                 let stream_id = extract_id(path, "/api/v0/streams/", "/close");
                 let mut s = self.state.lock().await;
                 let stream = s.streams.get_mut(stream_id).ok_or_else(|| {
@@ -801,10 +825,7 @@ mod tests {
             .unwrap();
         assert_eq!(tab.status, TabStatus::Open);
 
-        let closed = wallet
-            .close_tab(&tab.id, 0.10, "0x00")
-            .await
-            .unwrap();
+        let closed = wallet.close_tab(&tab.id, 0.10, "0x00").await.unwrap();
         assert_eq!(closed.status, TabStatus::Closed);
     }
 

@@ -291,7 +291,9 @@ fn sign_tab_charge(
     let digest = keccak256(&final_data);
 
     // Sign with k256
-    let (sig, recovery_id) = key.sign_prehash_recoverable(&digest).expect("sign tab charge");
+    let (sig, recovery_id) = key
+        .sign_prehash_recoverable(&digest)
+        .expect("sign tab charge");
     let mut sig_bytes = sig.to_bytes().to_vec();
     sig_bytes.push(recovery_id.to_byte() + 27);
 
@@ -584,9 +586,7 @@ async fn acceptance_stream_lifecycle() {
         payer_delta < 0.0,
         "payer should have lost funds, delta={payer_delta:.6}"
     );
-    eprintln!(
-        "Payer delta: {payer_delta:.6}, Payee balance: {payee_after:.6}"
-    );
+    eprintln!("Payer delta: {payer_delta:.6}, Payee balance: {payee_after:.6}");
 }
 
 // ─── Test: Bounty Lifecycle ──────────────────────────────────────────────────
@@ -626,19 +626,13 @@ async fn acceptance_bounty_lifecycle() {
         .await
         .expect("create_bounty_with_permit");
     assert!(!bounty.id.is_empty(), "bounty ID should not be empty");
-    eprintln!(
-        "Bounty created: {}, status={:?}",
-        bounty.id, bounty.status
-    );
+    eprintln!("Bounty created: {}, status={:?}", bounty.id, bounty.status);
 
     // Wait for on-chain lock
     wait_for_balance_change(poster.wallet.address(), poster_before).await;
 
     // 2. Submit evidence (as submitter)
-    let evidence_hash = format!(
-        "0x{}",
-        hex::encode(keccak256(b"test evidence"))
-    );
+    let evidence_hash = format!("0x{}", hex::encode(keccak256(b"test evidence")));
     let submission = submitter
         .wallet
         .submit_bounty(&bounty.id, &evidence_hash)
@@ -736,9 +730,7 @@ async fn acceptance_deposit_lifecycle() {
         refund_amount > 4.99,
         "expected near-full refund (~5.0), got {refund_amount:.6}"
     );
-    eprintln!(
-        "Deposit refunded: {refund_amount:.6} (full refund, no fee)"
-    );
+    eprintln!("Deposit refunded: {refund_amount:.6} (full refund, no fee)");
 }
 
 // ─── Test: X402 Auto-Pay ─────────────────────────────────────────────────────

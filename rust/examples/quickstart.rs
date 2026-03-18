@@ -65,9 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // 4. Tab -- payment channel for micro-payments
-    let tab = wallet
-        .create_tab(payee, dec!(10.00), dec!(0.10))
-        .await?;
+    let tab = wallet.create_tab(payee, dec!(10.00), dec!(0.10)).await?;
     println!(
         "\n[Tab] Opened {} (limit: {} USDC)",
         tab.id, tab.limit_amount

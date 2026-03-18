@@ -568,11 +568,8 @@ impl Wallet {
 
     /// Close an active stream (called by the payer).
     pub async fn close_stream(&self, stream_id: &str) -> Result<Stream, RemitError> {
-        self.post(
-            &format!("/api/v0/streams/{stream_id}/close"),
-            json!({}),
-        )
-        .await
+        self.post(&format!("/api/v0/streams/{stream_id}/close"), json!({}))
+            .await
     }
 
     /// Withdraw all vested stream payments (called by the recipient).
@@ -763,11 +760,8 @@ impl Wallet {
 
     /// Return a security deposit to the depositor.
     pub async fn return_deposit(&self, deposit_id: &str) -> Result<Value, RemitError> {
-        self.post(
-            &format!("/api/v0/deposits/{deposit_id}/return"),
-            json!({}),
-        )
-        .await
+        self.post(&format!("/api/v0/deposits/{deposit_id}/return"), json!({}))
+            .await
     }
 
     // ─── Intent negotiation ──────────────────────────────────────────────────

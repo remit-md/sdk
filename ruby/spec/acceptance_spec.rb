@@ -143,7 +143,7 @@ end
 
 # ─── Tests ────────────────────────────────────────────────────────────────────
 
-RSpec.describe "Acceptance", :acceptance do
+RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLength
   describe "direct payments" do
     it "payDirect with permit" do
       agent = create_test_wallet

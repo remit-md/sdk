@@ -209,13 +209,30 @@ module Remitmd
 
       # Tab create
       in ["POST", "/tabs"]
-        counterpart = fetch!(b, :counterpart)
-        limit       = decimal!(b, :limit)
-        tab = make_tab(counterpart: counterpart, limit: limit)
+        provider    = fetch!(b, :provider)
+        limit       = decimal!(b, :limit_amount)
+        tab = make_tab(provider: provider, limit: limit)
         @state[:tabs][tab.id] = tab
         tab_hash(tab)
 
-      # Tab charge (debit)
+      # Tab debit (legacy off-chain)
+      in ["POST", path] if path.end_with?("/debit") && path.include?("/tabs/")
+        id     = extract_id(path, "/tabs/", "/debit")
+        amount = decimal!(b, :amount)
+        tab    = @state[:tabs].fetch(id) { raise not_found(RemitError::TAB_NOT_FOUND, id) }
+        new_tab = update_tab(tab, used: tab.used + amount, remaining: tab.remaining - amount)
+        @state[:tabs][id] = new_tab
+        {
+          "tab_id"     => id,
+          "amount"     => amount.to_s("F"),
+          "cumulative" => new_tab.used.to_s("F"),
+          "call_count" => 0,
+          "memo"       => b[:memo].to_s,
+          "sequence"   => 1,
+          "signature"  => "0x00",
+        }
+
+      # Tab charge (EIP-712 signed)
       in ["POST", path] if path.end_with?("/charge") && path.include?("/tabs/")
         id     = extract_id(path, "/tabs/", "/charge")
         amount = decimal!(b, :amount)
@@ -223,11 +240,13 @@ module Remitmd
         new_tab = update_tab(tab, used: tab.used + amount, remaining: tab.remaining - amount)
         @state[:tabs][id] = new_tab
         {
-          "tab_id"    => id,
-          "amount"    => amount.to_s("F"),
-          "memo"      => b[:memo].to_s,
-          "sequence"  => 1,
-          "signature" => "0x00",
+          "tab_id"     => id,
+          "amount"     => amount.to_s("F"),
+          "cumulative" => new_tab.used.to_s("F"),
+          "call_count" => (b[:call_count] || 1).to_i,
+          "memo"       => b[:memo].to_s,
+          "sequence"   => 1,
+          "signature"  => "0x00",
         }
 
       # Tab close (settle)
@@ -236,19 +255,23 @@ module Remitmd
         tab = @state[:tabs].fetch(id) { raise not_found(RemitError::TAB_NOT_FOUND, id) }
         new_tab = update_tab(tab, status: TabStatus::SETTLED)
         @state[:tabs][id] = new_tab
-        tx = make_tx(from: tab.opener, to: tab.counterpart, amount: tab.used, memo: "tab settlement")
-        @state[:transactions] << tx
-        tx_hash(tx)
+        tab_hash(new_tab)
 
       # Stream create
       in ["POST", "/streams"]
-        recipient = fetch!(b, :recipient)
-        rate_per_sec = decimal!(b, :rate_per_sec)
-        deposit = decimal!(b, :deposit)
-        check_balance!(deposit)
-        @state[:balance] -= deposit
-        s = make_stream(recipient: recipient, rate_per_sec: rate_per_sec, deposited: deposit)
+        payee = fetch!(b, :payee)
+        rate_per_second = decimal!(b, :rate_per_second)
+        max_total = decimal!(b, :max_total)
+        check_balance!(max_total)
+        @state[:balance] -= max_total
+        s = make_stream(recipient: payee, rate_per_sec: rate_per_second, deposited: max_total)
         @state[:streams][s.id] = s
+        stream_hash(s)
+
+      # Stream close
+      in ["POST", path] if path.end_with?("/close") && path.include?("/streams/")
+        id  = extract_id(path, "/streams/", "/close")
+        s   = @state[:streams].fetch(id) { raise not_found(RemitError::STREAM_NOT_FOUND, id) }
         stream_hash(s)
 
       # Stream withdraw
@@ -261,34 +284,54 @@ module Remitmd
 
       # Bounty create
       in ["POST", "/bounties"]
-        award       = decimal!(b, :award)
-        description = fetch!(b, :description)
-        check_balance!(award)
-        @state[:balance] -= award
-        bnt = make_bounty(award: award, description: description)
+        amount           = decimal!(b, :amount)
+        task_description = fetch!(b, :task_description)
+        check_balance!(amount)
+        @state[:balance] -= amount
+        bnt = make_bounty(amount: amount, task_description: task_description)
         @state[:bounties][bnt.id] = bnt
         bounty_hash(bnt)
 
+      # Bounty submit
+      in ["POST", path] if path.end_with?("/submit") && path.include?("/bounties/")
+        id = extract_id(path, "/bounties/", "/submit")
+        bnt = @state[:bounties].fetch(id) { raise not_found(RemitError::BOUNTY_NOT_FOUND, id) }
+        {
+          "id"            => 1,
+          "bounty_id"     => id,
+          "submitter"     => MockRemit::MOCK_ADDRESS,
+          "evidence_hash" => (b[:evidence_hash] || "0x00").to_s,
+          "status"        => "pending",
+          "created_at"    => now,
+        }
+
       # Bounty award
       in ["POST", path] if path.end_with?("/award") && path.include?("/bounties/")
-        id     = extract_id(path, "/bounties/", "/award")
-        winner = fetch!(b, :winner)
-        bnt    = @state[:bounties].fetch(id) { raise not_found(RemitError::BOUNTY_NOT_FOUND, id) }
-        new_bnt = update_bounty(bnt, status: BountyStatus::AWARDED, winner: winner)
+        id            = extract_id(path, "/bounties/", "/award")
+        submission_id = (b[:submission_id] || b["submission_id"]).to_i
+        bnt           = @state[:bounties].fetch(id) { raise not_found(RemitError::BOUNTY_NOT_FOUND, id) }
+        new_bnt = update_bounty(bnt, status: BountyStatus::AWARDED)
         @state[:bounties][id] = new_bnt
-        tx = make_tx(from: bnt.poster, to: winner, amount: bnt.award, memo: "bounty award")
-        @state[:transactions] << tx
-        tx_hash(tx)
+        bounty_hash(new_bnt)
 
       # Deposit create
       in ["POST", "/deposits"]
-        beneficiary = fetch!(b, :beneficiary)
-        amount      = decimal!(b, :amount)
+        provider = fetch!(b, :provider)
+        amount   = decimal!(b, :amount)
         check_balance!(amount)
         @state[:balance] -= amount
-        dep = make_deposit(beneficiary: beneficiary, amount: amount)
+        dep = make_deposit(provider: provider, amount: amount)
         @state[:deposits][dep.id] = dep
         deposit_hash(dep)
+
+      # Deposit return
+      in ["POST", path] if path.end_with?("/return") && path.include?("/deposits/")
+        id  = extract_id(path, "/deposits/", "/return")
+        dep = @state[:deposits].fetch(id) { raise not_found(RemitError::DEPOSIT_NOT_FOUND, id) }
+        @state[:balance] += dep.amount
+        tx = make_tx(from: dep.provider, to: dep.depositor, amount: dep.amount, memo: "deposit returned")
+        @state[:transactions] << tx
+        tx_hash(tx)
 
       # Reputation
       in ["GET", path] if path.start_with?("/reputation/")
@@ -389,16 +432,16 @@ module Remitmd
       )
     end
 
-    def make_tab(counterpart:, limit:)
+    def make_tab(provider:, limit:)
       Tab.new(
-        "id"          => new_id("tab"),
-        "opener"      => MockRemit::MOCK_ADDRESS,
-        "counterpart" => counterpart,
-        "limit"       => limit.to_s("F"),
-        "used"        => "0",
-        "remaining"   => limit.to_s("F"),
-        "status"      => TabStatus::OPEN,
-        "created_at"  => now,
+        "id"           => new_id("tab"),
+        "opener"       => MockRemit::MOCK_ADDRESS,
+        "provider"     => provider,
+        "limit_amount" => limit.to_s("F"),
+        "used"         => "0",
+        "remaining"    => limit.to_s("F"),
+        "status"       => TabStatus::OPEN,
+        "created_at"   => now,
       )
     end
 
@@ -415,23 +458,23 @@ module Remitmd
       )
     end
 
-    def make_bounty(award:, description:)
+    def make_bounty(amount:, task_description:)
       Bounty.new(
-        "id"          => new_id("bnt"),
-        "poster"      => MockRemit::MOCK_ADDRESS,
-        "award"       => award.to_s("F"),
-        "description" => description,
-        "status"      => BountyStatus::OPEN,
-        "winner"      => "",
-        "created_at"  => now,
+        "id"               => new_id("bnt"),
+        "poster"           => MockRemit::MOCK_ADDRESS,
+        "amount"           => amount.to_s("F"),
+        "task_description" => task_description,
+        "status"           => BountyStatus::OPEN,
+        "winner"           => "",
+        "created_at"       => now,
       )
     end
 
-    def make_deposit(beneficiary:, amount:)
+    def make_deposit(provider:, amount:)
       Deposit.new(
         "id"          => new_id("dep"),
         "depositor"   => MockRemit::MOCK_ADDRESS,
-        "beneficiary" => beneficiary,
+        "provider"    => provider,
         "amount"      => amount.to_s("F"),
         "status"      => DepositStatus::LOCKED,
         "created_at"  => now,
@@ -486,14 +529,14 @@ module Remitmd
 
     def tab_hash(tab)
       {
-        "id"          => tab.id,
-        "opener"      => tab.opener,
-        "counterpart" => tab.counterpart,
-        "limit"       => tab.limit.to_s("F"),
-        "used"        => tab.used.to_s("F"),
-        "remaining"   => tab.remaining.to_s("F"),
-        "status"      => tab.status,
-        "created_at"  => now,
+        "id"           => tab.id,
+        "opener"       => tab.opener,
+        "provider"     => tab.provider,
+        "limit_amount" => tab.limit.to_s("F"),
+        "used"         => tab.used.to_s("F"),
+        "remaining"    => tab.remaining.to_s("F"),
+        "status"       => tab.status,
+        "created_at"   => now,
       }
     end
 
@@ -512,14 +555,14 @@ module Remitmd
 
     def bounty_hash(bnt)
       {
-        "id"          => bnt.id,
-        "poster"      => bnt.poster,
-        "award"       => bnt.award.to_s("F"),
-        "description" => bnt.description,
-        "status"      => bnt.status,
-        "winner"      => bnt.winner,
-        "expires_at"  => bnt.expires_at&.iso8601,
-        "created_at"  => now,
+        "id"               => bnt.id,
+        "poster"           => bnt.poster,
+        "amount"           => bnt.amount.to_s("F"),
+        "task_description" => bnt.task_description,
+        "status"           => bnt.status,
+        "winner"           => bnt.winner,
+        "expires_at"       => bnt.expires_at&.iso8601,
+        "created_at"       => now,
       }
     end
 
@@ -527,7 +570,7 @@ module Remitmd
       {
         "id"          => dep.id,
         "depositor"   => dep.depositor,
-        "beneficiary" => dep.beneficiary,
+        "provider"    => dep.provider,
         "amount"      => dep.amount.to_s("F"),
         "status"      => dep.status,
         "expires_at"  => dep.expires_at&.iso8601,

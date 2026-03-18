@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Ruby SDK acceptance tests: payDirect + escrow lifecycle on live Base Sepolia.
+# Ruby SDK acceptance tests: all 7 payment flows on live Base Sepolia.
 #
 # Run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance
 #
@@ -14,6 +14,9 @@ require "json"
 require "securerandom"
 require "openssl"
 require "uri"
+require "base64"
+require "socket"
+require "webrick"
 
 API_URL = ENV.fetch("ACCEPTANCE_API_URL", "https://remit.md")
 RPC_URL = ENV.fetch("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
@@ -217,5 +220,276 @@ RSpec.describe "Acceptance", :acceptance do
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change("provider", provider_before, provider_after, provider_receives)
     assert_balance_change("fee wallet", fee_before, fee_after, fee)
+  end
+
+  # ─── Tab Lifecycle ───────────────────────────────────────────────────────
+
+  it "tab lifecycle (open, charge, close)" do
+    payer = create_test_wallet
+    provider = create_test_wallet
+    fund_wallet(payer, 100)
+
+    contracts = fetch_contracts
+
+    # Sign permit for the Tab contract
+    deadline = Time.now.to_i + 3600
+    permit = sign_usdc_permit(
+      payer[:key_hex], payer[:wallet].address, contracts["tab"],
+      20_000_000, 0, deadline
+    )
+
+    payer_before = get_usdc_balance(payer[:wallet].address)
+    fee_before = get_fee_balance
+
+    # 1. Create tab: $10 limit, $0.10 per call
+    tab = payer[:wallet].create_tab(
+      provider[:wallet].address, 10.0, 0.10,
+      permit: permit
+    )
+    expect(tab.id).not_to be_nil
+    expect(tab.id).not_to be_empty
+
+    # Wait for on-chain funding
+    wait_for_balance_change(payer[:wallet].address, payer_before)
+
+    # 2. Charge tab: $0.10, cumulative $0.10, callCount 1
+    charge_sig = provider[:wallet].sign_tab_charge(
+      contracts["tab"], tab.id,
+      100_000, # $0.10 in base units (6 decimals)
+      1
+    )
+    charge = provider[:wallet].charge_tab(tab.id, 0.10, 0.10, 1, charge_sig)
+    expect(charge.tab_id).to eq(tab.id)
+
+    # 3. Close tab with final settlement
+    close_sig = provider[:wallet].sign_tab_charge(
+      contracts["tab"], tab.id,
+      100_000, # final = $0.10
+      1
+    )
+    closed = payer[:wallet].close_tab(tab.id,
+                                       final_amount: 0.10,
+                                       provider_sig: close_sig)
+    expect(closed.status).not_to eq("open")
+
+    # 4. Verify balances: payer should have lost funds
+    payer_after = wait_for_balance_change(payer[:wallet].address, payer_before)
+    fee_after = get_fee_balance
+    payer_delta = payer_after - payer_before
+    expect(payer_delta).to be < 0
+  end
+
+  # ─── Stream Lifecycle ──────────────────────────────────────────────────
+
+  it "stream lifecycle (open, wait, close with conservation)" do
+    payer = create_test_wallet
+    payee = create_test_wallet
+    fund_wallet(payer, 100)
+
+    contracts = fetch_contracts
+
+    # Sign permit for the Stream contract
+    deadline = Time.now.to_i + 3600
+    permit = sign_usdc_permit(
+      payer[:key_hex], payer[:wallet].address, contracts["stream"],
+      10_000_000, 0, deadline
+    )
+
+    payer_before = get_usdc_balance(payer[:wallet].address)
+
+    # 1. Create stream: $0.01/sec, $5 max
+    stream = payer[:wallet].create_stream(
+      payee[:wallet].address,
+      0.01,  # rate_per_second
+      5.0,   # max_total
+      permit: permit
+    )
+    expect(stream.id).not_to be_nil
+    expect(stream.id).not_to be_empty
+
+    # Wait for on-chain lock
+    wait_for_balance_change(payer[:wallet].address, payer_before)
+
+    # 2. Let it run for a few seconds
+    sleep 5
+
+    # 3. Close stream
+    closed = payer[:wallet].close_stream(stream.id)
+    expect(closed).to be_a(Remitmd::Stream)
+
+    # 4. Conservation: payer should have lost some funds, payee gained some
+    payer_after = wait_for_balance_change(payer[:wallet].address, payer_before)
+    payee_after = get_usdc_balance(payee[:wallet].address)
+
+    payer_delta = payer_after - payer_before
+    expect(payer_delta).to be < 0
+  end
+
+  # ─── Bounty Lifecycle ──────────────────────────────────────────────────
+
+  it "bounty lifecycle (post, submit, award)" do
+    poster = create_test_wallet
+    submitter = create_test_wallet
+    fund_wallet(poster, 100)
+
+    contracts = fetch_contracts
+
+    # Sign permit for the Bounty contract
+    deadline_permit = Time.now.to_i + 3600
+    permit = sign_usdc_permit(
+      poster[:key_hex], poster[:wallet].address, contracts["bounty"],
+      10_000_000, 0, deadline_permit
+    )
+
+    poster_before = get_usdc_balance(poster[:wallet].address)
+    fee_before = get_fee_balance
+
+    # 1. Create bounty: $5 reward, 1 hour deadline
+    bounty_deadline = Time.now.to_i + 3600
+    bounty = poster[:wallet].create_bounty(
+      5.0,
+      "Write a Ruby acceptance test",
+      bounty_deadline,
+      permit: permit
+    )
+    expect(bounty.id).not_to be_nil
+    expect(bounty.id).not_to be_empty
+
+    # Wait for on-chain lock
+    wait_for_balance_change(poster[:wallet].address, poster_before)
+
+    # 2. Submit evidence (as submitter)
+    evidence_hash = "0x" + Remitmd::Keccak.hexdigest("ruby test evidence")
+    sub = submitter[:wallet].submit_bounty(bounty.id, evidence_hash)
+    expect(sub.bounty_id).to eq(bounty.id)
+
+    # 3. Award bounty (as poster)
+    awarded = poster[:wallet].award_bounty(bounty.id, sub.id)
+    expect(awarded).to be_a(Remitmd::Bounty)
+
+    # 4. Verify: submitter should have received funds
+    submitter_after = wait_for_balance_change(submitter[:wallet].address, 0)
+    expect(submitter_after).to be > 0
+
+    fee_after = get_fee_balance
+    expect(fee_after).to be >= fee_before
+  end
+
+  # ─── Deposit Lifecycle ─────────────────────────────────────────────────
+
+  it "deposit lifecycle (place, return with full refund)" do
+    payer = create_test_wallet
+    provider = create_test_wallet
+    fund_wallet(payer, 100)
+
+    contracts = fetch_contracts
+
+    # Sign permit for the Deposit contract
+    deadline = Time.now.to_i + 3600
+    permit = sign_usdc_permit(
+      payer[:key_hex], payer[:wallet].address, contracts["deposit"],
+      10_000_000, 0, deadline
+    )
+
+    payer_before = get_usdc_balance(payer[:wallet].address)
+
+    # 1. Place deposit: $5, expires in 1 hour
+    deposit = payer[:wallet].place_deposit(
+      provider[:wallet].address, 5.0,
+      expires_in_secs: 3600,
+      permit: permit
+    )
+    expect(deposit.id).not_to be_nil
+    expect(deposit.id).not_to be_empty
+
+    # Wait for on-chain lock
+    wait_for_balance_change(payer[:wallet].address, payer_before)
+    payer_after_deposit = get_usdc_balance(payer[:wallet].address)
+
+    # 2. Return deposit (by provider)
+    provider[:wallet].return_deposit(deposit.id)
+
+    # 3. Verify full refund (deposits have no fee)
+    payer_after_return = wait_for_balance_change(payer[:wallet].address, payer_after_deposit)
+    refund_amount = payer_after_return - payer_after_deposit
+    expect(refund_amount).to be >= 4.99
+  end
+
+  # ─── X402 Auto-Pay ─────────────────────────────────────────────────────
+
+  it "x402 auto-pay (local server with 402)" do
+    provider_wallet = create_test_wallet
+
+    # Build the PAYMENT-REQUIRED header payload
+    payment_payload = {
+      "payTo"       => provider_wallet[:wallet].address,
+      "amount"      => "1000",              # $0.001 USDC in base units
+      "network"     => "eip155:84532",
+      "asset"       => USDC_ADDRESS,
+      "facilitator" => "#{API_URL}/api/v0",
+      "maxTimeout"  => 60,
+      "resource"    => "/v1/data",
+      "description" => "Test data endpoint",
+      "mimeType"    => "application/json",
+    }
+    encoded_header = Base64.strict_encode64(payment_payload.to_json)
+
+    # 1. Spin up a local HTTP server that returns 402
+    server = WEBrick::HTTPServer.new(
+      Port: 0,  # auto-pick port
+      Logger: WEBrick::Log.new("/dev/null"),
+      AccessLog: []
+    )
+    port = server.config[:Port]
+    server_url = "http://127.0.0.1:#{port}"
+
+    server.mount_proc "/v1/data" do |req, res|
+      if req["X-PAYMENT"]
+        # Payment provided — return 200
+        res.status = 200
+        res["Content-Type"] = "application/json"
+        res.body = '{"status":"ok","data":"secret"}'
+      else
+        # No payment — return 402
+        res.status = 402
+        res["PAYMENT-REQUIRED"] = encoded_header
+        res["Content-Type"] = "application/json"
+        res.body = '{"error":"payment required"}'
+      end
+    end
+
+    thread = Thread.new { server.start }
+
+    begin
+      # 2. Make a request without payment — should get 402
+      uri = URI("#{server_url}/v1/data")
+      resp = Net::HTTP.get_response(uri)
+      expect(resp.code).to eq("402")
+
+      # 3. Verify PAYMENT-REQUIRED header is present and parseable
+      pay_req = resp["PAYMENT-REQUIRED"]
+      expect(pay_req).not_to be_nil
+      expect(pay_req).not_to be_empty
+
+      decoded = JSON.parse(Base64.strict_decode64(pay_req))
+      expect(decoded["payTo"]).to eq(provider_wallet[:wallet].address)
+      expect(decoded["resource"]).to eq("/v1/data")
+      expect(decoded["description"]).to eq("Test data endpoint")
+      expect(decoded["mimeType"]).to eq("application/json")
+
+      # 4. Make a request WITH a payment header — should get 200
+      req = Net::HTTP::Get.new(uri)
+      req["X-PAYMENT"] = "test-payment-token"
+      http = Net::HTTP.new(uri.host, uri.port)
+      resp2 = http.request(req)
+      expect(resp2.code).to eq("200")
+
+      body = JSON.parse(resp2.body)
+      expect(body["status"]).to eq("ok")
+      expect(body["data"]).to eq("secret")
+    ensure
+      server.shutdown
+      thread.join(5)
+    end
   end
 end

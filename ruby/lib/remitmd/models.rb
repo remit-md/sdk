@@ -201,18 +201,21 @@ module Remitmd
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
       @id          = h["id"]
-      @opener      = h["opener"]
-      @counterpart = h["counterpart"]
-      @limit       = decimal(h["limit"])
+      @opener      = h["opener"] || h["payer"]
+      @provider    = h["provider"] || h["counterpart"]
+      @limit       = decimal(h["limit_amount"] || h["limit"])
       @used        = decimal(h["used"] || "0")
-      @remaining   = decimal(h["remaining"] || h["limit"])
+      @remaining   = decimal(h["remaining"] || h["limit_amount"] || h["limit"])
       @status      = h["status"]
       @created_at  = parse_time(h["created_at"])
       @closes_at   = parse_time(h["closes_at"])
     end
 
-    attr_reader :id, :opener, :counterpart, :limit, :used, :remaining,
+    attr_reader :id, :opener, :provider, :limit, :used, :remaining,
                 :status, :created_at, :closes_at
+
+    # Backward compatibility alias
+    alias counterpart provider
 
     private :decimal, :parse_time
   end
@@ -220,14 +223,16 @@ module Remitmd
   class TabDebit < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
-      @tab_id    = h["tab_id"]
-      @amount    = decimal(h["amount"])
-      @memo      = h["memo"] || ""
-      @sequence  = h["sequence"]&.to_i || 0
-      @signature = h["signature"]
+      @tab_id     = h["tab_id"]
+      @amount     = decimal(h["amount"])
+      @cumulative = decimal(h["cumulative"])
+      @call_count = h["call_count"]&.to_i || 0
+      @memo       = h["memo"] || ""
+      @sequence   = h["sequence"]&.to_i || 0
+      @signature  = h["signature"]
     end
 
-    attr_reader :tab_id, :amount, :memo, :sequence, :signature
+    attr_reader :tab_id, :amount, :cumulative, :call_count, :memo, :sequence, :signature
 
     private :decimal
   end
@@ -255,36 +260,59 @@ module Remitmd
   class Bounty < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
+      @id               = h["id"]
+      @poster           = h["poster"]
+      @amount           = decimal(h["amount"] || h["award"])
+      @task_description = h["task_description"] || h["description"]
+      @status           = h["status"]
+      @winner           = h["winner"] || ""
+      @expires_at       = parse_time(h["expires_at"])
+      @created_at       = parse_time(h["created_at"])
+    end
+
+    attr_reader :id, :poster, :amount, :task_description, :status,
+                :winner, :expires_at, :created_at
+
+    # Backward compatibility aliases
+    alias award amount
+    alias description task_description
+
+    private :decimal, :parse_time
+  end
+
+  class BountySubmission < Model
+    def initialize(attrs)
+      h = attrs.transform_keys(&:to_s)
       @id          = h["id"]
-      @poster      = h["poster"]
-      @award       = decimal(h["award"])
-      @description = h["description"]
+      @bounty_id   = h["bounty_id"]
+      @submitter   = h["submitter"]
+      @evidence_hash = h["evidence_hash"]
       @status      = h["status"]
-      @winner      = h["winner"] || ""
-      @expires_at  = parse_time(h["expires_at"])
       @created_at  = parse_time(h["created_at"])
     end
 
-    attr_reader :id, :poster, :award, :description, :status,
-                :winner, :expires_at, :created_at
+    attr_reader :id, :bounty_id, :submitter, :evidence_hash, :status, :created_at
 
-    private :decimal, :parse_time
+    private :parse_time
   end
 
   class Deposit < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
       @id          = h["id"]
-      @depositor   = h["depositor"]
-      @beneficiary = h["beneficiary"]
+      @depositor   = h["depositor"] || h["payer"]
+      @provider    = h["provider"] || h["beneficiary"]
       @amount      = decimal(h["amount"])
       @status      = h["status"]
       @expires_at  = parse_time(h["expires_at"])
       @created_at  = parse_time(h["created_at"])
     end
 
-    attr_reader :id, :depositor, :beneficiary, :amount,
+    attr_reader :id, :depositor, :provider, :amount,
                 :status, :expires_at, :created_at
+
+    # Backward compatibility alias
+    alias beneficiary provider
 
     private :decimal, :parse_time
   end

@@ -203,18 +203,41 @@ module Remitmd
     # ─── Tabs (Metered Billing) ───────────────────────────────────────────────
 
     # Open a payment tab for off-chain metered billing.
-    # @param counterpart [String] 0x-prefixed counterpart address
-    # @param limit [Numeric] maximum tab credit in USDC
-    # @param closes_in_secs [Integer, nil] optional expiry
+    # @param provider [String] 0x-prefixed provider address
+    # @param limit_amount [Numeric] maximum tab credit in USDC
+    # @param per_unit [Numeric] USDC per API call
+    # @param expires_in_secs [Integer] optional expiry duration in seconds (default: 86400)
     # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Tab]
-    def create_tab(counterpart, limit, closes_in_secs: nil, permit: nil)
-      validate_address!(counterpart)
-      validate_amount!(limit)
-      body = { chain: @chain, counterpart: counterpart, limit: limit.to_s }
-      body[:closes_in_secs] = closes_in_secs if closes_in_secs
+    def create_tab(provider, limit_amount, per_unit = 0.0, expires_in_secs: 86_400, permit: nil)
+      validate_address!(provider)
+      validate_amount!(limit_amount)
+      body = {
+        chain: @chain,
+        provider: provider,
+        limit_amount: limit_amount.to_f,
+        per_unit: per_unit.to_f,
+        expiry: Time.now.to_i + expires_in_secs
+      }
       body[:permit] = permit.to_h if permit
       Tab.new(@transport.post("/tabs", body))
+    end
+
+    # Charge a tab using an EIP-712 signed provider authorization.
+    # @param tab_id [String]
+    # @param amount [Numeric] charge amount in USDC
+    # @param cumulative [Numeric] cumulative total charged so far
+    # @param call_count [Integer] total number of calls so far
+    # @param provider_sig [String] EIP-712 signature from the provider
+    # @return [TabDebit]
+    def charge_tab(tab_id, amount, cumulative, call_count, provider_sig)
+      body = {
+        amount: amount.to_f,
+        cumulative: cumulative.to_f,
+        call_count: call_count,
+        provider_sig: provider_sig
+      }
+      TabDebit.new(@transport.post("/tabs/#{tab_id}/charge", body))
     end
 
     # Record a debit against an open tab (off-chain, no gas).
@@ -225,31 +248,95 @@ module Remitmd
     def debit_tab(tab_id, amount, memo = "")
       validate_amount!(amount)
       body = { amount: amount.to_s, memo: memo }
-      TabDebit.new(@transport.post("/tabs/#{tab_id}/charge", body))
+      TabDebit.new(@transport.post("/tabs/#{tab_id}/debit", body))
+    end
+
+    # Close a tab on-chain, settling the final balance.
+    # @param tab_id [String]
+    # @param final_amount [Numeric, nil] final settlement amount in USDC
+    # @param provider_sig [String, nil] EIP-712 signature from the provider
+    # @return [Tab]
+    def close_tab(tab_id, final_amount: nil, provider_sig: nil)
+      body = {}
+      body[:final_amount] = final_amount.to_f if final_amount
+      body[:provider_sig] = provider_sig if provider_sig
+      Tab.new(@transport.post("/tabs/#{tab_id}/close", body))
     end
 
     # Settle a tab on-chain, paying the net balance.
     # @param tab_id [String]
-    # @return [Transaction]
+    # @return [Tab]
+    # @deprecated Use {#close_tab} instead
     def settle_tab(tab_id)
-      Transaction.new(@transport.post("/tabs/#{tab_id}/close", {}))
+      close_tab(tab_id)
+    end
+
+    # Sign an EIP-712 TabCharge message as the provider.
+    # Domain: RemitTab/1/<chainId>/<tabContract>
+    # Type: TabCharge(bytes32 tabId, uint96 totalCharged, uint32 callCount)
+    # @param tab_contract [String] tab contract address
+    # @param tab_id [String] UUID of the tab
+    # @param total_charged_base_units [Integer] total charged in USDC base units (6 decimals)
+    # @param call_count [Integer] total call count
+    # @param chain_id [Integer] chain ID (default: 84532 for Base Sepolia)
+    # @return [String] 0x-prefixed 65-byte hex signature
+    def sign_tab_charge(tab_contract, tab_id, total_charged_base_units, call_count, chain_id: 84_532)
+      # Domain separator for RemitTab
+      domain_type_hash = keccak256_raw(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+      )
+      name_hash = keccak256_raw("RemitTab")
+      version_hash = keccak256_raw("1")
+      chain_id_enc = abi_uint256(chain_id)
+      contract_enc = abi_address(tab_contract)
+
+      domain_data = domain_type_hash + name_hash + version_hash + chain_id_enc + contract_enc
+      domain_sep = keccak256_raw(domain_data)
+
+      # TabCharge struct hash
+      type_hash = keccak256_raw(
+        "TabCharge(bytes32 tabId,uint96 totalCharged,uint32 callCount)"
+      )
+
+      # Encode tabId as bytes32: ASCII bytes right-padded with zeroes
+      tab_id_bytes = tab_id.b.ljust(32, "\x00".b)
+
+      struct_data = type_hash + tab_id_bytes + abi_uint256(total_charged_base_units) + abi_uint256(call_count)
+      struct_hash = keccak256_raw(struct_data)
+
+      # EIP-712 digest
+      digest = keccak256_raw("\x19\x01".b + domain_sep + struct_hash)
+
+      @signer.sign(digest)
     end
 
     # ─── Streams (Payment Streaming) ─────────────────────────────────────────
 
     # Create a real-time payment stream.
-    # @param recipient [String] 0x-prefixed address
-    # @param rate_per_sec [Numeric] USDC per second
-    # @param deposit [Numeric] upfront deposit in USDC
+    # @param payee [String] 0x-prefixed address of the stream recipient
+    # @param rate_per_second [Numeric] USDC per second
+    # @param max_total [Numeric] maximum total USDC for the stream
     # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Stream]
-    def create_stream(recipient, rate_per_sec, deposit, permit: nil)
-      validate_address!(recipient)
-      validate_amount!(rate_per_sec)
-      validate_amount!(deposit)
-      body = { chain: @chain, recipient: recipient, rate_per_sec: rate_per_sec.to_s, deposit: deposit.to_s }
+    def create_stream(payee, rate_per_second, max_total, permit: nil)
+      validate_address!(payee)
+      validate_amount!(rate_per_second)
+      validate_amount!(max_total)
+      body = {
+        chain: @chain,
+        payee: payee,
+        rate_per_second: rate_per_second.to_s,
+        max_total: max_total.to_s
+      }
       body[:permit] = permit.to_h if permit
       Stream.new(@transport.post("/streams", body))
+    end
+
+    # Close an active payment stream.
+    # @param stream_id [String]
+    # @return [Stream]
+    def close_stream(stream_id)
+      Stream.new(@transport.post("/streams/#{stream_id}/close", {}))
     end
 
     # Withdraw accrued funds from a stream.
@@ -262,26 +349,39 @@ module Remitmd
     # ─── Bounties ─────────────────────────────────────────────────────────────
 
     # Post a bounty for any agent to claim by completing a task.
-    # @param award [Numeric] amount in USDC
-    # @param description [String] task description
-    # @param expires_in_secs [Integer, nil] optional expiry
+    # @param amount [Numeric] bounty amount in USDC
+    # @param task_description [String] task description
+    # @param deadline [Integer] deadline as Unix timestamp
+    # @param max_attempts [Integer] maximum submission attempts (default: 10)
     # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Bounty]
-    def create_bounty(award, description, expires_in_secs: nil, permit: nil)
-      validate_amount!(award)
-      body = { chain: @chain, award: award.to_s, description: description }
-      body[:expires_in_secs] = expires_in_secs if expires_in_secs
+    def create_bounty(amount, task_description, deadline, max_attempts: 10, permit: nil)
+      validate_amount!(amount)
+      body = {
+        chain: @chain,
+        amount: amount.to_f,
+        task_description: task_description,
+        deadline: deadline,
+        max_attempts: max_attempts
+      }
       body[:permit] = permit.to_h if permit
       Bounty.new(@transport.post("/bounties", body))
     end
 
-    # Award a bounty to the winning agent.
+    # Submit evidence to claim a bounty.
     # @param bounty_id [String]
-    # @param winner [String] 0x-prefixed address of winner
-    # @return [Transaction]
-    def award_bounty(bounty_id, winner)
-      validate_address!(winner)
-      Transaction.new(@transport.post("/bounties/#{bounty_id}/award", { winner: winner }))
+    # @param evidence_hash [String] 0x-prefixed hash of the evidence
+    # @return [BountySubmission]
+    def submit_bounty(bounty_id, evidence_hash)
+      BountySubmission.new(@transport.post("/bounties/#{bounty_id}/submit", { evidence_hash: evidence_hash }))
+    end
+
+    # Award a bounty to a specific submission.
+    # @param bounty_id [String]
+    # @param submission_id [Integer] ID of the winning submission
+    # @return [Bounty]
+    def award_bounty(bounty_id, submission_id)
+      Bounty.new(@transport.post("/bounties/#{bounty_id}/award", { submission_id: submission_id }))
     end
 
     # List bounties with optional filters.
@@ -302,18 +402,36 @@ module Remitmd
 
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
-    # Lock a security deposit.
-    # @param beneficiary [String] 0x-prefixed address
+    # Place a security deposit with a provider.
+    # @param provider [String] 0x-prefixed provider address
     # @param amount [Numeric] amount in USDC
-    # @param lock_secs [Integer] duration to lock in seconds
+    # @param expires_in_secs [Integer] expiry duration in seconds (default: 3600)
     # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
     # @return [Deposit]
-    def lock_deposit(beneficiary, amount, lock_secs, permit: nil)
-      validate_address!(beneficiary)
+    def place_deposit(provider, amount, expires_in_secs: 3600, permit: nil)
+      validate_address!(provider)
       validate_amount!(amount)
-      body = { beneficiary: beneficiary, amount: amount.to_s, lock_secs: lock_secs }
+      body = {
+        chain: @chain,
+        provider: provider,
+        amount: amount.to_f,
+        expiry: Time.now.to_i + expires_in_secs
+      }
       body[:permit] = permit.to_h if permit
       Deposit.new(@transport.post("/deposits", body))
+    end
+
+    # Return a deposit to the payer.
+    # @param deposit_id [String]
+    # @return [Transaction]
+    def return_deposit(deposit_id)
+      Transaction.new(@transport.post("/deposits/#{deposit_id}/return", {}))
+    end
+
+    # Lock a security deposit.
+    # @deprecated Use {#place_deposit} instead
+    def lock_deposit(provider, amount, expires_in_secs, permit: nil)
+      place_deposit(provider, amount, expires_in_secs: expires_in_secs, permit: permit)
     end
 
     # ─── Payment Intents ─────────────────────────────────────────────────────
@@ -394,6 +512,21 @@ module Remitmd
         "Invalid amount #{amount.inspect}: must be a numeric value.",
         context: { amount: amount.inspect }
       )
+    end
+
+    # ─── EIP-712 helpers (used by sign_tab_charge) ────────────────────────
+
+    def keccak256_raw(data)
+      Remitmd::Keccak.digest(data.b)
+    end
+
+    def abi_uint256(value)
+      [value.to_i.to_s(16).rjust(64, "0")].pack("H*")
+    end
+
+    def abi_address(addr)
+      hex = addr.to_s.delete_prefix("0x").rjust(64, "0")
+      [hex].pack("H*")
     end
   end
 end

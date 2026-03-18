@@ -112,16 +112,17 @@ RSpec.describe "Remitmd MockRemit" do
   # ─── Tabs ──────────────────────────────────────────────────────────────────
 
   describe "tab lifecycle" do
-    it "opens a tab and records debits" do
-      tab = wallet.create_tab(PAYEE, 10.00)
+    it "opens a tab and charges via EIP-712" do
+      tab = wallet.create_tab(PAYEE, 10.00, 0.10)
       expect(tab.status).to eq(Remitmd::TabStatus::OPEN)
 
-      wallet.debit_tab(tab.id, 0.003, "API call 1")
-      wallet.debit_tab(tab.id, 0.003, "API call 2")
+      charge = wallet.charge_tab(tab.id, 0.10, 0.10, 1, "0xfakesig")
+      expect(charge).to be_a(Remitmd::TabDebit)
+      expect(charge.tab_id).to eq(tab.id)
 
-      tx = wallet.settle_tab(tab.id)
-      expect(tx).to be_a(Remitmd::Transaction)
-      expect(mock.transaction_count).to eq(1) # settle is 1 on-chain tx
+      closed = wallet.close_tab(tab.id, final_amount: 0.10, provider_sig: "0xfakesig")
+      expect(closed).to be_a(Remitmd::Tab)
+      expect(closed.status).to eq(Remitmd::TabStatus::SETTLED)
     end
   end
 
@@ -139,24 +140,39 @@ RSpec.describe "Remitmd MockRemit" do
   # ─── Bounties ─────────────────────────────────────────────────────────────
 
   describe "bounty lifecycle" do
-    it "posts and awards a bounty" do
-      bounty = wallet.create_bounty(5.00, "find the cheapest API route")
+    it "posts, submits, and awards a bounty" do
+      deadline = Time.now.to_i + 3600
+      bounty = wallet.create_bounty(5.00, "find the cheapest API route", deadline)
       expect(bounty.status).to eq(Remitmd::BountyStatus::OPEN)
 
-      tx = wallet.award_bounty(bounty.id, RECIPIENT)
-      expect(tx.to).to eq(RECIPIENT)
-      expect(tx.amount).to eq(BigDecimal("5"))
+      sub = wallet.submit_bounty(bounty.id, "0xdeadbeef")
+      expect(sub).to be_a(Remitmd::BountySubmission)
+      expect(sub.bounty_id).to eq(bounty.id)
+
+      awarded = wallet.award_bounty(bounty.id, sub.id)
+      expect(awarded).to be_a(Remitmd::Bounty)
+      expect(awarded.status).to eq(Remitmd::BountyStatus::AWARDED)
     end
   end
 
   # ─── Deposits ─────────────────────────────────────────────────────────────
 
-  describe "#lock_deposit" do
-    it "locks a security deposit and deducts balance" do
-      dep = wallet.lock_deposit(PAYEE, 20.00, 86400)
+  describe "deposit lifecycle" do
+    it "places a security deposit and returns it" do
+      dep = wallet.place_deposit(PAYEE, 20.00)
       expect(dep).to be_a(Remitmd::Deposit)
       expect(dep.status).to eq(Remitmd::DepositStatus::LOCKED)
       expect(mock.balance).to eq(BigDecimal("9980"))
+
+      tx = wallet.return_deposit(dep.id)
+      expect(tx).to be_a(Remitmd::Transaction)
+      expect(mock.balance).to eq(BigDecimal("10000"))
+    end
+
+    it "backward-compat lock_deposit still works" do
+      dep = wallet.lock_deposit(PAYEE, 20.00, 86400)
+      expect(dep).to be_a(Remitmd::Deposit)
+      expect(dep.status).to eq(Remitmd::DepositStatus::LOCKED)
     end
   end
 

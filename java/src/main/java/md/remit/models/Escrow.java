@@ -1,5 +1,6 @@
 package md.remit.models;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -11,7 +12,8 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Escrow {
 
-    @JsonProperty("id")
+    @JsonProperty("invoice_id")
+    @JsonAlias("id")
     public String id;
 
     @JsonProperty("payer")

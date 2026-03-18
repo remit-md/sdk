@@ -156,16 +156,32 @@ public class Wallet {
         validateAddress(payee);
         validateAmount(amount);
 
-        Map<String, Object> body = new java.util.HashMap<>();
-        body.put("payee", payee);
-        body.put("amount", amount.toPlainString());
-        if (memo != null) body.put("memo", memo);
-        if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());
-        if (milestones != null && !milestones.isEmpty()) body.put("milestones", milestones);
-        if (splits != null && !splits.isEmpty()) body.put("splits", splits);
-        if (permit != null) body.put("permit", permit);
+        // Step 1: create invoice on server.
+        byte[] nb = new byte[16];
+        new java.security.SecureRandom().nextBytes(nb);
+        String invoiceId = java.util.HexFormat.of().formatHex(nb);
+        String nonce = java.util.HexFormat.of().formatHex(nb);
 
-        return client.post("/api/v0/escrows", body, Escrow.class);
+        Map<String, Object> invoiceBody = new java.util.HashMap<>();
+        invoiceBody.put("id", invoiceId);
+        invoiceBody.put("chain", chain);
+        invoiceBody.put("from_agent", signer.address().toLowerCase());
+        invoiceBody.put("to_agent", payee.toLowerCase());
+        invoiceBody.put("amount", amount.toPlainString());
+        invoiceBody.put("type", "escrow");
+        invoiceBody.put("task", memo != null ? memo : "");
+        invoiceBody.put("nonce", nonce);
+        invoiceBody.put("signature", "0x");
+        if (expiresIn != null) invoiceBody.put("escrow_timeout", (int) expiresIn.toSeconds());
+
+        client.post("/api/v0/invoices", invoiceBody, Map.class);
+
+        // Step 2: fund the escrow.
+        Map<String, Object> escrowBody = new java.util.HashMap<>();
+        escrowBody.put("invoice_id", invoiceId);
+        if (permit != null) escrowBody.put("permit", permit);
+
+        return client.post("/api/v0/escrows", escrowBody, Escrow.class);
     }
 
     /** Releases escrow funds to the payee. */
@@ -192,7 +208,7 @@ public class Wallet {
 
     /** Signals the provider has started work on an escrow. */
     public Escrow claimStart(String escrowId) {
-        return client.post("/api/v0/escrows/" + escrowId + "/claim_start", null, Escrow.class);
+        return client.post("/api/v0/escrows/" + escrowId + "/claim-start", Map.of(), Escrow.class);
     }
 
     // ─── Tab ──────────────────────────────────────────────────────────────────

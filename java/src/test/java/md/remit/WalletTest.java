@@ -104,7 +104,7 @@ class WalletTest {
         String payee = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
         Escrow escrow = wallet.createEscrow(payee, BigDecimal.valueOf(5.00));
 
-        assertThat(escrow.id).startsWith("esc_");
+        assertThat(escrow.id).isNotEmpty();
         assertThat(escrow.status).isEqualTo("funded");
         assertThat(escrow.amount).isEqualByComparingTo(BigDecimal.valueOf(5.00));
         assertThat(wallet.balance().usdc).isEqualByComparingTo(BigDecimal.valueOf(9995));

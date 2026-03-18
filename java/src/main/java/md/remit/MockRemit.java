@@ -38,6 +38,7 @@ public class MockRemit {
     private final Map<String, Stream> streams = new ConcurrentHashMap<>();
     private final Map<String, Bounty> bounties = new ConcurrentHashMap<>();
     private final Map<String, Deposit> deposits = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, Object>> pendingInvoices = new ConcurrentHashMap<>();
     private final AtomicLong counter = new AtomicLong();
 
     /** Creates a mock with a default starting balance of 10,000 USDC. */
@@ -74,6 +75,7 @@ public class MockRemit {
         streams.clear();
         bounties.clear();
         deposits.clear();
+        pendingInvoices.clear();
         counter.set(0);
     }
 
@@ -136,7 +138,22 @@ public class MockRemit {
         return tx;
     }
 
-    Escrow mockCreateEscrow(String payee, BigDecimal amount, String memo) {
+    void mockCreateInvoice(Map<String, Object> body) {
+        String invoiceId = (String) body.get("id");
+        pendingInvoices.put(invoiceId, body);
+    }
+
+    Escrow mockCreateEscrow(String invoiceId) {
+        Map<String, Object> inv = pendingInvoices.remove(invoiceId);
+        if (inv == null) {
+            throw new RemitError(ErrorCodes.ESCROW_NOT_FOUND,
+                "Invoice \"" + invoiceId + "\" not found in mock.",
+                Map.of("invoice_id", invoiceId));
+        }
+        String payee = (String) inv.get("to_agent");
+        BigDecimal amount = new BigDecimal((String) inv.get("amount"));
+        String memo = (String) inv.getOrDefault("task", "");
+
         BigDecimal current = balance.get();
         if (current.compareTo(amount) < 0) {
             throw new RemitError(ErrorCodes.INSUFFICIENT_FUNDS,
@@ -146,7 +163,7 @@ public class MockRemit {
         }
         balance.set(current.subtract(amount));
         Escrow e = new Escrow();
-        e.id = "esc_" + counter.incrementAndGet();
+        e.id = invoiceId;
         e.payer = MOCK_ADDRESS;
         e.payee = payee;
         e.amount = amount;
@@ -423,11 +440,17 @@ public class MockRemit {
                 String memo = (String) b.getOrDefault("task", "");
                 return (T) mock.mockPay(to, amount, memo);
             }
+            if ("POST".equals(method) && "/api/v0/invoices".equals(path)) {
+                mock.mockCreateInvoice(b);
+                return null;
+            }
             if ("POST".equals(method) && "/api/v0/escrows".equals(path)) {
-                String payee = (String) b.get("payee");
-                BigDecimal amount = new BigDecimal((String) b.get("amount"));
-                String memo = (String) b.getOrDefault("memo", "");
-                return (T) mock.mockCreateEscrow(payee, amount, memo);
+                String invoiceId = (String) b.get("invoice_id");
+                return (T) mock.mockCreateEscrow(invoiceId);
+            }
+            if ("POST".equals(method) && path.endsWith("/claim-start")) {
+                String escrowId = path.replace("/api/v0/escrows/", "").replace("/claim-start", "");
+                return (T) mock.mockGetEscrow(escrowId);
             }
             if ("POST".equals(method) && path.endsWith("/release")) {
                 String escrowId = path.replace("/api/v0/escrows/", "").replace("/release", "");

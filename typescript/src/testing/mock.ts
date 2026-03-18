@@ -322,13 +322,27 @@ export class MockRemit {
     return { ...bounty };
   }
 
-  awardBounty(from: string, bountyId: string, winner: string): Transaction {
+  submitBounty(from: string, bountyId: string, evidenceHash: string): { id: number } {
+    this._checkForced(from);
+    const mut = this.#bounties.get(bountyId);
+    if (!mut) throw new Error(`bounty ${bountyId} not found`);
+    mut.submissions.push({
+      submitter: from,
+      evidenceUri: evidenceHash,
+      submittedAt: this._now(),
+    });
+    return { id: mut.submissions.length };
+  }
+
+  awardBounty(from: string, bountyId: string, submissionId: number): Transaction {
     this._checkForced(from);
     const bounty = this.getBounty(bountyId);
     const mut = this.#bounties.get(bountyId)!;
+    const submission = mut.submissions[submissionId - 1];
+    if (!submission) throw new Error(`submission ${submissionId} not found`);
     mut.status = "awarded";
-    mut.winner = winner;
-    this._credit(winner, bounty.amount);
+    mut.winner = submission.submitter;
+    this._credit(submission.submitter, bounty.amount);
     return mkTx();
   }
 
@@ -421,8 +435,13 @@ export class MockWallet extends Wallet {
     );
   }
 
-  override async awardBounty(bountyId: string, winner: string): Promise<Transaction> {
-    return this.#mock.awardBounty(this.address, bountyId, winner);
+  override async submitBounty(bountyId: string, evidenceHash: string): Promise<Transaction> {
+    this.#mock.submitBounty(this.address, bountyId, evidenceHash);
+    return mkTx();
+  }
+
+  override async awardBounty(bountyId: string, submissionId: number): Promise<Transaction> {
+    return this.#mock.awardBounty(this.address, bountyId, submissionId);
   }
 
   override async placeDeposit(options: Parameters<Wallet["placeDeposit"]>[0]): Promise<Deposit> {

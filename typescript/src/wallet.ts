@@ -427,20 +427,22 @@ export class Wallet extends RemitClient {
     return this.#auth.post<Bounty>("/bounties", {
       chain: this._chain,
       amount: options.amount,
-      task: options.task,
+      task_description: options.task,
       deadline: options.deadline,
-      validation: options.validation ?? "poster",
-      maxAttempts: options.maxAttempts ?? 10,
+      max_attempts: options.maxAttempts ?? 10,
       ...(options.permit ? { permit: options.permit } : {}),
     });
   }
 
-  submitBounty(bountyId: string, evidenceUri: string): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/bounties/${bountyId}/submit`, { evidenceUri });
+  submitBounty(bountyId: string, evidenceHash: string, evidenceUri?: string): Promise<Transaction> {
+    return this.#auth.post<Transaction>(`/bounties/${bountyId}/submit`, {
+      evidence_hash: evidenceHash,
+      ...(evidenceUri ? { evidence_uri: evidenceUri } : {}),
+    });
   }
 
-  awardBounty(bountyId: string, winner: string): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/bounties/${bountyId}/award`, { winner });
+  awardBounty(bountyId: string, submissionId: number): Promise<Transaction> {
+    return this.#auth.post<Transaction>(`/bounties/${bountyId}/award`, { submission_id: submissionId });
   }
 
   // ─── Deposits ───────────────────────────────────────────────────────────────

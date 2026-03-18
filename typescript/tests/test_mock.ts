@@ -125,7 +125,8 @@ describe("MockRemit", () => {
     assert.equal(bounty.status, "open");
     assert.equal(await poster.balance(), 50);
 
-    await poster.awardBounty(bounty.id, winner.address);
+    await winner.submitBounty(bounty.id, "0xevidence");
+    await poster.awardBounty(bounty.id, 1);
     const b = mock.getBounty(bounty.id);
     assert.equal(b.status, "awarded");
     assert.equal(b.winner, winner.address);
@@ -184,7 +185,8 @@ describe("MockRemit", () => {
 
     const b1 = await poster.postBounty({ amount: 10, task: "Task A", deadline });
     await poster.postBounty({ amount: 10, task: "Task B", deadline });
-    await poster.awardBounty(b1.id, w2.address);
+    await w2.submitBounty(b1.id, "0xevidence");
+    await poster.awardBounty(b1.id, 1);
 
     const open = mock.listBounties("open");
     const awarded = mock.listBounties("awarded");

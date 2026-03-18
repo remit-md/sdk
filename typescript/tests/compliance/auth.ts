@@ -63,7 +63,7 @@ describe("TypeScript compliance: authentication", () => {
 
     const wallet = await makeWallet();
     const tx = await wallet.mint(100);
-    assert.ok(tx.txHash, "txHash must be set after mint");
+    assert.ok(tx.tx_hash, "tx_hash must be set after mint");
   });
 
 });

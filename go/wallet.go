@@ -448,12 +448,35 @@ func (w *Wallet) GetTab(ctx context.Context, tabID string) (*Tab, error) {
 	return &tab, nil
 }
 
+// CloseTabOptions configures CloseTab.
+type CloseTabOptions struct {
+	FinalAmount float64
+	ProviderSig string
+}
+
+// CloseTabOption configures CloseTab.
+type CloseTabOption func(*CloseTabOptions)
+
+// WithCloseTabAmount sets the final settlement amount.
+func WithCloseTabAmount(amount float64) CloseTabOption {
+	return func(o *CloseTabOptions) { o.FinalAmount = amount }
+}
+
+// WithCloseTabSig sets the provider EIP-712 signature for settlement.
+func WithCloseTabSig(sig string) CloseTabOption {
+	return func(o *CloseTabOptions) { o.ProviderSig = sig }
+}
+
 // CloseTab settles all charges on-chain and closes the tab.
-func (w *Wallet) CloseTab(ctx context.Context, tabID string) (*Tab, error) {
+func (w *Wallet) CloseTab(ctx context.Context, tabID string, opts ...CloseTabOption) (*Tab, error) {
+	cfg := &CloseTabOptions{ProviderSig: "0x"}
+	for _, o := range opts {
+		o(cfg)
+	}
 	var tab Tab
 	if err := w.http.post(ctx, "/api/v0/tabs/"+tabID+"/close", map[string]any{
-		"final_amount": 0,
-		"provider_sig": "0x",
+		"final_amount": cfg.FinalAmount,
+		"provider_sig": cfg.ProviderSig,
 	}, &tab); err != nil {
 		return nil, err
 	}
@@ -463,6 +486,20 @@ func (w *Wallet) CloseTab(ctx context.Context, tabID string) (*Tab, error) {
 // SettleTab is an alias for CloseTab for backward compatibility.
 func (w *Wallet) SettleTab(ctx context.Context, tabID string) (*Tab, error) {
 	return w.CloseTab(ctx, tabID)
+}
+
+// ChargeTab charges the given amount from an open tab using EIP-712 signed authorization.
+func (w *Wallet) ChargeTab(ctx context.Context, tabID string, amount, cumulative float64, callCount int, providerSig string) (*TabCharge, error) {
+	var charge TabCharge
+	if err := w.http.post(ctx, "/api/v0/tabs/"+tabID+"/charge", map[string]any{
+		"amount":       amount,
+		"cumulative":   cumulative,
+		"call_count":   callCount,
+		"provider_sig": providerSig,
+	}, &charge); err != nil {
+		return nil, err
+	}
+	return &charge, nil
 }
 
 // ─── Stream ───────────────────────────────────────────────────────────────────
@@ -480,9 +517,9 @@ func WithStreamPermit(permit *PermitSignature) StreamOption {
 	return func(o *StreamOptions) { o.Permit = permit }
 }
 
-// CreateStream starts a per-second USDC payment stream to a recipient.
-func (w *Wallet) CreateStream(ctx context.Context, recipient string, ratePerSec decimal.Decimal, deposit decimal.Decimal, opts ...StreamOption) (*Stream, error) {
-	if err := validateAddress(recipient); err != nil {
+// CreateStream starts a per-second USDC payment stream to a payee.
+func (w *Wallet) CreateStream(ctx context.Context, payee string, ratePerSecond decimal.Decimal, maxTotal decimal.Decimal, opts ...StreamOption) (*Stream, error) {
+	if err := validateAddress(payee); err != nil {
 		return nil, err
 	}
 	cfg := &StreamOptions{}
@@ -490,16 +527,25 @@ func (w *Wallet) CreateStream(ctx context.Context, recipient string, ratePerSec 
 		o(cfg)
 	}
 	body := map[string]any{
-		"chain":        w.chain,
-		"recipient":    recipient,
-		"rate_per_sec": ratePerSec.String(),
-		"deposit":      deposit.String(),
+		"chain":           w.chain,
+		"payee":           payee,
+		"rate_per_second": ratePerSecond.String(),
+		"max_total":       maxTotal.String(),
 	}
 	if cfg.Permit != nil {
 		body["permit"] = cfg.Permit
 	}
 	var stream Stream
 	if err := w.http.post(ctx, "/api/v0/streams", body, &stream); err != nil {
+		return nil, err
+	}
+	return &stream, nil
+}
+
+// CloseStream closes an active payment stream.
+func (w *Wallet) CloseStream(ctx context.Context, streamID string) (*Stream, error) {
+	var stream Stream
+	if err := w.http.post(ctx, "/api/v0/streams/"+streamID+"/close", map[string]any{}, &stream); err != nil {
 		return nil, err
 	}
 	return &stream, nil
@@ -516,18 +562,43 @@ func (w *Wallet) WithdrawStream(ctx context.Context, streamID string) (*Transact
 
 // ─── Bounty ───────────────────────────────────────────────────────────────────
 
+// BountyOptions configures bounty creation.
+type BountyOptions struct {
+	MaxAttempts int
+	Permit      *PermitSignature
+}
+
+// BountyOption configures CreateBounty.
+type BountyOption func(*BountyOptions)
+
+// WithBountyMaxAttempts sets the maximum number of submission attempts allowed.
+func WithBountyMaxAttempts(n int) BountyOption {
+	return func(o *BountyOptions) { o.MaxAttempts = n }
+}
+
+// WithBountyPermit attaches an EIP-2612 permit signature to a bounty.
+func WithBountyPermit(permit *PermitSignature) BountyOption {
+	return func(o *BountyOptions) { o.Permit = permit }
+}
+
 // CreateBounty posts a USDC bounty for task completion.
-func (w *Wallet) CreateBounty(ctx context.Context, award decimal.Decimal, description string, expiresIn ...time.Duration) (*Bounty, error) {
-	if err := validateAmount(award); err != nil {
+func (w *Wallet) CreateBounty(ctx context.Context, amount decimal.Decimal, task string, deadline int64, opts ...BountyOption) (*Bounty, error) {
+	if err := validateAmount(amount); err != nil {
 		return nil, err
 	}
-	body := map[string]any{
-		"chain":       w.chain,
-		"award":       award.String(),
-		"description": description,
+	cfg := &BountyOptions{MaxAttempts: 10}
+	for _, o := range opts {
+		o(cfg)
 	}
-	if len(expiresIn) > 0 {
-		body["expires_in_seconds"] = int(expiresIn[0].Seconds())
+	body := map[string]any{
+		"chain":            w.chain,
+		"amount":           amount.InexactFloat64(),
+		"task_description": task,
+		"deadline":         deadline,
+		"max_attempts":     cfg.MaxAttempts,
+	}
+	if cfg.Permit != nil {
+		body["permit"] = cfg.Permit
 	}
 	var bounty Bounty
 	if err := w.http.post(ctx, "/api/v0/bounties", body, &bounty); err != nil {
@@ -536,20 +607,26 @@ func (w *Wallet) CreateBounty(ctx context.Context, award decimal.Decimal, descri
 	return &bounty, nil
 }
 
-// AwardBounty pays the bounty to the winner.
-func (w *Wallet) AwardBounty(ctx context.Context, bountyID string, winner string) (*Transaction, error) {
-	if err := validateAddress(winner); err != nil {
+// SubmitBounty submits evidence to claim a bounty.
+func (w *Wallet) SubmitBounty(ctx context.Context, bountyID string, evidenceHash string) (*BountySubmission, error) {
+	var sub BountySubmission
+	if err := w.http.post(ctx, "/api/v0/bounties/"+bountyID+"/submit", map[string]any{
+		"evidence_hash": evidenceHash,
+	}, &sub); err != nil {
 		return nil, err
 	}
-	body := map[string]any{
-		"bounty_id": bountyID,
-		"winner":    winner,
-	}
-	var tx Transaction
-	if err := w.http.post(ctx, "/api/v0/bounties/"+bountyID+"/award", body, &tx); err != nil {
+	return &sub, nil
+}
+
+// AwardBounty awards the bounty to a specific submission.
+func (w *Wallet) AwardBounty(ctx context.Context, bountyID string, submissionID int) (*Bounty, error) {
+	var bounty Bounty
+	if err := w.http.post(ctx, "/api/v0/bounties/"+bountyID+"/award", map[string]any{
+		"submission_id": submissionID,
+	}, &bounty); err != nil {
 		return nil, err
 	}
-	return &tx, nil
+	return &bounty, nil
 }
 
 // BountyListOptions controls filtering for ListBounties.
@@ -596,21 +673,60 @@ func (w *Wallet) ListBounties(ctx context.Context, opts *BountyListOptions) ([]B
 
 // ─── Deposit ──────────────────────────────────────────────────────────────────
 
-// LockDeposit locks a security deposit with a beneficiary.
-func (w *Wallet) LockDeposit(ctx context.Context, beneficiary string, amount decimal.Decimal, expiresIn time.Duration) (*Deposit, error) {
-	if err := validateAddress(beneficiary); err != nil {
+// DepositOptions configures deposit creation.
+type DepositOptions struct {
+	Permit *PermitSignature
+}
+
+// DepositOption configures PlaceDeposit.
+type DepositOption func(*DepositOptions)
+
+// WithDepositPermit attaches an EIP-2612 permit signature to a deposit.
+func WithDepositPermit(permit *PermitSignature) DepositOption {
+	return func(o *DepositOptions) { o.Permit = permit }
+}
+
+// PlaceDeposit locks a security deposit with a provider.
+func (w *Wallet) PlaceDeposit(ctx context.Context, provider string, amount decimal.Decimal, expires time.Duration, opts ...DepositOption) (*Deposit, error) {
+	if err := validateAddress(provider); err != nil {
 		return nil, err
 	}
+	if err := validateAmount(amount); err != nil {
+		return nil, err
+	}
+	cfg := &DepositOptions{}
+	for _, o := range opts {
+		o(cfg)
+	}
 	body := map[string]any{
-		"beneficiary":        beneficiary,
-		"amount":             amount.String(),
-		"expires_in_seconds": int(expiresIn.Seconds()),
+		"chain":    w.chain,
+		"provider": provider,
+		"amount":   amount.InexactFloat64(),
+		"expiry":   int(time.Now().Unix()) + int(expires.Seconds()),
+	}
+	if cfg.Permit != nil {
+		body["permit"] = cfg.Permit
 	}
 	var deposit Deposit
 	if err := w.http.post(ctx, "/api/v0/deposits", body, &deposit); err != nil {
 		return nil, err
 	}
 	return &deposit, nil
+}
+
+// LockDeposit locks a security deposit with a beneficiary.
+// Deprecated: Use PlaceDeposit instead.
+func (w *Wallet) LockDeposit(ctx context.Context, beneficiary string, amount decimal.Decimal, expiresIn time.Duration) (*Deposit, error) {
+	return w.PlaceDeposit(ctx, beneficiary, amount, expiresIn)
+}
+
+// ReturnDeposit returns a deposit to the payer.
+func (w *Wallet) ReturnDeposit(ctx context.Context, depositID string) (*Transaction, error) {
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v0/deposits/"+depositID+"/return", map[string]any{}, &tx); err != nil {
+		return nil, err
+	}
+	return &tx, nil
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────

@@ -169,6 +169,7 @@ type Tab struct {
 }
 
 // TabDebit records a single charge against a Tab.
+// Deprecated: Use TabCharge instead. Kept for backward compatibility.
 type TabDebit struct {
 	TabID     string          `json:"tab_id"`
 	Amount    decimal.Decimal `json:"amount"`
@@ -177,40 +178,75 @@ type TabDebit struct {
 	Signature string          `json:"signature"`
 }
 
+// TabCharge records a single charge against a Tab (new server model).
+type TabCharge struct {
+	ID          int     `json:"id"`
+	TabID       string  `json:"tab_id"`
+	Amount      float64 `json:"amount"`
+	Cumulative  float64 `json:"cumulative"`
+	CallCount   int     `json:"call_count"`
+	ProviderSig string  `json:"provider_sig"`
+	ChargedAt   string  `json:"charged_at"`
+}
+
 // Stream is a time-based payment flow (pay-per-second).
+// Field names match the server's models::stream::Stream struct (snake_case JSON).
+// BigDecimal fields are serialized as JSON strings by the server.
 type Stream struct {
-	ID          string          `json:"id"`
-	Sender      string          `json:"sender"`
-	Recipient   string          `json:"recipient"`
-	RatePerSec  decimal.Decimal `json:"rate_per_sec"`
-	Deposited   decimal.Decimal `json:"deposited"`
-	Withdrawn   decimal.Decimal `json:"withdrawn"`
-	Status      StreamStatus    `json:"status"`
-	StartedAt   time.Time       `json:"started_at"`
-	EndsAt      *time.Time      `json:"ends_at,omitempty"`
+	ID            string `json:"id"`
+	Chain         string `json:"chain"`
+	Payer         string `json:"payer"`
+	Payee         string `json:"payee"`
+	RatePerSecond string `json:"rate_per_second"`
+	MaxTotal      string `json:"max_total"`
+	Withdrawn     string `json:"withdrawn"`
+	Status        string `json:"status"`
+	StartedAt     string `json:"started_at"`
+	ClosedAt      string `json:"closed_at,omitempty"`
+	TxHash        string `json:"tx_hash"`
+	UpdatedAt     string `json:"updated_at"`
 }
 
 // Bounty is a task with a USDC reward for completion.
+// Field names match the server's models::bounty::Bounty struct (snake_case JSON).
 type Bounty struct {
-	ID          string          `json:"id"`
-	Poster      string          `json:"poster"`
-	Award       decimal.Decimal `json:"award"`
-	Description string          `json:"description"`
-	Status      BountyStatus    `json:"status"`
-	Winner      string          `json:"winner,omitempty"`
-	ExpiresAt   *time.Time      `json:"expires_at,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
+	ID              string `json:"id"`
+	Chain           string `json:"chain"`
+	Poster          string `json:"poster"`
+	Amount          string `json:"amount"`
+	TaskDescription string `json:"task_description"`
+	Deadline        int64  `json:"deadline,omitempty"`
+	MaxAttempts     int    `json:"max_attempts,omitempty"`
+	Status          string `json:"status"`
+	Winner          string `json:"winner,omitempty"`
+	TxHash          string `json:"tx_hash,omitempty"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at,omitempty"`
+}
+
+// BountySubmission records a submission against a Bounty.
+type BountySubmission struct {
+	ID           int    `json:"id"`
+	BountyID     string `json:"bounty_id"`
+	Submitter    string `json:"submitter"`
+	EvidenceHash string `json:"evidence_hash"`
+	Status       string `json:"status"`
+	SubmittedAt  string `json:"submitted_at"`
 }
 
 // Deposit is a security deposit held as collateral.
+// Field names match the server's models::deposit::Deposit struct (snake_case JSON).
 type Deposit struct {
-	ID          string          `json:"id"`
-	Depositor   string          `json:"depositor"`
-	Beneficiary string          `json:"beneficiary"`
-	Amount      decimal.Decimal `json:"amount"`
-	Status      DepositStatus   `json:"status"`
-	ExpiresAt   *time.Time      `json:"expires_at,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
+	ID        string `json:"id"`
+	Chain     string `json:"chain"`
+	Payer     string `json:"payer"`
+	Provider  string `json:"provider"`
+	Amount    string `json:"amount"`
+	Status    string `json:"status"`
+	Expiry    string `json:"expiry"`
+	TxHash    string `json:"tx_hash,omitempty"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
 // Intent represents a proposed payment awaiting negotiation.

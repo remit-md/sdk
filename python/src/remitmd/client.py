@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict, cast
+from typing import TypedDict, cast
 
 from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.models.bounty import Bounty

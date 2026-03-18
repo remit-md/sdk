@@ -85,6 +85,9 @@ jobs:
           go-version: "1.22"
           cache-dependency-path: go/go.sum
 
+      - name: Tidy modules
+        run: cd go && go mod tidy
+
       - name: Run acceptance tests
         env:
           ACCEPTANCE_API_URL: https://remit.md

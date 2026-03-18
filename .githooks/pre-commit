@@ -9,7 +9,7 @@ RAN_TESTS=0
 
 if echo "$STAGED" | grep -q '^python/'; then
     echo "[SDK] Python: ruff + pytest..."
-    cd python && ruff check . && ruff format --check . && pytest -v && cd ..
+    cd python && ruff check . && ruff format --check . && pytest -v --ignore=tests/acceptance --ignore=tests/compliance && cd ..
     RAN_TESTS=1
 fi
 

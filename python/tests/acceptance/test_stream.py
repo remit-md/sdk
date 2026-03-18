@@ -77,17 +77,13 @@ async def test_stream_lifecycle() -> None:
     fee_gain = fee_after - fee_before
 
     # Agent should have lost money (stream accrued), but <= maxTotal
-    assert agent_loss > 0.05, (
-        f"agent should have lost money from streaming, got loss={agent_loss}"
-    )
+    assert agent_loss > 0.05, f"agent should have lost money from streaming, got loss={agent_loss}"
     assert agent_loss <= max_total + 0.01, (
         f"agent loss should not exceed maxTotal (${max_total}), got loss={agent_loss}"
     )
 
     # Provider should have received payout (accrued minus 1% fee)
-    assert provider_gain > 0.04, (
-        f"provider should have received payout, got gain={provider_gain}"
-    )
+    assert provider_gain > 0.04, f"provider should have received payout, got gain={provider_gain}"
 
     # Fee wallet should not decrease
     assert fee_gain >= 0, f"fee wallet should not decrease, got change={fee_gain}"

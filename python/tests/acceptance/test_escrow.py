@@ -60,6 +60,7 @@ async def test_escrow_lifecycle() -> None:
     # Provider claims
     await provider.claim_start(escrow_id)
     import asyncio
+
     await asyncio.sleep(5)
 
     # Agent releases

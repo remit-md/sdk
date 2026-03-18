@@ -92,6 +92,7 @@ class Wallet(RemitClient):
         self._http = AuthenticatedClient(
             url, signer=self._signer, chain_id=chain_id, verifying_contract=verifying_contract
         )
+        self._contracts_cache = None
 
         # Event callbacks: event_type → list of callables
         self._callbacks: dict[str, list[Callable[..., Any]]] = {}
@@ -436,11 +437,22 @@ class Wallet(RemitClient):
 
     async def mint(self, amount: float) -> dict[str, Any]:
         """Mint testnet USDC. Returns ``{"tx_hash": "0x…", "balance": "…"}``."""
-        data: dict[str, Any] = await self._http.post(
-            "/api/v0/mint",
-            {"wallet": self.address, "amount": amount},
-        )
-        return data
+        import httpx  # noqa: PLC0415
+
+        # Mint is a public endpoint — use raw HTTP without auth.
+        base = self._http._base_url.rstrip("/")
+        url = f"{base}/api/v0/mint" if "/api/v0" not in base else f"{base}/mint"
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                url,
+                json={"wallet": self.address, "amount": amount},
+            )
+            if not resp.is_success:
+                data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+                msg = data.get("message", resp.text) if isinstance(data, dict) else resp.text
+                raise RuntimeError(f"mint failed ({resp.status_code}): {msg}")
+            return resp.json()  # type: ignore[no-any-return]
 
     # ─── Repr (never expose key) ──────────────────────────────────────────────
 

@@ -110,7 +110,8 @@ async fn wait_for_balance_change(address: &str, before: f64) -> f64 {
 
 fn assert_balance_change(label: &str, before: f64, after: f64, expected: f64) {
     let actual = after - before;
-    let tolerance = expected.abs() * 0.001; // 10 bps
+    // Use max of 10 bps OR $0.02 absolute tolerance (handles concurrent test fee noise).
+    let tolerance = (expected.abs() * 0.001).max(0.02);
     let diff = (actual - expected).abs();
     assert!(
         diff <= tolerance,

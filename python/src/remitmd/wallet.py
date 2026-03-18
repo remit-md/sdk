@@ -12,6 +12,7 @@ from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.client import RemitClient
 from remitmd.models.bounty import Bounty
 from remitmd.models.common import LinkResponse, Transaction, WalletStatus, Webhook
+from remitmd.models.tab import TabCharge
 from remitmd.models.deposit import Deposit
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
@@ -293,12 +294,80 @@ class Wallet(RemitClient):
         data = await self._http.post("/api/v0/tabs", body)
         return Tab.model_validate(data)
 
-    async def close_tab(self, tab_id: str) -> Tab:
+    async def charge_tab(
+        self,
+        tab_id: str,
+        amount: float,
+        cumulative: float,
+        call_count: int,
+        provider_sig: str,
+    ) -> TabCharge:
+        """Provider-side: charge a tab with an EIP-712 TabCharge signature."""
+        data = await self._http.post(
+            f"/api/v0/tabs/{tab_id}/charge",
+            {
+                "amount": amount,
+                "cumulative": cumulative,
+                "call_count": call_count,
+                "provider_sig": provider_sig,
+            },
+        )
+        return TabCharge.model_validate(data)
+
+    async def close_tab(
+        self,
+        tab_id: str,
+        final_amount: float = 0,
+        provider_sig: str = "0x",
+    ) -> Tab:
         data = await self._http.post(
             f"/api/v0/tabs/{tab_id}/close",
-            {"final_amount": 0, "provider_sig": "0x"},
+            {"final_amount": final_amount, "provider_sig": provider_sig},
         )
         return Tab.model_validate(data)
+
+    async def sign_tab_charge(
+        self,
+        tab_contract: str,
+        tab_id: str,
+        total_charged: int,
+        call_count: int,
+    ) -> str:
+        """Sign a TabCharge EIP-712 message (provider-side).
+
+        Args:
+            tab_contract: Tab contract address (verifyingContract for domain).
+            tab_id: UUID of the tab (will be encoded as bytes32).
+            total_charged: Cumulative charged amount in USDC base units (uint96).
+            call_count: Number of charges made (uint32).
+
+        Returns:
+            0x-prefixed hex signature.
+        """
+        # Encode UUID string as bytes32 (ASCII chars padded to 32 bytes).
+        tab_id_bytes = tab_id.encode("ascii")[:32].ljust(32, b"\x00")
+        tab_id_hex = "0x" + tab_id_bytes.hex()
+
+        domain = {
+            "name": "RemitTab",
+            "version": "1",
+            "chainId": self._chain_id,
+            "verifyingContract": tab_contract,
+        }
+        types: dict[str, object] = {
+            "TabCharge": [
+                {"name": "tabId", "type": "bytes32"},
+                {"name": "totalCharged", "type": "uint96"},
+                {"name": "callCount", "type": "uint32"},
+            ],
+        }
+        message = {
+            "tabId": tab_id_hex,
+            "totalCharged": total_charged,
+            "callCount": call_count,
+        }
+
+        return await self._signer.sign_typed_data(domain, types, message)
 
     # ─── Streaming ────────────────────────────────────────────────────────────
 
@@ -306,18 +375,15 @@ class Wallet(RemitClient):
         self,
         to: str,
         rate: float,
-        max_duration: int = 3600,
-        max_total: float | None = None,
+        max_total: float,
         permit: PermitSignature | None = None,
     ) -> Stream:
         body: dict[str, Any] = {
             "chain": self.chain,
-            "to": to,
-            "rate": rate,
-            "max_duration": max_duration,
+            "payee": to,
+            "rate_per_second": rate,
+            "max_total": max_total,
         }
-        if max_total is not None:
-            body["max_total"] = max_total
         if permit is not None:
             body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v0/streams", body)
@@ -334,16 +400,14 @@ class Wallet(RemitClient):
         amount: float,
         task: str,
         deadline: int,
-        validation: str = "poster",
         max_attempts: int = 10,
         permit: PermitSignature | None = None,
     ) -> Bounty:
         body: dict[str, Any] = {
             "chain": self.chain,
             "amount": amount,
-            "task": task,
+            "task_description": task,
             "deadline": deadline,
-            "validation": validation,
             "max_attempts": max_attempts,
         }
         if permit is not None:
@@ -351,19 +415,28 @@ class Wallet(RemitClient):
         data = await self._http.post("/api/v0/bounties", body)
         return Bounty.model_validate(data)
 
-    async def submit_bounty(self, bounty_id: str, evidence_uri: str) -> Transaction:
-        data = await self._http.post(
+    async def submit_bounty(
+        self,
+        bounty_id: str,
+        evidence_hash: str,
+        evidence_uri: str | None = None,
+    ) -> dict[str, Any]:
+        """Submit evidence for a bounty. Returns BountySubmission (with ``id``)."""
+        body: dict[str, Any] = {"evidence_hash": evidence_hash}
+        if evidence_uri is not None:
+            body["evidence_uri"] = evidence_uri
+        return await self._http.post(  # type: ignore[return-value]
             f"/api/v0/bounties/{bounty_id}/submit",
-            {"evidence_uri": evidence_uri},
+            body,
         )
-        return Transaction.model_validate(data)
 
-    async def award_bounty(self, bounty_id: str, winner: str) -> Transaction:
+    async def award_bounty(self, bounty_id: str, submission_id: int) -> Bounty:
+        """Award a bounty to a specific submission (poster-only)."""
         data = await self._http.post(
             f"/api/v0/bounties/{bounty_id}/award",
-            {"winner": winner},
+            {"submission_id": submission_id},
         )
-        return Transaction.model_validate(data)
+        return Bounty.model_validate(data)
 
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
@@ -374,11 +447,22 @@ class Wallet(RemitClient):
         expires: int,
         permit: PermitSignature | None = None,
     ) -> Deposit:
-        body: dict[str, Any] = {"to": to, "amount": amount, "expires": expires}
+        expiry = int(time.time()) + expires
+        body: dict[str, Any] = {
+            "chain": self.chain,
+            "provider": to,
+            "amount": amount,
+            "expiry": expiry,
+        }
         if permit is not None:
             body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v0/deposits", body)
         return Deposit.model_validate(data)
+
+    async def return_deposit(self, deposit_id: str) -> Transaction:
+        """Provider returns a deposit (full refund to depositor, no fee)."""
+        data = await self._http.post(f"/api/v0/deposits/{deposit_id}/return", {})
+        return Transaction.model_validate(data)
 
     # ─── Events ───────────────────────────────────────────────────────────────
 
@@ -454,6 +538,27 @@ class Wallet(RemitClient):
                 msg = data.get("message", resp.text) if isinstance(data, dict) else resp.text
                 raise RuntimeError(f"mint failed ({resp.status_code}): {msg}")
             return resp.json()  # type: ignore[no-any-return]
+
+    # ─── x402 ──────────────────────────────────────────────────────────────
+
+    async def x402_fetch(
+        self,
+        url: str,
+        max_auto_pay_usdc: float = 0.10,
+    ) -> tuple[Any, dict[str, Any] | None]:
+        """Make an HTTP request, auto-paying any x402 402 response.
+
+        Returns:
+            A tuple of ``(response, last_payment)``. ``last_payment`` is the
+            decoded PAYMENT-REQUIRED header (including V2 fields like
+            ``resource``, ``description``, ``mimeType``) or ``None``.
+        """
+        from remitmd.x402 import X402Client  # noqa: PLC0415
+
+        client = X402Client(wallet=self, max_auto_pay_usdc=max_auto_pay_usdc)
+        async with client:
+            response = await client.get(url)
+            return response, client.last_payment
 
     # ─── Repr (never expose key) ──────────────────────────────────────────────
 

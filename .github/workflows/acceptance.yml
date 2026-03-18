@@ -1,0 +1,34 @@
+name: Acceptance Tests (TS SDK)
+
+# Manual-only. Tests hit live Base Sepolia via the production API.
+# Trigger after merging SDK changes to verify all payment flows work end-to-end.
+on:
+  workflow_dispatch:
+
+jobs:
+  acceptance:
+    name: TS SDK Acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: typescript
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md/api/v0
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: npm run acceptance

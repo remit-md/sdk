@@ -15,6 +15,7 @@
     "build": "tsc",
     "test": "node --import tsx --test tests/*.ts",
     "compliance": "node --import tsx --test tests/compliance/*.ts",
+    "acceptance": "node --import tsx --test tests/acceptance/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
   },

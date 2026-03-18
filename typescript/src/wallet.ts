@@ -449,11 +449,16 @@ export class Wallet extends RemitClient {
 
   placeDeposit(options: PlaceDepositOptions): Promise<Deposit> {
     return this.#auth.post<Deposit>("/deposits", {
-      to: options.to,
+      chain: this._chain,
+      provider: options.to,
       amount: options.amount,
-      expires: options.expires,
+      expiry: Math.floor(Date.now() / 1000) + options.expires,
       ...(options.permit ? { permit: options.permit } : {}),
     });
+  }
+
+  returnDeposit(depositId: string): Promise<Transaction> {
+    return this.#auth.post<Transaction>(`/deposits/${depositId}/return`, {});
   }
 
   // ─── Authenticated reads (override unauthenticated base class versions) ──────

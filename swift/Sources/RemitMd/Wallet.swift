@@ -37,6 +37,9 @@ public final class RemitWallet: @unchecked Sendable {
         return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress)
     }
 
+    /// The Ethereum address (0x-prefixed) of this wallet.
+    public var address: String { signerAddress }
+
     // MARK: - Contracts
 
     /// Get deployed contract addresses. Cached for the lifetime of this client instance.

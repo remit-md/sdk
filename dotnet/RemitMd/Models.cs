@@ -17,7 +17,7 @@ public enum ChainId
 public enum InvoiceStatus { Pending, Funded, Released, Cancelled, Expired }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
-public enum EscrowStatus { Pending, Funded, Released, Cancelled, Expired }
+public enum EscrowStatus { Pending, Funded, Active, Released, Cancelled, Expired }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum TabStatus { Open, Closed, Settled }

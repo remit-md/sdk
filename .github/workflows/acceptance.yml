@@ -18,6 +18,7 @@ on:
           - java
           - ruby
           - swift
+          - dotnet
         default: all
 
 jobs:
@@ -199,3 +200,34 @@ jobs:
           ACCEPTANCE_API_URL: https://remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: swift test --filter AcceptanceTests
+
+  dotnet:
+    name: .NET SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'dotnet'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: dotnet
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: dotnet test --no-build -c Release --filter "Category=Acceptance" --verbosity normal

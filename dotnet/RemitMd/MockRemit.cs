@@ -21,6 +21,7 @@ public sealed class MockRemit
     private readonly object _lock = new();
     private readonly List<Transaction> _transactions = [];
     private readonly Dictionary<string, Escrow> _escrows = [];
+    private readonly Dictionary<string, Dictionary<string, object?>> _pendingInvoices = [];
     private readonly Dictionary<string, Tab> _tabs = [];
     private readonly Dictionary<string, Stream> _streams = [];
     private readonly Dictionary<string, Bounty> _bounties = [];
@@ -80,6 +81,7 @@ public sealed class MockRemit
         {
             _transactions.Clear();
             _escrows.Clear();
+            _pendingInvoices.Clear();
             _tabs.Clear();
             _streams.Clear();
             _bounties.Clear();
@@ -129,7 +131,9 @@ public sealed class MockRemit
             {
                 "/api/v0/payments/direct"              => HandlePay(body, id, now),
 
-                "/api/v0/escrows"                      => HandleCreateEscrow(body, id, now),
+                "/api/v0/invoices"                     => HandleCreateInvoice(body),
+                "/api/v0/escrows"                      => HandleCreateEscrow(body, now),
+                var p when p.EndsWith("/claim-start")  => HandleClaimStart(p),
                 var p when p.EndsWith("/release")      => HandleEscrowAction(p, "released"),
                 var p when p.EndsWith("/cancel")       => HandleEscrowAction(p, "cancelled"),
 
@@ -145,7 +149,6 @@ public sealed class MockRemit
                 var p when p.EndsWith("/award")        => HandleBountyAward(p, body, id, now),
 
                 "/api/v0/deposits"                     => HandleCreateDeposit(body, id, now),
-                "/api/v0/invoices"                     => HandleCreateIntent(body, id, now),
 
                 _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled POST {path}"),
             };
@@ -182,23 +185,50 @@ public sealed class MockRemit
 
         // ── Escrow ───────────────────────────────────────────────────────────
 
-        private Escrow HandleCreateEscrow(object body, string id, DateTimeOffset now)
+        private object HandleCreateInvoice(object body)
         {
-            var d    = Deserialize(body);
-            var to   = d.GetValueOrDefault("payee")?.ToString() ?? MockAddress;
-            var amt  = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
-            var memo = d.GetValueOrDefault("memo")?.ToString() ?? "";
-
+            var d = Deserialize(body);
+            var invoiceId = d.GetValueOrDefault("id")?.ToString() ?? "";
             lock (_mock._lock)
             {
+                _mock._pendingInvoices[invoiceId] = d;
+            }
+            return new { id = invoiceId, status = "pending" };
+        }
+
+        private Escrow HandleCreateEscrow(object body, DateTimeOffset now)
+        {
+            var d = Deserialize(body);
+            var invoiceId = d.GetValueOrDefault("invoice_id")?.ToString() ?? "";
+            lock (_mock._lock)
+            {
+                if (!_mock._pendingInvoices.TryGetValue(invoiceId, out var inv))
+                    throw new RemitError(ErrorCodes.EscrowNotFound, $"Invoice not found: {invoiceId}");
+                _mock._pendingInvoices.Remove(invoiceId);
+
+                var to   = inv.GetValueOrDefault("to_agent")?.ToString() ?? MockAddress;
+                var amt  = decimal.Parse(inv.GetValueOrDefault("amount")?.ToString() ?? "0");
+                var memo = inv.GetValueOrDefault("task")?.ToString() ?? "";
+
                 if (_mock._balance < amt)
                     throw new RemitError(ErrorCodes.InsufficientFunds,
                         $"Insufficient funds for escrow: balance is {_mock._balance:F6} USDC.");
 
                 _mock._balance -= amt;
-                var escrow = new Escrow(id, MockAddress, to, amt, Math.Round(amt * 0.001m, 6),
+                var escrow = new Escrow(invoiceId, MockAddress, to, amt, Math.Round(amt * 0.001m, 6),
                     EscrowStatus.Funded, memo, null, null, null, now);
-                _mock._escrows[id] = escrow;
+                _mock._escrows[invoiceId] = escrow;
+                return escrow;
+            }
+        }
+
+        private Escrow HandleClaimStart(string path)
+        {
+            var escrowId = PathId(path.Replace("/claim-start", ""));
+            lock (_mock._lock)
+            {
+                if (!_mock._escrows.TryGetValue(escrowId, out var escrow))
+                    throw new RemitError(ErrorCodes.EscrowNotFound, $"Escrow not found: {escrowId}");
                 return escrow;
             }
         }

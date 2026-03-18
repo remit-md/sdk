@@ -154,7 +154,7 @@ public sealed class Wallet
     /// <param name="milestones">Optional milestone-based payment schedule.</param>
     /// <param name="splits">Optional multi-party splits.</param>
     /// <param name="expiresAt">Optional expiry date for the escrow.</param>
-    public Task<Escrow> CreateEscrowAsync(
+    public async Task<Escrow> CreateEscrowAsync(
         string payee,
         decimal amount,
         string memo = "",
@@ -167,17 +167,32 @@ public sealed class Wallet
         ValidateAddress(payee, nameof(payee));
         ValidateAmount(amount);
 
-        var body = new Dictionary<string, object?>
+        // Step 1: create invoice on server.
+        var invoiceId = Guid.NewGuid().ToString("N")[..32];
+        var nonce = Guid.NewGuid().ToString("N")[..32];
+        var invoiceBody = new Dictionary<string, object?>
         {
-            ["payee"]      = payee,
+            ["id"]         = invoiceId,
+            ["chain"]      = _chain,
+            ["from_agent"] = Address.ToLowerInvariant(),
+            ["to_agent"]   = payee.ToLowerInvariant(),
             ["amount"]     = amount.ToString("F6"),
-            ["memo"]       = memo,
-            ["milestones"] = milestones?.ToList(),
-            ["splits"]     = splits?.ToList(),
-            ["expires_at"] = expiresAt,
+            ["type"]       = "escrow",
+            ["task"]       = memo,
+            ["nonce"]      = nonce,
+            ["signature"]  = "0x",
         };
-        if (permit is not null) body["permit"] = permit;
-        return _transport.PostAsync<Escrow>("/api/v0/escrows", body, ct);
+        if (expiresAt is not null)
+        {
+            var secs = (int)(expiresAt.Value - DateTimeOffset.UtcNow).TotalSeconds;
+            invoiceBody["escrow_timeout"] = secs;
+        }
+        await _transport.PostAsync<object>("/api/v0/invoices", invoiceBody, ct);
+
+        // Step 2: fund the escrow.
+        var escrowBody = new Dictionary<string, object?> { ["invoice_id"] = invoiceId };
+        if (permit is not null) escrowBody["permit"] = permit;
+        return await _transport.PostAsync<Escrow>("/api/v0/escrows", escrowBody, ct);
     }
 
     /// <summary>Releases escrow funds to the payee after work is approved.</summary>
@@ -187,6 +202,10 @@ public sealed class Wallet
     /// <summary>Cancels an unfunded escrow and returns funds to the payer.</summary>
     public Task<Transaction> CancelEscrowAsync(string escrowId, CancellationToken ct = default) =>
         _transport.PostAsync<Transaction>($"/api/v0/escrows/{escrowId}/cancel", new { }, ct);
+
+    /// <summary>Signals the provider has started work on an escrow.</summary>
+    public Task<Escrow> ClaimStartAsync(string escrowId, CancellationToken ct = default) =>
+        _transport.PostAsync<Escrow>($"/api/v0/escrows/{escrowId}/claim-start", new { }, ct);
 
     /// <summary>Retrieves the current state of an escrow.</summary>
     public Task<Escrow> GetEscrowAsync(string escrowId, CancellationToken ct = default) =>

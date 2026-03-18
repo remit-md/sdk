@@ -89,7 +89,7 @@ public record Split(
 
 /// <summary>Escrow — holds funds until work is delivered and approved.</summary>
 public record Escrow(
-    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("invoice_id")] string Id,
     [property: JsonPropertyName("payer")] string Payer,
     [property: JsonPropertyName("payee")] string Payee,
     [property: JsonPropertyName("amount")] decimal Amount,

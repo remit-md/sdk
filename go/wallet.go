@@ -309,8 +309,8 @@ func (w *Wallet) CreateEscrow(ctx context.Context, payee string, amount decimal.
 	invBody := map[string]any{
 		"id":         invoiceID,
 		"chain":      w.chain,
-		"from_agent": w.Address(),
-		"to_agent":   payee,
+		"from_agent": strings.ToLower(w.Address()),
+		"to_agent":   strings.ToLower(payee),
 		"amount":     amount.InexactFloat64(),
 		"type":       "escrow",
 		"task":       cfg.Memo,

@@ -22,29 +22,54 @@ import { Wallet } from "@remitmd/sdk";
 const wallet = Wallet.fromEnv();
 
 // Or with explicit key
-const wallet = new Wallet({ privateKey: "0x...", chain: "base" });
+const wallet = new Wallet({ privateKey: "0x...", chain: "base-sepolia" });
 
-// Send 1.50 USDC
-const tx = await wallet.payDirect("0xRecipient...", 1.50, "inference fee");
+// Get contract addresses (cached per session)
+const contracts = await wallet.getContracts();
+
+// Sign a permit (gasless USDC approval) and pay
+const permit = await wallet.signPermit(contracts.router, 1.50);
+const tx = await wallet.payDirect("0xRecipient...", 1.50, "inference fee", { permit });
 console.log(tx.txHash);
 ```
 
 ## Payment Models
 
+### Permits (Gasless USDC Approval)
+
+Every payment that moves USDC requires on-chain approval. Use `signPermit()` to sign an EIP-2612 permit off-chain — no gas, no approve transaction.
+
+```typescript
+const contracts = await wallet.getContracts();
+
+// signPermit(spender, amount, deadline?) — auto-fetches nonce from chain
+const permit = await wallet.signPermit(contracts.router, 5.0);
+```
+
+The `spender` must match the contract handling the payment:
+- Direct payment: `contracts.router`
+- Escrow: `contracts.escrow`
+- Tab: `contracts.tab`
+- Stream: `contracts.stream`
+- Bounty: `contracts.bounty`
+- Deposit: `contracts.deposit`
+
 ### Direct Payment
 
 ```typescript
-const tx = await wallet.payDirect("0xRecipient...", 5.0, "AI task");
+const permit = await wallet.signPermit(contracts.router, 5.0);
+const tx = await wallet.payDirect("0xRecipient...", 5.0, "AI task", { permit });
 ```
 
 ### Escrow
 
 ```typescript
+const permit = await wallet.signPermit(contracts.escrow, 100.0);
 const escrow = await wallet.pay({
   to: "0xContractor...",
   amount: 100.0,
   memo: "Code review",
-});
+}, { permit });
 
 // Work happens...
 await wallet.releaseEscrow(escrow.id);  // pay the contractor
@@ -55,10 +80,12 @@ await wallet.cancelEscrow(escrow.id);   // refund yourself
 ### Metered Tab (off-chain billing)
 
 ```typescript
+const permit = await wallet.signPermit(contracts.tab, 50);
 const tab = await wallet.openTab({
   to: "0xProvider...",
   limit: 50,
   perUnit: 0.003,
+  permit,
 });
 
 // Provider debits the tab for each API call — zero gas, instant
@@ -70,9 +97,11 @@ await wallet.closeTab(tab.id);
 ### Payment Stream
 
 ```typescript
+const permit = await wallet.signPermit(contracts.stream, 10);
 const stream = await wallet.openStream({
   to: "0xWorker...",
   rate: 0.001, // USDC per second
+  permit,
 });
 
 await wallet.closeStream(stream.id);
@@ -81,10 +110,12 @@ await wallet.closeStream(stream.id);
 ### Bounty
 
 ```typescript
+const permit = await wallet.signPermit(contracts.bounty, 25);
 const bounty = await wallet.postBounty({
   amount: 25,
   task: "Summarise top 10 EIPs of 2025",
   deadline: 1700000000,
+  permit,
 });
 
 // Any agent can submit work; you decide the winner
@@ -94,10 +125,12 @@ await wallet.awardBounty(bounty.id, "0xWinner...");
 ### Security Deposit
 
 ```typescript
+const permit = await wallet.signPermit(contracts.deposit, 100);
 const deposit = await wallet.placeDeposit({
   to: "0xCounterpart...",
   amount: 100,
   expires: 86400, // 24 hours
+  permit,
 });
 ```
 
@@ -118,11 +151,18 @@ console.log(mock.wasPaid("0xProvider...", 0.003)); // true
 ## All Methods
 
 ```typescript
+// Contract discovery (cached per session)
+wallet.getContracts()                                    // Promise<ContractAddresses>
+
+// Permits (gasless USDC approval)
+wallet.signPermit(spender, amount, deadline?)            // Promise<PermitSignature>
+wallet.signUsdcPermit({ spender, value, deadline, ... }) // Promise<PermitSignature>
+
 // Direct payment
-wallet.payDirect(to, amount, memo?)                     // Promise<Transaction>
+wallet.payDirect(to, amount, memo?, { permit? })         // Promise<Transaction>
 
 // Escrow
-wallet.pay(invoice)                                      // Promise<Escrow>
+wallet.pay(invoice, { permit? })                         // Promise<Escrow>
 wallet.claimStart(invoiceId)                             // Promise<Transaction>
 wallet.submitEvidence(invoiceId, uri, milestoneIndex?)   // Promise<Transaction>
 wallet.releaseEscrow(invoiceId)                          // Promise<Transaction>
@@ -131,21 +171,21 @@ wallet.cancelEscrow(invoiceId)                           // Promise<Transaction>
 wallet.getEscrow(invoiceId)                              // Promise<Escrow>
 
 // Tabs
-wallet.openTab({ to, limit, perUnit, expires? })         // Promise<Tab>
-wallet.closeTab(tabId)                                   // Promise<Transaction>
-wallet.getTab(tabId)                                     // Promise<Tab>
+wallet.openTab({ to, limit, perUnit, expires?, permit? })    // Promise<Tab>
+wallet.closeTab(tabId)                                       // Promise<Transaction>
+wallet.getTab(tabId)                                         // Promise<Tab>
 
 // Streams
-wallet.openStream({ to, rate, maxDuration?, maxTotal? }) // Promise<Stream>
-wallet.closeStream(streamId)                             // Promise<Transaction>
+wallet.openStream({ to, rate, maxDuration?, maxTotal?, permit? }) // Promise<Stream>
+wallet.closeStream(streamId)                                      // Promise<Transaction>
 
 // Bounties
-wallet.postBounty({ amount, task, deadline, ... })       // Promise<Bounty>
-wallet.submitBounty(bountyId, evidenceUri)               // Promise<Transaction>
-wallet.awardBounty(bountyId, winner)                     // Promise<Transaction>
+wallet.postBounty({ amount, task, deadline, permit?, ... })  // Promise<Bounty>
+wallet.submitBounty(bountyId, evidenceUri)                   // Promise<Transaction>
+wallet.awardBounty(bountyId, winner)                         // Promise<Transaction>
 
 // Deposits
-wallet.placeDeposit({ to, amount, expires })             // Promise<Deposit>
+wallet.placeDeposit({ to, amount, expires, permit? })    // Promise<Deposit>
 
 // Status & analytics
 wallet.status()                                          // Promise<WalletStatus>
@@ -161,7 +201,8 @@ wallet.createFundLink()                                  // Promise<LinkResponse
 wallet.createWithdrawLink()                              // Promise<LinkResponse>
 
 // Testnet
-wallet.requestTestnetFunds()                             // Promise<Transaction>
+wallet.mint(amount)                                      // Promise<{ tx_hash, balance }>
+wallet.requestTestnetFunds()                             // Promise<Transaction> (deprecated)
 
 // x402 (HTTP 402 auto-pay)
 wallet.x402Fetch(url, maxAutoPayUsdc?, init?)            // Promise<Response>

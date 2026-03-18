@@ -66,27 +66,6 @@ module Remitmd
     end
   end
 
-  # Contract addresses returned by GET /contracts.
-  class ContractAddresses < Model
-    def initialize(attrs)
-      h = attrs.transform_keys(&:to_s)
-      @chain_id       = h["chain_id"]&.to_i
-      @usdc           = h["usdc"]
-      @router         = h["router"]
-      @escrow         = h["escrow"]
-      @tab            = h["tab"]
-      @stream         = h["stream"]
-      @bounty         = h["bounty"]
-      @deposit        = h["deposit"]
-      @fee_calculator = h["fee_calculator"]
-      @key_registry   = h["key_registry"]
-      @arbitration    = h["arbitration"]
-    end
-
-    attr_reader :chain_id, :usdc, :router, :escrow, :tab, :stream,
-                :bounty, :deposit, :fee_calculator, :key_registry, :arbitration
-  end
-
   # ─── Value objects ────────────────────────────────────────────────────────
 
   # Immutable model base. Builds from a hash with string or symbol keys.
@@ -121,6 +100,27 @@ module Remitmd
       return Time.parse(value) if value.is_a?(String)
       nil
     end
+  end
+
+  # Contract addresses returned by GET /contracts.
+  class ContractAddresses < Model
+    def initialize(attrs)
+      h = attrs.transform_keys(&:to_s)
+      @chain_id       = h["chain_id"]&.to_i
+      @usdc           = h["usdc"]
+      @router         = h["router"]
+      @escrow         = h["escrow"]
+      @tab            = h["tab"]
+      @stream         = h["stream"]
+      @bounty         = h["bounty"]
+      @deposit        = h["deposit"]
+      @fee_calculator = h["fee_calculator"]
+      @key_registry   = h["key_registry"]
+      @arbitration    = h["arbitration"]
+    end
+
+    attr_reader :chain_id, :usdc, :router, :escrow, :tab, :stream,
+                :bounty, :deposit, :fee_calculator, :key_registry, :arbitration
   end
 
   class Transaction < Model

@@ -1,13 +1,25 @@
-name: Acceptance Tests (TS SDK)
+name: Acceptance Tests
 
 # Manual-only. Tests hit live Base Sepolia via the production API.
 # Trigger after merging SDK changes to verify all payment flows work end-to-end.
 on:
   workflow_dispatch:
+    inputs:
+      sdk:
+        description: "Which SDK to test"
+        required: true
+        type: choice
+        options:
+          - all
+          - typescript
+          - python
+          - go
+        default: all
 
 jobs:
-  acceptance:
+  typescript:
     name: TS SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'typescript'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -32,3 +44,49 @@ jobs:
           ACCEPTANCE_API_URL: https://remit.md/api/v0
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: npm run acceptance
+
+  python:
+    name: Python SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'python'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: cd python && pip install -e ".[dev]"
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: cd python && python -m pytest tests/acceptance/ -v --timeout=180
+
+  go:
+    name: Go SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'go'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: go/go.sum
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: cd go && go test -tags acceptance -timeout 300s -v -count=1

@@ -35,10 +35,12 @@ end
 def create_test_wallet
   key_hex = SecureRandom.hex(32)
   contracts = fetch_contracts
+  # Ruby SDK paths don't include /api/v0, so base URL must include it.
+  base_url = API_URL.end_with?("/api/v0") ? API_URL : "#{API_URL}/api/v0"
   wallet = Remitmd::RemitWallet.new(
     private_key: "0x#{key_hex}",
     chain: "base_sepolia",
-    api_url: API_URL,
+    api_url: base_url,
     router_address: contracts["router"]
   )
   { wallet: wallet, key_hex: key_hex }

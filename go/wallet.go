@@ -349,6 +349,16 @@ func (w *Wallet) ReleaseEscrow(ctx context.Context, escrowID string, milestoneID
 	return &escrow, nil
 }
 
+// ClaimStart signals that the payee has started work on an escrow.
+// Must be called by the payee before the payer can release funds.
+func (w *Wallet) ClaimStart(ctx context.Context, escrowID string) (*Escrow, error) {
+	var escrow Escrow
+	if err := w.http.post(ctx, "/api/v0/escrows/"+escrowID+"/claim-start", map[string]any{}, &escrow); err != nil {
+		return nil, err
+	}
+	return &escrow, nil
+}
+
 // CancelEscrow cancels an escrow and returns funds to the payer.
 func (w *Wallet) CancelEscrow(ctx context.Context, escrowID string) (*Escrow, error) {
 	var escrow Escrow

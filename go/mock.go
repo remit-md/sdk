@@ -186,6 +186,14 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 		}
 		return t.respond(dst, escrow)
 
+	case method == "POST" && strings.HasSuffix(path, "/claim-start"):
+		escrowID := extractID(path, "/api/v0/escrows/", "/claim-start")
+		escrow, err := m.mockClaimStart(escrowID)
+		if err != nil {
+			return err
+		}
+		return t.respond(dst, escrow)
+
 	case method == "POST" && strings.HasSuffix(path, "/release"):
 		escrowID := extractID(path, "/api/v0/escrows/", "/release")
 		escrow, err := m.mockReleaseEscrow(escrowID)
@@ -294,6 +302,21 @@ func (m *MockRemit) mockCreateEscrow(payee string, amount decimal.Decimal, memo 
 		Status:    EscrowStatusFunded,
 	}
 	m.escrows[escrow.InvoiceID] = escrow
+	return escrow, nil
+}
+
+func (m *MockRemit) mockClaimStart(escrowID string) (*Escrow, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	escrow, ok := m.escrows[escrowID]
+	if !ok {
+		return nil, remitErr(ErrCodeEscrowNotFound,
+			fmt.Sprintf("escrow %q not found", escrowID),
+			map[string]any{"escrow_id": escrowID},
+		)
+	}
+	escrow.ClaimStarted = true
 	return escrow, nil
 }
 

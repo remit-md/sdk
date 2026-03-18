@@ -12,12 +12,11 @@ from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.client import RemitClient
 from remitmd.models.bounty import Bounty
 from remitmd.models.common import LinkResponse, Transaction, WalletStatus, Webhook
-from remitmd.models.tab import TabCharge
 from remitmd.models.deposit import Deposit
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
 from remitmd.models.stream import Stream
-from remitmd.models.tab import Tab
+from remitmd.models.tab import Tab, TabCharge
 from remitmd.signer import PrivateKeySigner, Signer
 
 

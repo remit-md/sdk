@@ -9,7 +9,6 @@ On-chain settlement is tested separately in the API acceptance tests (C2).
 This test focuses on the SDK client-side flow: 402 detection -> EIP-3009 signing -> retry.
 """
 
-import asyncio
 import base64
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -18,7 +17,7 @@ from threading import Thread
 import httpx
 import pytest
 
-from .conftest import create_wallet, fund_wallet, API_URL
+from .conftest import API_URL, create_wallet, fund_wallet
 
 pytestmark = pytest.mark.timeout(120)
 

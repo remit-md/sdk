@@ -122,64 +122,66 @@ public sealed class MockPayTests
     // ─── Tab ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Tab_OpenAndDebit_TracksBalance()
+    public async Task Tab_OpenAndCharge_TracksBalance()
     {
         var tab = await _wallet.CreateTabAsync(
-            "0xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", 5m);
-        Assert.Equal(5m, tab.Limit);
+            "0xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", 5m, 0.10m);
+        Assert.Equal(5m, tab.LimitAmount);
         Assert.Equal(0m, tab.Used);
 
-        await _wallet.DebitTabAsync(tab.Id, 1.00m, "API call");
-        await _wallet.DebitTabAsync(tab.Id, 0.50m, "data query");
+        await _wallet.ChargeTabAsync(tab.Id, 1.00m, 1.00m, 1, "0xsig1");
+        await _wallet.ChargeTabAsync(tab.Id, 0.50m, 1.50m, 2, "0xsig2");
 
-        // Verify remaining via GetEscrow doesn't apply here — check by attempting overspend
+        // Verify remaining via attempting overspend
         var ex = await Assert.ThrowsAsync<RemitError>(() =>
-            _wallet.DebitTabAsync(tab.Id, 5.00m)); // would exceed limit
+            _wallet.ChargeTabAsync(tab.Id, 5.00m, 6.50m, 3, "0xsig3")); // would exceed limit
         Assert.Equal(ErrorCodes.TabLimitExceeded, ex.Code);
     }
 
     [Fact]
-    public async Task Tab_Settle_ClosesTab()
+    public async Task Tab_Close_ClosesTab()
     {
         var tab = await _wallet.CreateTabAsync(
-            "0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", 10m);
-        await _wallet.DebitTabAsync(tab.Id, 2m);
-        var tx = await _wallet.SettleTabAsync(tab.Id);
+            "0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", 10m, 0.05m);
+        await _wallet.ChargeTabAsync(tab.Id, 2m, 2m, 1, "0xsig1");
+        var closed = await _wallet.CloseTabAsync(tab.Id, 2m, "0xsig_final");
 
-        Assert.Equal(2m, tx.Amount);
+        Assert.Equal(TabStatus.Settled, closed.Status);
     }
 
     // ─── Stream ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Stream_CreateAndWithdraw_Works()
+    public async Task Stream_CreateAndClose_Works()
     {
-        const string recipient = "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+        const string payee = "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
         _mock.SetBalance(100m);
 
-        var stream = await _wallet.CreateStreamAsync(recipient, 0.000277m, 10m);
+        var stream = await _wallet.CreateStreamAsync(payee, 0.000277m, 10m);
         Assert.Equal(StreamStatus.Active, stream.Status);
         Assert.Equal(90m, _mock.Balance);
 
-        var tx = await _wallet.WithdrawStreamAsync(stream.Id);
+        var tx = await _wallet.CloseStreamAsync(stream.Id);
         Assert.True(tx.Amount > 0m);
     }
 
     // ─── Bounty ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Bounty_PostAndAward_Works()
+    public async Task Bounty_PostSubmitAndAward_Works()
     {
-        const string winner = "0x1111111111111111111111111111111111111111";
         _mock.SetBalance(50m);
 
         var bounty = await _wallet.CreateBountyAsync(25m, "Summarize this paper");
         Assert.Equal(BountyStatus.Open, bounty.Status);
         Assert.Equal(25m, _mock.Balance);
 
-        var tx = await _wallet.AwardBountyAsync(bounty.Id, winner);
-        Assert.Equal(25m, tx.Amount);
-        Assert.Equal(winner, tx.To, StringComparer.OrdinalIgnoreCase);
+        var sub = await _wallet.SubmitBountyAsync(bounty.Id, "0xevidence123");
+        Assert.True(sub.Id > 0);
+        Assert.Equal(bounty.Id, sub.BountyId);
+
+        var awarded = await _wallet.AwardBountyAsync(bounty.Id, sub.Id);
+        Assert.Equal(BountyStatus.Awarded, awarded.Status);
     }
 
     // ─── Reset ────────────────────────────────────────────────────────────────

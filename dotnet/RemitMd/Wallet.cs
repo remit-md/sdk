@@ -214,111 +214,196 @@ public sealed class Wallet
     // ─── Tab (micro-payment channel) ──────────────────────────────────────────
 
     /// <summary>Opens a Tab — an off-chain payment channel for micro-payments.</summary>
-    /// <param name="counterpart">Address of the service accepting Tab debits.</param>
-    /// <param name="limit">Maximum USDC spend limit for this Tab.</param>
-    /// <param name="closesAt">Optional expiry date.</param>
+    /// <param name="provider">Address of the service provider accepting Tab charges.</param>
+    /// <param name="limitAmount">Maximum USDC spend limit for this Tab.</param>
+    /// <param name="perUnit">Cost per unit/call in USDC.</param>
+    /// <param name="expiresSecs">Seconds until Tab expires (default: 86400 = 24h).</param>
     public Task<Tab> CreateTabAsync(
-        string counterpart,
-        decimal limit,
-        DateTimeOffset? closesAt = null,
+        string provider,
+        decimal limitAmount,
+        decimal perUnit,
+        int expiresSecs = 86400,
         PermitSignature? permit = null,
         CancellationToken ct = default)
     {
-        ValidateAddress(counterpart, nameof(counterpart));
-        ValidateAmount(limit);
+        ValidateAddress(provider, nameof(provider));
+        ValidateAmount(limitAmount, "limitAmount");
 
+        var expiry = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + expiresSecs;
         var body = new Dictionary<string, object?>
         {
-            ["chain"]       = _chain,
-            ["counterpart"] = counterpart,
-            ["limit"]       = limit.ToString("F6"),
-            ["closes_at"]   = closesAt,
+            ["chain"]        = _chain,
+            ["provider"]     = provider,
+            ["limit_amount"] = limitAmount.ToString("F6"),
+            ["per_unit"]     = perUnit.ToString("F6"),
+            ["expiry"]       = expiry,
         };
         if (permit is not null) body["permit"] = permit;
         return _transport.PostAsync<Tab>("/api/v0/tabs", body, ct);
     }
 
-    /// <summary>Charges an amount against an open Tab (near-zero latency, gas-free).</summary>
-    public Task<TabDebit> DebitTabAsync(string tabId, decimal amount, string memo = "", CancellationToken ct = default)
+    /// <summary>Charges an amount against an open Tab with a provider EIP-712 signature.</summary>
+    /// <param name="tabId">Tab identifier.</param>
+    /// <param name="amount">Amount for this individual charge.</param>
+    /// <param name="cumulative">Cumulative total charged so far (including this charge).</param>
+    /// <param name="callCount">Total number of charges made (including this one).</param>
+    /// <param name="providerSig">EIP-712 TabCharge signature from the provider.</param>
+    public Task<TabCharge> ChargeTabAsync(
+        string tabId,
+        decimal amount,
+        decimal cumulative,
+        int callCount,
+        string providerSig,
+        CancellationToken ct = default)
     {
         ValidateAmount(amount);
-        return _transport.PostAsync<TabDebit>($"/api/v0/tabs/{tabId}/charge", new
+        return _transport.PostAsync<TabCharge>($"/api/v0/tabs/{tabId}/charge", new Dictionary<string, object?>
         {
-            amount = amount.ToString("F6"),
-            memo,
+            ["amount"]       = amount.ToString("F6"),
+            ["cumulative"]   = cumulative.ToString("F6"),
+            ["call_count"]   = callCount,
+            ["provider_sig"] = providerSig,
         }, ct);
     }
 
-    /// <summary>Settles a Tab on-chain, finalizing all debits.</summary>
-    public Task<Transaction> SettleTabAsync(string tabId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/api/v0/tabs/{tabId}/close", new { }, ct);
+    /// <summary>Closes a Tab on-chain, finalizing all charges.</summary>
+    /// <param name="tabId">Tab identifier.</param>
+    /// <param name="finalAmount">Final settled amount (0 to close without settlement).</param>
+    /// <param name="providerSig">EIP-712 signature from the provider for the final amount.</param>
+    public Task<Tab> CloseTabAsync(
+        string tabId,
+        decimal finalAmount = 0,
+        string providerSig = "0x",
+        CancellationToken ct = default) =>
+        _transport.PostAsync<Tab>($"/api/v0/tabs/{tabId}/close", new Dictionary<string, object?>
+        {
+            ["final_amount"] = finalAmount.ToString("F6"),
+            ["provider_sig"] = providerSig,
+        }, ct);
+
+    /// <summary>
+    /// Signs an EIP-712 TabCharge message (provider-side).
+    /// </summary>
+    /// <param name="tabContract">Tab contract address (verifyingContract for the EIP-712 domain).</param>
+    /// <param name="tabId">UUID of the tab (encoded as ASCII bytes padded to 32 bytes).</param>
+    /// <param name="totalCharged">Cumulative charged amount in USDC base units (uint96).</param>
+    /// <param name="callCount">Number of charges made (uint32).</param>
+    /// <returns>0x-prefixed hex signature.</returns>
+    public string SignTabCharge(string tabContract, string tabId, long totalCharged, int callCount)
+    {
+        // Encode tab UUID as bytes32: ASCII chars left-aligned, zero-padded to 32 bytes.
+        var tabIdAscii = System.Text.Encoding.ASCII.GetBytes(tabId);
+        var tabIdBytes32 = new byte[32];
+        Buffer.BlockCopy(tabIdAscii, 0, tabIdBytes32, 0, Math.Min(tabIdAscii.Length, 32));
+
+        // EIP-712 domain: RemitTab/1/<chainId>/<tabContract>
+        var domainTypeHash = Eip712.Keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+        var nameHash = Eip712.Keccak256("RemitTab");
+        var versionHash = Eip712.Keccak256("1");
+        var domainData = ConcatBytes(domainTypeHash, nameHash, versionHash,
+            PadUint256Long(_chainId), PadAddressBytes(tabContract));
+        var domainSep = Eip712.Keccak256(domainData);
+
+        // TabCharge struct hash
+        var typeHash = Eip712.Keccak256(
+            "TabCharge(bytes32 tabId,uint96 totalCharged,uint32 callCount)");
+        var structData = ConcatBytes(typeHash, tabIdBytes32,
+            PadUint256Long(totalCharged), PadUint256Long(callCount));
+        var structHash = Eip712.Keccak256(structData);
+
+        // Final EIP-712 digest: "\x19\x01" || domainSeparator || structHash
+        var payload = new byte[66];
+        payload[0] = 0x19;
+        payload[1] = 0x01;
+        Buffer.BlockCopy(domainSep, 0, payload, 2, 32);
+        Buffer.BlockCopy(structHash, 0, payload, 34, 32);
+        var digest = Eip712.Keccak256(payload);
+
+        return _signer.Sign(digest);
+    }
 
     // ─── Stream (time-based payments) ─────────────────────────────────────────
 
     /// <summary>
-    /// Creates a payment stream — funds flow per-second to the recipient.
+    /// Creates a payment stream — funds flow per-second to the payee.
     /// Ideal for API usage billing, subscriptions, and real-time service fees.
     /// </summary>
-    /// <param name="recipient">Address receiving the stream.</param>
+    /// <param name="payee">Address receiving the stream.</param>
     /// <param name="ratePerSecond">USDC per second (e.g. 0.000277m = $1/hour).</param>
-    /// <param name="deposit">Up-front USDC deposited to back the stream.</param>
+    /// <param name="maxTotal">Maximum total USDC the stream can pay out.</param>
     public Task<Stream> CreateStreamAsync(
-        string recipient,
+        string payee,
         decimal ratePerSecond,
-        decimal deposit,
+        decimal maxTotal,
         PermitSignature? permit = null,
         CancellationToken ct = default)
     {
-        ValidateAddress(recipient, nameof(recipient));
+        ValidateAddress(payee, nameof(payee));
         ValidateAmount(ratePerSecond, "ratePerSecond");
-        ValidateAmount(deposit, "deposit");
+        ValidateAmount(maxTotal, "maxTotal");
 
         var body = new Dictionary<string, object?>
         {
-            ["chain"]        = _chain,
-            ["recipient"]    = recipient,
-            ["rate_per_sec"] = ratePerSecond.ToString("F9"),
-            ["deposit"]      = deposit.ToString("F6"),
+            ["chain"]           = _chain,
+            ["payee"]           = payee,
+            ["rate_per_second"] = ratePerSecond.ToString("F9"),
+            ["max_total"]       = maxTotal.ToString("F6"),
         };
         if (permit is not null) body["permit"] = permit;
         return _transport.PostAsync<Stream>("/api/v0/streams", body, ct);
     }
 
-    /// <summary>Withdraws accrued streaming funds to the recipient.</summary>
-    public Task<Transaction> WithdrawStreamAsync(string streamId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/api/v0/streams/{streamId}/withdraw", new { }, ct);
+    /// <summary>Closes a stream, stopping further payments and settling on-chain.</summary>
+    public Task<Transaction> CloseStreamAsync(string streamId, CancellationToken ct = default) =>
+        _transport.PostAsync<Transaction>($"/api/v0/streams/{streamId}/close", new { }, ct);
 
     // ─── Bounty ───────────────────────────────────────────────────────────────
 
     /// <summary>Posts a bounty — a task with a USDC reward for completion.</summary>
-    /// <param name="award">USDC reward amount.</param>
-    /// <param name="description">Human (and agent) readable task description.</param>
-    /// <param name="expiresAt">Optional expiry date.</param>
+    /// <param name="amount">USDC reward amount.</param>
+    /// <param name="taskDescription">Human (and agent) readable task description.</param>
+    /// <param name="deadlineSecs">Seconds until bounty deadline (default: 86400 = 24h).</param>
+    /// <param name="maxAttempts">Maximum number of submission attempts (default: 10).</param>
     public Task<Bounty> CreateBountyAsync(
-        decimal award,
-        string description,
-        DateTimeOffset? expiresAt = null,
+        decimal amount,
+        string taskDescription,
+        int deadlineSecs = 86400,
+        int maxAttempts = 10,
         PermitSignature? permit = null,
         CancellationToken ct = default)
     {
-        ValidateAmount(award, "award");
+        ValidateAmount(amount);
+        var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + deadlineSecs;
         var body = new Dictionary<string, object?>
         {
-            ["chain"]       = _chain,
-            ["award"]       = award.ToString("F6"),
-            ["description"] = description,
-            ["expires_at"]  = expiresAt,
+            ["chain"]            = _chain,
+            ["amount"]           = amount.ToString("F6"),
+            ["task_description"] = taskDescription,
+            ["deadline"]         = deadline,
+            ["max_attempts"]     = maxAttempts,
         };
         if (permit is not null) body["permit"] = permit;
         return _transport.PostAsync<Bounty>("/api/v0/bounties", body, ct);
     }
 
-    /// <summary>Awards a bounty to the winning agent address.</summary>
-    public Task<Transaction> AwardBountyAsync(string bountyId, string winner, CancellationToken ct = default)
-    {
-        ValidateAddress(winner, nameof(winner));
-        return _transport.PostAsync<Transaction>($"/api/v0/bounties/{bountyId}/award", new { winner }, ct);
-    }
+    /// <summary>Submits evidence for a bounty.</summary>
+    /// <param name="bountyId">Bounty identifier.</param>
+    /// <param name="evidenceHash">Hash of the evidence being submitted.</param>
+    /// <returns>A BountySubmission with the submission ID.</returns>
+    public Task<BountySubmission> SubmitBountyAsync(
+        string bountyId,
+        string evidenceHash,
+        CancellationToken ct = default) =>
+        _transport.PostAsync<BountySubmission>($"/api/v0/bounties/{bountyId}/submit",
+            new Dictionary<string, object?> { ["evidence_hash"] = evidenceHash }, ct);
+
+    /// <summary>Awards a bounty to a specific submission (poster-only).</summary>
+    /// <param name="bountyId">Bounty identifier.</param>
+    /// <param name="submissionId">Integer ID of the winning submission.</param>
+    public Task<Bounty> AwardBountyAsync(string bountyId, int submissionId, CancellationToken ct = default) =>
+        _transport.PostAsync<Bounty>($"/api/v0/bounties/{bountyId}/award",
+            new Dictionary<string, object?> { ["submission_id"] = submissionId }, ct);
 
     /// <summary>Lists bounties, optionally filtered by status, poster, or submitter.</summary>
     /// <param name="status">Filter by status (open, claimed, awarded, expired).</param>
@@ -349,24 +434,33 @@ public sealed class Wallet
     // ─── Deposit (security collateral) ────────────────────────────────────────
 
     /// <summary>Locks a security deposit held as collateral for a service agreement.</summary>
+    /// <param name="provider">Address of the provider holding the deposit.</param>
+    /// <param name="amount">USDC amount to deposit.</param>
+    /// <param name="expireSecs">Seconds until deposit expires (default: 86400 = 24h).</param>
     public Task<Deposit> LockDepositAsync(
-        string beneficiary,
+        string provider,
         decimal amount,
-        DateTimeOffset? expiresAt = null,
+        int expireSecs = 86400,
         PermitSignature? permit = null,
         CancellationToken ct = default)
     {
-        ValidateAddress(beneficiary, nameof(beneficiary));
+        ValidateAddress(provider, nameof(provider));
         ValidateAmount(amount);
+        var expiry = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + expireSecs;
         var body = new Dictionary<string, object?>
         {
-            ["beneficiary"] = beneficiary,
-            ["amount"]      = amount.ToString("F6"),
-            ["expires_at"]  = expiresAt,
+            ["chain"]    = _chain,
+            ["provider"] = provider,
+            ["amount"]   = amount.ToString("F6"),
+            ["expiry"]   = expiry,
         };
         if (permit is not null) body["permit"] = permit;
         return _transport.PostAsync<Deposit>("/api/v0/deposits", body, ct);
     }
+
+    /// <summary>Returns a deposit to the depositor (provider-side, no fee).</summary>
+    public Task<Transaction> ReturnDepositAsync(string depositId, CancellationToken ct = default) =>
+        _transport.PostAsync<Transaction>($"/api/v0/deposits/{depositId}/return", new { }, ct);
 
     // ─── Analytics & budget ───────────────────────────────────────────────────
 
@@ -471,5 +565,34 @@ public sealed class Wallet
                 $"Invalid {paramName}: amount must be positive, got {amount}. " +
                 "Minimum payment is 0.000001 USDC.",
                 new Dictionary<string, object> { [paramName] = amount });
+    }
+
+    // ─── EIP-712 byte helpers (used by SignTabCharge) ────────────────────────
+
+    private static byte[] PadUint256Long(long value)
+    {
+        var result = new byte[32];
+        var bytes = BitConverter.GetBytes((ulong)value);
+        if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
+        Buffer.BlockCopy(bytes, 0, result, 24, 8);
+        return result;
+    }
+
+    private static byte[] PadAddressBytes(string address)
+    {
+        var hex = address.Replace("0x", "").Replace("0X", "");
+        var bytes = Convert.FromHexString(hex);
+        var result = new byte[32];
+        Buffer.BlockCopy(bytes, 0, result, 12, 20);
+        return result;
+    }
+
+    private static byte[] ConcatBytes(params byte[][] arrays)
+    {
+        var total = arrays.Sum(a => a.Length);
+        var result = new byte[total];
+        var pos = 0;
+        foreach (var a in arrays) { Buffer.BlockCopy(a, 0, result, pos, a.Length); pos += a.Length; }
+        return result;
     }
 }

@@ -19,12 +19,12 @@ var releaseTx = await wallet.ReleaseEscrowAsync(escrow.Id);
 Console.WriteLine($"Release: {releaseTx.Amount:F2} USDC released");
 
 // Tab (micro-payment channel)
-var tab = await wallet.CreateTabAsync(Agent, limit: 10m);
-await wallet.DebitTabAsync(tab.Id, 0.001m, "query #1");
-await wallet.DebitTabAsync(tab.Id, 0.001m, "query #2");
-await wallet.DebitTabAsync(tab.Id, 0.001m, "query #3");
-await wallet.SettleTabAsync(tab.Id);
-Console.WriteLine($"Tab:     settled {tab.Id} (3 × $0.001)");
+var tab = await wallet.CreateTabAsync(Agent, limitAmount: 10m, perUnit: 0.001m);
+await wallet.ChargeTabAsync(tab.Id, 0.001m, 0.001m, 1, "0xsig1");
+await wallet.ChargeTabAsync(tab.Id, 0.001m, 0.002m, 2, "0xsig2");
+await wallet.ChargeTabAsync(tab.Id, 0.001m, 0.003m, 3, "0xsig3");
+await wallet.CloseTabAsync(tab.Id, 0.003m, "0xsig_final");
+Console.WriteLine($"Tab:     closed {tab.Id} (3 × $0.001)");
 
 // Inspection
 Console.WriteLine($"\nBalance: {mock.Balance:F2} USDC");

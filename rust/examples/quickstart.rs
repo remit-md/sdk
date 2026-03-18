@@ -1,4 +1,4 @@
-//! # remitmd Rust SDK — Quick Start
+//! # remitmd Rust SDK -- Quick Start
 //!
 //! This example shows the core payment patterns for AI agents.
 //! Run with: `cargo run --example quickstart`
@@ -11,6 +11,7 @@
 
 use remitmd::MockRemit;
 use rust_decimal_macros::dec;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,10 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bal = wallet.balance().await?;
     println!("Balance: {} USDC (address: {})", bal.usdc, bal.address);
 
-    // 2. Direct payment — one-way, instant, no escrow
+    // 2. Direct payment -- one-way, instant, no escrow
     let tx = wallet.pay(recipient, dec!(1.50)).await?;
     println!(
-        "\n[Direct] Paid {} USDC → {} (tx: {})",
+        "\n[Direct] Paid {} USDC -> {} (tx: {})",
         tx.amount, tx.to, tx.id
     );
 
@@ -49,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(mock.was_paid(recipient, dec!(1.50)).await);
     assert_eq!(mock.total_paid_to(recipient).await, dec!(1.50));
 
-    // 3. Escrow — lock funds, release on delivery
+    // 3. Escrow -- lock funds, release on delivery
     let escrow = wallet.create_escrow(payee, dec!(100.00)).await?;
     println!(
         "\n[Escrow] Created {} (status: {:?})",
@@ -57,56 +58,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Agent completes work...
-    let release_tx = wallet.release_escrow(&escrow.id, None).await?;
+    let release_result = wallet.release_escrow(&escrow.id, None).await?;
     println!(
-        "[Escrow] Released {} USDC → {}",
-        release_tx.amount, release_tx.to
+        "[Escrow] Released {} USDC -> {}",
+        release_result.amount, release_result.payee
     );
 
-    // 4. Tab — off-chain channel for micro-payments
-    let tab = wallet.create_tab(payee, dec!(10.00)).await?;
-    println!("\n[Tab] Opened {} (limit: {} USDC)", tab.id, tab.limit);
-
-    wallet
-        .debit_tab(&tab.id, dec!(0.003), "LLM API call #1")
+    // 4. Tab -- payment channel for micro-payments
+    let tab = wallet
+        .create_tab(payee, dec!(10.00), dec!(0.10))
         .await?;
-    wallet
-        .debit_tab(&tab.id, dec!(0.003), "LLM API call #2")
-        .await?;
-    println!("[Tab] Debited 2 API calls (0.003 USDC each, off-chain)");
-
-    let settle_tx = wallet.settle_tab(&tab.id).await?;
     println!(
-        "[Tab] Settled {} USDC on-chain (tx: {})",
-        settle_tx.amount, settle_tx.id
+        "\n[Tab] Opened {} (limit: {} USDC)",
+        tab.id, tab.limit_amount
     );
 
-    // 5. Stream — per-second payment flow
+    let closed = wallet.close_tab(&tab.id, 0.10, "0x00").await?;
+    println!("[Tab] Closed: status={:?}", closed.status);
+
+    // 5. Stream -- per-second payment flow
     let stream = wallet
         .create_stream(recipient, dec!(0.001), dec!(50.00))
         .await?;
     println!(
         "\n[Stream] Started {} ({} USDC/sec)",
-        stream.id, stream.rate_per_sec
+        stream.id, stream.rate_per_second
     );
 
-    // 6. Bounty — open reward for task completion
+    // 6. Bounty -- open reward for task completion
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
     let bounty = wallet
-        .create_bounty(dec!(5.00), "Find cheapest Base RPC endpoint")
+        .create_bounty(dec!(5.00), "Find cheapest Base RPC endpoint", now + 3600)
         .await?;
     println!(
-        "\n[Bounty] Posted {} (award: {} USDC)",
-        bounty.id, bounty.award
+        "\n[Bounty] Posted {} (amount: {} USDC)",
+        bounty.id, bounty.amount
     );
 
-    let award_tx = wallet.award_bounty(&bounty.id, recipient).await?;
-    println!(
-        "[Bounty] Awarded {} USDC → {}",
-        award_tx.amount, award_tx.to
-    );
+    let awarded = wallet.award_bounty(&bounty.id, 1).await?;
+    println!("[Bounty] Awarded: status={:?}", awarded.status);
 
-    // 7. Deposit — security collateral
-    let deposit = wallet.lock_deposit(payee, dec!(20.00), 86_400).await?;
+    // 7. Deposit -- security collateral
+    let deposit = wallet
+        .lock_deposit(payee, dec!(20.00), now + 86_400)
+        .await?;
     println!(
         "\n[Deposit] Locked {} (status: {:?})",
         deposit.id, deposit.status
@@ -130,6 +128,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let budget = wallet.remaining_budget().await?;
     println!("[Budget] Daily remaining: {} USDC", budget.daily_remaining);
 
-    println!("\n✓ All patterns demonstrated successfully.");
+    println!("\nAll patterns demonstrated successfully.");
     Ok(())
 }

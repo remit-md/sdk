@@ -227,45 +227,89 @@ pub struct Escrow {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tab {
     pub id: String,
-    pub opener: String,
-    pub counterpart: String,
-    #[serde(with = "rust_decimal::serde::float")]
-    pub limit: Decimal,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(default)]
+    pub chain: String,
+    #[serde(default, alias = "opener")]
+    pub payer: String,
+    #[serde(alias = "counterpart")]
+    pub provider: String,
+    #[serde(with = "rust_decimal::serde::float", alias = "limit")]
+    pub limit_amount: Decimal,
+    #[serde(default, with = "rust_decimal::serde::float")]
+    pub per_unit: Decimal,
+    #[serde(default, with = "rust_decimal::serde::float")]
     pub used: Decimal,
-    #[serde(with = "rust_decimal::serde::float")]
+    #[serde(default, with = "rust_decimal::serde::float")]
     pub remaining: Decimal,
     pub status: TabStatus,
+    #[serde(default)]
+    pub expiry: u64,
+    #[serde(default)]
+    pub tx_hash: String,
     pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub closes_at: Option<DateTime<Utc>>,
 }
 
-/// A single charge against a Tab.
+/// A single debit against a Tab (legacy).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TabDebit {
     pub tab_id: String,
     #[serde(with = "rust_decimal::serde::float")]
     pub amount: Decimal,
+    #[serde(default)]
     pub memo: String,
+    #[serde(default)]
     pub sequence: u64,
+    #[serde(default)]
     pub signature: String,
+}
+
+/// A charge against a Tab (on-chain signed by provider).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TabCharge {
+    pub id: i64,
+    pub tab_id: String,
+    #[serde(with = "rust_decimal::serde::float")]
+    pub amount: Decimal,
+    #[serde(with = "rust_decimal::serde::float")]
+    pub cumulative: Decimal,
+    pub call_count: u32,
+    pub provider_sig: String,
+    pub charged_at: DateTime<Utc>,
+}
+
+/// A bounty submission from a submitter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BountySubmission {
+    pub id: i64,
+    pub bounty_id: String,
+    pub submitter: String,
+    pub evidence_hash: String,
+    pub status: String,
+    pub submitted_at: DateTime<Utc>,
 }
 
 /// Time-based payment stream (pay-per-second).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stream {
     pub id: String,
-    pub sender: String,
-    pub recipient: String,
+    #[serde(default)]
+    pub chain: String,
+    #[serde(default, alias = "sender")]
+    pub payer: String,
+    pub payee: String,
     #[serde(with = "rust_decimal::serde::float")]
-    pub rate_per_sec: Decimal,
+    pub rate_per_second: Decimal,
     #[serde(with = "rust_decimal::serde::float")]
-    pub deposited: Decimal,
-    #[serde(with = "rust_decimal::serde::float")]
+    pub max_total: Decimal,
+    #[serde(default, with = "rust_decimal::serde::float")]
     pub withdrawn: Decimal,
     pub status: StreamStatus,
+    #[serde(default)]
     pub started_at: DateTime<Utc>,
+    #[serde(default)]
+    pub tx_hash: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ends_at: Option<DateTime<Utc>>,
 }
@@ -274,15 +318,24 @@ pub struct Stream {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bounty {
     pub id: String,
+    #[serde(default)]
+    pub chain: String,
     pub poster: String,
-    #[serde(with = "rust_decimal::serde::float")]
-    pub award: Decimal,
-    pub description: String,
+    #[serde(with = "rust_decimal::serde::float", alias = "award")]
+    pub amount: Decimal,
+    #[serde(alias = "description")]
+    pub task_description: String,
     pub status: BountyStatus,
+    #[serde(default)]
+    pub deadline: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_attempts: Option<u32>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub winner: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub tx_hash: String,
     pub created_at: DateTime<Utc>,
 }
 
@@ -290,13 +343,20 @@ pub struct Bounty {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
     pub id: String,
+    #[serde(default)]
+    pub chain: String,
     pub depositor: String,
-    pub beneficiary: String,
+    #[serde(alias = "beneficiary")]
+    pub provider: String,
     #[serde(with = "rust_decimal::serde::float")]
     pub amount: Decimal,
     pub status: DepositStatus,
+    #[serde(default)]
+    pub expiry: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub tx_hash: String,
     pub created_at: DateTime<Utc>,
 }
 

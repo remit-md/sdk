@@ -322,17 +322,31 @@ impl MockTransport {
 
             // ─── Tab ──────────────────────────────────────────────────────
             ("POST", "/api/v0/tabs") => {
-                let counterpart = str_field(&b, "counterpart")?;
-                let limit = decimal_field(&b, "limit")?;
+                let provider = b["provider"]
+                    .as_str()
+                    .or_else(|| b["counterpart"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let limit = b["limit_amount"]
+                    .as_f64()
+                    .or_else(|| decimal_field(&b, "limit").ok().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)))
+                    .unwrap_or(0.0);
+                let limit = Decimal::from_str_exact(&format!("{limit}")).unwrap_or_default();
+                let per_unit = b["per_unit"].as_f64().unwrap_or(0.0);
+                let per_unit = Decimal::from_str_exact(&format!("{per_unit}")).unwrap_or_default();
 
                 let tab = Tab {
                     id: new_id("tab"),
-                    opener: "0xMockWallet0000000000000000000000000001".to_string(),
-                    counterpart,
-                    limit,
+                    chain: "base-sepolia".to_string(),
+                    payer: "0xMockWallet0000000000000000000000000001".to_string(),
+                    provider,
+                    limit_amount: limit,
+                    per_unit,
                     used: Decimal::ZERO,
                     remaining: limit,
                     status: TabStatus::Open,
+                    expiry: 0,
+                    tx_hash: format!("0x{}", mock_hash()),
                     created_at: Utc::now(),
                     closes_at: None,
                 };
@@ -341,51 +355,50 @@ impl MockTransport {
                 Ok(serde_json::to_value(&tab).unwrap())
             }
 
-            // ─── Tab settle ───────────────────────────────────────────────
-            (method, path) if method == "POST" && path.ends_with("/settle") => {
-                let tab_id = extract_id(path, "/api/v0/tabs/", "/settle");
+            // ─── Tab close ────────────────────────────────────────────────
+            (method, path) if method == "POST" && path.ends_with("/close") && path.contains("/tabs/") => {
+                let tab_id = extract_id(path, "/api/v0/tabs/", "/close");
                 let mut s = self.state.lock().await;
                 let tab = s.tabs.get_mut(tab_id).ok_or_else(|| {
                     remit_err(codes::TAB_NOT_FOUND, format!("tab {tab_id:?} not found"))
                 })?;
-                tab.status = TabStatus::Settled;
-                let amount = tab.used;
-
-                let tx = Transaction {
-                    id: new_id("tx"),
-                    tx_hash: format!("0x{}", mock_hash()),
-                    from: tab.opener.clone(),
-                    to: tab.counterpart.clone(),
-                    amount,
-                    fee: Decimal::new(1, 3),
-                    memo: "tab settlement".to_string(),
-                    chain_id: ChainId::BASE_SEPOLIA,
-                    block_number: 0,
-                    created_at: Utc::now(),
-                };
-                s.transactions.push(tx.clone());
-                Ok(serde_json::to_value(&tx).unwrap())
+                tab.status = TabStatus::Closed;
+                Ok(serde_json::to_value(&*tab).unwrap())
             }
 
             // ─── Stream ───────────────────────────────────────────────────
             ("POST", "/api/v0/streams") => {
-                let recipient = str_field(&b, "recipient")?;
-                let rate_per_sec = decimal_field(&b, "rate_per_sec")?;
-                let deposit = decimal_field(&b, "deposit")?;
+                let payee = b["payee"]
+                    .as_str()
+                    .or_else(|| b["recipient"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let rate_per_second = b["rate_per_second"]
+                    .as_f64()
+                    .or_else(|| decimal_field(&b, "rate_per_sec").ok().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)))
+                    .unwrap_or(0.0);
+                let rate_per_second = Decimal::from_str_exact(&format!("{rate_per_second}")).unwrap_or_default();
+                let max_total = b["max_total"]
+                    .as_f64()
+                    .or_else(|| decimal_field(&b, "deposit").ok().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)))
+                    .unwrap_or(0.0);
+                let max_total = Decimal::from_str_exact(&format!("{max_total}")).unwrap_or_default();
 
                 let mut s = self.state.lock().await;
-                check_balance(s.balance, deposit)?;
-                s.balance -= deposit;
+                check_balance(s.balance, max_total)?;
+                s.balance -= max_total;
 
                 let stream = Stream {
                     id: new_id("str"),
-                    sender: "0xMockWallet0000000000000000000000000001".to_string(),
-                    recipient,
-                    rate_per_sec,
-                    deposited: deposit,
+                    chain: "base-sepolia".to_string(),
+                    payer: "0xMockWallet0000000000000000000000000001".to_string(),
+                    payee,
+                    rate_per_second,
+                    max_total,
                     withdrawn: Decimal::ZERO,
                     status: StreamStatus::Active,
                     started_at: Utc::now(),
+                    tx_hash: format!("0x{}", mock_hash()),
                     ends_at: None,
                 };
                 s.streams.insert(stream.id.clone(), stream.clone());
@@ -394,21 +407,34 @@ impl MockTransport {
 
             // ─── Bounty ───────────────────────────────────────────────────
             ("POST", "/api/v0/bounties") => {
-                let award = decimal_field(&b, "award")?;
-                let description = str_field(&b, "description")?;
+                let amount = b["amount"]
+                    .as_f64()
+                    .or_else(|| decimal_field(&b, "award").ok().map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)))
+                    .unwrap_or(0.0);
+                let amount = Decimal::from_str_exact(&format!("{amount}")).unwrap_or_default();
+                let task_description = b["task_description"]
+                    .as_str()
+                    .or_else(|| b["description"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let deadline = b["deadline"].as_u64().unwrap_or(0);
 
                 let mut s = self.state.lock().await;
-                check_balance(s.balance, award)?;
-                s.balance -= award;
+                check_balance(s.balance, amount)?;
+                s.balance -= amount;
 
                 let bounty = Bounty {
                     id: new_id("bnt"),
+                    chain: "base-sepolia".to_string(),
                     poster: "0xMockWallet0000000000000000000000000001".to_string(),
-                    award,
-                    description,
+                    amount,
+                    task_description,
                     status: BountyStatus::Open,
+                    deadline,
+                    max_attempts: None,
                     winner: String::new(),
                     expires_at: None,
+                    tx_hash: format!("0x{}", mock_hash()),
                     created_at: Utc::now(),
                 };
                 s.bounties.insert(bounty.id.clone(), bounty.clone());
@@ -416,9 +442,8 @@ impl MockTransport {
             }
 
             // ─── Bounty award ─────────────────────────────────────────────
-            (method, path) if method == "POST" && path.ends_with("/award") => {
+            (method, path) if method == "POST" && path.ends_with("/award") && path.contains("/bounties/") => {
                 let bounty_id = extract_id(path, "/api/v0/bounties/", "/award");
-                let winner = str_field(&b, "winner")?;
 
                 let mut s = self.state.lock().await;
                 let bounty = s.bounties.get_mut(bounty_id).ok_or_else(|| {
@@ -428,29 +453,22 @@ impl MockTransport {
                     )
                 })?;
                 bounty.status = BountyStatus::Awarded;
-                bounty.winner = winner.clone();
-                let amount = bounty.award;
-
-                let tx = Transaction {
-                    id: new_id("tx"),
-                    tx_hash: format!("0x{}", mock_hash()),
-                    from: bounty.poster.clone(),
-                    to: winner,
-                    amount,
-                    fee: Decimal::new(1, 3),
-                    memo: "bounty award".to_string(),
-                    chain_id: ChainId::BASE_SEPOLIA,
-                    block_number: 0,
-                    created_at: Utc::now(),
-                };
-                s.transactions.push(tx.clone());
-                Ok(serde_json::to_value(&tx).unwrap())
+                Ok(serde_json::to_value(&*bounty).unwrap())
             }
 
             // ─── Deposit ──────────────────────────────────────────────────
             ("POST", "/api/v0/deposits") => {
-                let beneficiary = str_field(&b, "beneficiary")?;
-                let amount = decimal_field(&b, "amount")?;
+                let provider = b["provider"]
+                    .as_str()
+                    .or_else(|| b["beneficiary"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let amount = b["amount"]
+                    .as_f64()
+                    .map(|f| Decimal::from_str_exact(&format!("{f}")).unwrap_or_default())
+                    .or_else(|| decimal_field(&b, "amount").ok())
+                    .unwrap_or_default();
+                let expiry = b["expiry"].as_u64().unwrap_or(0);
 
                 let mut s = self.state.lock().await;
                 check_balance(s.balance, amount)?;
@@ -458,11 +476,14 @@ impl MockTransport {
 
                 let deposit = Deposit {
                     id: new_id("dep"),
+                    chain: "base-sepolia".to_string(),
                     depositor: "0xMockWallet0000000000000000000000000001".to_string(),
-                    beneficiary,
+                    provider,
                     amount,
                     status: DepositStatus::Locked,
+                    expiry,
                     expires_at: None,
+                    tx_hash: format!("0x{}", mock_hash()),
                     created_at: Utc::now(),
                 };
                 s.deposits.insert(deposit.id.clone(), deposit.clone());
@@ -559,6 +580,20 @@ impl MockTransport {
                 }))
             }
 
+            // ─── Stream close ─────────────────────────────────────────────
+            (method, path) if method == "POST" && path.contains("/streams/") && path.ends_with("/close") => {
+                let stream_id = extract_id(path, "/api/v0/streams/", "/close");
+                let mut s = self.state.lock().await;
+                let stream = s.streams.get_mut(stream_id).ok_or_else(|| {
+                    remit_err(
+                        codes::STREAM_NOT_FOUND,
+                        format!("stream {stream_id:?} not found"),
+                    )
+                })?;
+                stream.status = StreamStatus::Ended;
+                Ok(serde_json::to_value(&*stream).unwrap())
+            }
+
             // ─── Stream withdraw ──────────────────────────────────────────
             (method, path) if method == "POST" && path.ends_with("/withdraw") => {
                 let stream_id = extract_id(path, "/api/v0/streams/", "/withdraw");
@@ -572,9 +607,9 @@ impl MockTransport {
                 let tx = Transaction {
                     id: new_id("tx"),
                     tx_hash: format!("0x{}", mock_hash()),
-                    from: stream.sender.clone(),
-                    to: stream.recipient.clone(),
-                    amount: stream.deposited,
+                    from: stream.payer.clone(),
+                    to: stream.payee.clone(),
+                    amount: stream.max_total,
                     fee: Decimal::ZERO,
                     memo: "stream withdraw".to_string(),
                     chain_id: ChainId::BASE_SEPOLIA,
@@ -756,28 +791,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tab_lifecycle_open_debit_settle() {
+    async fn tab_lifecycle_open_and_close() {
         let mock = MockRemit::new();
         let wallet = mock.wallet();
 
-        let tab = wallet.create_tab(PAYEE, dec!(10.00)).await.unwrap();
+        let tab = wallet
+            .create_tab(PAYEE, dec!(10.00), dec!(0.10))
+            .await
+            .unwrap();
         assert_eq!(tab.status, TabStatus::Open);
 
-        wallet
-            .debit_tab(&tab.id, dec!(0.003), "API call 1")
+        let closed = wallet
+            .close_tab(&tab.id, 0.10, "0x00")
             .await
             .unwrap();
-        wallet
-            .debit_tab(&tab.id, dec!(0.003), "API call 2")
-            .await
-            .unwrap();
-
-        wallet.settle_tab(&tab.id).await.unwrap();
-        assert_eq!(mock.transaction_count().await, 1); // settle = 1 on-chain tx
+        assert_eq!(closed.status, TabStatus::Closed);
     }
 
     #[tokio::test]
-    async fn stream_creation_deducts_deposit() {
+    async fn stream_creation_deducts_max_total() {
         let mock = MockRemit::new();
         let wallet = mock.wallet();
 
@@ -794,15 +826,19 @@ mod tests {
         let mock = MockRemit::new();
         let wallet = mock.wallet();
 
+        let deadline = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600;
         let bounty = wallet
-            .create_bounty(dec!(5.00), "find the cheapest API route")
+            .create_bounty(dec!(5.00), "find the cheapest API route", deadline)
             .await
             .unwrap();
         assert_eq!(bounty.status, BountyStatus::Open);
 
-        let tx = wallet.award_bounty(&bounty.id, RECIPIENT).await.unwrap();
-        assert_eq!(tx.to, RECIPIENT);
-        assert_eq!(tx.amount, dec!(5.00));
+        let awarded = wallet.award_bounty(&bounty.id, 1).await.unwrap();
+        assert_eq!(awarded.status, BountyStatus::Awarded);
     }
 
     #[tokio::test]
@@ -810,8 +846,13 @@ mod tests {
         let mock = MockRemit::new();
         let wallet = mock.wallet();
 
+        let expiry = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 86400;
         let deposit = wallet
-            .lock_deposit(PAYEE, dec!(20.00), 86400)
+            .lock_deposit(PAYEE, dec!(20.00), expiry)
             .await
             .unwrap();
         assert_eq!(deposit.status, DepositStatus::Locked);

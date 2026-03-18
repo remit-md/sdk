@@ -82,10 +82,10 @@ mod wallet;
 pub use error::RemitError;
 pub use mock::MockRemit;
 pub use models::{
-    Balance, Bounty, BountyStatus, Budget, ChainId, ContractAddresses, Deposit, DepositStatus,
-    Escrow, EscrowStatus, Intent, Milestone, MintResponse, PermitSignature, Reputation,
-    SpendingSummary, Split, Stream, StreamStatus, Tab, TabDebit, TabStatus, TopRecipient,
-    Transaction, TransactionList,
+    Balance, Bounty, BountyStatus, BountySubmission, Budget, ChainId, ContractAddresses, Deposit,
+    DepositStatus, Escrow, EscrowStatus, Intent, Milestone, MintResponse, PermitSignature,
+    Reputation, SpendingSummary, Split, Stream, StreamStatus, Tab, TabCharge, TabDebit, TabStatus,
+    TopRecipient, Transaction, TransactionList,
 };
 pub use signer::{PrivateKeySigner, Signer};
 pub use wallet::{Wallet, WalletBuilder, WithKey, WithSigner};

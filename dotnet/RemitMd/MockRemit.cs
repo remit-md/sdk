@@ -138,17 +138,24 @@ public sealed class MockRemit
                 var p when p.EndsWith("/cancel")       => HandleEscrowAction(p, "cancelled"),
 
                 "/api/v0/tabs"                         => HandleCreateTab(body, id, now),
-                var p when p.EndsWith("/charge")       => HandleTabDebit(p, body, id),
+                var p when p.StartsWith("/api/v0/tabs/") && p.EndsWith("/charge")
+                                                       => HandleTabCharge(p, body, id),
                 var p when p.StartsWith("/api/v0/tabs/") && p.EndsWith("/close")
-                                                       => HandleTabSettle(p, id, now),
+                                                       => HandleTabClose(p, body, id, now),
 
                 "/api/v0/streams"                      => HandleCreateStream(body, id, now),
-                var p when p.EndsWith("/withdraw")     => HandleStreamWithdraw(p, id, now),
+                var p when p.StartsWith("/api/v0/streams/") && p.EndsWith("/close")
+                                                       => HandleStreamClose(p, id, now),
 
                 "/api/v0/bounties"                     => HandleCreateBounty(body, id, now),
-                var p when p.EndsWith("/award")        => HandleBountyAward(p, body, id, now),
+                var p when p.StartsWith("/api/v0/bounties/") && p.EndsWith("/submit")
+                                                       => HandleBountySubmit(p, body, id),
+                var p when p.StartsWith("/api/v0/bounties/") && p.EndsWith("/award")
+                                                       => HandleBountyAward(p, body, id, now),
 
                 "/api/v0/deposits"                     => HandleCreateDeposit(body, id, now),
+                var p when p.StartsWith("/api/v0/deposits/") && p.EndsWith("/return")
+                                                       => HandleDepositReturn(p, id, now),
 
                 _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled POST {path}"),
             };
@@ -261,21 +268,25 @@ public sealed class MockRemit
 
         private Tab HandleCreateTab(object body, string id, DateTimeOffset now)
         {
-            var d     = Deserialize(body);
-            var cp    = d.GetValueOrDefault("counterpart")?.ToString() ?? "0x0";
-            var limit = decimal.Parse(d.GetValueOrDefault("limit")?.ToString() ?? "0");
+            var d       = Deserialize(body);
+            var prov    = d.GetValueOrDefault("provider")?.ToString() ?? "0x0";
+            var limit   = decimal.Parse(d.GetValueOrDefault("limit_amount")?.ToString() ?? "0");
+            var perUnit = decimal.Parse(d.GetValueOrDefault("per_unit")?.ToString() ?? "0");
+            var expiry  = long.TryParse(d.GetValueOrDefault("expiry")?.ToString(), out var exp) ? exp : (long?)null;
 
-            var tab = new Tab(id, MockAddress, cp, limit, 0m, limit, TabStatus.Open, now, null);
+            var tab = new Tab(id, MockAddress, prov, limit, perUnit, 0m, limit, TabStatus.Open, now, expiry);
             lock (_mock._lock) _mock._tabs[id] = tab;
             return tab;
         }
 
-        private TabDebit HandleTabDebit(string path, object body, string id)
+        private TabCharge HandleTabCharge(string path, object body, string id)
         {
-            var tabId  = PathId(path.Replace("/charge", ""));
-            var d      = Deserialize(body);
-            var amount = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
-            var memo   = d.GetValueOrDefault("memo")?.ToString() ?? "";
+            var tabId      = PathId(path.Replace("/charge", ""));
+            var d          = Deserialize(body);
+            var amount     = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
+            var cumulative = decimal.Parse(d.GetValueOrDefault("cumulative")?.ToString() ?? "0");
+            var callCount  = int.Parse(d.GetValueOrDefault("call_count")?.ToString() ?? "0");
+            var provSig    = d.GetValueOrDefault("provider_sig")?.ToString() ?? "0x";
 
             lock (_mock._lock)
             {
@@ -288,21 +299,20 @@ public sealed class MockRemit
                         $"Tab limit exceeded: remaining {tab.Remaining:F6}, requested {amount:F6}.");
 
                 _mock._tabs[tabId] = tab with { Used = tab.Used + amount, Remaining = tab.Remaining - amount };
-                return new TabDebit(tabId, amount, memo, (ulong)_mock._tabs[tabId].Used.GetHashCode(), "0xsig-" + id);
+                return new TabCharge(tabId, amount, cumulative, callCount, provSig);
             }
         }
 
-        private Transaction HandleTabSettle(string path, string id, DateTimeOffset now)
+        private Tab HandleTabClose(string path, object body, string id, DateTimeOffset now)
         {
             var tabId = PathId(path.Replace("/close", ""));
             lock (_mock._lock)
             {
                 if (!_mock._tabs.TryGetValue(tabId, out var tab))
                     throw new RemitError(ErrorCodes.TabNotFound, $"Tab not found: {tabId}");
-                _mock._tabs[tabId] = tab with { Status = TabStatus.Settled };
-                return new Transaction(id, "0x" + id, MockAddress, tab.Counterpart,
-                    tab.Used, Math.Round(tab.Used * 0.001m, 6), "tab settle",
-                    ChainId.BaseSepolia, 1_000_002ul, now);
+                var closed = tab with { Status = TabStatus.Settled };
+                _mock._tabs[tabId] = closed;
+                return closed;
             }
         }
 
@@ -310,26 +320,26 @@ public sealed class MockRemit
 
         private Stream HandleCreateStream(object body, string id, DateTimeOffset now)
         {
-            var d    = Deserialize(body);
-            var to   = d.GetValueOrDefault("recipient")?.ToString() ?? "0x0";
-            var rate = decimal.Parse(d.GetValueOrDefault("rate_per_sec")?.ToString() ?? "0");
-            var dep  = decimal.Parse(d.GetValueOrDefault("deposit")?.ToString() ?? "0");
+            var d      = Deserialize(body);
+            var payee  = d.GetValueOrDefault("payee")?.ToString() ?? "0x0";
+            var rate   = decimal.Parse(d.GetValueOrDefault("rate_per_second")?.ToString() ?? "0");
+            var maxTot = decimal.Parse(d.GetValueOrDefault("max_total")?.ToString() ?? "0");
 
             lock (_mock._lock)
             {
-                if (_mock._balance < dep)
+                if (_mock._balance < maxTot)
                     throw new RemitError(ErrorCodes.InsufficientFunds,
-                        $"Insufficient funds for stream deposit: balance {_mock._balance:F6}, deposit {dep:F6}.");
-                _mock._balance -= dep;
-                var stream = new Stream(id, MockAddress, to, rate, dep, 0m, StreamStatus.Active, now, null);
+                        $"Insufficient funds for stream: balance {_mock._balance:F6}, max_total {maxTot:F6}.");
+                _mock._balance -= maxTot;
+                var stream = new Stream(id, MockAddress, payee, rate, maxTot, 0m, StreamStatus.Active, now, null);
                 _mock._streams[id] = stream;
                 return stream;
             }
         }
 
-        private Transaction HandleStreamWithdraw(string path, string id, DateTimeOffset now)
+        private Transaction HandleStreamClose(string path, string id, DateTimeOffset now)
         {
-            var streamId = PathId(path.Replace("/withdraw", ""));
+            var streamId = PathId(path.Replace("/close", ""));
             lock (_mock._lock)
             {
                 if (!_mock._streams.TryGetValue(streamId, out var stream))
@@ -337,42 +347,40 @@ public sealed class MockRemit
                 if (stream.Status != StreamStatus.Active)
                     throw new RemitError(ErrorCodes.StreamNotActive, $"Stream {streamId} is not active.");
 
-                // Simulate 5 minutes of accrued earnings
-                var accrued = stream.RatePerSec * 300m;
-                if (accrued <= 0)
-                    throw new RemitError(ErrorCodes.NothingToWithdraw, "Nothing to withdraw yet.");
-
-                _mock._streams[streamId] = stream with { Withdrawn = stream.Withdrawn + accrued };
+                _mock._streams[streamId] = stream with { Status = StreamStatus.Ended };
                 return new Transaction(id, "0x" + id, MockAddress, stream.Recipient,
-                    accrued, 0m, "stream withdraw", ChainId.BaseSepolia, 1_000_003ul, now);
+                    stream.Deposited, 0m, "stream close", ChainId.BaseSepolia, 1_000_003ul, now);
             }
         }
 
         // ── Bounty ───────────────────────────────────────────────────────────
 
+        private int _nextSubmissionId = 1;
+
         private Bounty HandleCreateBounty(object body, string id, DateTimeOffset now)
         {
-            var d     = Deserialize(body);
-            var award = decimal.Parse(d.GetValueOrDefault("award")?.ToString() ?? "0");
-            var desc  = d.GetValueOrDefault("description")?.ToString() ?? "";
+            var d      = Deserialize(body);
+            var amount = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
+            var desc   = d.GetValueOrDefault("task_description")?.ToString() ?? "";
+            var dl     = long.TryParse(d.GetValueOrDefault("deadline")?.ToString(), out var dv) ? dv : (long?)null;
 
             lock (_mock._lock)
             {
-                if (_mock._balance < award)
+                if (_mock._balance < amount)
                     throw new RemitError(ErrorCodes.InsufficientFunds,
-                        $"Insufficient funds for bounty: balance {_mock._balance:F6}, award {award:F6}.");
-                _mock._balance -= award;
-                var bounty = new Bounty(id, MockAddress, award, desc, BountyStatus.Open, null, null, now);
+                        $"Insufficient funds for bounty: balance {_mock._balance:F6}, amount {amount:F6}.");
+                _mock._balance -= amount;
+                var bounty = new Bounty(id, MockAddress, amount, desc, BountyStatus.Open, dl, now);
                 _mock._bounties[id] = bounty;
                 return bounty;
             }
         }
 
-        private Transaction HandleBountyAward(string path, object body, string id, DateTimeOffset now)
+        private BountySubmission HandleBountySubmit(string path, object body, string id)
         {
-            var bountyId = PathId(path.Replace("/award", ""));
+            var bountyId = PathId(path.Replace("/submit", ""));
             var d        = Deserialize(body);
-            var winner   = d.GetValueOrDefault("winner")?.ToString() ?? "0x0";
+            var hash     = d.GetValueOrDefault("evidence_hash")?.ToString() ?? "";
 
             lock (_mock._lock)
             {
@@ -381,9 +389,26 @@ public sealed class MockRemit
                 if (bounty.Status != BountyStatus.Open)
                     throw new RemitError(ErrorCodes.BountyAlreadyClosed, $"Bounty {bountyId} is not open.");
 
-                _mock._bounties[bountyId] = bounty with { Status = BountyStatus.Awarded, Winner = winner };
-                return new Transaction(id, "0x" + id, MockAddress, winner,
-                    bounty.Award, 0m, "bounty award", ChainId.BaseSepolia, 1_000_004ul, now);
+                var subId = _nextSubmissionId++;
+                return new BountySubmission(subId, bountyId, MockAddress, hash);
+            }
+        }
+
+        private Bounty HandleBountyAward(string path, object body, string id, DateTimeOffset now)
+        {
+            var bountyId     = PathId(path.Replace("/award", ""));
+            var d            = Deserialize(body);
+
+            lock (_mock._lock)
+            {
+                if (!_mock._bounties.TryGetValue(bountyId, out var bounty))
+                    throw new RemitError(ErrorCodes.BountyNotFound, $"Bounty not found: {bountyId}");
+                if (bounty.Status != BountyStatus.Open)
+                    throw new RemitError(ErrorCodes.BountyAlreadyClosed, $"Bounty {bountyId} is not open.");
+
+                var awarded = bounty with { Status = BountyStatus.Awarded };
+                _mock._bounties[bountyId] = awarded;
+                return awarded;
             }
         }
 
@@ -391,9 +416,10 @@ public sealed class MockRemit
 
         private Deposit HandleCreateDeposit(object body, string id, DateTimeOffset now)
         {
-            var d    = Deserialize(body);
-            var bene = d.GetValueOrDefault("beneficiary")?.ToString() ?? "0x0";
-            var amt  = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
+            var d      = Deserialize(body);
+            var prov   = d.GetValueOrDefault("provider")?.ToString() ?? "0x0";
+            var amt    = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
+            var expiry = long.TryParse(d.GetValueOrDefault("expiry")?.ToString(), out var exp) ? exp : (long?)null;
 
             lock (_mock._lock)
             {
@@ -401,9 +427,23 @@ public sealed class MockRemit
                     throw new RemitError(ErrorCodes.InsufficientFunds,
                         $"Insufficient funds for deposit: balance {_mock._balance:F6}, amount {amt:F6}.");
                 _mock._balance -= amt;
-                var deposit = new Deposit(id, MockAddress, bene, amt, DepositStatus.Locked, null, now);
+                var deposit = new Deposit(id, MockAddress, prov, amt, DepositStatus.Locked, expiry, now);
                 _mock._deposits[id] = deposit;
                 return deposit;
+            }
+        }
+
+        private Transaction HandleDepositReturn(string path, string id, DateTimeOffset now)
+        {
+            var depositId = PathId(path.Replace("/return", ""));
+            lock (_mock._lock)
+            {
+                if (!_mock._deposits.TryGetValue(depositId, out var deposit))
+                    throw new RemitError(ErrorCodes.ServerError, $"Deposit not found: {depositId}");
+                _mock._balance += deposit.Amount; // full refund, no fee
+                _mock._deposits[depositId] = deposit with { Status = DepositStatus.Returned };
+                return new Transaction(id, "0x" + id, deposit.Provider, MockAddress,
+                    deposit.Amount, 0m, "deposit return", ChainId.BaseSepolia, 1_000_005ul, now);
             }
         }
 

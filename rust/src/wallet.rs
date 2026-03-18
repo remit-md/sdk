@@ -377,53 +377,64 @@ impl Wallet {
     /// Open a payment channel for batched micro-payments.
     ///
     /// Tabs are ideal for high-frequency low-value payments (e.g., per-token LLM
-    /// billing, per-query data APIs). Debits are off-chain; settlement is on-chain.
+    /// billing, per-query data APIs). Charges are provider-signed; settlement is on-chain.
     ///
     /// # Arguments
-    /// - `counterpart` — the agent receiving payments
-    /// - `limit` — maximum USDC pre-deposited into the channel
-    pub async fn create_tab(&self, counterpart: &str, limit: Decimal) -> Result<Tab, RemitError> {
-        self.create_tab_full(counterpart, limit, None, None).await
+    /// - `provider` — the agent receiving payments
+    /// - `limit_amount` — maximum USDC pre-deposited into the channel
+    /// - `per_unit` — USDC per unit/call
+    pub async fn create_tab(
+        &self,
+        provider: &str,
+        limit_amount: Decimal,
+        per_unit: Decimal,
+    ) -> Result<Tab, RemitError> {
+        self.create_tab_full(provider, limit_amount, per_unit, None, None)
+            .await
     }
 
     /// Open a tab with a permit for gasless approval.
     pub async fn create_tab_with_permit(
         &self,
-        counterpart: &str,
-        limit: Decimal,
+        provider: &str,
+        limit_amount: Decimal,
+        per_unit: Decimal,
         permit: PermitSignature,
     ) -> Result<Tab, RemitError> {
-        self.create_tab_full(counterpart, limit, None, Some(permit))
+        self.create_tab_full(provider, limit_amount, per_unit, None, Some(permit))
             .await
     }
 
     /// Open a tab with a custom expiry.
     pub async fn create_tab_with_expiry(
         &self,
-        counterpart: &str,
-        limit: Decimal,
-        expires_in_secs: u64,
+        provider: &str,
+        limit_amount: Decimal,
+        per_unit: Decimal,
+        expiry: u64,
     ) -> Result<Tab, RemitError> {
-        self.create_tab_full(counterpart, limit, Some(expires_in_secs), None)
+        self.create_tab_full(provider, limit_amount, per_unit, Some(expiry), None)
             .await
     }
 
     /// Open a tab with optional expiry and permit.
     pub async fn create_tab_full(
         &self,
-        counterpart: &str,
-        limit: Decimal,
-        expires_in_secs: Option<u64>,
+        provider: &str,
+        limit_amount: Decimal,
+        per_unit: Decimal,
+        expiry: Option<u64>,
         permit: Option<PermitSignature>,
     ) -> Result<Tab, RemitError> {
-        validate_address(counterpart)?;
+        validate_address(provider)?;
         let mut body = json!({
             "chain": &self.chain,
-            "counterpart": counterpart,
-            "limit": limit.to_string(),
+            "provider": provider,
+            "limit_amount": limit_amount.to_string().parse::<f64>().unwrap_or(0.0),
+            "per_unit": per_unit.to_string().parse::<f64>().unwrap_or(0.0),
         });
-        if let Some(exp) = expires_in_secs {
-            body["expires_in_seconds"] = json!(exp);
+        if let Some(exp) = expiry {
+            body["expiry"] = json!(exp);
         }
         if let Some(p) = permit {
             body["permit"] = serde_json::to_value(p).unwrap();
@@ -431,7 +442,69 @@ impl Wallet {
         self.post("/api/v0/tabs", body).await
     }
 
-    /// Debit a charge from an open tab (off-chain, signed).
+    /// Charge a tab (called by the provider with an EIP-712 signature).
+    ///
+    /// # Arguments
+    /// - `tab_id` — the tab to charge
+    /// - `amount` — this individual charge amount in USDC
+    /// - `cumulative` — total cumulative amount charged so far (including this charge)
+    /// - `call_count` — total number of charges so far (including this one)
+    /// - `provider_sig` — EIP-712 TabCharge signature from the provider
+    pub async fn charge_tab(
+        &self,
+        tab_id: &str,
+        amount: f64,
+        cumulative: f64,
+        call_count: u32,
+        provider_sig: &str,
+    ) -> Result<TabCharge, RemitError> {
+        self.post(
+            &format!("/api/v0/tabs/{tab_id}/charge"),
+            json!({
+                "amount": amount,
+                "cumulative": cumulative,
+                "call_count": call_count,
+                "provider_sig": provider_sig,
+            }),
+        )
+        .await
+    }
+
+    /// Close the tab with a final settlement amount and provider signature.
+    ///
+    /// # Arguments
+    /// - `tab_id` — the tab to close
+    /// - `final_amount` — final settled USDC amount
+    /// - `provider_sig` — EIP-712 TabCharge signature from the provider
+    pub async fn close_tab(
+        &self,
+        tab_id: &str,
+        final_amount: f64,
+        provider_sig: &str,
+    ) -> Result<Tab, RemitError> {
+        self.post(
+            &format!("/api/v0/tabs/{tab_id}/close"),
+            json!({
+                "final_amount": final_amount,
+                "provider_sig": provider_sig,
+            }),
+        )
+        .await
+    }
+
+    /// Close the tab and settle all charges on-chain (compat alias for `close_tab`).
+    #[deprecated(note = "use close_tab() instead")]
+    pub async fn settle_tab(
+        &self,
+        tab_id: &str,
+        final_amount: f64,
+        provider_sig: &str,
+    ) -> Result<Tab, RemitError> {
+        self.close_tab(tab_id, final_amount, provider_sig).await
+    }
+
+    /// Debit a charge from an open tab (off-chain, signed). Legacy method.
+    #[deprecated(note = "use charge_tab() instead")]
     pub async fn debit_tab(
         &self,
         tab_id: &str,
@@ -450,12 +523,6 @@ impl Wallet {
         .await
     }
 
-    /// Close the tab and settle all charges on-chain.
-    pub async fn settle_tab(&self, tab_id: &str) -> Result<Transaction, RemitError> {
-        self.post(&format!("/api/v0/tabs/{tab_id}/settle"), json!({}))
-            .await
-    }
-
     // ─── Stream ──────────────────────────────────────────────────────────────
 
     /// Start a per-second USDC payment stream.
@@ -464,39 +531,48 @@ impl Wallet {
     /// provides ongoing value (compute time, uptime guarantees, etc.).
     ///
     /// # Arguments
-    /// - `recipient` — the agent receiving the stream
-    /// - `rate_per_sec` — USDC per second
-    /// - `deposit` — total USDC pre-deposited (determines stream duration)
+    /// - `payee` — the agent receiving the stream
+    /// - `rate_per_second` — USDC per second
+    /// - `max_total` — total USDC pre-deposited (determines stream duration)
     pub async fn create_stream(
         &self,
-        recipient: &str,
-        rate_per_sec: Decimal,
-        deposit: Decimal,
+        payee: &str,
+        rate_per_second: Decimal,
+        max_total: Decimal,
     ) -> Result<Stream, RemitError> {
-        self.create_stream_with_permit(recipient, rate_per_sec, deposit, None)
+        self.create_stream_with_permit(payee, rate_per_second, max_total, None)
             .await
     }
 
     /// Start a per-second USDC payment stream with an optional permit.
     pub async fn create_stream_with_permit(
         &self,
-        recipient: &str,
-        rate_per_sec: Decimal,
-        deposit: Decimal,
+        payee: &str,
+        rate_per_second: Decimal,
+        max_total: Decimal,
         permit: Option<PermitSignature>,
     ) -> Result<Stream, RemitError> {
-        validate_address(recipient)?;
-        validate_amount(deposit)?;
+        validate_address(payee)?;
+        validate_amount(max_total)?;
         let mut body = json!({
             "chain": &self.chain,
-            "recipient": recipient,
-            "rate_per_sec": rate_per_sec.to_string(),
-            "deposit": deposit.to_string(),
+            "payee": payee,
+            "rate_per_second": rate_per_second.to_string().parse::<f64>().unwrap_or(0.0),
+            "max_total": max_total.to_string().parse::<f64>().unwrap_or(0.0),
         });
         if let Some(p) = permit {
             body["permit"] = serde_json::to_value(p).unwrap();
         }
         self.post("/api/v0/streams", body).await
+    }
+
+    /// Close an active stream (called by the payer).
+    pub async fn close_stream(&self, stream_id: &str) -> Result<Stream, RemitError> {
+        self.post(
+            &format!("/api/v0/streams/{stream_id}/close"),
+            json!({}),
+        )
+        .await
     }
 
     /// Withdraw all vested stream payments (called by the recipient).
@@ -512,58 +588,80 @@ impl Wallet {
     /// Any agent can submit work; the poster awards the bounty to the winner.
     ///
     /// # Arguments
-    /// - `award` — USDC prize for the winner
-    /// - `description` — task description (agent-readable)
+    /// - `amount` — USDC prize for the winner
+    /// - `task_description` — task description (agent-readable)
+    /// - `deadline` — unix timestamp when the bounty expires
     pub async fn create_bounty(
         &self,
-        award: Decimal,
-        description: &str,
+        amount: Decimal,
+        task_description: &str,
+        deadline: u64,
     ) -> Result<Bounty, RemitError> {
-        validate_amount(award)?;
-        self.post(
-            "/api/v0/bounties",
-            json!({
-                "chain": &self.chain,
-                "award": award.to_string(),
-                "description": description,
-            }),
-        )
-        .await
+        self.create_bounty_full(amount, task_description, deadline, None, None)
+            .await
     }
 
-    /// Create a bounty with a custom expiry.
-    pub async fn create_bounty_with_expiry(
+    /// Create a bounty with a permit for gasless approval.
+    pub async fn create_bounty_with_permit(
         &self,
-        award: Decimal,
-        description: &str,
-        expires_in_secs: u64,
+        amount: Decimal,
+        task_description: &str,
+        deadline: u64,
+        permit: PermitSignature,
     ) -> Result<Bounty, RemitError> {
-        validate_amount(award)?;
+        self.create_bounty_full(amount, task_description, deadline, None, Some(permit))
+            .await
+    }
+
+    /// Create a bounty with all options.
+    pub async fn create_bounty_full(
+        &self,
+        amount: Decimal,
+        task_description: &str,
+        deadline: u64,
+        max_attempts: Option<u32>,
+        permit: Option<PermitSignature>,
+    ) -> Result<Bounty, RemitError> {
+        validate_amount(amount)?;
+        let mut body = json!({
+            "chain": &self.chain,
+            "amount": amount.to_string().parse::<f64>().unwrap_or(0.0),
+            "task_description": task_description,
+            "deadline": deadline,
+        });
+        if let Some(ma) = max_attempts {
+            body["max_attempts"] = json!(ma);
+        }
+        if let Some(p) = permit {
+            body["permit"] = serde_json::to_value(p).unwrap();
+        }
+        self.post("/api/v0/bounties", body).await
+    }
+
+    /// Submit evidence for a bounty.
+    ///
+    /// Returns a JSON value containing the submission (with `id` field for the submission ID).
+    pub async fn submit_bounty(
+        &self,
+        bounty_id: &str,
+        evidence_hash: &str,
+    ) -> Result<BountySubmission, RemitError> {
         self.post(
-            "/api/v0/bounties",
-            json!({
-                "chain": &self.chain,
-                "award": award.to_string(),
-                "description": description,
-                "expires_in_seconds": expires_in_secs,
-            }),
+            &format!("/api/v0/bounties/{bounty_id}/submit"),
+            json!({ "evidence_hash": evidence_hash }),
         )
         .await
     }
 
-    /// Award a bounty to the winner.
+    /// Award a bounty to a submission.
     pub async fn award_bounty(
         &self,
         bounty_id: &str,
-        winner: &str,
-    ) -> Result<Transaction, RemitError> {
-        validate_address(winner)?;
+        submission_id: i64,
+    ) -> Result<Bounty, RemitError> {
         self.post(
             &format!("/api/v0/bounties/{bounty_id}/award"),
-            json!({
-                "bounty_id": bounty_id,
-                "winner": winner,
-            }),
+            json!({ "submission_id": submission_id }),
         )
         .await
     }
@@ -611,30 +709,63 @@ impl Wallet {
 
     // ─── Deposit ─────────────────────────────────────────────────────────────
 
-    /// Lock a security deposit with a beneficiary.
+    /// Lock a security deposit with a provider.
     ///
-    /// The depositor's funds are locked until the beneficiary forfeits them,
+    /// The depositor's funds are locked until the provider returns them,
     /// the depositor requests return (after the lock period), or the deposit expires.
     ///
     /// # Arguments
-    /// - `beneficiary` — address that can forfeit the deposit
+    /// - `provider` — address that can forfeit the deposit
     /// - `amount` — USDC to lock
-    /// - `expires_in_secs` — lock duration in seconds
+    /// - `expiry` — unix timestamp when the deposit expires
     pub async fn lock_deposit(
         &self,
-        beneficiary: &str,
+        provider: &str,
         amount: Decimal,
-        expires_in_secs: u64,
+        expiry: u64,
     ) -> Result<Deposit, RemitError> {
-        validate_address(beneficiary)?;
+        self.lock_deposit_full(provider, amount, expiry, None).await
+    }
+
+    /// Lock a security deposit with a permit for gasless approval.
+    pub async fn lock_deposit_with_permit(
+        &self,
+        provider: &str,
+        amount: Decimal,
+        expiry: u64,
+        permit: PermitSignature,
+    ) -> Result<Deposit, RemitError> {
+        self.lock_deposit_full(provider, amount, expiry, Some(permit))
+            .await
+    }
+
+    /// Lock a security deposit with optional permit.
+    pub async fn lock_deposit_full(
+        &self,
+        provider: &str,
+        amount: Decimal,
+        expiry: u64,
+        permit: Option<PermitSignature>,
+    ) -> Result<Deposit, RemitError> {
+        validate_address(provider)?;
         validate_amount(amount)?;
+        let mut body = json!({
+            "chain": &self.chain,
+            "provider": provider,
+            "amount": amount.to_string().parse::<f64>().unwrap_or(0.0),
+            "expiry": expiry,
+        });
+        if let Some(p) = permit {
+            body["permit"] = serde_json::to_value(p).unwrap();
+        }
+        self.post("/api/v0/deposits", body).await
+    }
+
+    /// Return a security deposit to the depositor.
+    pub async fn return_deposit(&self, deposit_id: &str) -> Result<Value, RemitError> {
         self.post(
-            "/api/v0/deposits",
-            json!({
-                "beneficiary": beneficiary,
-                "amount": amount.to_string(),
-                "expires_in_seconds": expires_in_secs,
-            }),
+            &format!("/api/v0/deposits/{deposit_id}/return"),
+            json!({}),
         )
         .await
     }

@@ -410,10 +410,9 @@ export class Wallet extends RemitClient {
   openStream(options: OpenStreamOptions): Promise<Stream> {
     return this.#auth.post<Stream>("/streams", {
       chain: this._chain,
-      to: options.to,
-      rate: options.rate,
-      maxDuration: options.maxDuration ?? 3600,
-      maxTotal: options.maxTotal,
+      payee: options.to,
+      rate_per_second: options.rate,
+      max_total: options.maxTotal,
       ...(options.permit ? { permit: options.permit } : {}),
     });
   }

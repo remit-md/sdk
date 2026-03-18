@@ -14,6 +14,7 @@ on:
           - typescript
           - python
           - go
+          - rust
         default: all
 
 jobs:
@@ -93,3 +94,27 @@ jobs:
           ACCEPTANCE_API_URL: https://remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd go && go test -tags acceptance -timeout 300s -v -count=1
+
+  rust:
+    name: Rust SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'rust'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture

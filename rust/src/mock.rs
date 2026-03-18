@@ -41,10 +41,17 @@ pub struct MockRemit {
     state: Arc<Mutex<MockState>>,
 }
 
+struct PendingInvoice {
+    payee: String,
+    amount: Decimal,
+    memo: String,
+}
+
 struct MockState {
     balance: Decimal,
     transactions: Vec<Transaction>,
     escrows: HashMap<String, Escrow>,
+    pending_invoices: HashMap<String, PendingInvoice>,
     tabs: HashMap<String, Tab>,
     streams: HashMap<String, Stream>,
     bounties: HashMap<String, Bounty>,
@@ -57,6 +64,7 @@ impl MockState {
             balance,
             transactions: Vec::new(),
             escrows: HashMap::new(),
+            pending_invoices: HashMap::new(),
             tabs: HashMap::new(),
             streams: HashMap::new(),
             bounties: HashMap::new(),
@@ -206,24 +214,38 @@ impl MockTransport {
                 Ok(serde_json::to_value(&tx).unwrap())
             }
 
-            // ─── Escrow create ────────────────────────────────────────────
-            ("POST", "/api/v0/escrows") => {
-                let payee = str_field(&b, "payee")?;
+            // ─── Invoice create (step 1 of escrow) ────────────────────────
+            ("POST", "/api/v0/invoices") => {
+                let id = str_field(&b, "id")?;
+                let payee = b["to_agent"].as_str().unwrap_or("").to_string();
                 let amount = decimal_field(&b, "amount")?;
-                let memo = b["memo"].as_str().unwrap_or("").to_string();
-
+                let memo = b["task"].as_str().unwrap_or("").to_string();
                 let mut s = self.state.lock().await;
-                check_balance(s.balance, amount)?;
-                s.balance -= amount;
+                s.pending_invoices.insert(id.clone(), PendingInvoice { payee, amount, memo });
+                Ok(json!({ "id": id, "status": "pending" }))
+            }
+
+            // ─── Escrow create (step 2: fund with invoice_id) ────────────
+            ("POST", "/api/v0/escrows") => {
+                let invoice_id = str_field(&b, "invoice_id")?;
+                let mut s = self.state.lock().await;
+                let inv = s.pending_invoices.remove(&invoice_id).ok_or_else(|| {
+                    remit_err(codes::ESCROW_NOT_FOUND, "invoice not found in mock")
+                })?;
+                check_balance(s.balance, inv.amount)?;
+                s.balance -= inv.amount;
 
                 let escrow = Escrow {
-                    id: new_id("esc"),
-                    payer: "0xMockWallet0000000000000000000000000001".to_string(),
-                    payee,
-                    amount,
+                    id: invoice_id,
+                    chain: "base-sepolia".to_string(),
+                    tx_hash: format!("0x{}", mock_hash()),
+                    payer: MOCK_WALLET.to_string(),
+                    payee: inv.payee,
+                    amount: inv.amount,
                     fee: Decimal::new(1, 3),
                     status: EscrowStatus::Funded,
-                    memo,
+                    memo: inv.memo,
+                    claim_started: false,
                     milestones: vec![],
                     splits: vec![],
                     expires_at: None,
@@ -231,6 +253,20 @@ impl MockTransport {
                 };
                 s.escrows.insert(escrow.id.clone(), escrow.clone());
                 Ok(serde_json::to_value(&escrow).unwrap())
+            }
+
+            // ─── Escrow claim-start ──────────────────────────────────────
+            (method, path) if method == "POST" && path.ends_with("/claim-start") => {
+                let escrow_id = extract_id(path, "/api/v0/escrows/", "/claim-start");
+                let mut s = self.state.lock().await;
+                let escrow = s.escrows.get_mut(escrow_id).ok_or_else(|| {
+                    remit_err(
+                        codes::ESCROW_NOT_FOUND,
+                        format!("escrow {escrow_id:?} not found"),
+                    )
+                })?;
+                escrow.claim_started = true;
+                Ok(serde_json::to_value(&*escrow).unwrap())
             }
 
             // ─── Escrow release ───────────────────────────────────────────
@@ -622,15 +658,20 @@ fn str_field(v: &Value, key: &str) -> Result<String, RemitError> {
 }
 
 fn decimal_field(v: &Value, key: &str) -> Result<Decimal, RemitError> {
-    let s = v[key]
-        .as_str()
-        .ok_or_else(|| remit_err(codes::SERVER_ERROR, format!("missing field: {key}")))?;
-    Decimal::from_str_exact(s).map_err(|_| {
-        remit_err(
-            codes::INVALID_AMOUNT,
-            format!("invalid decimal in field {key}: {s}"),
-        )
-    })
+    let val = &v[key];
+    // Accept both string ("1.50") and number (1.50) representations.
+    if let Some(s) = val.as_str() {
+        return Decimal::from_str_exact(s).map_err(|_| {
+            remit_err(
+                codes::INVALID_AMOUNT,
+                format!("invalid decimal in field {key}: {s}"),
+            )
+        });
+    }
+    if let Some(n) = val.as_f64() {
+        return Ok(Decimal::from_str_exact(&n.to_string()).unwrap_or_default());
+    }
+    Err(remit_err(codes::SERVER_ERROR, format!("missing field: {key}")))
 }
 
 fn check_balance(balance: Decimal, needed: Decimal) -> Result<(), RemitError> {

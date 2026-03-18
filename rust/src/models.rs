@@ -193,7 +193,13 @@ pub struct Split {
 /// Holds USDC until conditions are met.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Escrow {
+    /// Escrow identifier (server returns this as `invoice_id`).
+    #[serde(alias = "invoice_id")]
     pub id: String,
+    #[serde(default)]
+    pub chain: String,
+    #[serde(default)]
+    pub tx_hash: String,
     pub payer: String,
     pub payee: String,
     #[serde(with = "rust_decimal::serde::float")]
@@ -203,12 +209,15 @@ pub struct Escrow {
     pub status: EscrowStatus,
     #[serde(default)]
     pub memo: String,
+    #[serde(default)]
+    pub claim_started: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub milestones: Vec<Milestone>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub splits: Vec<Split>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<DateTime<Utc>>,
+    #[serde(default)]
     pub created_at: DateTime<Utc>,
 }
 

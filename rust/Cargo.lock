@@ -1092,6 +1092,7 @@ dependencies = [
  "getrandom 0.2.17",
  "hex",
  "k256",
+ "rand_core 0.6.4",
  "reqwest",
  "rust_decimal",
  "rust_decimal_macros",

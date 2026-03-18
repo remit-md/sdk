@@ -287,31 +287,62 @@ impl Wallet {
     }
 
     /// Create an escrow with optional milestones, splits, and permit.
+    ///
+    /// Two-step flow: creates an invoice, then funds the escrow.
     #[allow(clippy::too_many_arguments)]
     pub async fn create_escrow_full(
         &self,
         payee: &str,
         amount: Decimal,
         memo: &str,
-        milestones: &[Milestone],
-        splits: &[Split],
+        _milestones: &[Milestone],
+        _splits: &[Split],
         expires_in_secs: Option<u64>,
         permit: Option<PermitSignature>,
     ) -> Result<Escrow, RemitError> {
         validate_address(payee)?;
         validate_amount(amount)?;
-        let mut body = json!({
-            "payee": payee,
-            "amount": amount.to_string(),
-            "memo": memo,
-            "milestones": milestones,
-            "splits": splits,
-            "expires_in_seconds": expires_in_secs,
+
+        // Step 1: create the invoice.
+        let mut nb = [0u8; 16];
+        getrandom::getrandom(&mut nb)
+            .map_err(|_| remit_err(codes::SERVER_ERROR, "random generation failed"))?;
+        let invoice_id = hex::encode(nb);
+
+        let mut inv_body = json!({
+            "id": invoice_id,
+            "chain": &self.chain,
+            "from_agent": self.address().to_lowercase(),
+            "to_agent": payee.to_lowercase(),
+            "amount": amount.to_string().parse::<f64>().unwrap_or(0.0),
+            "type": "escrow",
+            "task": memo,
+            "nonce": hex::encode(nb),
+            "signature": "0x",
         });
-        if let Some(p) = permit {
-            body["permit"] = serde_json::to_value(p).unwrap();
+        if let Some(secs) = expires_in_secs {
+            inv_body["escrow_timeout"] = json!(secs);
         }
-        self.post("/api/v0/escrows", body).await
+        // Discard response (server returns 201 with invoice data).
+        let _: serde_json::Value = self.post("/api/v0/invoices", inv_body).await?;
+
+        // Step 2: fund the escrow.
+        let mut escrow_body = json!({ "invoice_id": invoice_id });
+        if let Some(p) = permit {
+            escrow_body["permit"] = serde_json::to_value(p).unwrap();
+        }
+        self.post("/api/v0/escrows", escrow_body).await
+    }
+
+    /// Signal that the payee has started work on an escrow.
+    ///
+    /// Must be called by the payee before the payer can release funds.
+    pub async fn claim_start(&self, escrow_id: &str) -> Result<Escrow, RemitError> {
+        self.post(
+            &format!("/api/v0/escrows/{escrow_id}/claim-start"),
+            json!({}),
+        )
+        .await
     }
 
     /// Release escrow funds to the payee.

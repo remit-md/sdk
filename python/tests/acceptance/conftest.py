@@ -11,7 +11,6 @@ import secrets
 import time
 
 import httpx
-import pytest_asyncio
 
 from remitmd.wallet import Wallet
 

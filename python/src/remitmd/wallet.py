@@ -449,7 +449,8 @@ class Wallet(RemitClient):
                 json={"wallet": self.address, "amount": amount},
             )
             if not resp.is_success:
-                data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+                ct = resp.headers.get("content-type", "")
+                data = resp.json() if ct.startswith("application/json") else {}
                 msg = data.get("message", resp.text) if isinstance(data, dict) else resp.text
                 raise RuntimeError(f"mint failed ({resp.status_code}): {msg}")
             return resp.json()  # type: ignore[no-any-return]

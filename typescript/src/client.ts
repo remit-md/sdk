@@ -2,7 +2,7 @@
  * RemitClient — read-only operations, no private key required.
  */
 
-import type { WalletStatus, Reputation } from "./models/index.js";
+import type { WalletStatus, Reputation, ContractAddresses } from "./models/index.js";
 import type { Invoice } from "./models/invoice.js";
 import type { Escrow } from "./models/escrow.js";
 import type { Tab } from "./models/tab.js";
@@ -31,6 +31,7 @@ export class RemitClient {
   protected readonly _chain: string;
   protected readonly _apiUrl: string;
   protected readonly _chainId: number;
+  #contractsCache: ContractAddresses | null = null;
 
   constructor(options: RemitClientOptions = {}) {
     const { chain = "base", testnet = false, apiUrl } = options;
@@ -80,6 +81,14 @@ export class RemitClient {
 
   getReputation(wallet: string): Promise<Reputation> {
     return this._fetch<Reputation>(`/reputation/${wallet}`);
+  }
+
+  /** Get deployed contract addresses. Cached for the lifetime of this client instance. */
+  async getContracts(): Promise<ContractAddresses> {
+    if (this.#contractsCache) return this.#contractsCache;
+    const contracts = await this._fetch<ContractAddresses>("/contracts");
+    this.#contractsCache = contracts;
+    return contracts;
   }
 
   listBounties(options: { status?: string; limit?: number; poster?: string; submitter?: string } = {}): Promise<Bounty[]> {

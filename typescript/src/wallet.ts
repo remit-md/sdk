@@ -20,11 +20,20 @@ import type { Tab } from "./models/tab.js";
 import type { Stream } from "./models/stream.js";
 import type { Bounty } from "./models/bounty.js";
 import type { Deposit } from "./models/deposit.js";
+/** Default public RPC URLs per chain. */
+const DEFAULT_RPC_URLS: Record<string, string> = {
+  "base-sepolia": "https://sepolia.base.org",
+  base: "https://mainnet.base.org",
+  localhost: "http://127.0.0.1:8545",
+};
+
 export interface WalletOptions extends RemitClientOptions {
   privateKey?: string;
   signer?: Signer;
   /** Router contract address for EIP-712 domain — must match server's ROUTER_ADDRESS. */
   routerAddress?: string;
+  /** JSON-RPC URL for on-chain reads (nonce fetching). Falls back to REMITMD_RPC_URL env var, then public defaults. */
+  rpcUrl?: string;
 }
 
 export interface OpenTabOptions {
@@ -32,6 +41,8 @@ export interface OpenTabOptions {
   limit: number;
   perUnit: number;
   expires?: number; // seconds
+  /** Optional EIP-2612 permit for gasless USDC approval. */
+  permit?: PermitSignature;
 }
 
 export interface OpenStreamOptions {
@@ -39,6 +50,8 @@ export interface OpenStreamOptions {
   rate: number; // per second
   maxDuration?: number; // seconds
   maxTotal?: number;
+  /** Optional EIP-2612 permit for gasless USDC approval. */
+  permit?: PermitSignature;
 }
 
 /** EIP-2612 permit signature for gasless USDC approval. */
@@ -85,9 +98,10 @@ export interface PlaceDepositOptions {
 export class Wallet extends RemitClient {
   readonly #signer: Signer;
   readonly #auth: AuthenticatedClient;
+  readonly #rpcUrl: string;
 
   constructor(options: WalletOptions = {}) {
-    const { privateKey: explicitKey, signer, routerAddress, ...clientOptions } = options;
+    const { privateKey: explicitKey, signer, routerAddress, rpcUrl, ...clientOptions } = options;
 
     const privateKey =
       explicitKey ?? (!signer ? process.env["REMITMD_KEY"] : undefined);
@@ -99,6 +113,8 @@ export class Wallet extends RemitClient {
     }
 
     super(clientOptions);
+
+    this.#rpcUrl = rpcUrl ?? process.env["REMITMD_RPC_URL"] ?? DEFAULT_RPC_URLS[this._chain] ?? DEFAULT_RPC_URLS["base-sepolia"]!;
 
     // Router contract address for EIP-712 domain — falls back to env var.
     const verifyingContract =
@@ -199,9 +215,52 @@ export class Wallet extends RemitClient {
     };
   }
 
+  /**
+   * Convenience: sign an EIP-2612 permit for USDC approval.
+   * Auto-fetches the on-chain nonce and sets a default deadline (1 hour).
+   * @param spender Contract address that will call transferFrom (e.g. Router, Escrow).
+   * @param amount Amount in USDC (e.g. 1.50 for $1.50).
+   * @param deadline Optional Unix timestamp. Defaults to 1 hour from now.
+   */
+  async signPermit(spender: string, amount: number, deadline?: number): Promise<PermitSignature> {
+    const usdcAddress = Wallet.USDC_ADDRESSES[this._chain] ?? "";
+    const nonce = await this.#fetchUsdcNonce(usdcAddress);
+    const dl = deadline ?? Math.floor(Date.now() / 1000) + 3600;
+    const rawAmount = BigInt(Math.round(amount * 1e6));
+    return this.signUsdcPermit({
+      spender,
+      value: rawAmount,
+      deadline: dl,
+      nonce,
+      usdcAddress,
+    });
+  }
+
+  /** Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC. */
+  async #fetchUsdcNonce(usdcAddress: string): Promise<number> {
+    // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
+    const paddedAddress = this.address.toLowerCase().replace("0x", "").padStart(64, "0");
+    const data = `0x7ecebe00${paddedAddress}`;
+
+    const response = await fetch(this.#rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_call",
+        params: [{ to: usdcAddress, data }, "latest"],
+      }),
+    });
+
+    const json = await response.json() as { result?: string; error?: { message: string } };
+    if (json.error) throw new Error(`RPC error fetching nonce: ${json.error.message}`);
+    return parseInt(json.result ?? "0x0", 16);
+  }
+
   // ─── Direct Payment ─────────────────────────────────────────────────────────
 
-  payDirect(to: string, amount: number, memo = ""): Promise<Transaction> {
+  payDirect(to: string, amount: number, memo = "", options?: { permit?: PermitSignature }): Promise<Transaction> {
     return this.#auth.post<Transaction>("/payments/direct", {
       to,
       amount,
@@ -209,12 +268,13 @@ export class Wallet extends RemitClient {
       chain: this._chain,
       nonce: randomBytes(16).toString("hex"),
       signature: "0x",
+      ...(options?.permit ? { permit: options.permit } : {}),
     });
   }
 
   // ─── Escrow ─────────────────────────────────────────────────────────────────
 
-  async pay(invoice: Invoice): Promise<Escrow> {
+  async pay(invoice: Invoice, options?: { permit?: PermitSignature }): Promise<Escrow> {
     // Step 1: create invoice on server.
     const invoiceId = invoice.id || randomBytes(16).toString("hex");
     await this.#auth.post<unknown>("/invoices", {
@@ -230,7 +290,10 @@ export class Wallet extends RemitClient {
       ...(invoice.timeout ? { escrow_timeout: invoice.timeout } : {}),
     });
     // Step 2: fund the escrow and return it.
-    return this.#auth.post<Escrow>("/escrows", { invoice_id: invoiceId });
+    return this.#auth.post<Escrow>("/escrows", {
+      invoice_id: invoiceId,
+      ...(options?.permit ? { permit: options.permit } : {}),
+    });
   }
 
   claimStart(invoiceId: string): Promise<Transaction> {
@@ -265,6 +328,7 @@ export class Wallet extends RemitClient {
       limit_amount: options.limit,
       per_unit: options.perUnit,
       expiry: Math.floor(Date.now() / 1000) + (options.expires ?? 86400),
+      ...(options.permit ? { permit: options.permit } : {}),
     });
   }
 
@@ -284,6 +348,7 @@ export class Wallet extends RemitClient {
       rate: options.rate,
       maxDuration: options.maxDuration ?? 3600,
       maxTotal: options.maxTotal,
+      ...(options.permit ? { permit: options.permit } : {}),
     });
   }
 
@@ -375,8 +440,23 @@ export class Wallet extends RemitClient {
 
   // ─── Testnet ────────────────────────────────────────────────────────────────
 
+  /** @deprecated Use mint() instead. Faucet endpoint returns 410 Gone. */
   requestTestnetFunds(): Promise<Transaction> {
     return this.#auth.post<Transaction>("/faucet", { wallet: this.address });
+  }
+
+  /** Mint testnet USDC via POST /mint. Max $2,500 per call, once per hour per wallet. */
+  async mint(amount: number): Promise<{ tx_hash: string; balance: number }> {
+    const res = await fetch(`${this._apiUrl}/mint`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wallet: this.address, amount }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+      throw new Error(`mint failed (${res.status}): ${(body as Record<string, string>).message ?? res.statusText}`);
+    }
+    return res.json() as Promise<{ tx_hash: string; balance: number }>;
   }
 
   // ─── x402 ───────────────────────────────────────────────────────────────────

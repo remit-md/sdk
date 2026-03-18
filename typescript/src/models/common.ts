@@ -89,3 +89,18 @@ export interface LinkResponse {
   expiresAt: string;
   walletAddress: string;
 }
+
+/** Contract addresses returned by GET /contracts. */
+export interface ContractAddresses {
+  chain_id: number;
+  usdc: string;
+  router: string;
+  escrow: string;
+  tab: string;
+  stream: string;
+  bounty: string;
+  deposit: string;
+  fee_calculator: string;
+  key_registry: string;
+  arbitration: string;
+}

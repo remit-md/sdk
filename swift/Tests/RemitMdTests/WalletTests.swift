@@ -126,23 +126,26 @@ final class WalletTests: XCTestCase {
     // MARK: - Tab lifecycle
 
     func testTabLifecycle() async throws {
-        let tab = try await wallet.openTab(recipient: recipient, limit: 10.0)
+        let tab = try await wallet.openTab(provider: recipient, limitAmount: 10.0, perUnit: 0.10)
         XCTAssertEqual(tab.status, .open)
 
-        let debit = try await wallet.debitTab(id: tab.id, amount: 3.0, memo: "call 1")
-        XCTAssertEqual(debit.amount, 3.0, accuracy: 0.001)
-        XCTAssertEqual(debit.spentAfter, 3.0, accuracy: 0.001)
+        let charge = try await wallet.chargeTab(id: tab.id, amount: 3.0, cumulative: 3.0,
+                                                 callCount: 1, providerSig: "0xdead")
+        XCTAssertEqual(charge.amount, 3.0, accuracy: 0.001)
+        XCTAssertEqual(charge.tabId, tab.id)
 
-        _ = try await wallet.debitTab(id: tab.id, amount: 4.0)
-        let closed = try await wallet.closeTab(id: tab.id)
+        _ = try await wallet.chargeTab(id: tab.id, amount: 4.0, cumulative: 7.0,
+                                        callCount: 2, providerSig: "0xbeef")
+        let closed = try await wallet.closeTab(id: tab.id, finalAmount: 7.0, providerSig: "0xfeed")
         XCTAssertEqual(closed.status, .closed)
         XCTAssertEqual(closed.spent, 7.0, accuracy: 0.001)
     }
 
     func testTabLimitExceeded() async throws {
-        let tab = try await wallet.openTab(recipient: recipient, limit: 5.0)
+        let tab = try await wallet.openTab(provider: recipient, limitAmount: 5.0, perUnit: 0.10)
         do {
-            _ = try await wallet.debitTab(id: tab.id, amount: 6.0)
+            _ = try await wallet.chargeTab(id: tab.id, amount: 6.0, cumulative: 6.0,
+                                            callCount: 1, providerSig: "0xdead")
             XCTFail("expected limit-exceeded error")
         } catch let e as RemitError {
             XCTAssertEqual(e.code, RemitError.tabLimitExceeded)
@@ -152,7 +155,7 @@ final class WalletTests: XCTestCase {
     // MARK: - Stream
 
     func testStream() async throws {
-        let stream = try await wallet.startStream(recipient: recipient, ratePerSecond: 0.001)
+        let stream = try await wallet.startStream(payee: recipient, ratePerSecond: 0.001, maxTotal: 5.0)
         XCTAssertEqual(stream.status, .active)
         XCTAssertEqual(stream.ratePerSecond, 0.001, accuracy: 0.0001)
 
@@ -164,15 +167,19 @@ final class WalletTests: XCTestCase {
     // MARK: - Bounty
 
     func testBountyLifecycle() async throws {
-        let bounty = try await wallet.postBounty(amount: 50.0, description: "Summarize this document")
+        let deadline = Int(Date().timeIntervalSince1970) + 3600
+        let bounty = try await wallet.postBounty(amount: 50.0, taskDescription: "Summarize this document",
+                                                  deadline: deadline)
         XCTAssertEqual(bounty.status, .open)
 
-        let awarded = try await wallet.awardBounty(id: bounty.id, winner: recipient)
+        let sub = try await wallet.submitBounty(id: bounty.id, evidenceHash: "0xdeadbeef")
+        XCTAssertEqual(sub.bountyId, bounty.id)
+
+        let awarded = try await wallet.awardBounty(id: bounty.id, submissionId: sub.id)
         XCTAssertEqual(awarded.status, .awarded)
-        XCTAssertEqual(awarded.winner, recipient)
 
         do {
-            _ = try await wallet.awardBounty(id: bounty.id, winner: other)
+            _ = try await wallet.awardBounty(id: bounty.id, submissionId: 999)
             XCTFail("expected already-awarded error")
         } catch let e as RemitError {
             XCTAssertEqual(e.code, RemitError.bountyAlreadyAwarded)
@@ -182,10 +189,13 @@ final class WalletTests: XCTestCase {
     // MARK: - Deposit
 
     func testDeposit() async throws {
-        let deposit = try await wallet.lockDeposit(recipient: recipient, amount: 25.0, reason: "collateral")
+        let deposit = try await wallet.placeDeposit(provider: recipient, amount: 25.0, expiresIn: 3600)
         XCTAssertEqual(deposit.status, .locked)
         XCTAssertEqual(deposit.amount, 25.0, accuracy: 0.001)
-        XCTAssertEqual(deposit.reason, "collateral")
+
+        let returned = try await wallet.returnDeposit(id: deposit.id)
+        XCTAssertEqual(returned.status, "confirmed")
+        XCTAssertEqual(returned.amount, 25.0, accuracy: 0.001)
     }
 
     // MARK: - Reputation

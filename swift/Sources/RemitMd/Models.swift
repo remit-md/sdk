@@ -264,6 +264,40 @@ public struct Bounty: Codable, Sendable {
     }
 }
 
+public struct BountySubmission: Codable, Sendable {
+    public let id: Int
+    public let bountyId: String
+    public let submitter: String
+    public let evidenceHash: String
+    public let status: String
+    public let submittedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, submitter, status
+        case bountyId = "bounty_id"
+        case evidenceHash = "evidence_hash"
+        case submittedAt = "submitted_at"
+    }
+}
+
+public struct TabCharge: Codable, Sendable {
+    public let id: Int
+    public let tabId: String
+    public let amount: Double
+    public let cumulative: Double
+    public let callCount: Int
+    public let providerSig: String
+    public let chargedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, amount, cumulative
+        case tabId = "tab_id"
+        case callCount = "call_count"
+        case providerSig = "provider_sig"
+        case chargedAt = "charged_at"
+    }
+}
+
 public struct Deposit: Codable, Sendable {
     public let id: String
     public let depositor: String

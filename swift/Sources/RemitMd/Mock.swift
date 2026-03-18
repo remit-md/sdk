@@ -124,7 +124,7 @@ public final class MockRemit: @unchecked Sendable {
             return try cast(handleDebitTab(id: parts[parts.count - 2], body: body))
         }
         if path.hasPrefix("/api/v0/tabs/") && path.hasSuffix("/close") && method == "POST" {
-            return try cast(handleCloseTab(id: parts[parts.count - 2]))
+            return try cast(handleCloseTab(id: parts[parts.count - 2], body: body))
         }
         if path == "/api/v0/streams" && method == "POST" {
             return try cast(handleCreateStream(body: body))
@@ -135,11 +135,17 @@ public final class MockRemit: @unchecked Sendable {
         if path == "/api/v0/bounties" && method == "POST" {
             return try cast(handleCreateBounty(body: body))
         }
+        if path.hasPrefix("/api/v0/bounties/") && path.hasSuffix("/submit") && method == "POST" {
+            return try cast(handleSubmitBounty(id: parts[parts.count - 2], body: body))
+        }
         if path.hasSuffix("/award") && method == "POST" {
             return try cast(handleAwardBounty(id: parts[parts.count - 2], body: body))
         }
         if path == "/api/v0/deposits" && method == "POST" {
             return try cast(handleCreateDeposit(body: body))
+        }
+        if path.hasPrefix("/api/v0/deposits/") && path.hasSuffix("/return") && method == "POST" {
+            return try cast(handleReturnDeposit(id: parts[parts.count - 2]))
         }
         if path.hasPrefix("/api/v0/reputation/") {
             return try cast(handleReputation(address: parts.last ?? walletAddress))
@@ -250,38 +256,38 @@ public final class MockRemit: @unchecked Sendable {
 
     private func handleCreateTab(body: (any Encodable)?) throws -> Tab {
         let b = try jsonDecode(TabBody.self, from: body)
-        try validate(address: b.recipient)
-        try validate(amount: b.limit)
+        try validate(address: b.provider)
+        try validate(amount: b.limit_amount)
         return lock.remitLock {
-            let t = Tab(id: newID("tab"), payer: walletAddress, recipient: b.recipient,
-                        limit: b.limit, spent: 0, currency: "USDC", status: .open, createdAt: Date())
+            let t = Tab(id: newID("tab"), payer: walletAddress, recipient: b.provider,
+                        limit: b.limit_amount, spent: 0, currency: "USDC", status: .open, createdAt: Date())
             _tabs[t.id] = t
             return t
         }
     }
 
-    private func handleDebitTab(id: String, body: (any Encodable)?) throws -> TabDebit {
-        let b = try jsonDecode(DebitBody.self, from: body)
+    private func handleDebitTab(id: String, body: (any Encodable)?) throws -> TabCharge {
+        let b = try jsonDecode(ChargeTabBody.self, from: body)
         try validate(amount: b.amount)
         return try lock.remitLock {
             guard let t = _tabs[id] else { throw RemitError.notFound(RemitError.tabNotFound, id) }
             let newSpent = t.spent + b.amount
             if newSpent > t.limit {
                 throw RemitError(RemitError.tabLimitExceeded,
-                    "debit would bring spent to \(newSpent) USDC, exceeding limit of \(t.limit) USDC")
+                    "charge would bring spent to \(newSpent) USDC, exceeding limit of \(t.limit) USDC")
             }
             let updated = Tab(id: t.id, payer: t.payer, recipient: t.recipient,
                               limit: t.limit, spent: newSpent, currency: t.currency,
                               status: t.status, createdAt: t.createdAt)
             _tabs[id] = updated
-            let debit = TabDebit(tabId: id, debitId: newID("debit"),
-                                 amount: b.amount, memo: b.memo, spentAfter: newSpent)
-            _tabDebits[id, default: []].append(debit)
-            return debit
+            _counter += 1
+            return TabCharge(id: _counter, tabId: id, amount: b.amount,
+                             cumulative: b.cumulative, callCount: b.call_count,
+                             providerSig: b.provider_sig, chargedAt: ISO8601DateFormatter().string(from: Date()))
         }
     }
 
-    private func handleCloseTab(id: String) throws -> Tab {
+    private func handleCloseTab(id: String, body: (any Encodable)?) throws -> Tab {
         return try lock.remitLock {
             guard let t = _tabs[id] else { throw RemitError.notFound(RemitError.tabNotFound, id) }
             let updated = Tab(id: t.id, payer: t.payer, recipient: t.recipient,
@@ -294,13 +300,13 @@ public final class MockRemit: @unchecked Sendable {
 
     private func handleCreateStream(body: (any Encodable)?) throws -> Stream {
         let b = try jsonDecode(StreamBody.self, from: body)
-        try validate(address: b.recipient)
-        guard b.ratePerSecond > 0 else {
+        try validate(address: b.payee)
+        guard b.rate_per_second > 0 else {
             throw RemitError(RemitError.invalidAmount, "rate_per_second must be positive")
         }
         return lock.remitLock {
-            let s = Stream(id: newID("stream"), payer: walletAddress, recipient: b.recipient,
-                           ratePerSecond: b.ratePerSecond, currency: "USDC", status: .active,
+            let s = Stream(id: newID("stream"), payer: walletAddress, recipient: b.payee,
+                           ratePerSecond: b.rate_per_second, currency: "USDC", status: .active,
                            totalStreamed: 0, startedAt: Date(), endedAt: nil)
             _streams[s.id] = s
             return s
@@ -325,22 +331,34 @@ public final class MockRemit: @unchecked Sendable {
         return lock.remitLock {
             let bounty = Bounty(id: newID("bounty"), payer: walletAddress,
                                 amount: b.amount, currency: "USDC",
-                                description: b.description, status: .open,
+                                description: b.task_description, status: .open,
                                 winner: nil, expiresAt: nil, createdAt: Date())
             _bounties[bounty.id] = bounty
             return bounty
         }
     }
 
+    private struct SubmitBountyBody: Codable { let evidence_hash: String }
+
+    private func handleSubmitBounty(id: String, body: (any Encodable)?) throws -> BountySubmission {
+        let b = try jsonDecode(SubmitBountyBody.self, from: body)
+        return try lock.remitLock {
+            guard _bounties[id] != nil else { throw RemitError.notFound(RemitError.bountyNotFound, id) }
+            _counter += 1
+            return BountySubmission(id: _counter, bountyId: id, submitter: walletAddress,
+                                    evidenceHash: b.evidence_hash, status: "pending",
+                                    submittedAt: ISO8601DateFormatter().string(from: Date()))
+        }
+    }
+
     private func handleAwardBounty(id: String, body: (any Encodable)?) throws -> Bounty {
         let b = try jsonDecode(AwardBody.self, from: body)
-        try validate(address: b.winner)
         return try lock.remitLock {
             guard let bounty = _bounties[id] else { throw RemitError.notFound(RemitError.bountyNotFound, id) }
             if bounty.status == .awarded { throw RemitError(RemitError.bountyAlreadyAwarded, "bounty \(id) already awarded") }
             let updated = Bounty(id: bounty.id, payer: bounty.payer, amount: bounty.amount,
                                  currency: bounty.currency, description: bounty.description,
-                                 status: .awarded, winner: b.winner,
+                                 status: .awarded, winner: "submission_\(b.submission_id)",
                                  expiresAt: bounty.expiresAt, createdAt: bounty.createdAt)
             _bounties[id] = updated
             return updated
@@ -349,14 +367,31 @@ public final class MockRemit: @unchecked Sendable {
 
     private func handleCreateDeposit(body: (any Encodable)?) throws -> Deposit {
         let b = try jsonDecode(DepositBody.self, from: body)
-        try validate(address: b.recipient)
+        try validate(address: b.provider)
         try validate(amount: b.amount)
         return lock.remitLock {
-            let d = Deposit(id: newID("dep"), depositor: walletAddress, recipient: b.recipient,
+            let d = Deposit(id: newID("dep"), depositor: walletAddress, recipient: b.provider,
                             amount: b.amount, currency: "USDC", status: .locked,
-                            reason: b.reason, createdAt: Date())
+                            reason: nil, createdAt: Date())
             _deposits[d.id] = d
             return d
+        }
+    }
+
+    private func handleReturnDeposit(id: String) throws -> Transaction {
+        return try lock.remitLock {
+            guard let d = _deposits[id] else { throw RemitError.notFound(RemitError.depositNotFound, id) }
+            let updated = Deposit(id: d.id, depositor: d.depositor, recipient: d.recipient,
+                                  amount: d.amount, currency: d.currency, status: .returned,
+                                  reason: d.reason, createdAt: d.createdAt)
+            _deposits[id] = updated
+            return Transaction(
+                id: newID("tx"), from: d.recipient, to: d.depositor,
+                amount: d.amount, currency: "USDC", status: "confirmed",
+                memo: "deposit returned", blockNumber: 1,
+                txHash: "0x" + String(repeating: "cd", count: 32),
+                createdAt: Date()
+            )
         }
     }
 
@@ -441,18 +476,13 @@ public final class MockRemit: @unchecked Sendable {
 
 private struct PayBody: Codable { let to: String; let amount: Double; let memo: String? }
 private struct EscrowBody: Codable { let recipient: String; let amount: Double; let conditions: String? }
-private struct TabBody: Codable { let recipient: String; let limit: Double }
-private struct DebitBody: Codable { let amount: Double; let memo: String? }
-private struct StreamBody: Codable {
-    let recipient: String; let ratePerSecond: Double
-    enum CodingKeys: String, CodingKey {
-        case recipient
-        case ratePerSecond = "rate_per_second"
-    }
-}
-private struct BountyBody: Codable { let amount: Double; let description: String }
-private struct AwardBody: Codable { let winner: String }
-private struct DepositBody: Codable { let recipient: String; let amount: Double; let reason: String? }
+private struct TabBody: Codable { let provider: String; let limit_amount: Double; let per_unit: Double?; let expiry: Int? }
+private struct ChargeTabBody: Codable { let amount: Double; let cumulative: Double; let call_count: Int; let provider_sig: String }
+private struct CloseTabBody: Codable { let final_amount: Double?; let provider_sig: String? }
+private struct StreamBody: Codable { let payee: String; let rate_per_second: Double; let max_total: Double? }
+private struct BountyBody: Codable { let amount: Double; let task_description: String; let deadline: Int?; let max_attempts: Int? }
+private struct AwardBody: Codable { let submission_id: Int }
+private struct DepositBody: Codable { let provider: String; let amount: Double; let expiry: Int? }
 private struct IntentBody: Codable { let to: String; let amount: Double; let model: String }
 
 extension NSLock {

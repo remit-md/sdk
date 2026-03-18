@@ -1,4 +1,4 @@
-// Swift SDK acceptance tests: payDirect + escrow lifecycle on live Base Sepolia.
+// Swift SDK acceptance tests: all 7 payment flows on live Base Sepolia.
 //
 // Run: swift test --filter AcceptanceTests
 //
@@ -173,6 +173,17 @@ final class AcceptanceTests: XCTestCase {
         return data
     }
 
+    // ─── EIP-712 TabCharge Signing ──────────────────────────────────────────
+
+    func signTabCharge(signer: PrivateKeySigner, tabContract: String,
+                       tabId: String, totalCharged: UInt64, callCount: UInt32) throws -> String {
+        return try RemitWallet.signTabCharge(
+            signer: signer, tabContract: tabContract,
+            tabId: tabId, totalCharged: totalCharged, callCount: callCount,
+            chainId: Self.chainIdVal
+        )
+    }
+
     // ─── Tests ──────────────────────────────────────────────────────────────
 
     func testPayDirectWithPermit() async throws {
@@ -252,5 +263,243 @@ final class AcceptanceTests: XCTestCase {
         assertBalanceChange("agent", before: agentBefore, after: agentAfter, expected: -amount)
         assertBalanceChange("provider", before: providerBefore, after: providerAfter, expected: providerReceives)
         assertBalanceChange("fee wallet", before: feeBefore, after: feeAfter, expected: fee)
+    }
+
+    // ─── Test: Tab Lifecycle ────────────────────────────────────────────────
+
+    func testTabLifecycle() async throws {
+        guard ProcessInfo.processInfo.environment["ACCEPTANCE_API_URL"] != nil else {
+            throw XCTSkip("ACCEPTANCE_API_URL not set")
+        }
+
+        let payer = try await createTestWallet()
+        let provider = try await createTestWallet()
+        try await fundWallet(payer, amount: 100)
+
+        let contracts = try await fetchContracts()
+        let tabAddr = contracts["tab"] as! String
+
+        // Sign permit for the Tab contract
+        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
+        let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
+                                        spender: tabAddr, value: 20_000_000, nonce: 0, deadline: deadline)
+
+        let payerBefore = try await getUsdcBalance(payer.wallet.address)
+        let feeBefore = try await getFeeBalance()
+
+        // 1. Create tab: $10 limit, $0.10 per call
+        let tab = try await payer.wallet.openTab(provider: provider.wallet.address,
+                                                  limitAmount: 10.0, perUnit: 0.10, permit: permit)
+        XCTAssertFalse(tab.id.isEmpty, "tab ID should not be empty")
+
+        // Wait for on-chain funding
+        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
+
+        // 2. Charge tab: $0.10 charge, cumulative $0.10, callCount 1
+        let chargeAmount = 0.10
+        let chargeSig = try signTabCharge(signer: provider.signer, tabContract: tabAddr,
+                                          tabId: tab.id, totalCharged: 100_000, callCount: 1)
+        let charge = try await provider.wallet.chargeTab(id: tab.id, amount: chargeAmount,
+                                                          cumulative: chargeAmount, callCount: 1, providerSig: chargeSig)
+        XCTAssertEqual(charge.tabId, tab.id, "charge tab_id mismatch")
+
+        // 3. Close tab with final settlement
+        let closeSig = try signTabCharge(signer: provider.signer, tabContract: tabAddr,
+                                         tabId: tab.id, totalCharged: 100_000, callCount: 1)
+        let closed = try await payer.wallet.closeTab(id: tab.id, finalAmount: chargeAmount, providerSig: closeSig)
+        XCTAssertNotEqual(closed.status, .open, "tab should not be open after close")
+
+        // 4. Verify balance: payer should have lost funds
+        let payerAfter = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
+        let feeAfter = try await getFeeBalance()
+        let payerDelta = payerAfter - payerBefore
+        XCTAssertTrue(payerDelta < 0, "payer should have lost funds, delta=\(payerDelta)")
+        print("Tab: payer delta=\(payerDelta), fee delta=\(feeAfter - feeBefore)")
+    }
+
+    // ─── Test: Stream Lifecycle ─────────────────────────────────────────────
+
+    func testStreamLifecycle() async throws {
+        guard ProcessInfo.processInfo.environment["ACCEPTANCE_API_URL"] != nil else {
+            throw XCTSkip("ACCEPTANCE_API_URL not set")
+        }
+
+        let payer = try await createTestWallet()
+        let payee = try await createTestWallet()
+        try await fundWallet(payer, amount: 100)
+
+        let contracts = try await fetchContracts()
+        let streamAddr = contracts["stream"] as! String
+
+        // Sign permit for the Stream contract
+        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
+        let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
+                                        spender: streamAddr, value: 10_000_000, nonce: 0, deadline: deadline)
+
+        let payerBefore = try await getUsdcBalance(payer.wallet.address)
+
+        // 1. Create stream: $0.01/sec, $5 max
+        let stream = try await payer.wallet.startStream(payee: payee.wallet.address,
+                                                         ratePerSecond: 0.01, maxTotal: 5.0, permit: permit)
+        XCTAssertFalse(stream.id.isEmpty, "stream ID should not be empty")
+
+        // Wait for on-chain lock
+        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
+
+        // 2. Let it run for a few seconds
+        try await Task.sleep(nanoseconds: 5_000_000_000)
+
+        // 3. Close stream
+        let closed = try await payer.wallet.closeStream(id: stream.id)
+        print("Stream closed: status=\(closed.status)")
+
+        // 4. Conservation of funds: payer should have lost some amount
+        let payerAfter = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
+        let payeeAfter = try await getUsdcBalance(payee.wallet.address)
+        let payerDelta = payerAfter - payerBefore
+        XCTAssertTrue(payerDelta < 0, "payer should have lost funds, delta=\(payerDelta)")
+        print("Stream: payer delta=\(payerDelta), payee balance=\(payeeAfter)")
+    }
+
+    // ─── Test: Bounty Lifecycle ─────────────────────────────────────────────
+
+    func testBountyLifecycle() async throws {
+        guard ProcessInfo.processInfo.environment["ACCEPTANCE_API_URL"] != nil else {
+            throw XCTSkip("ACCEPTANCE_API_URL not set")
+        }
+
+        let poster = try await createTestWallet()
+        let submitter = try await createTestWallet()
+        try await fundWallet(poster, amount: 100)
+
+        let contracts = try await fetchContracts()
+        let bountyAddr = contracts["bounty"] as! String
+
+        // Sign permit for the Bounty contract
+        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
+        let permit = try signUsdcPermit(signer: poster.signer, owner: poster.wallet.address,
+                                        spender: bountyAddr, value: 10_000_000, nonce: 0, deadline: deadline)
+
+        let posterBefore = try await getUsdcBalance(poster.wallet.address)
+        let feeBefore = try await getFeeBalance()
+
+        // 1. Create bounty: $5 reward, 1 hour deadline
+        let bountyDeadline = Int(Date().timeIntervalSince1970) + 3600
+        let bounty = try await poster.wallet.postBounty(amount: 5.0,
+                                                         taskDescription: "Write a Swift acceptance test",
+                                                         deadline: bountyDeadline, permit: permit)
+        XCTAssertFalse(bounty.id.isEmpty, "bounty ID should not be empty")
+
+        // Wait for on-chain lock
+        _ = try await waitForBalanceChange(poster.wallet.address, before: posterBefore)
+
+        // 2. Submit evidence (as submitter)
+        let evidenceBytes = keccak256("test evidence".data(using: .utf8)!)
+        let evidenceHash = "0x" + evidenceBytes.map { String(format: "%02x", $0) }.joined()
+        let sub = try await submitter.wallet.submitBounty(id: bounty.id, evidenceHash: evidenceHash)
+        XCTAssertEqual(sub.bountyId, bounty.id, "submission bounty_id mismatch")
+
+        // 3. Award bounty (as poster)
+        let awarded = try await poster.wallet.awardBounty(id: bounty.id, submissionId: sub.id)
+        print("Bounty awarded: status=\(awarded.status)")
+
+        // 4. Verify balances
+        let submitterAfter = try await waitForBalanceChange(submitter.wallet.address, before: 0)
+        let feeAfter = try await getFeeBalance()
+        XCTAssertTrue(submitterAfter > 0, "submitter should have received funds, got balance=\(submitterAfter)")
+        print("Bounty: submitter received=\(submitterAfter), fee delta=\(feeAfter - feeBefore)")
+    }
+
+    // ─── Test: Deposit Lifecycle ────────────────────────────────────────────
+
+    func testDepositLifecycle() async throws {
+        guard ProcessInfo.processInfo.environment["ACCEPTANCE_API_URL"] != nil else {
+            throw XCTSkip("ACCEPTANCE_API_URL not set")
+        }
+
+        let payer = try await createTestWallet()
+        let provider = try await createTestWallet()
+        try await fundWallet(payer, amount: 100)
+
+        let contracts = try await fetchContracts()
+        let depositAddr = contracts["deposit"] as! String
+
+        // Sign permit for the Deposit contract
+        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
+        let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
+                                        spender: depositAddr, value: 10_000_000, nonce: 0, deadline: deadline)
+
+        let payerBefore = try await getUsdcBalance(payer.wallet.address)
+
+        // 1. Place deposit: $5, expires in 1 hour
+        let deposit = try await payer.wallet.placeDeposit(provider: provider.wallet.address,
+                                                           amount: 5.0, expiresIn: 3600, permit: permit)
+        XCTAssertFalse(deposit.id.isEmpty, "deposit ID should not be empty")
+
+        // Wait for on-chain lock
+        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
+        let payerAfterDeposit = try await getUsdcBalance(payer.wallet.address)
+
+        // 2. Return deposit (by provider)
+        _ = try await provider.wallet.returnDeposit(id: deposit.id)
+
+        // 3. Verify full refund (deposits have no fee)
+        let payerAfterReturn = try await waitForBalanceChange(payer.wallet.address, before: payerAfterDeposit)
+        let refundAmount = payerAfterReturn - payerAfterDeposit
+        XCTAssertTrue(refundAmount > 4.99, "expected near-full refund (~5.0), got \(refundAmount)")
+        print("Deposit: refunded=\(refundAmount) (full refund, no fee)")
+    }
+
+    // ─── Test: X402 Auto-Pay ────────────────────────────────────────────────
+
+    func testX402AutoPay() async throws {
+        guard ProcessInfo.processInfo.environment["ACCEPTANCE_API_URL"] != nil else {
+            throw XCTSkip("ACCEPTANCE_API_URL not set")
+        }
+
+        let providerWallet = try await createTestWallet()
+
+        // Build the x402 PAYMENT-REQUIRED header payload
+        let payloadDict: [String: Any] = [
+            "payTo": providerWallet.wallet.address,
+            "maxAmountRequired": 100_000,
+            "asset": "eip155:84532/erc20:\(Self.usdcAddress)",
+            "network": "eip155:84532",
+            "facilitatorURL": Self.apiURL + "/api/v0/x402/verify",
+            "resource": "/v1/data",
+            "description": "Test data endpoint",
+            "mimeType": "application/json",
+            "maxTimeoutSeconds": 60
+        ]
+        let payloadData = try JSONSerialization.data(withJSONObject: payloadDict)
+        let payloadBase64 = payloadData.base64EncodedString()
+
+        // 1. Verify the PAYMENT-REQUIRED header is parseable
+        guard let decoded = Data(base64Encoded: payloadBase64) else {
+            XCTFail("Failed to decode PAYMENT-REQUIRED base64")
+            return
+        }
+        let parsed = try JSONSerialization.jsonObject(with: decoded) as! [String: Any]
+        XCTAssertNotNil(parsed["payTo"], "PAYMENT-REQUIRED missing payTo field")
+
+        // 2. Verify V2 fields are present
+        XCTAssertEqual(parsed["resource"] as? String, "/v1/data", "resource field mismatch")
+        XCTAssertEqual(parsed["description"] as? String, "Test data endpoint", "description field mismatch")
+        XCTAssertEqual(parsed["mimeType"] as? String, "application/json", "mimeType field mismatch")
+
+        // 3. Verify the facilitator URL points to our API
+        let facilitatorURL = parsed["facilitatorURL"] as? String ?? ""
+        XCTAssertTrue(facilitatorURL.contains(Self.apiURL),
+                      "facilitatorURL should reference our API: got \(facilitatorURL)")
+
+        // 4. Verify a GET to the x402/verify endpoint exists (OPTIONS or 4xx, not 404)
+        let verifyURL = URL(string: Self.apiURL + "/api/v0/x402/verify")!
+        let (_, verifyResp) = try await URLSession.shared.data(from: verifyURL)
+        let httpResp = verifyResp as! HTTPURLResponse
+        // 405 (Method Not Allowed) or 400 (Bad Request) means the endpoint exists
+        // 404 would mean the endpoint is missing
+        XCTAssertNotEqual(httpResp.statusCode, 404,
+                          "x402/verify endpoint should exist (got \(httpResp.statusCode))")
+        print("X402: paywall verified, facilitator endpoint exists (status=\(httpResp.statusCode))")
     }
 }

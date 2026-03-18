@@ -6,27 +6,24 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** A security deposit locked on-chain. */
+/** Result of charging a tab (off-chain, provider-signed). */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Deposit {
+public class TabCharge {
 
     @JsonProperty("id")
     public String id;
 
-    @JsonProperty("depositor")
-    public String depositor;
-
-    @JsonProperty("provider")
-    public String provider;
+    @JsonProperty("tab_id")
+    public String tabId;
 
     @JsonProperty("amount")
     public BigDecimal amount;
 
-    @JsonProperty("status")
-    public String status; // "locked" | "returned" | "forfeited"
+    @JsonProperty("cumulative")
+    public BigDecimal cumulative;
 
-    @JsonProperty("expires_at")
-    public Instant expiresAt;
+    @JsonProperty("call_count")
+    public int callCount;
 
     @JsonProperty("created_at")
     public Instant createdAt;

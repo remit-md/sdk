@@ -16,11 +16,11 @@ public class Bounty {
     @JsonProperty("poster")
     public String poster;
 
-    @JsonProperty("award")
-    public BigDecimal award;
+    @JsonProperty("amount")
+    public BigDecimal amount;
 
-    @JsonProperty("description")
-    public String description;
+    @JsonProperty("task_description")
+    public String taskDescription;
 
     @JsonProperty("status")
     public String status; // "open" | "awarded" | "expired"

@@ -151,34 +151,34 @@ class WalletTest {
     // ─── Tab ──────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("createTab + debitTab + settleTab lifecycle")
+    @DisplayName("createTab + chargeTab + closeTab lifecycle")
     void testTabLifecycle() {
         String service = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-        Tab tab = wallet.createTab(service, BigDecimal.valueOf(10.00));
+        Tab tab = wallet.createTab(service, BigDecimal.valueOf(10.00), BigDecimal.valueOf(0.1));
 
         assertThat(tab.id).startsWith("tab_");
         assertThat(tab.status).isEqualTo("open");
-        assertThat(tab.used).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(tab.totalCharged).isEqualByComparingTo(BigDecimal.ZERO);
 
-        // Debit twice
-        TabDebit d1 = wallet.debitTab(tab.id, BigDecimal.valueOf(0.003), "API call 1");
-        assertThat(d1.cumulative).isEqualByComparingTo(BigDecimal.valueOf(0.003));
+        // Charge twice
+        TabCharge c1 = wallet.chargeTab(tab.id, BigDecimal.valueOf(0.003), BigDecimal.valueOf(0.003), 1, "0x");
+        assertThat(c1.cumulative).isEqualByComparingTo(BigDecimal.valueOf(0.003));
 
-        TabDebit d2 = wallet.debitTab(tab.id, BigDecimal.valueOf(0.003), "API call 2");
-        assertThat(d2.cumulative).isEqualByComparingTo(BigDecimal.valueOf(0.006));
+        TabCharge c2 = wallet.chargeTab(tab.id, BigDecimal.valueOf(0.003), BigDecimal.valueOf(0.006), 2, "0x");
+        assertThat(c2.cumulative).isEqualByComparingTo(BigDecimal.valueOf(0.006));
 
-        // Settle
-        Transaction tx = wallet.settleTab(tab.id);
-        assertThat(tx.amount).isEqualByComparingTo(BigDecimal.valueOf(0.006));
+        // Close
+        Tab closed = wallet.closeTab(tab.id, BigDecimal.valueOf(0.006), "0x");
+        assertThat(closed.status).isEqualTo("closed");
     }
 
     @Test
-    @DisplayName("debitTab throws TAB_LIMIT_EXCEEDED when over limit")
+    @DisplayName("chargeTab throws TAB_LIMIT_EXCEEDED when over limit")
     void testTabLimitExceeded() {
         String service = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-        Tab tab = wallet.createTab(service, BigDecimal.valueOf(1.00));
+        Tab tab = wallet.createTab(service, BigDecimal.valueOf(1.00), BigDecimal.valueOf(0.1));
 
-        assertThatThrownBy(() -> wallet.debitTab(tab.id, BigDecimal.valueOf(2.00), "too much"))
+        assertThatThrownBy(() -> wallet.chargeTab(tab.id, BigDecimal.valueOf(2.00), BigDecimal.valueOf(2.00), 1, "0x"))
             .isInstanceOf(RemitError.class)
             .extracting(e -> ((RemitError) e).getCode())
             .isEqualTo(ErrorCodes.TAB_LIMIT_EXCEEDED);
@@ -187,18 +187,20 @@ class WalletTest {
     // ─── Bounty ───────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("createBounty + awardBounty lifecycle")
+    @DisplayName("createBounty + submitBounty + awardBounty lifecycle")
     void testBountyLifecycle() {
-        Bounty bounty = wallet.createBounty(BigDecimal.valueOf(25.00), "Summarize this research paper");
+        long deadline = java.time.Instant.now().getEpochSecond() + 3600;
+        Bounty bounty = wallet.createBounty(BigDecimal.valueOf(25.00), "Summarize this research paper", deadline);
 
         assertThat(bounty.id).startsWith("bty_");
         assertThat(bounty.status).isEqualTo("open");
-        assertThat(bounty.award).isEqualByComparingTo(BigDecimal.valueOf(25.00));
+        assertThat(bounty.amount).isEqualByComparingTo(BigDecimal.valueOf(25.00));
 
-        String winner = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-        Transaction tx = wallet.awardBounty(bounty.id, winner);
-        assertThat(tx.to).isEqualToIgnoringCase(winner);
-        assertThat(tx.amount).isEqualByComparingTo(BigDecimal.valueOf(25.00));
+        BountySubmission sub = wallet.submitBounty(bounty.id, "0x" + "ab".repeat(32));
+        assertThat(sub.id).isGreaterThan(0);
+
+        Bounty awarded = wallet.awardBounty(bounty.id, sub.id);
+        assertThat(awarded.status).isEqualTo("awarded");
     }
 
     // ─── Reset ────────────────────────────────────────────────────────────────

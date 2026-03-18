@@ -64,7 +64,8 @@ fun Wallet.escrow(payee: String, amount: BigDecimal, configure: EscrowConfig.() 
 
 /** Configuration block for [Wallet.createTab]. */
 class TabConfig {
-    var expiresIn: Duration? = null
+    var perUnit: BigDecimal = BigDecimal.valueOf(0.1)
+    var expiresInSeconds: Int = 86400
 }
 
 /**
@@ -72,20 +73,22 @@ class TabConfig {
  *
  * ```kotlin
  * val tab = wallet.tab("0xService...", 50.00.usdc) {
- *     expiresIn = Duration.ofHours(24)
+ *     perUnit = 0.05.usdc
+ *     expiresInSeconds = 3600
  * }
  * ```
  */
-fun Wallet.tab(counterpart: String, limit: BigDecimal, configure: TabConfig.() -> Unit = {}): Tab {
+fun Wallet.tab(provider: String, limitAmount: BigDecimal, configure: TabConfig.() -> Unit = {}): Tab {
     val cfg = TabConfig().apply(configure)
-    return createTab(counterpart, limit, cfg.expiresIn)
+    return createTab(provider, limitAmount, cfg.perUnit, cfg.expiresInSeconds)
 }
 
 // ─── Bounty DSL ───────────────────────────────────────────────────────────────
 
 /** Configuration block for [Wallet.createBounty]. */
 class BountyConfig {
-    var expiresIn: Duration? = null
+    var deadline: Long = java.time.Instant.now().epochSecond + 86400
+    var maxAttempts: Int = 10
 }
 
 /**
@@ -93,13 +96,13 @@ class BountyConfig {
  *
  * ```kotlin
  * val bounty = wallet.bounty(25.00.usdc, "Summarize this research paper") {
- *     expiresIn = Duration.ofDays(3)
+ *     deadline = Instant.now().epochSecond + 7200
  * }
  * ```
  */
-fun Wallet.bounty(award: BigDecimal, description: String, configure: BountyConfig.() -> Unit = {}): Bounty {
+fun Wallet.bounty(amount: BigDecimal, taskDescription: String, configure: BountyConfig.() -> Unit = {}): Bounty {
     val cfg = BountyConfig().apply(configure)
-    return createBounty(award, description, cfg.expiresIn)
+    return createBounty(amount, taskDescription, cfg.deadline, cfg.maxAttempts, null)
 }
 
 // ─── Suspension wrappers (coroutines-friendly) ────────────────────────────────

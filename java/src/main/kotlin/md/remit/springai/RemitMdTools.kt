@@ -80,52 +80,64 @@ class RemitMdTools(private val wallet: Wallet) {
     @Tool(name = "remitmd_create_tab", description = """
         Open a payment channel for recurring micro-payments to a service.
         Cheaper than individual payments for high-frequency calls (e.g., API calls priced per use).
-        Settle the tab when done to finalize charges on-chain.
+        Close the tab when done to finalize charges on-chain.
     """)
     fun createTab(
         @ToolParam(description = "Ethereum address of the service provider")
-        counterpart: String,
+        provider: String,
         @ToolParam(description = "Maximum USDC that can be charged through this tab")
-        limit: BigDecimal
-    ): Tab = wallet.createTab(counterpart, limit)
+        limitAmount: BigDecimal,
+        @ToolParam(description = "Price per unit of work in USDC")
+        perUnit: BigDecimal
+    ): Tab = wallet.createTab(provider, limitAmount, perUnit)
 
-    @Tool(name = "remitmd_debit_tab", description = """
-        Charge an amount against an open tab for a service call.
+    @Tool(name = "remitmd_charge_tab", description = """
+        Charge an amount against an open tab with a provider signature.
         Use after each API call or task to record the charge.
     """)
-    fun debitTab(
+    fun chargeTab(
         @ToolParam(description = "The tab ID to charge")
         tabId: String,
         @ToolParam(description = "Amount in USDC to charge")
         amount: BigDecimal,
-        @ToolParam(description = "Description of what was charged for")
-        memo: String
-    ): TabDebit = wallet.debitTab(tabId, amount, memo)
+        @ToolParam(description = "Cumulative charged amount")
+        cumulative: BigDecimal,
+        @ToolParam(description = "Call count")
+        callCount: Int,
+        @ToolParam(description = "Provider EIP-712 signature")
+        providerSig: String
+    ): TabCharge = wallet.chargeTab(tabId, amount, cumulative, callCount, providerSig)
 
-    @Tool(name = "remitmd_settle_tab", description = "Close a tab and settle all charges on-chain.")
-    fun settleTab(
-        @ToolParam(description = "The tab ID to settle")
-        tabId: String
-    ): Transaction = wallet.settleTab(tabId)
+    @Tool(name = "remitmd_close_tab", description = "Close a tab and settle all charges on-chain.")
+    fun closeTab(
+        @ToolParam(description = "The tab ID to close")
+        tabId: String,
+        @ToolParam(description = "Final charged amount")
+        finalAmount: BigDecimal,
+        @ToolParam(description = "Provider EIP-712 signature for the final state")
+        providerSig: String
+    ): Tab = wallet.closeTab(tabId, finalAmount, providerSig)
 
     @Tool(name = "remitmd_create_bounty", description = """
         Post a USDC bounty for a task that any agent can claim.
         Any agent can submit work and you award the bounty to the best submission.
     """)
     fun createBounty(
-        @ToolParam(description = "USDC amount awarded to the winner")
-        award: BigDecimal,
+        @ToolParam(description = "USDC amount for the bounty")
+        amount: BigDecimal,
         @ToolParam(description = "Clear description of the task and success criteria")
-        description: String
-    ): Bounty = wallet.createBounty(award, description)
+        taskDescription: String,
+        @ToolParam(description = "Deadline as unix timestamp (epoch seconds)")
+        deadline: Long
+    ): Bounty = wallet.createBounty(amount, taskDescription, deadline)
 
-    @Tool(name = "remitmd_award_bounty", description = "Award a bounty to the agent who completed the task.")
+    @Tool(name = "remitmd_award_bounty", description = "Award a bounty to a specific submission.")
     fun awardBounty(
         @ToolParam(description = "The bounty ID to award")
         bountyId: String,
-        @ToolParam(description = "Ethereum address of the winner")
-        winner: String
-    ): Transaction = wallet.awardBounty(bountyId, winner)
+        @ToolParam(description = "ID of the submission to award")
+        submissionId: Int
+    ): Bounty = wallet.awardBounty(bountyId, submissionId)
 
     @Tool(name = "remitmd_balance", description = "Check your current USDC balance.")
     fun balance(): Balance = wallet.balance()

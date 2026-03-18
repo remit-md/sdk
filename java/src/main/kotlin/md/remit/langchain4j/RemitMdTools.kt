@@ -66,45 +66,53 @@ class RemitMdTools(private val wallet: Wallet) {
 
     @Tool("Open a payment channel (tab) for micro-payments to a service. Cheaper for high-frequency calls.")
     fun openTab(
-        @P("Service provider address") counterpart: String,
-        @P("Maximum USDC allowed on this tab") limit: BigDecimal
+        @P("Service provider address") provider: String,
+        @P("Maximum USDC allowed on this tab") limitAmount: BigDecimal,
+        @P("Price per unit of work") perUnit: BigDecimal
     ): String {
-        val t = wallet.createTab(counterpart, limit)
-        return "Tab opened: ${t.id} — limit ${t.limit} USDC with ${t.counterpart}"
+        val t = wallet.createTab(provider, limitAmount, perUnit)
+        return "Tab opened: ${t.id} — limit ${t.limitAmount} USDC with ${t.provider}"
     }
 
-    @Tool("Charge a tab for a service call. Use after each API call or micro-service invocation.")
+    @Tool("Charge a tab with a provider signature. Use after each API call or micro-service invocation.")
     fun chargeTab(
         @P("Tab ID to charge") tabId: String,
         @P("USDC amount to charge") amount: BigDecimal,
-        @P("What you were charged for") memo: String
+        @P("Cumulative amount charged") cumulative: BigDecimal,
+        @P("Call count") callCount: Int,
+        @P("Provider EIP-712 signature") providerSig: String
     ): String {
-        val d = wallet.debitTab(tabId, amount, memo)
-        return "Tab charged: ${d.amount} USDC (cumulative: ${d.cumulative} USDC)"
+        val c = wallet.chargeTab(tabId, amount, cumulative, callCount, providerSig)
+        return "Tab charged: ${c.amount} USDC (cumulative: ${c.cumulative} USDC)"
     }
 
-    @Tool("Settle and close a tab, finalizing all charges on-chain.")
-    fun settleTab(@P("Tab ID to settle") tabId: String): String {
-        val tx = wallet.settleTab(tabId)
-        return "Tab settled: ${tx.amount} USDC finalized on-chain (tx: ${tx.txHash})"
+    @Tool("Close a tab and settle all charges on-chain.")
+    fun closeTab(
+        @P("Tab ID to close") tabId: String,
+        @P("Final charged amount") finalAmount: BigDecimal,
+        @P("Provider EIP-712 signature") providerSig: String
+    ): String {
+        val t = wallet.closeTab(tabId, finalAmount, providerSig)
+        return "Tab closed: ${t.totalCharged} USDC finalized on-chain (tx: ${t.closedTxHash})"
     }
 
     @Tool("Post a USDC bounty that any agent can claim by completing the task.")
     fun postBounty(
-        @P("USDC award for completion") award: BigDecimal,
-        @P("Clear description of the task and acceptance criteria") description: String
+        @P("USDC amount for the bounty") amount: BigDecimal,
+        @P("Clear description of the task and acceptance criteria") taskDescription: String,
+        @P("Deadline as unix timestamp") deadline: Long
     ): String {
-        val b = wallet.createBounty(award, description)
-        return "Bounty posted: ${b.id} — ${b.award} USDC for: ${b.description}"
+        val b = wallet.createBounty(amount, taskDescription, deadline)
+        return "Bounty posted: ${b.id} — ${b.amount} USDC for: ${b.taskDescription}"
     }
 
-    @Tool("Award a bounty to the agent who completed the task.")
+    @Tool("Award a bounty to a specific submission.")
     fun awardBounty(
         @P("Bounty ID to award") bountyId: String,
-        @P("Winner's Ethereum address") winner: String
+        @P("Submission ID to award") submissionId: Int
     ): String {
-        val tx = wallet.awardBounty(bountyId, winner)
-        return "Bounty awarded: ${tx.amount} USDC sent to ${winner}"
+        val b = wallet.awardBounty(bountyId, submissionId)
+        return "Bounty awarded: ${b.amount} USDC (status: ${b.status})"
     }
 
     @Tool("Check your current USDC wallet balance.")

@@ -227,93 +227,160 @@ public class MockRemit {
         return e;
     }
 
-    Tab mockCreateTab(String counterpart, BigDecimal limit) {
+    Tab mockCreateTab(String provider, BigDecimal limitAmount) {
         Tab t = new Tab();
         t.id = "tab_" + counter.incrementAndGet();
         t.opener = MOCK_ADDRESS;
-        t.counterpart = counterpart;
-        t.limit = limit;
-        t.used = BigDecimal.ZERO;
+        t.provider = provider;
+        t.limitAmount = limitAmount;
+        t.totalCharged = BigDecimal.ZERO;
         t.status = "open";
         t.createdAt = Instant.now();
         tabs.put(t.id, t);
         return t;
     }
 
-    TabDebit mockDebitTab(String tabId, BigDecimal amount, String memo) {
+    TabCharge mockChargeTab(String tabId, BigDecimal amount, BigDecimal cumulative, int callCount) {
         Tab t = tabs.get(tabId);
         if (t == null) {
             throw new RemitError(ErrorCodes.TAB_NOT_FOUND, "Tab \"" + tabId + "\" not found.",
                 Map.of("tab_id", tabId));
         }
-        BigDecimal newUsed = t.used.add(amount);
-        if (newUsed.compareTo(t.limit) > 0) {
+        if (cumulative.compareTo(t.limitAmount) > 0) {
             throw new RemitError(ErrorCodes.TAB_LIMIT_EXCEEDED,
-                "Tab debit of " + amount + " USDC would exceed tab limit of " + t.limit + " USDC. " +
-                "Used so far: " + t.used + " USDC.",
-                Map.of("limit", t.limit.toPlainString(), "used", t.used.toPlainString(), "requested", amount.toPlainString())
+                "Tab charge of " + amount + " USDC would exceed tab limit of " + t.limitAmount + " USDC.",
+                Map.of("limit", t.limitAmount.toPlainString(), "requested", amount.toPlainString())
             );
         }
-        t.used = newUsed;
-        TabDebit debit = new TabDebit();
-        debit.id = "dbt_" + counter.incrementAndGet();
-        debit.tabId = tabId;
-        debit.amount = amount;
-        debit.memo = memo;
-        debit.cumulative = newUsed;
-        debit.createdAt = Instant.now();
-        return debit;
+        t.totalCharged = cumulative;
+        TabCharge charge = new TabCharge();
+        charge.id = "chg_" + counter.incrementAndGet();
+        charge.tabId = tabId;
+        charge.amount = amount;
+        charge.cumulative = cumulative;
+        charge.callCount = callCount;
+        charge.createdAt = Instant.now();
+        return charge;
     }
 
-    Transaction mockSettleTab(String tabId) {
+    Tab mockCloseTab(String tabId) {
         Tab t = tabs.get(tabId);
         if (t == null) {
             throw new RemitError(ErrorCodes.TAB_NOT_FOUND, "Tab \"" + tabId + "\" not found.",
                 Map.of("tab_id", tabId));
         }
-        t.status = "settled";
+        t.status = "closed";
+        t.closedTxHash = "0x" + "d".repeat(64);
         Transaction tx = new Transaction();
         tx.id = "tx_" + counter.incrementAndGet();
-        tx.txHash = "0x" + "d".repeat(64);
+        tx.txHash = t.closedTxHash;
         tx.from = t.opener;
-        tx.to = t.counterpart;
-        tx.amount = t.used;
+        tx.to = t.provider;
+        tx.amount = t.totalCharged;
         tx.chainId = MOCK_CHAIN_ID;
         tx.createdAt = Instant.now();
         transactions.add(tx);
-        return tx;
+        return t;
     }
 
-    Bounty mockCreateBounty(BigDecimal award, String description) {
+    Bounty mockCreateBounty(BigDecimal amount, String taskDescription) {
         Bounty b = new Bounty();
         b.id = "bty_" + counter.incrementAndGet();
         b.poster = MOCK_ADDRESS;
-        b.award = award;
-        b.description = description;
+        b.amount = amount;
+        b.taskDescription = taskDescription;
         b.status = "open";
         b.createdAt = Instant.now();
         bounties.put(b.id, b);
         return b;
     }
 
-    Transaction mockAwardBounty(String bountyId, String winner) {
+    BountySubmission mockSubmitBounty(String bountyId, String evidenceHash) {
+        Bounty b = bounties.get(bountyId);
+        if (b == null) {
+            throw new RemitError(ErrorCodes.BOUNTY_NOT_FOUND, "Bounty \"" + bountyId + "\" not found.",
+                Map.of("bounty_id", bountyId));
+        }
+        BountySubmission sub = new BountySubmission();
+        sub.id = (int) counter.incrementAndGet();
+        sub.bountyId = bountyId;
+        sub.submitter = MOCK_ADDRESS;
+        return sub;
+    }
+
+    Bounty mockAwardBounty(String bountyId, int submissionId) {
         Bounty b = bounties.get(bountyId);
         if (b == null) {
             throw new RemitError(ErrorCodes.BOUNTY_NOT_FOUND, "Bounty \"" + bountyId + "\" not found.",
                 Map.of("bounty_id", bountyId));
         }
         b.status = "awarded";
-        b.winner = winner;
         Transaction tx = new Transaction();
         tx.id = "tx_" + counter.incrementAndGet();
         tx.txHash = "0x" + "e".repeat(64);
         tx.from = b.poster;
-        tx.to = winner;
-        tx.amount = b.award;
+        tx.to = MOCK_ADDRESS;
+        tx.amount = b.amount;
         tx.chainId = MOCK_CHAIN_ID;
         tx.createdAt = Instant.now();
         transactions.add(tx);
-        return tx;
+        return b;
+    }
+
+    Stream mockCreateStream(String payee, BigDecimal ratePerSecond, BigDecimal maxTotal) {
+        Stream s = new Stream();
+        s.id = "stm_" + counter.incrementAndGet();
+        s.payer = MOCK_ADDRESS;
+        s.payee = payee;
+        s.ratePerSecond = ratePerSecond;
+        s.maxTotal = maxTotal;
+        s.withdrawn = BigDecimal.ZERO;
+        s.vested = BigDecimal.ZERO;
+        s.status = "active";
+        s.createdAt = Instant.now();
+        streams.put(s.id, s);
+        return s;
+    }
+
+    Stream mockCloseStream(String streamId) {
+        Stream s = streams.get(streamId);
+        if (s == null) {
+            throw new RemitError(ErrorCodes.STREAM_NOT_FOUND, "Stream \"" + streamId + "\" not found.",
+                Map.of("stream_id", streamId));
+        }
+        s.status = "closed";
+        s.closedTxHash = "0x" + "f".repeat(64);
+        return s;
+    }
+
+    Deposit mockLockDeposit(String provider, BigDecimal amount) {
+        BigDecimal current = balance.get();
+        if (current.compareTo(amount) < 0) {
+            throw new RemitError(ErrorCodes.INSUFFICIENT_FUNDS,
+                "Insufficient balance for deposit.",
+                Map.of("balance", current.toPlainString(), "amount", amount.toPlainString()));
+        }
+        balance.set(current.subtract(amount));
+        Deposit d = new Deposit();
+        d.id = "dep_" + counter.incrementAndGet();
+        d.depositor = MOCK_ADDRESS;
+        d.provider = provider;
+        d.amount = amount;
+        d.status = "locked";
+        d.createdAt = Instant.now();
+        deposits.put(d.id, d);
+        return d;
+    }
+
+    Deposit mockReturnDeposit(String depositId) {
+        Deposit d = deposits.get(depositId);
+        if (d == null) {
+            throw new RemitError(ErrorCodes.DEPOSIT_NOT_FOUND, "Deposit \"" + depositId + "\" not found.",
+                Map.of("deposit_id", depositId));
+        }
+        d.status = "returned";
+        balance.set(balance.get().add(d.amount));
+        return d;
     }
 
     Reputation mockReputation(String address) {
@@ -461,29 +528,54 @@ public class MockRemit {
                 return (T) mock.mockCancelEscrow(escrowId);
             }
             if ("POST".equals(method) && "/api/v0/tabs".equals(path)) {
-                String counterpart = (String) b.get("counterpart");
-                BigDecimal limit = new BigDecimal((String) b.get("limit"));
-                return (T) mock.mockCreateTab(counterpart, limit);
+                String provider = (String) b.get("provider");
+                BigDecimal limitAmount = new BigDecimal((String) b.get("limit_amount"));
+                return (T) mock.mockCreateTab(provider, limitAmount);
             }
-            if ("POST".equals(method) && path.contains("/tabs/") && path.endsWith("/debit")) {
-                String tabId = path.replace("/api/v0/tabs/", "").replace("/debit", "");
+            if ("POST".equals(method) && path.contains("/tabs/") && path.endsWith("/charge")) {
+                String tabId = path.replace("/api/v0/tabs/", "").replace("/charge", "");
                 BigDecimal amount = new BigDecimal((String) b.get("amount"));
-                String memo = (String) b.getOrDefault("memo", "");
-                return (T) mock.mockDebitTab(tabId, amount, memo);
+                BigDecimal cumulative = new BigDecimal((String) b.get("cumulative"));
+                int callCount = b.get("call_count") instanceof Number ? ((Number) b.get("call_count")).intValue() : 1;
+                return (T) mock.mockChargeTab(tabId, amount, cumulative, callCount);
             }
-            if ("POST".equals(method) && path.contains("/tabs/") && path.endsWith("/settle")) {
-                String tabId = path.replace("/api/v0/tabs/", "").replace("/settle", "");
-                return (T) mock.mockSettleTab(tabId);
+            if ("POST".equals(method) && path.contains("/tabs/") && path.endsWith("/close")) {
+                String tabId = path.replace("/api/v0/tabs/", "").replace("/close", "");
+                return (T) mock.mockCloseTab(tabId);
             }
             if ("POST".equals(method) && "/api/v0/bounties".equals(path)) {
-                BigDecimal award = new BigDecimal((String) b.get("award"));
-                String desc = (String) b.get("description");
-                return (T) mock.mockCreateBounty(award, desc);
+                BigDecimal amount = new BigDecimal((String) b.get("amount"));
+                String desc = (String) b.get("task_description");
+                return (T) mock.mockCreateBounty(amount, desc);
+            }
+            if ("POST".equals(method) && path.contains("/bounties/") && path.endsWith("/submit")) {
+                String bountyId = path.replace("/api/v0/bounties/", "").replace("/submit", "");
+                String evidenceHash = (String) b.get("evidence_hash");
+                return (T) mock.mockSubmitBounty(bountyId, evidenceHash);
             }
             if ("POST".equals(method) && path.contains("/bounties/") && path.endsWith("/award")) {
                 String bountyId = path.replace("/api/v0/bounties/", "").replace("/award", "");
-                String winner = (String) b.get("winner");
-                return (T) mock.mockAwardBounty(bountyId, winner);
+                int submissionId = b.get("submission_id") instanceof Number ? ((Number) b.get("submission_id")).intValue() : 0;
+                return (T) mock.mockAwardBounty(bountyId, submissionId);
+            }
+            if ("POST".equals(method) && "/api/v0/streams".equals(path)) {
+                String payee = (String) b.get("payee");
+                BigDecimal rate = new BigDecimal((String) b.get("rate_per_second"));
+                BigDecimal maxTotal = new BigDecimal((String) b.get("max_total"));
+                return (T) mock.mockCreateStream(payee, rate, maxTotal);
+            }
+            if ("POST".equals(method) && path.contains("/streams/") && path.endsWith("/close")) {
+                String streamId = path.replace("/api/v0/streams/", "").replace("/close", "");
+                return (T) mock.mockCloseStream(streamId);
+            }
+            if ("POST".equals(method) && "/api/v0/deposits".equals(path)) {
+                String provider = (String) b.get("provider");
+                BigDecimal amount = new BigDecimal((String) b.get("amount"));
+                return (T) mock.mockLockDeposit(provider, amount);
+            }
+            if ("POST".equals(method) && path.contains("/deposits/") && path.endsWith("/return")) {
+                String depositId = path.replace("/api/v0/deposits/", "").replace("/return", "");
+                return (T) mock.mockReturnDeposit(depositId);
             }
             if ("GET".equals(method) && "/api/v0/contracts".equals(path)) {
                 return (T) mock.mockContracts();

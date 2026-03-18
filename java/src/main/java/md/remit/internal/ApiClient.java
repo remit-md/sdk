@@ -193,7 +193,7 @@ public class ApiClient {
     }
 
     /** Encode a long as ABI uint256 (32 bytes, big-endian, unsigned). */
-    static byte[] toUint256(long value) {
+    public static byte[] toUint256(long value) {
         // Use Long.toUnsignedString so that large u64 values (e.g. u64::MAX stored as -1L)
         // are treated as positive unsigned integers.
         BigInteger unsigned = new BigInteger(Long.toUnsignedString(value));

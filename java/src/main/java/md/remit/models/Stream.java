@@ -16,14 +16,14 @@ public class Stream {
     @JsonProperty("payer")
     public String payer;
 
-    @JsonProperty("recipient")
-    public String recipient;
+    @JsonProperty("payee")
+    public String payee;
 
-    @JsonProperty("rate_per_sec")
-    public BigDecimal ratePerSec;
+    @JsonProperty("rate_per_second")
+    public BigDecimal ratePerSecond;
 
-    @JsonProperty("deposit")
-    public BigDecimal deposit;
+    @JsonProperty("max_total")
+    public BigDecimal maxTotal;
 
     @JsonProperty("withdrawn")
     public BigDecimal withdrawn;
@@ -33,6 +33,9 @@ public class Stream {
 
     @JsonProperty("status")
     public String status; // "active" | "paused" | "closed"
+
+    @JsonProperty("closed_tx_hash")
+    public String closedTxHash;
 
     @JsonProperty("created_at")
     public Instant createdAt;

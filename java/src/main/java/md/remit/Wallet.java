@@ -5,7 +5,10 @@ import md.remit.models.*;
 import md.remit.signer.Signer;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +42,11 @@ public class Wallet {
     /** The Ethereum address (0x-prefixed) of this wallet. */
     public String address() {
         return signer.address();
+    }
+
+    /** Package-private accessor for the signer (used by X402Client). */
+    Signer signer() {
+        return signer;
     }
 
     /** The chain ID this wallet is connected to. */
@@ -216,45 +224,123 @@ public class Wallet {
     /**
      * Opens a payment channel for batched micro-payments.
      *
-     * @param counterpart the other party's address
-     * @param limit       maximum USDC that can be charged through this tab
+     * @param provider   the provider's address
+     * @param limitAmount maximum USDC that can be charged through this tab
+     * @param perUnit    price per unit of work
      */
-    public Tab createTab(String counterpart, BigDecimal limit) {
-        return createTab(counterpart, limit, null, null);
+    public Tab createTab(String provider, BigDecimal limitAmount, BigDecimal perUnit) {
+        return createTab(provider, limitAmount, perUnit, 86400, null);
     }
 
     /** Opens a tab with a permit for gasless approval. */
-    public Tab createTab(String counterpart, BigDecimal limit, PermitSignature permit) {
-        return createTab(counterpart, limit, null, permit);
+    public Tab createTab(String provider, BigDecimal limitAmount, BigDecimal perUnit, PermitSignature permit) {
+        return createTab(provider, limitAmount, perUnit, 86400, permit);
     }
 
-    /** Opens a tab with an explicit expiry. */
-    public Tab createTab(String counterpart, BigDecimal limit, Duration expiresIn) {
-        return createTab(counterpart, limit, expiresIn, null);
+    /** Opens a tab with an explicit expiry (in seconds from now). */
+    public Tab createTab(String provider, BigDecimal limitAmount, BigDecimal perUnit, int expiresInSeconds) {
+        return createTab(provider, limitAmount, perUnit, expiresInSeconds, null);
     }
 
     /** Opens a tab with an optional expiry and permit. */
-    public Tab createTab(String counterpart, BigDecimal limit, Duration expiresIn, PermitSignature permit) {
-        validateAddress(counterpart);
+    public Tab createTab(String provider, BigDecimal limitAmount, BigDecimal perUnit, int expiresInSeconds, PermitSignature permit) {
+        validateAddress(provider);
+        long expiry = Instant.now().getEpochSecond() + expiresInSeconds;
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("chain", chain);
-        body.put("counterpart", counterpart);
-        body.put("limit", limit.toPlainString());
-        if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());
+        body.put("provider", provider);
+        body.put("limit_amount", limitAmount.toPlainString());
+        body.put("per_unit", perUnit.toPlainString());
+        body.put("expiry", expiry);
         if (permit != null) body.put("permit", permit);
         return client.post("/api/v0/tabs", body, Tab.class);
     }
 
-    /** Charges the given amount from an open tab (off-chain, signed). */
-    public TabDebit debitTab(String tabId, BigDecimal amount, String memo) {
-        return client.post("/api/v0/tabs/" + tabId + "/debit",
-            Map.of("tab_id", tabId, "amount", amount.toPlainString(), "memo", memo != null ? memo : ""),
-            TabDebit.class);
+    /**
+     * Charges a tab with an EIP-712 TabCharge signature (provider-side).
+     *
+     * @param tabId       tab UUID
+     * @param amount      amount to charge for this call
+     * @param cumulative  cumulative amount charged so far (including this charge)
+     * @param callCount   number of charges made (including this one)
+     * @param providerSig EIP-712 TabCharge signature from the provider
+     */
+    public TabCharge chargeTab(String tabId, BigDecimal amount, BigDecimal cumulative, int callCount, String providerSig) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("amount", amount.toPlainString());
+        body.put("cumulative", cumulative.toPlainString());
+        body.put("call_count", callCount);
+        body.put("provider_sig", providerSig);
+        return client.post("/api/v0/tabs/" + tabId + "/charge", body, TabCharge.class);
     }
 
-    /** Closes the tab and settles all charges on-chain. */
-    public Transaction settleTab(String tabId) {
-        return client.post("/api/v0/tabs/" + tabId + "/settle", null, Transaction.class);
+    /**
+     * Closes a tab and settles on-chain.
+     *
+     * @param tabId       tab UUID
+     * @param finalAmount final cumulative charged amount
+     * @param providerSig EIP-712 TabCharge signature for the final state
+     */
+    public Tab closeTab(String tabId, BigDecimal finalAmount, String providerSig) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("final_amount", finalAmount.toPlainString());
+        body.put("provider_sig", providerSig);
+        return client.post("/api/v0/tabs/" + tabId + "/close", body, Tab.class);
+    }
+
+    /**
+     * Signs a TabCharge EIP-712 message (provider-side).
+     *
+     * @param tabContract    Tab contract address (verifyingContract for domain)
+     * @param tabId          UUID of the tab (encoded as bytes32)
+     * @param totalCharged   cumulative charged amount in USDC base units (uint96)
+     * @param callCount      number of charges made (uint32)
+     * @return 0x-prefixed hex signature
+     */
+    public String signTabCharge(String tabContract, String tabId, long totalCharged, int callCount) {
+        // Encode UUID string as bytes32 (ASCII chars padded to 32 bytes).
+        byte[] tabIdBytes = new byte[32];
+        byte[] ascii = tabId.getBytes(StandardCharsets.US_ASCII);
+        System.arraycopy(ascii, 0, tabIdBytes, 0, Math.min(ascii.length, 32));
+
+        // Domain: RemitTab, version 1
+        byte[] domainTypeHash = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                .getBytes(StandardCharsets.UTF_8));
+        byte[] nameHash = keccak256("RemitTab".getBytes(StandardCharsets.UTF_8));
+        byte[] versionHash = keccak256("1".getBytes(StandardCharsets.UTF_8));
+        byte[] chainIdBytes = ApiClient.toUint256(chainId);
+        byte[] contractBytes = addressToBytes32(tabContract);
+
+        byte[] domainSep = keccak256(concatBytes(domainTypeHash, nameHash, versionHash, chainIdBytes, contractBytes));
+
+        // Struct hash: TabCharge(bytes32 tabId, uint96 totalCharged, uint32 callCount)
+        byte[] typeHash = keccak256(
+            "TabCharge(bytes32 tabId,uint96 totalCharged,uint32 callCount)"
+                .getBytes(StandardCharsets.UTF_8));
+
+        byte[] structHash = keccak256(concatBytes(
+            typeHash,
+            tabIdBytes,
+            ApiClient.toUint256(totalCharged),
+            ApiClient.toUint256(callCount)));
+
+        // EIP-712 digest: "\x19\x01" || domainSeparator || structHash
+        byte[] finalData = new byte[2 + 32 + 32];
+        finalData[0] = 0x19;
+        finalData[1] = 0x01;
+        System.arraycopy(domainSep, 0, finalData, 2, 32);
+        System.arraycopy(structHash, 0, finalData, 34, 32);
+        byte[] digest = keccak256(finalData);
+
+        try {
+            byte[] sig = signer.sign(digest);
+            return "0x" + HexFormat.of().formatHex(sig);
+        } catch (Exception e) {
+            throw new RemitError(ErrorCodes.INVALID_SIGNATURE,
+                "Failed to sign TabCharge. Check that your private key is valid.",
+                Map.of());
+        }
     }
 
     // ─── Stream ───────────────────────────────────────────────────────────────
@@ -262,24 +348,29 @@ public class Wallet {
     /**
      * Starts a per-second USDC payment stream.
      *
-     * @param recipient  receiving address
-     * @param ratePerSec USDC per second (e.g., 0.0001)
-     * @param deposit    initial deposit locking funds for streaming
+     * @param payee         receiving address
+     * @param ratePerSecond USDC per second (e.g., 0.1)
+     * @param maxTotal      maximum total USDC the stream can pay out
      */
-    public Stream createStream(String recipient, BigDecimal ratePerSec, BigDecimal deposit) {
-        return createStream(recipient, ratePerSec, deposit, null);
+    public Stream createStream(String payee, BigDecimal ratePerSecond, BigDecimal maxTotal) {
+        return createStream(payee, ratePerSecond, maxTotal, null);
     }
 
     /** Starts a per-second USDC payment stream with a permit for gasless approval. */
-    public Stream createStream(String recipient, BigDecimal ratePerSec, BigDecimal deposit, PermitSignature permit) {
-        validateAddress(recipient);
+    public Stream createStream(String payee, BigDecimal ratePerSecond, BigDecimal maxTotal, PermitSignature permit) {
+        validateAddress(payee);
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("chain", chain);
-        body.put("recipient", recipient);
-        body.put("rate_per_sec", ratePerSec.toPlainString());
-        body.put("deposit", deposit.toPlainString());
+        body.put("payee", payee);
+        body.put("rate_per_second", ratePerSecond.toPlainString());
+        body.put("max_total", maxTotal.toPlainString());
         if (permit != null) body.put("permit", permit);
         return client.post("/api/v0/streams", body, Stream.class);
+    }
+
+    /** Closes a stream and settles on-chain (payer only). */
+    public Stream closeStream(String streamId) {
+        return client.post("/api/v0/streams/" + streamId + "/close", Map.of(), Stream.class);
     }
 
     /** Claims all vested stream payments (callable by recipient). */
@@ -292,29 +383,54 @@ public class Wallet {
     /**
      * Posts a USDC bounty for task completion.
      *
-     * @param award       amount awarded to the winner
-     * @param description human-readable task description
+     * @param amount          bounty amount in USDC
+     * @param taskDescription human-readable task description
+     * @param deadline        deadline as unix timestamp (epoch seconds)
      */
-    public Bounty createBounty(BigDecimal award, String description) {
-        return createBounty(award, description, null);
+    public Bounty createBounty(BigDecimal amount, String taskDescription, long deadline) {
+        return createBounty(amount, taskDescription, deadline, 10, null);
     }
 
-    /** Posts a bounty with an expiry deadline. */
-    public Bounty createBounty(BigDecimal award, String description, Duration expiresIn) {
-        validateAmount(award);
+    /** Posts a bounty with a permit for gasless approval. */
+    public Bounty createBounty(BigDecimal amount, String taskDescription, long deadline, PermitSignature permit) {
+        return createBounty(amount, taskDescription, deadline, 10, permit);
+    }
+
+    /** Posts a bounty with max attempts and an optional permit. */
+    public Bounty createBounty(BigDecimal amount, String taskDescription, long deadline, int maxAttempts, PermitSignature permit) {
+        validateAmount(amount);
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("chain", chain);
-        body.put("award", award.toPlainString());
-        body.put("description", description);
-        if (expiresIn != null) body.put("expires_in_seconds", (int) expiresIn.toSeconds());
+        body.put("amount", amount.toPlainString());
+        body.put("task_description", taskDescription);
+        body.put("deadline", deadline);
+        body.put("max_attempts", maxAttempts);
+        if (permit != null) body.put("permit", permit);
         return client.post("/api/v0/bounties", body, Bounty.class);
     }
 
-    /** Pays the bounty to the winner. */
-    public Transaction awardBounty(String bountyId, String winner) {
-        validateAddress(winner);
+    /**
+     * Submits evidence for a bounty.
+     *
+     * @param bountyId     bounty UUID
+     * @param evidenceHash 0x-prefixed hash of the evidence
+     * @return submission with its ID (needed for {@link #awardBounty})
+     */
+    public BountySubmission submitBounty(String bountyId, String evidenceHash) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("evidence_hash", evidenceHash);
+        return client.post("/api/v0/bounties/" + bountyId + "/submit", body, BountySubmission.class);
+    }
+
+    /**
+     * Awards a bounty to a specific submission (poster-only).
+     *
+     * @param bountyId     bounty UUID
+     * @param submissionId submission ID returned by {@link #submitBounty}
+     */
+    public Bounty awardBounty(String bountyId, int submissionId) {
         return client.post("/api/v0/bounties/" + bountyId + "/award",
-            Map.of("bounty_id", bountyId, "winner", winner), Transaction.class);
+            Map.of("submission_id", submissionId), Bounty.class);
     }
 
     /**
@@ -342,20 +458,33 @@ public class Wallet {
     // ─── Deposit ──────────────────────────────────────────────────────────────
 
     /**
-     * Locks a security deposit with a beneficiary.
+     * Locks a security deposit with a provider.
      *
-     * @param beneficiary address that can claim the deposit on default
-     * @param amount      USDC to lock
-     * @param expiresIn   how long the deposit remains locked
+     * @param provider   the provider's address
+     * @param amount     USDC to lock
+     * @param expiresIn  how long the deposit remains locked (seconds from now)
      */
-    public Deposit lockDeposit(String beneficiary, BigDecimal amount, Duration expiresIn) {
-        validateAddress(beneficiary);
+    public Deposit lockDeposit(String provider, BigDecimal amount, int expiresIn) {
+        return lockDeposit(provider, amount, expiresIn, null);
+    }
+
+    /** Locks a security deposit with a permit for gasless approval. */
+    public Deposit lockDeposit(String provider, BigDecimal amount, int expiresIn, PermitSignature permit) {
+        validateAddress(provider);
         validateAmount(amount);
-        return client.post("/api/v0/deposits",
-            Map.of("beneficiary", beneficiary,
-                   "amount", amount.toPlainString(),
-                   "expires_in_seconds", (int) expiresIn.toSeconds()),
-            Deposit.class);
+        long expiry = Instant.now().getEpochSecond() + expiresIn;
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("chain", chain);
+        body.put("provider", provider);
+        body.put("amount", amount.toPlainString());
+        body.put("expiry", expiry);
+        if (permit != null) body.put("permit", permit);
+        return client.post("/api/v0/deposits", body, Deposit.class);
+    }
+
+    /** Returns a deposit (provider-side, full refund to depositor). */
+    public Deposit returnDeposit(String depositId) {
+        return client.post("/api/v0/deposits/" + depositId + "/return", Map.of(), Deposit.class);
     }
 
     // ─── Analytics ────────────────────────────────────────────────────────────
@@ -449,6 +578,34 @@ public class Wallet {
     /** Generates a one-time URL for the operator to withdraw funds. */
     public LinkResponse createWithdrawLink() {
         return client.post("/api/v0/links/withdraw", Map.of(), LinkResponse.class);
+    }
+
+    // ─── Private crypto helpers ──────────────────────────────────────────────
+
+    private static byte[] keccak256(byte[] input) {
+        return org.web3j.crypto.Hash.sha3(input);
+    }
+
+    private static byte[] addressToBytes32(String address) {
+        if (address == null || address.isBlank()) return new byte[32];
+        String hex = address.startsWith("0x") ? address.substring(2) : address;
+        if (hex.length() != 40) return new byte[32];
+        byte[] addr = HexFormat.of().parseHex(hex);
+        byte[] result = new byte[32];
+        System.arraycopy(addr, 0, result, 12, 20);
+        return result;
+    }
+
+    private static byte[] concatBytes(byte[]... arrays) {
+        int total = 0;
+        for (byte[] a : arrays) total += a.length;
+        byte[] result = new byte[total];
+        int pos = 0;
+        for (byte[] a : arrays) {
+            System.arraycopy(a, 0, result, pos, a.length);
+            pos += a.length;
+        }
+        return result;
     }
 
     static void validateAmount(BigDecimal amount) {

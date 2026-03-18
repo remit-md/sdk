@@ -16,17 +16,23 @@ public class Tab {
     @JsonProperty("opener")
     public String opener;
 
-    @JsonProperty("counterpart")
-    public String counterpart;
+    @JsonProperty("provider")
+    public String provider;
 
-    @JsonProperty("limit")
-    public BigDecimal limit;
+    @JsonProperty("limit_amount")
+    public BigDecimal limitAmount;
 
-    @JsonProperty("used")
-    public BigDecimal used;
+    @JsonProperty("per_unit")
+    public BigDecimal perUnit;
 
     @JsonProperty("status")
-    public String status; // "open" | "settled" | "expired"
+    public String status; // "open" | "closed" | "settled" | "expired"
+
+    @JsonProperty("total_charged")
+    public BigDecimal totalCharged;
+
+    @JsonProperty("closed_tx_hash")
+    public String closedTxHash;
 
     @JsonProperty("expires_at")
     public Instant expiresAt;

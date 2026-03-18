@@ -287,6 +287,7 @@ impl Wallet {
     }
 
     /// Create an escrow with optional milestones, splits, and permit.
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_escrow_full(
         &self,
         payee: &str,

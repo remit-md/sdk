@@ -72,9 +72,30 @@ public final class RemitWallet: @unchecked Sendable {
     public func createEscrow(recipient: String, amount: Double, conditions: String? = nil, permit: PermitSignature? = nil) async throws -> Escrow {
         try validateAddress(recipient)
         try validateAmount(amount)
+
+        // Step 1: create invoice on server.
+        let invoiceId = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(32).lowercased()
+        let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(32).lowercased()
+        let _: InvoiceResponse = try await transport.request(
+            method: "POST", path: "/api/v0/invoices",
+            body: InvoiceBody(
+                id: String(invoiceId), chain: chainName,
+                from_agent: signerAddress.lowercased(), to_agent: recipient.lowercased(),
+                amount: String(format: "%.6f", amount), type: "escrow",
+                task: conditions ?? "", nonce: String(nonce), signature: "0x"
+            )
+        )
+
+        // Step 2: fund the escrow.
         return try await transport.request(
             method: "POST", path: "/api/v0/escrows",
-            body: EscrowBody(recipient: recipient, amount: amount, conditions: conditions, permit: permit)
+            body: EscrowFundBody(invoice_id: String(invoiceId), permit: permit)
+        )
+    }
+
+    public func claimStart(id: String) async throws -> Escrow {
+        return try await transport.request(
+            method: "POST", path: "/api/v0/escrows/\(id)/claim-start", body: Optional<EmptyBody>.none
         )
     }
 
@@ -299,7 +320,9 @@ public final class RemitWallet: @unchecked Sendable {
 
 private struct EmptyBody: Codable {}
 private struct PayBody: Codable { let to: String; let amount: Double; let memo: String?; let permit: PermitSignature? }
-private struct EscrowBody: Codable { let recipient: String; let amount: Double; let conditions: String?; let permit: PermitSignature? }
+private struct InvoiceBody: Codable { let id: String; let chain: String; let from_agent: String; let to_agent: String; let amount: String; let type: String; let task: String; let nonce: String; let signature: String }
+private struct InvoiceResponse: Codable { let id: String? }
+private struct EscrowFundBody: Codable { let invoice_id: String; let permit: PermitSignature? }
 private struct TabBody: Codable { let chain: String; let recipient: String; let limit: Double; let permit: PermitSignature? }
 private struct DebitBody: Codable { let amount: Double; let memo: String? }
 private struct StreamBody: Codable {

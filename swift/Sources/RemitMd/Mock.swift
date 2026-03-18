@@ -27,6 +27,7 @@ public final class MockRemit: @unchecked Sendable {
     private var _bounties: [String: Bounty] = [:]
     private var _deposits: [String: Deposit] = [:]
     private var _reputations: [String: Reputation] = [:]
+    private var _pendingInvoices: [String: [String: Any]] = [:]
 
     /// Default wallet address used by the mock signer.
     public let walletAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
@@ -98,8 +99,14 @@ public final class MockRemit: @unchecked Sendable {
         if path.hasPrefix("/api/v0/balance/") {
             return try cast(handleBalance(address: parts.last ?? walletAddress))
         }
+        if path == "/api/v0/invoices" && method == "POST" {
+            return try cast(handleCreateInvoice(body: body))
+        }
         if path == "/api/v0/escrows" && method == "POST" {
             return try cast(handleCreateEscrow(body: body))
+        }
+        if path.hasPrefix("/api/v0/escrows/") && path.hasSuffix("/claim-start") && method == "POST" {
+            return try cast(handleGetEscrow(id: parts[parts.count - 2]))
         }
         if path.hasPrefix("/api/v0/escrows/") && method == "GET" {
             return try cast(handleGetEscrow(id: parts.last ?? ""))
@@ -177,14 +184,31 @@ public final class MockRemit: @unchecked Sendable {
         }
     }
 
+    private struct InvoiceBody: Codable { let id: String; let to_agent: String; let amount: String; let task: String? }
+    private struct InvoiceResp: Codable { let id: String; let status: String }
+
+    private func handleCreateInvoice(body: (any Encodable)?) throws -> InvoiceResp {
+        let b = try jsonDecode(InvoiceBody.self, from: body)
+        lock.remitLock {
+            _pendingInvoices[b.id] = ["to_agent": b.to_agent, "amount": b.amount, "task": b.task ?? ""]
+        }
+        return InvoiceResp(id: b.id, status: "pending")
+    }
+
+    private struct EscrowFundBody: Codable { let invoice_id: String }
+
     private func handleCreateEscrow(body: (any Encodable)?) throws -> Escrow {
-        let b = try jsonDecode(EscrowBody.self, from: body)
-        try validate(address: b.recipient)
-        try validate(amount: b.amount)
-        return lock.remitLock {
-            let e = Escrow(id: newID("escrow"), payer: walletAddress, recipient: b.recipient,
-                           amount: b.amount, currency: "USDC", status: .pending,
-                           conditions: b.conditions, expiresAt: nil, createdAt: Date())
+        let b = try jsonDecode(EscrowFundBody.self, from: body)
+        return try lock.remitLock {
+            guard let inv = _pendingInvoices.removeValue(forKey: b.invoice_id) else {
+                throw RemitError.notFound(RemitError.escrowNotFound, b.invoice_id)
+            }
+            let recipient = inv["to_agent"] as? String ?? ""
+            let amount = Double(inv["amount"] as? String ?? "0") ?? 0
+            let conditions = inv["task"] as? String
+            let e = Escrow(id: b.invoice_id, payer: walletAddress, recipient: recipient,
+                           amount: amount, currency: "USDC", status: .pending,
+                           conditions: conditions, expiresAt: nil, createdAt: Date())
             _escrows[e.id] = e
             return e
         }

@@ -151,8 +151,47 @@ public struct Escrow: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, payer, recipient, amount, currency, status, conditions
+        case invoiceId = "invoice_id"
         case expiresAt = "expires_at"
         case createdAt = "created_at"
+    }
+
+    public init(id: String, payer: String, recipient: String, amount: Double, currency: String,
+                status: EscrowStatus, conditions: String?, expiresAt: Date?, createdAt: Date) {
+        self.id = id; self.payer = payer; self.recipient = recipient; self.amount = amount
+        self.currency = currency; self.status = status; self.conditions = conditions
+        self.expiresAt = expiresAt; self.createdAt = createdAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Server returns invoice_id for escrows. Fall back to id for mocks.
+        if let invoiceId = try? c.decode(String.self, forKey: .invoiceId) {
+            self.id = invoiceId
+        } else {
+            self.id = try c.decode(String.self, forKey: .id)
+        }
+        self.payer = (try? c.decode(String.self, forKey: .payer)) ?? ""
+        self.recipient = (try? c.decode(String.self, forKey: .recipient)) ?? ""
+        self.amount = (try? c.decode(Double.self, forKey: .amount)) ?? 0
+        self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USDC"
+        self.status = (try? c.decode(EscrowStatus.self, forKey: .status)) ?? .pending
+        self.conditions = try? c.decode(String.self, forKey: .conditions)
+        self.expiresAt = try? c.decode(Date.self, forKey: .expiresAt)
+        self.createdAt = (try? c.decode(Date.self, forKey: .createdAt)) ?? Date()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(payer, forKey: .payer)
+        try c.encode(recipient, forKey: .recipient)
+        try c.encode(amount, forKey: .amount)
+        try c.encode(currency, forKey: .currency)
+        try c.encode(status, forKey: .status)
+        try c.encodeIfPresent(conditions, forKey: .conditions)
+        try c.encodeIfPresent(expiresAt, forKey: .expiresAt)
+        try c.encode(createdAt, forKey: .createdAt)
     }
 }
 

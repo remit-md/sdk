@@ -17,6 +17,7 @@ on:
           - rust
           - java
           - ruby
+          - swift
         default: all
 
 jobs:
@@ -178,3 +179,23 @@ jobs:
           ACCEPTANCE_API_URL: https://remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance -f documentation
+
+  swift:
+    name: Swift SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'swift'
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: swift
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: swift test --filter AcceptanceTests

@@ -139,7 +139,7 @@ export class AuthenticatedClient {
     };
 
     if (method === "POST" || method === "PUT" || method === "PATCH") {
-      headers["Idempotency-Key"] = newIdempotencyKey();
+      headers["X-Idempotency-Key"] = newIdempotencyKey();
     }
 
     let response: Response;

@@ -47,7 +47,7 @@ class ComplianceTest {
     /** Set to false when the server health-check fails — all tests skip. */
     private static boolean serverAvailable = false;
 
-    /** Shared funded payer wallet — only one faucet drip per test run. */
+    /** Shared funded payer wallet — only one mint per test run. */
     private static final AtomicReference<Wallet> SHARED_PAYER = new AtomicReference<>();
     private static final AtomicReference<String> SHARED_PAYER_ADDR = new AtomicReference<>();
 
@@ -114,13 +114,13 @@ class ComplianceTest {
         return new String[]{privateKey, walletAddr};
     }
 
-    /** Fund a wallet via the faucet (no auth required on testnet). */
+    /** Fund a wallet via mint (no auth required on testnet). */
     private static void fundWallet(String walletAddress) throws Exception {
         String body = MAPPER.writeValueAsString(
             java.util.Map.of("wallet", walletAddress, "amount", 1000));
-        JsonNode resp = MAPPER.readTree(post("/api/v0/faucet", body, null));
+        JsonNode resp = MAPPER.readTree(post("/api/v0/mint", body, null));
         assertThat(resp.has("tx_hash"))
-            .as("faucet response must contain tx_hash, got: " + resp)
+            .as("mint response must contain tx_hash, got: " + resp)
             .isTrue();
     }
 

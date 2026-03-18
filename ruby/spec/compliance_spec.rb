@@ -59,9 +59,9 @@ module ComplianceHelpers
   end
 
   def fund_wallet(wallet_addr)
-    faucet_resp = http_post("/api/v0/faucet", { "wallet" => wallet_addr, "amount" => 1000 })
-    data = JSON.parse(faucet_resp.body)
-    raise "faucet failed: #{faucet_resp.body}" unless data["tx_hash"]
+    mint_resp = http_post("/api/v0/mint", { "wallet" => wallet_addr, "amount" => 1000 })
+    data = JSON.parse(mint_resp.body)
+    raise "mint failed: #{mint_resp.body}" unless data["tx_hash"]
   end
 
   def make_wallet(private_key)
@@ -74,7 +74,7 @@ module ComplianceHelpers
   end
 
   def funded_wallet_pair
-    # Payer: registered + funded via faucet (1000 USDC).
+    # Payer: registered + funded via mint (1000 USDC).
     payer_pk, payer_addr = register_and_get_key
     fund_wallet(payer_addr)
     payer = make_wallet(payer_pk)

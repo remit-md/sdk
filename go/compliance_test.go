@@ -125,8 +125,8 @@ func makeWalletC(t *testing.T, privateKey string) *remitmd.Wallet {
 	return w
 }
 
-// requestFundsWithRetry calls the faucet via the SDK, retrying up to 5 times with 2-second backoff.
-// Used only by TestComplianceAuth_FaucetCredits to verify the faucet endpoint works.
+// requestFundsWithRetry calls mint via the SDK, retrying up to 5 times with 2-second backoff.
+// Used only by TestComplianceAuth_MintCredits to verify the mint endpoint works.
 func requestFundsWithRetry(t *testing.T, w *remitmd.Wallet) {
 	t.Helper()
 	var lastErr error
@@ -135,13 +135,13 @@ func requestFundsWithRetry(t *testing.T, w *remitmd.Wallet) {
 			time.Sleep(2 * time.Second)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		_, lastErr = w.RequestTestnetFunds(ctx)
+		_, lastErr = w.Mint(ctx, 100)
 		cancel()
 		if lastErr == nil {
 			return
 		}
 	}
-	t.Fatalf("faucet failed after 5 attempts: %v", lastErr)
+	t.Fatalf("mint failed after 5 attempts: %v", lastErr)
 }
 
 // ─── Shared funded payer ──────────────────────────────────────────────────────
@@ -152,19 +152,19 @@ var (
 )
 
 // getSharedPayer returns (or lazily creates) a single funded test payer wallet
-// with 1000 USDC. All payment tests share this wallet so only one faucet call
+// with 1000 USDC. All payment tests share this wallet so only one mint call
 // is needed per test run, avoiding the per-wallet-per-hour rate limit.
 func getSharedPayer(t *testing.T) *remitmd.Wallet {
 	t.Helper()
 	oncePayer.Do(func() {
 		pk, addr := registerAndGetWalletC(t)
-		// Fund with 1000 USDC via direct HTTP — faucet is public (no EIP-712 auth required).
-		resp := doJSONC(t, "POST", compServerURL+"/api/v0/faucet", map[string]any{
+		// Fund with 1000 USDC via direct HTTP — mint is public (no EIP-712 auth required).
+		resp := doJSONC(t, "POST", compServerURL+"/api/v0/mint", map[string]any{
 			"wallet": addr,
 			"amount": 1000,
 		}, "")
 		if resp["tx_hash"] == nil {
-			t.Fatalf("faucet: no tx_hash in response (wallet=%s): %v", addr, resp)
+			t.Fatalf("mint: no tx_hash in response (wallet=%s): %v", addr, resp)
 		}
 		sharedPayer = makeWalletC(t, pk)
 	})
@@ -175,7 +175,7 @@ func getSharedPayer(t *testing.T) *remitmd.Wallet {
 }
 
 // makeFundedPairC returns the shared funded payer and a fresh payee wallet.
-// Only one faucet call is made for the entire test run (via getSharedPayer).
+// Only one mint call is made for the entire test run (via getSharedPayer).
 func makeFundedPairC(t *testing.T) (payer *remitmd.Wallet, payee *remitmd.Wallet, payeeAddr string) {
 	t.Helper()
 	pkB, addrB := registerAndGetWalletC(t)
@@ -201,12 +201,12 @@ func TestComplianceAuth_AuthenticatedRequestSucceeds(t *testing.T) {
 	}
 }
 
-func TestComplianceAuth_FaucetCredits(t *testing.T) {
+func TestComplianceAuth_MintCredits(t *testing.T) {
 	skipIfNoServer(t)
 	pk, _ := registerAndGetWalletC(t)
 	wallet := makeWalletC(t, pk)
 
-	// requestFundsWithRetry handles the global faucet rate limit.
+	// requestFundsWithRetry handles the global mint rate limit.
 	requestFundsWithRetry(t, wallet)
 }
 

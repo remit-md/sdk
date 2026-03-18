@@ -66,7 +66,7 @@ export async function makeWallet(): Promise<Wallet> {
   });
 }
 
-/** Create two wallets (payer + payee) and fund the payer via faucet. */
+/** Create two wallets (payer + payee) and fund the payer via mint. */
 export async function makeFundedPair(): Promise<{
   payer: Wallet;
   payee: Wallet;
@@ -84,7 +84,7 @@ export async function makeFundedPair(): Promise<{
   const payer = new Wallet({ privateKey: pkA, ...walletOpts });
   const payee = new Wallet({ privateKey: pkB, ...walletOpts });
 
-  await payer.requestTestnetFunds();
+  await payer.mint(100);
 
   return { payer, payee, payeeAddress: addrB };
 }

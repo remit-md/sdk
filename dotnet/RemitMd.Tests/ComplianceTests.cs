@@ -82,7 +82,7 @@ public class ComplianceTests
 
     private static async Task FundWallet(string walletAddress)
     {
-        var resp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v0/faucet", new
+        var resp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v0/mint", new
         {
             wallet = walletAddress,
             amount = 1000,
@@ -90,7 +90,7 @@ public class ComplianceTests
         resp.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         Assert.True(doc.RootElement.TryGetProperty("tx_hash", out _),
-            $"faucet response must contain tx_hash");
+            $"mint response must contain tx_hash");
     }
 
     private static Wallet MakeWallet(string privateKey) =>

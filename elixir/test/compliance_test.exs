@@ -20,7 +20,7 @@ defmodule RemitMd.ComplianceTest do
 
   # ─── Shared state ─────────────────────────────────────────────────────────
 
-  # Agent holds the shared funded payer key (pk) so we only call the faucet once.
+  # Agent holds the shared funded payer key (pk) so we only call mint once.
   defmodule SharedPayer do
     use Agent
 
@@ -97,8 +97,8 @@ defmodule RemitMd.ComplianceTest do
   end
 
   defp fund_wallet(wallet_addr) do
-    {200, resp} = http_post("/api/v0/faucet", %{wallet: wallet_addr, amount: 1000})
-    assert resp["tx_hash"] != nil, "faucet response must contain tx_hash, got: #{inspect(resp)}"
+    {200, resp} = http_post("/api/v0/mint", %{wallet: wallet_addr, amount: 1000})
+    assert resp["tx_hash"] != nil, "mint response must contain tx_hash, got: #{inspect(resp)}"
   end
 
   defp make_wallet(private_key) do

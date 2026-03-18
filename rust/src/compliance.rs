@@ -88,20 +88,20 @@ mod compliance_tests {
         (private_key, wallet_addr)
     }
 
-    /// Fund a wallet via the faucet (no auth required in testnet mode).
+    /// Fund a wallet via mint (no auth required in testnet mode).
     async fn fund_wallet(client: &reqwest::Client, wallet_addr: &str) {
         let resp: serde_json::Value = client
-            .post(format!("{}/api/v0/faucet", server_url()))
+            .post(format!("{}/api/v0/mint", server_url()))
             .json(&serde_json::json!({ "wallet": wallet_addr, "amount": 1000 }))
             .send()
             .await
-            .expect("faucet POST")
+            .expect("mint POST")
             .json()
             .await
-            .expect("faucet JSON");
+            .expect("mint JSON");
         assert!(
             resp["tx_hash"].is_string(),
-            "faucet response must contain tx_hash, got: {resp}"
+            "mint response must contain tx_hash, got: {resp}"
         );
     }
 

@@ -58,12 +58,12 @@ describe("TypeScript compliance: authentication", () => {
     assert.equal(resp.status, 401, `Expected 401, got ${resp.status}`);
   });
 
-  it("faucet credits testnet funds", async (t) => {
+  it("mint credits testnet funds", async (t) => {
     if (skip) return t.skip("server not available");
 
     const wallet = await makeWallet();
-    const tx = await wallet.requestTestnetFunds();
-    assert.ok(tx.txHash, "txHash must be set after faucet");
+    const tx = await wallet.mint(100);
+    assert.ok(tx.txHash, "txHash must be set after mint");
   });
 
 });

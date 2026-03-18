@@ -123,9 +123,9 @@ async def wallet(http: httpx.AsyncClient):
 
 @pytest_asyncio.fixture
 async def funded_wallet(wallet):
-    """A Wallet that has received testnet funds from the faucet."""
-    tx = await wallet.request_testnet_funds()
-    assert tx.tx_hash is not None
+    """A Wallet that has received testnet USDC via mint."""
+    result = await wallet.mint(100)
+    assert result["tx_hash"] is not None
     return wallet
 
 
@@ -151,8 +151,8 @@ async def wallet_pair(http: httpx.AsyncClient):
         api_url=SERVER_URL,
         router_address=ROUTER_ADDRESS,
     )
-    # Fund payer via faucet
-    await payer.request_testnet_funds()
+    # Fund payer via mint
+    await payer.mint(100)
 
     yield payer, payee, addr_b
 

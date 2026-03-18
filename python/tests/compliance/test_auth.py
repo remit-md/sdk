@@ -48,7 +48,7 @@ async def test_unauthenticated_request_returns_401(http):
 
 @pytest.mark.asyncio
 @server_available
-async def test_faucet_credits_testnet_funds(wallet):
-    """POST /api/v0/faucet must return a tx_hash."""
-    tx = await wallet.request_testnet_funds()
-    assert tx.tx_hash is not None
+async def test_mint_credits_testnet_funds(wallet):
+    """POST /api/v0/mint must return a tx_hash."""
+    result = await wallet.mint(100)
+    assert result["tx_hash"] is not None

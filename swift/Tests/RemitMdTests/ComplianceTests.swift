@@ -96,16 +96,16 @@ final class ComplianceTests: XCTestCase {
         return (privateKey, walletAddr)
     }
 
-    /// Fund a wallet via faucet (no auth required in testnet mode).
+    /// Fund a wallet via mint (no auth required in testnet mode).
     private static func fundWallet(_ walletAddr: String) async throws {
         let resp = try await httpJSON(
             method: "POST",
-            path: "/api/v0/faucet",
+            path: "/api/v0/mint",
             body: ["wallet": walletAddr, "amount": 1000]
         )
         guard resp["tx_hash"] is String else {
             throw NSError(domain: "Compliance", code: 3,
-                          userInfo: [NSLocalizedDescriptionKey: "faucet failed: \(resp)"])
+                          userInfo: [NSLocalizedDescriptionKey: "mint failed: \(resp)"])
         }
     }
 

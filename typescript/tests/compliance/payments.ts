@@ -1,7 +1,7 @@
 /**
  * Compliance: pay_direct against a real server.
  *
- * Verifies end-to-end direct payment: faucet → payDirect → invoice exists.
+ * Verifies end-to-end direct payment: mint → payDirect → invoice exists.
  * Requires the compliance server to be running (docker-compose.compliance.yml).
  */
 

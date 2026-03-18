@@ -82,13 +82,14 @@ module Remitmd
 
     def initial_state(balance)
       {
-        balance:      balance,
-        transactions: [],
-        escrows:      {},
-        tabs:         {},
-        streams:      {},
-        bounties:     {},
-        deposits:     {},
+        balance:           balance,
+        transactions:      [],
+        escrows:           {},
+        tabs:              {},
+        streams:           {},
+        bounties:          {},
+        deposits:          {},
+        pending_invoices:  {},
       }
     end
   end
@@ -153,14 +154,30 @@ module Remitmd
         @state[:transactions] << tx
         tx_hash(tx)
 
-      # Escrow create
+      # Invoice create (step 1 of escrow)
+      in ["POST", "/invoices"]
+        id = fetch!(b, :id)
+        @state[:pending_invoices][id] = b
+        { "id" => id, "status" => "pending" }
+
+      # Escrow create (step 2 — fund with invoice_id)
       in ["POST", "/escrows"]
-        payee  = fetch!(b, :payee)
-        amount = decimal!(b, :amount)
+        invoice_id = fetch!(b, :invoice_id)
+        inv = @state[:pending_invoices].delete(invoice_id)
+        raise not_found(RemitError::ESCROW_NOT_FOUND, invoice_id) unless inv
+        payee  = (inv[:to_agent] || inv["to_agent"]).to_s
+        amount = decimal!(inv, :amount)
+        memo   = (inv[:task] || inv["task"]).to_s
         check_balance!(amount)
         @state[:balance] -= amount
-        esc = make_escrow(payee: payee, amount: amount, memo: b[:memo].to_s)
+        esc = make_escrow(payee: payee, amount: amount, memo: memo, id: invoice_id)
         @state[:escrows][esc.id] = esc
+        escrow_hash(esc)
+
+      # Escrow claim-start
+      in ["POST", path] if path.end_with?("/claim-start") && path.include?("/escrows/")
+        id  = extract_id(path, "/escrows/", "/claim-start")
+        esc = @state[:escrows].fetch(id) { raise not_found(RemitError::ESCROW_NOT_FOUND, id) }
         escrow_hash(esc)
 
       # Escrow release
@@ -357,9 +374,9 @@ module Remitmd
       )
     end
 
-    def make_escrow(payee:, amount:, memo: "")
+    def make_escrow(payee:, amount:, memo: "", id: nil)
       Escrow.new(
-        "id"         => new_id("esc"),
+        "id"         => id || new_id("esc"),
         "payer"      => MockRemit::MOCK_ADDRESS,
         "payee"      => payee,
         "amount"     => amount.to_s("F"),

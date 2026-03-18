@@ -151,11 +151,23 @@ module Remitmd
     def create_escrow(payee, amount, memo: nil, expires_in_secs: nil, permit: nil)
       validate_address!(payee)
       validate_amount!(amount)
-      body = { payee: payee, amount: amount.to_s }
-      body[:memo] = memo if memo
-      body[:expires_in_secs] = expires_in_secs if expires_in_secs
-      body[:permit] = permit.to_h if permit
-      Escrow.new(@transport.post("/escrows", body))
+
+      # Step 1: create invoice on server.
+      invoice_id = SecureRandom.hex(16)
+      nonce      = SecureRandom.hex(16)
+      inv_body = {
+        id: invoice_id, chain: @chain,
+        from_agent: address.downcase, to_agent: payee.downcase,
+        amount: amount.to_s, type: "escrow",
+        task: memo || "", nonce: nonce, signature: "0x"
+      }
+      inv_body[:escrow_timeout] = expires_in_secs if expires_in_secs
+      @transport.post("/invoices", inv_body)
+
+      # Step 2: fund the escrow.
+      esc_body = { invoice_id: invoice_id }
+      esc_body[:permit] = permit.to_h if permit
+      Escrow.new(@transport.post("/escrows", esc_body))
     end
 
     # Release an escrow to the payee.
@@ -172,6 +184,13 @@ module Remitmd
     # @return [Transaction]
     def cancel_escrow(escrow_id)
       Transaction.new(@transport.post("/escrows/#{escrow_id}/cancel", {}))
+    end
+
+    # Signal the provider has started work on an escrow.
+    # @param escrow_id [String]
+    # @return [Escrow]
+    def claim_start(escrow_id)
+      Escrow.new(@transport.post("/escrows/#{escrow_id}/claim-start", {}))
     end
 
     # Fetch escrow details.

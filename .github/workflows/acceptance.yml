@@ -16,6 +16,7 @@ on:
           - go
           - rust
           - java
+          - ruby
         default: all
 
 jobs:
@@ -150,3 +151,30 @@ jobs:
           ACCEPTANCE_API_URL: https://remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: gradle acceptanceTest --no-daemon
+
+  ruby:
+    name: Ruby SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'ruby'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: ruby
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: ruby
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance -f documentation

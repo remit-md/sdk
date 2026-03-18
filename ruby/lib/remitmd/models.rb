@@ -178,7 +178,7 @@ module Remitmd
   class Escrow < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
-      @id         = h["id"]
+      @id         = h["invoice_id"] || h["id"]
       @payer      = h["payer"]
       @payee      = h["payee"]
       @amount     = decimal(h["amount"])

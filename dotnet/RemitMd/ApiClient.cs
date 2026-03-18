@@ -17,6 +17,7 @@ internal sealed class ApiClient : IDisposable
     {
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
         Converters = { new JsonStringEnumConverter(new SnakeCaseNamingPolicy()) },
     };
 

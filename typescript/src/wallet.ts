@@ -297,7 +297,7 @@ export class Wallet extends RemitClient {
   }
 
   claimStart(invoiceId: string): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/claim-start`);
+    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/claim-start`, {});
   }
 
   submitEvidence(invoiceId: string, evidenceUri: string, milestoneIndex = 0): Promise<Transaction> {
@@ -308,11 +308,11 @@ export class Wallet extends RemitClient {
   }
 
   releaseEscrow(invoiceId: string): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/release`);
+    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/release`, {});
   }
 
   releaseMilestone(invoiceId: string, milestoneIndex: number): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/milestones/${milestoneIndex}/release`);
+    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/milestones/${milestoneIndex}/release`, {});
   }
 
   cancelEscrow(invoiceId: string): Promise<Transaction> {

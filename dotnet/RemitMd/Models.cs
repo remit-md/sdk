@@ -237,8 +237,12 @@ public record ContractAddresses(
 /// <summary>Result of a testnet mint operation.</summary>
 public record MintResponse(
     [property: JsonPropertyName("tx_hash")] string TxHash,
-    [property: JsonPropertyName("balance")] decimal Balance
-);
+    [property: JsonPropertyName("balance")] string BalanceRaw
+)
+{
+    /// <summary>Parsed balance as decimal.</summary>
+    public decimal Balance => decimal.TryParse(BalanceRaw, out var d) ? d : 0m;
+};
 
 /// <summary>A paginated list of transactions.</summary>
 public record TransactionList(

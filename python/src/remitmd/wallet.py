@@ -424,10 +424,11 @@ class Wallet(RemitClient):
         body: dict[str, Any] = {"evidence_hash": evidence_hash}
         if evidence_uri is not None:
             body["evidence_uri"] = evidence_uri
-        return await self._http.post(  # type: ignore[return-value]
+        result: dict[str, Any] = await self._http.post(
             f"/api/v0/bounties/{bounty_id}/submit",
             body,
         )
+        return result
 
     async def award_bounty(self, bounty_id: str, submission_id: int) -> Bounty:
         """Award a bounty to a specific submission (poster-only)."""

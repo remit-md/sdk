@@ -132,7 +132,7 @@ module Remitmd
       @mutex.synchronize { handle(method, path, body || {}) }
     end
 
-    def handle(method, path, b)
+    def handle(method, path, b) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       case [method, path]
 
       # Balance

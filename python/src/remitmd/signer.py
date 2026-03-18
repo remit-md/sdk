@@ -50,7 +50,7 @@ class PrivateKeySigner(Signer):
     ) -> str:
         structured = encode_typed_data(domain_data=domain, message_types=types, message_data=value)
         signed = self._account.sign_message(structured)
-        return "0x" + signed.signature.hex()
+        return str("0x" + signed.signature.hex())
 
     def get_address(self) -> str:
         return str(self._account.address)

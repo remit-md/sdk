@@ -139,7 +139,7 @@ publishing {
 }
 
 signing {
-    val signingKey = System.getenv("GPG_PRIVATE_KEY")
+    val signingKey = System.getenv("GPG_PRIVATE_KEY_DECODED") ?: System.getenv("GPG_PRIVATE_KEY")
     val signingPassword = System.getenv("GPG_PASSPHRASE")
     if (signingKey != null && signingPassword != null) {
         useInMemoryPgpKeys(signingKey, signingPassword)

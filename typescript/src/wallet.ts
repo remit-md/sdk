@@ -41,7 +41,7 @@ export interface OpenTabOptions {
   limit: number;
   perUnit: number;
   expires?: number; // seconds
-  /** Optional EIP-2612 permit for gasless USDC approval. */
+  /** Pre-signed permit override. Omit to auto-sign (recommended). */
   permit?: PermitSignature;
 }
 
@@ -65,7 +65,7 @@ export interface OpenStreamOptions {
   rate: number; // per second
   maxDuration?: number; // seconds
   maxTotal?: number;
-  /** Optional EIP-2612 permit for gasless USDC approval. */
+  /** Pre-signed permit override. Omit to auto-sign (recommended). */
   permit?: PermitSignature;
 }
 
@@ -98,7 +98,7 @@ export interface PostBountyOptions {
   deadline: number; // unix timestamp
   validation?: "poster" | "oracle" | "multisig";
   maxAttempts?: number;
-  /** Optional EIP-2612 permit for gasless USDC approval. */
+  /** Pre-signed permit override. Omit to auto-sign (recommended). */
   permit?: PermitSignature;
 }
 
@@ -106,7 +106,7 @@ export interface PlaceDepositOptions {
   to: string;
   amount: number;
   expires: number; // seconds
-  /** Optional EIP-2612 permit for gasless USDC approval. */
+  /** Pre-signed permit override. Omit to auto-sign (recommended). */
   permit?: PermitSignature;
 }
 
@@ -263,6 +263,20 @@ export class Wallet extends RemitClient {
     });
   }
 
+  /**
+   * Internal: auto-sign a permit for the given contract type and amount.
+   * Used by payment methods when no explicit permit is provided.
+   */
+  async #autoPermit(
+    contract: "router" | "escrow" | "tab" | "stream" | "bounty" | "deposit",
+    amount: number,
+  ): Promise<PermitSignature> {
+    const contracts = await this.getContracts();
+    const spender = contracts[contract];
+    if (!spender) throw new Error(`No ${contract} contract address available`);
+    return this.signPermit(spender, amount);
+  }
+
   /** Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC. */
   async #fetchUsdcNonce(usdcAddress: string): Promise<number> {
     // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
@@ -287,7 +301,8 @@ export class Wallet extends RemitClient {
 
   // ─── Direct Payment ─────────────────────────────────────────────────────────
 
-  payDirect(to: string, amount: number, memo = "", options?: { permit?: PermitSignature }): Promise<Transaction> {
+  async payDirect(to: string, amount: number, memo = "", options?: { permit?: PermitSignature }): Promise<Transaction> {
+    const permit = options?.permit ?? await this.#autoPermit("router", amount);
     return this.#auth.post<Transaction>("/payments/direct", {
       to,
       amount,
@@ -295,7 +310,7 @@ export class Wallet extends RemitClient {
       chain: this._chain,
       nonce: randomBytes(16).toString("hex"),
       signature: "0x",
-      ...(options?.permit ? { permit: options.permit } : {}),
+      permit,
     });
   }
 
@@ -317,9 +332,10 @@ export class Wallet extends RemitClient {
       ...(invoice.timeout ? { escrow_timeout: invoice.timeout } : {}),
     });
     // Step 2: fund the escrow and return it.
+    const permit = options?.permit ?? await this.#autoPermit("escrow", invoice.amount);
     return this.#auth.post<Escrow>("/escrows", {
       invoice_id: invoiceId,
-      ...(options?.permit ? { permit: options.permit } : {}),
+      permit,
     });
   }
 
@@ -348,14 +364,15 @@ export class Wallet extends RemitClient {
 
   // ─── Metered Tabs ───────────────────────────────────────────────────────────
 
-  openTab(options: OpenTabOptions): Promise<Tab> {
+  async openTab(options: OpenTabOptions): Promise<Tab> {
+    const permit = options.permit ?? await this.#autoPermit("tab", options.limit);
     return this.#auth.post<Tab>("/tabs", {
       chain: this._chain,
       provider: options.to,
       limit_amount: options.limit,
       per_unit: options.perUnit,
       expiry: Math.floor(Date.now() / 1000) + (options.expires ?? 86400),
-      ...(options.permit ? { permit: options.permit } : {}),
+      permit,
     });
   }
 
@@ -407,13 +424,16 @@ export class Wallet extends RemitClient {
 
   // ─── Streaming ──────────────────────────────────────────────────────────────
 
-  openStream(options: OpenStreamOptions): Promise<Stream> {
+  async openStream(options: OpenStreamOptions): Promise<Stream> {
+    const permit = options.permit ?? (options.maxTotal != null
+      ? await this.#autoPermit("stream", options.maxTotal)
+      : undefined);
     return this.#auth.post<Stream>("/streams", {
       chain: this._chain,
       payee: options.to,
       rate_per_second: options.rate,
       max_total: options.maxTotal,
-      ...(options.permit ? { permit: options.permit } : {}),
+      ...(permit ? { permit } : {}),
     });
   }
 
@@ -423,14 +443,15 @@ export class Wallet extends RemitClient {
 
   // ─── Bounties ───────────────────────────────────────────────────────────────
 
-  postBounty(options: PostBountyOptions): Promise<Bounty> {
+  async postBounty(options: PostBountyOptions): Promise<Bounty> {
+    const permit = options.permit ?? await this.#autoPermit("bounty", options.amount);
     return this.#auth.post<Bounty>("/bounties", {
       chain: this._chain,
       amount: options.amount,
       task_description: options.task,
       deadline: options.deadline,
       max_attempts: options.maxAttempts ?? 10,
-      ...(options.permit ? { permit: options.permit } : {}),
+      permit,
     });
   }
 
@@ -447,13 +468,14 @@ export class Wallet extends RemitClient {
 
   // ─── Deposits ───────────────────────────────────────────────────────────────
 
-  placeDeposit(options: PlaceDepositOptions): Promise<Deposit> {
+  async placeDeposit(options: PlaceDepositOptions): Promise<Deposit> {
+    const permit = options.permit ?? await this.#autoPermit("deposit", options.amount);
     return this.#auth.post<Deposit>("/deposits", {
       chain: this._chain,
       provider: options.to,
       amount: options.amount,
       expiry: Math.floor(Date.now() / 1000) + options.expires,
-      ...(options.permit ? { permit: options.permit } : {}),
+      permit,
     });
   }
 

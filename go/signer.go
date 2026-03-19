@@ -100,12 +100,25 @@ var (
 		{Type: mustType("uint256")},  // timestamp
 		{Type: mustType("bytes32")},  // nonce
 	}
+	permitType = abi.Arguments{
+		{Type: mustType("bytes32")},  // typeHash
+		{Type: mustType("address")},  // owner
+		{Type: mustType("address")},  // spender
+		{Type: mustType("uint256")},  // value
+		{Type: mustType("uint256")},  // nonce
+		{Type: mustType("uint256")},  // deadline
+	}
 
 	domainTypeHash      = crypto.Keccak256Hash([]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"))
 	paymentTypeHash     = crypto.Keccak256Hash([]byte("Payment(address recipient,uint256 amount,bytes32 nonce)"))
 	apiRequestTypeHash  = crypto.Keccak256Hash([]byte("APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)"))
+	permitTypeHash      = crypto.Keccak256Hash([]byte("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"))
 	nameHash            = crypto.Keccak256Hash([]byte("remit.md"))
 	versionHash         = crypto.Keccak256Hash([]byte("0.1"))
+
+	// USDC EIP-712 domain uses name="USD Coin", version="2"
+	usdcNameHash    = crypto.Keccak256Hash([]byte("USD Coin"))
+	usdcVersionHash = crypto.Keccak256Hash([]byte("2"))
 )
 
 // computeDomainSeparator returns the EIP-712 domain separator for a given chain and contract.
@@ -146,6 +159,26 @@ func computeRequestDigest(chainID *big.Int, contract common.Address, method, pat
 		new(big.Int).SetUint64(timestamp),
 		nonce,
 	)
+	structHash := crypto.Keccak256Hash(packed)
+
+	return crypto.Keccak256Hash(
+		append([]byte("\x19\x01"), append(domain[:], structHash[:]...)...),
+	)
+}
+
+// computeUsdcDomainSeparator returns the EIP-712 domain separator for USDC (name="USD Coin", version="2").
+func computeUsdcDomainSeparator(chainID *big.Int, usdcAddress common.Address) [32]byte {
+	packed, _ := domainType.Pack(domainTypeHash, usdcNameHash, usdcVersionHash, chainID, usdcAddress)
+	return crypto.Keccak256Hash(packed)
+}
+
+// computePermitDigest computes the EIP-712 digest for an EIP-2612 Permit message.
+// Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address.
+// Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline).
+func computePermitDigest(chainID *big.Int, usdcAddress, owner, spender common.Address, value, nonce, deadline *big.Int) [32]byte {
+	domain := computeUsdcDomainSeparator(chainID, usdcAddress)
+
+	packed, _ := permitType.Pack(permitTypeHash, owner, spender, value, nonce, deadline)
 	structHash := crypto.Keccak256Hash(packed)
 
 	return crypto.Keccak256Hash(

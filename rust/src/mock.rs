@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::error::{codes, remit_err, RemitError};
 use crate::http::Transport;
 use crate::models::*;
+use crate::signer::Signer;
 use crate::wallet::Wallet;
 
 const MOCK_WALLET: &str = "0xMockWallet0000000000000000000000000001";
@@ -88,6 +89,8 @@ impl MockRemit {
 
     /// Return a `Wallet` backed by this mock. No private key required.
     pub fn wallet(&self) -> Wallet {
+        // Use Anvil test key #0 for mock permit signing.
+        let signer = Arc::new(MockSigner);
         Wallet {
             transport: Arc::new(MockTransport {
                 state: self.state.clone(),
@@ -95,7 +98,10 @@ impl MockRemit {
             address: MOCK_WALLET.to_string(),
             chain_id: ChainId::BASE_SEPOLIA,
             chain: "base".to_string(),
+            chain_key: "base-sepolia".to_string(),
             contracts_cache: Mutex::new(None),
+            rpc_url: "http://127.0.0.1:8545".to_string(),
+            signer,
         }
     }
 
@@ -147,6 +153,21 @@ impl MockRemit {
 impl Default for MockRemit {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ─── MockSigner ──────────────────────────────────────────────────────────────
+
+/// A no-op signer for mock wallets. Returns a dummy 65-byte signature.
+struct MockSigner;
+
+impl Signer for MockSigner {
+    fn sign(&self, _digest: &[u8; 32]) -> Result<Vec<u8>, RemitError> {
+        Ok(vec![0u8; 65])
+    }
+
+    fn address(&self) -> &str {
+        MOCK_WALLET
     }
 }
 

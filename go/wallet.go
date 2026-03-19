@@ -1,8 +1,14 @@
 package remitmd
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
+	"math/big"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -10,6 +16,20 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 )
+
+// usdcAddresses maps chain keys to the USDC contract address on that chain.
+var usdcAddresses = map[string]string{
+	"base-sepolia": "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+	"base":         "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+	"localhost":    "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+}
+
+// defaultRPCURLs maps chain keys to public JSON-RPC endpoints.
+var defaultRPCURLs = map[string]string{
+	"base-sepolia": "https://sepolia.base.org",
+	"base":         "https://mainnet.base.org",
+	"localhost":    "http://127.0.0.1:8545",
+}
 
 // Wallet is the primary remit.md client for agents that send payments.
 // All payment operations are methods on Wallet.
@@ -26,7 +46,9 @@ type Wallet struct {
 	signer         Signer
 	chainID        ChainID
 	chain          string
+	chainKey       string
 	testnet        bool
+	rpcURL         string
 	contractsCache *ContractAddresses
 }
 
@@ -38,6 +60,7 @@ type walletConfig struct {
 	testnet       bool
 	baseURL       string
 	routerAddress common.Address
+	rpcURL        string
 }
 
 // WithChain sets the target chain. Currently only "base" is supported. Default: "base".
@@ -59,6 +82,12 @@ func WithBaseURL(url string) Option {
 // This must match the ROUTER_ADDRESS configured on the server.
 func WithRouterAddress(addr string) Option {
 	return func(c *walletConfig) { c.routerAddress = common.HexToAddress(addr) }
+}
+
+// WithRPCURL overrides the JSON-RPC endpoint used for on-chain reads (e.g., permit nonces).
+// If not set, defaults to the public RPC for the selected chain.
+func WithRPCURL(url string) Option {
+	return func(c *walletConfig) { c.rpcURL = url }
 }
 
 // NewWallet creates a Wallet from a hex-encoded private key.
@@ -99,12 +128,19 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 		apiURL = cfg.baseURL
 	}
 
+	rpcURL := cfg.rpcURL
+	if rpcURL == "" {
+		rpcURL = defaultRPCURLs[chainKey]
+	}
+
 	return &Wallet{
 		http:    newHTTPClient(apiURL, cc.ChainID, cfg.routerAddress, signer),
 		signer:  signer,
 		chainID: cc.ChainID,
 		chain:   cfg.chain,
+		chainKey: chainKey,
 		testnet: cfg.testnet,
+		rpcURL:  rpcURL,
 	}, nil
 }
 
@@ -132,6 +168,9 @@ func FromEnv(opts ...Option) (*Wallet, error) {
 	}
 	if routerAddr := os.Getenv("REMITMD_ROUTER_ADDRESS"); routerAddr != "" {
 		envOpts = append(envOpts, WithRouterAddress(routerAddr))
+	}
+	if rpcURL := os.Getenv("REMITMD_RPC_URL"); rpcURL != "" {
+		envOpts = append(envOpts, WithRPCURL(rpcURL))
 	}
 
 	// Caller opts take precedence over env opts
@@ -195,6 +234,15 @@ func (w *Wallet) Pay(ctx context.Context, to string, amount decimal.Decimal, opt
 		o(cfg)
 	}
 
+	permit := cfg.Permit
+	if permit == nil {
+		p, err := w.autoPermit(ctx, "router", amount.InexactFloat64())
+		if err != nil {
+			return nil, err
+		}
+		permit = p
+	}
+
 	body := map[string]any{
 		"to":        to,
 		"amount":    amount.InexactFloat64(),
@@ -202,9 +250,7 @@ func (w *Wallet) Pay(ctx context.Context, to string, amount decimal.Decimal, opt
 		"chain":     w.chain,
 		"nonce":     randomHex(16),
 		"signature": "0x",
-	}
-	if cfg.Permit != nil {
-		body["permit"] = cfg.Permit
+		"permit":    permit,
 	}
 	var tx Transaction
 	if err := w.http.post(ctx, "/api/v0/payments/direct", body, &tx); err != nil {
@@ -325,9 +371,18 @@ func (w *Wallet) CreateEscrow(ctx context.Context, payee string, amount decimal.
 	}
 
 	// Step 2: fund the escrow.
-	escrowBody := map[string]any{"invoice_id": invoiceID}
-	if cfg.Permit != nil {
-		escrowBody["permit"] = cfg.Permit
+	permit := cfg.Permit
+	if permit == nil {
+		p, err := w.autoPermit(ctx, "escrow", amount.InexactFloat64())
+		if err != nil {
+			return nil, err
+		}
+		permit = p
+	}
+
+	escrowBody := map[string]any{
+		"invoice_id": invoiceID,
+		"permit":     permit,
 	}
 	var escrow Escrow
 	if err := w.http.post(ctx, "/api/v0/escrows", escrowBody, &escrow); err != nil {
@@ -408,15 +463,22 @@ func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.D
 	for _, o := range opts {
 		o(cfg)
 	}
+	permit := cfg.Permit
+	if permit == nil {
+		p, err := w.autoPermit(ctx, "tab", limit.InexactFloat64())
+		if err != nil {
+			return nil, err
+		}
+		permit = p
+	}
+
 	body := map[string]any{
 		"chain":        w.chain,
 		"provider":     provider,
 		"limit_amount": limit.InexactFloat64(),
 		"per_unit":     perUnit.InexactFloat64(),
 		"expiry":       int(time.Now().Unix()) + int(cfg.ExpiresIn.Seconds()),
-	}
-	if cfg.Permit != nil {
-		body["permit"] = cfg.Permit
+		"permit":       permit,
 	}
 	var tab Tab
 	if err := w.http.post(ctx, "/api/v0/tabs", body, &tab); err != nil {
@@ -526,14 +588,21 @@ func (w *Wallet) CreateStream(ctx context.Context, payee string, ratePerSecond d
 	for _, o := range opts {
 		o(cfg)
 	}
+	permit := cfg.Permit
+	if permit == nil {
+		p, err := w.autoPermit(ctx, "stream", maxTotal.InexactFloat64())
+		if err != nil {
+			return nil, err
+		}
+		permit = p
+	}
+
 	body := map[string]any{
 		"chain":           w.chain,
 		"payee":           payee,
 		"rate_per_second": ratePerSecond.String(),
 		"max_total":       maxTotal.String(),
-	}
-	if cfg.Permit != nil {
-		body["permit"] = cfg.Permit
+		"permit":          permit,
 	}
 	var stream Stream
 	if err := w.http.post(ctx, "/api/v0/streams", body, &stream); err != nil {
@@ -590,15 +659,22 @@ func (w *Wallet) CreateBounty(ctx context.Context, amount decimal.Decimal, task 
 	for _, o := range opts {
 		o(cfg)
 	}
+	permit := cfg.Permit
+	if permit == nil {
+		p, err := w.autoPermit(ctx, "bounty", amount.InexactFloat64())
+		if err != nil {
+			return nil, err
+		}
+		permit = p
+	}
+
 	body := map[string]any{
 		"chain":            w.chain,
 		"amount":           amount.InexactFloat64(),
 		"task_description": task,
 		"deadline":         deadline,
 		"max_attempts":     cfg.MaxAttempts,
-	}
-	if cfg.Permit != nil {
-		body["permit"] = cfg.Permit
+		"permit":           permit,
 	}
 	var bounty Bounty
 	if err := w.http.post(ctx, "/api/v0/bounties", body, &bounty); err != nil {
@@ -698,14 +774,22 @@ func (w *Wallet) PlaceDeposit(ctx context.Context, provider string, amount decim
 	for _, o := range opts {
 		o(cfg)
 	}
+
+	permit := cfg.Permit
+	if permit == nil {
+		p, err := w.autoPermit(ctx, "deposit", amount.InexactFloat64())
+		if err != nil {
+			return nil, err
+		}
+		permit = p
+	}
+
 	body := map[string]any{
 		"chain":    w.chain,
 		"provider": provider,
 		"amount":   amount.InexactFloat64(),
 		"expiry":   int(time.Now().Unix()) + int(expires.Seconds()),
-	}
-	if cfg.Permit != nil {
-		body["permit"] = cfg.Permit
+		"permit":   permit,
 	}
 	var deposit Deposit
 	if err := w.http.post(ctx, "/api/v0/deposits", body, &deposit); err != nil {
@@ -835,6 +919,163 @@ func (w *Wallet) CreateWithdrawLink(ctx context.Context) (*LinkResponse, error) 
 		return nil, err
 	}
 	return &lr, nil
+}
+
+// ─── Permit ───────────────────────────────────────────────────────────────────
+
+// SignPermit signs an EIP-2612 permit for USDC approval.
+// Auto-fetches the on-chain nonce and sets a default deadline of 1 hour.
+// The spender is the contract that will call transferFrom (e.g., Router, Escrow).
+// Amount is in USDC (e.g., 5.0 for $5.00).
+// An optional deadline Unix timestamp can be provided; defaults to 1 hour from now.
+func (w *Wallet) SignPermit(ctx context.Context, spender string, amount float64, deadline ...int64) (*PermitSignature, error) {
+	usdcAddr, ok := usdcAddresses[w.chainKey]
+	if !ok {
+		return nil, remitErr("UNSUPPORTED_CHAIN",
+			fmt.Sprintf("no USDC address configured for chain %q", w.chainKey),
+			map[string]any{"chain": w.chainKey},
+		)
+	}
+
+	nonce, err := w.fetchUsdcNonce(ctx, usdcAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	dl := time.Now().Unix() + 3600
+	if len(deadline) > 0 && deadline[0] > 0 {
+		dl = deadline[0]
+	}
+
+	// Convert USDC amount to base units (6 decimals)
+	rawAmount := new(big.Int).SetUint64(uint64(amount * 1e6))
+	chainID := new(big.Int).SetUint64(uint64(w.chainID))
+
+	digest := computePermitDigest(
+		chainID,
+		common.HexToAddress(usdcAddr),
+		w.signer.Address(),
+		common.HexToAddress(spender),
+		rawAmount,
+		new(big.Int).SetUint64(nonce),
+		new(big.Int).SetInt64(dl),
+	)
+
+	sig, err := w.signer.Sign(digest)
+	if err != nil {
+		return nil, fmt.Errorf("sign permit: %w", err)
+	}
+
+	// Split signature into v, r, s
+	r := "0x" + hex.EncodeToString(sig[0:32])
+	s := "0x" + hex.EncodeToString(sig[32:64])
+	v := int(sig[64])
+
+	return &PermitSignature{
+		Value:    int(rawAmount.Int64()),
+		Deadline: int(dl),
+		V:        v,
+		R:        r,
+		S:        s,
+	}, nil
+}
+
+// fetchUsdcNonce fetches the current EIP-2612 nonce for this wallet from the USDC contract.
+// Returns 0 if no RPC URL is configured (mock/test mode).
+func (w *Wallet) fetchUsdcNonce(ctx context.Context, usdcAddr string) (uint64, error) {
+	if w.rpcURL == "" {
+		return 0, nil
+	}
+	// Encode: nonces(address) selector = 0x7ecebe00 + padded address
+	addrHex := strings.ToLower(strings.TrimPrefix(w.signer.Address().Hex(), "0x"))
+	padded := fmt.Sprintf("%064s", addrHex)
+	data := "0x7ecebe00" + padded
+
+	payload := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "eth_call",
+		"params": []any{
+			map[string]string{"to": usdcAddr, "data": data},
+			"latest",
+		},
+	}
+
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return 0, fmt.Errorf("marshal RPC request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, w.rpcURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return 0, fmt.Errorf("create RPC request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, remitErr(ErrCodeNetworkError,
+			fmt.Sprintf("RPC call to %s failed: %s", w.rpcURL, err),
+			map[string]any{"rpc_url": w.rpcURL},
+		)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("read RPC response: %w", err)
+	}
+
+	var rpcResp struct {
+		Result string         `json:"result"`
+		Error  map[string]any `json:"error"`
+	}
+	if err := json.Unmarshal(respBytes, &rpcResp); err != nil {
+		return 0, fmt.Errorf("parse RPC response: %w", err)
+	}
+	if rpcResp.Error != nil {
+		msg, _ := rpcResp.Error["message"].(string)
+		return 0, fmt.Errorf("RPC error fetching nonce: %s", msg)
+	}
+
+	result := rpcResp.Result
+	if result == "" || result == "0x" {
+		return 0, nil
+	}
+	nonce := new(big.Int)
+	nonce.SetString(strings.TrimPrefix(result, "0x"), 16)
+	return nonce.Uint64(), nil
+}
+
+// autoPermit signs a permit for the given contract type and amount.
+// Used internally by payment methods when no explicit permit is provided.
+func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64) (*PermitSignature, error) {
+	contracts, err := w.GetContracts(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var spender string
+	switch contract {
+	case "router":
+		spender = contracts.Router
+	case "escrow":
+		spender = contracts.Escrow
+	case "tab":
+		spender = contracts.Tab
+	case "stream":
+		spender = contracts.Stream
+	case "bounty":
+		spender = contracts.Bounty
+	case "deposit":
+		spender = contracts.Deposit
+	default:
+		return nil, fmt.Errorf("unknown contract type: %s", contract)
+	}
+	if spender == "" {
+		return nil, fmt.Errorf("no %s contract address available", contract)
+	}
+	return w.SignPermit(ctx, spender, amount)
 }
 
 // ─── Webhooks ─────────────────────────────────────────────────────────────────

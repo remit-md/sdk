@@ -2,8 +2,25 @@
 
 require "bigdecimal"
 require "bigdecimal/util"
+require "net/http"
+require "uri"
+require "json"
 
 module Remitmd
+  # Known USDC contract addresses per chain (EIP-2612 compatible).
+  USDC_ADDRESSES = {
+    "base-sepolia" => "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+    "base" => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "localhost" => "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  }.freeze
+
+  # Default JSON-RPC endpoints per chain (for nonce fetching).
+  DEFAULT_RPC_URLS = {
+    "base-sepolia" => "https://sepolia.base.org",
+    "base" => "https://mainnet.base.org",
+    "localhost" => "http://127.0.0.1:8545",
+  }.freeze
+
   # Primary remit.md client. All payment operations are methods on RemitWallet.
   #
   # @example Quickstart
@@ -22,12 +39,17 @@ module Remitmd
     # @param signer [Signer, nil]      custom signer (pass instead of private_key)
     # @param chain [String]            chain name — "base", "base_sepolia"
     # @param api_url [String, nil]     override API base URL
+    # @param rpc_url [String, nil]     override JSON-RPC URL for on-chain queries
     # @param transport [Object, nil]   inject mock transport (used by MockRemit)
-    def initialize(private_key: nil, signer: nil, chain: "base", api_url: nil, router_address: nil, transport: nil)
+    def initialize(private_key: nil, signer: nil, chain: "base", api_url: nil, router_address: nil, rpc_url: nil, transport: nil)
       if transport
         # MockRemit path: transport + signer injected directly
         @signer    = signer
         @transport = transport
+        @chain_key = "base-sepolia"
+        @chain_id  = ChainId::BASE_SEPOLIA
+        @rpc_url   = DEFAULT_RPC_URLS["base-sepolia"]
+        @mock_mode = true
         return
       end
 
@@ -39,6 +61,8 @@ module Remitmd
       end
 
       @signer = signer || PrivateKeySigner.new(private_key)
+      # Normalize chain key for USDC/RPC lookups (underscore → hyphen).
+      @chain_key = chain.tr("_", "-")
       # Normalize to the base chain name (strip testnet suffix) for use in pay body.
       # The server accepts "base" — not "base_sepolia" etc.
       @chain  = chain.sub(/_sepolia\z/, "").sub(/-sepolia\z/, "")
@@ -46,24 +70,26 @@ module Remitmd
         raise ArgumentError, "Unknown chain: #{chain}. Valid: #{CHAIN_CONFIG.keys.join(", ")}"
       end
       base_url       = api_url || cfg[:url]
-      chain_id       = cfg[:chain_id]
+      @chain_id      = cfg[:chain_id]
       router_address ||= ""
+      @rpc_url = rpc_url || ENV["REMITMD_RPC_URL"] || DEFAULT_RPC_URLS[@chain_key] || DEFAULT_RPC_URLS["base-sepolia"]
       @transport = HttpTransport.new(
         base_url:       base_url,
         signer:         @signer,
-        chain_id:       chain_id,
+        chain_id:       @chain_id,
         router_address: router_address
       )
     end
 
     # Build a RemitWallet from environment variables.
-    # Reads: REMITMD_PRIVATE_KEY, REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS.
+    # Reads: REMITMD_PRIVATE_KEY, REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS, REMITMD_RPC_URL.
     def self.from_env
       key            = ENV.fetch("REMITMD_PRIVATE_KEY") { raise ArgumentError, "REMITMD_PRIVATE_KEY not set" }
       chain          = ENV.fetch("REMITMD_CHAIN", "base")
       api_url        = ENV["REMITMD_API_URL"]
       router_address = ENV["REMITMD_ROUTER_ADDRESS"]
-      new(private_key: key, chain: chain, api_url: api_url, router_address: router_address)
+      rpc_url        = ENV["REMITMD_RPC_URL"]
+      new(private_key: key, chain: chain, api_url: api_url, router_address: router_address, rpc_url: rpc_url)
     end
 
     # The Ethereum address associated with this wallet.
@@ -128,14 +154,15 @@ module Remitmd
     # @param to [String] recipient 0x-prefixed address
     # @param amount [Numeric, BigDecimal] amount in USDC (e.g. 1.50)
     # @param memo [String, nil] optional note
-    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
+    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
     # @return [Transaction]
     def pay(to, amount, memo: nil, permit: nil)
       validate_address!(to)
       validate_amount!(amount)
+      resolved = permit || auto_permit("router", amount.to_f)
       nonce = SecureRandom.hex(16)
       body = { to: to, amount: amount.to_s, task: memo || "", chain: @chain, nonce: nonce, signature: "0x" }
-      body[:permit] = permit.to_h if permit
+      body[:permit] = resolved.to_h
       Transaction.new(@transport.post("/payments/direct", body))
     end
 
@@ -146,11 +173,12 @@ module Remitmd
     # @param amount [Numeric] amount in USDC
     # @param memo [String, nil] optional note
     # @param expires_in_secs [Integer, nil] optional expiry in seconds from now
-    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
+    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
     # @return [Escrow]
     def create_escrow(payee, amount, memo: nil, expires_in_secs: nil, permit: nil)
       validate_address!(payee)
       validate_amount!(amount)
+      resolved = permit || auto_permit("escrow", amount.to_f)
 
       # Step 1: create invoice on server.
       invoice_id = SecureRandom.hex(16)
@@ -165,8 +193,7 @@ module Remitmd
       @transport.post("/invoices", inv_body)
 
       # Step 2: fund the escrow.
-      esc_body = { invoice_id: invoice_id }
-      esc_body[:permit] = permit.to_h if permit
+      esc_body = { invoice_id: invoice_id, permit: resolved.to_h }
       Escrow.new(@transport.post("/escrows", esc_body))
     end
 
@@ -207,19 +234,20 @@ module Remitmd
     # @param limit_amount [Numeric] maximum tab credit in USDC
     # @param per_unit [Numeric] USDC per API call
     # @param expires_in_secs [Integer] optional expiry duration in seconds (default: 86400)
-    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
+    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
     # @return [Tab]
     def create_tab(provider, limit_amount, per_unit = 0.0, expires_in_secs: 86_400, permit: nil)
       validate_address!(provider)
       validate_amount!(limit_amount)
+      resolved = permit || auto_permit("tab", limit_amount.to_f)
       body = {
         chain: @chain,
         provider: provider,
         limit_amount: limit_amount.to_f,
         per_unit: per_unit.to_f,
-        expiry: Time.now.to_i + expires_in_secs
+        expiry: Time.now.to_i + expires_in_secs,
+        permit: resolved.to_h
       }
-      body[:permit] = permit.to_h if permit
       Tab.new(@transport.post("/tabs", body))
     end
 
@@ -310,25 +338,92 @@ module Remitmd
       @signer.sign(digest)
     end
 
+    # ─── EIP-2612 Permit ─────────────────────────────────────────────────────
+
+    # Sign an EIP-2612 permit for USDC approval.
+    # Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address
+    # Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline)
+    # @param spender [String] contract address that will be approved
+    # @param value [Integer] amount in USDC base units (6 decimals)
+    # @param deadline [Integer] permit deadline (Unix timestamp)
+    # @param nonce [Integer] current permit nonce for this wallet
+    # @param usdc_address [String, nil] override the USDC contract address
+    # @return [PermitSignature]
+    def sign_usdc_permit(spender, value, deadline, nonce = 0, usdc_address: nil)
+      usdc_addr = usdc_address || USDC_ADDRESSES[@chain_key] || ""
+      chain_id = @chain_id || ChainId::BASE_SEPOLIA
+
+      # Domain separator for USDC (EIP-2612)
+      domain_type_hash = keccak256_raw(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+      )
+      name_hash = keccak256_raw("USD Coin")
+      version_hash = keccak256_raw("2")
+      chain_id_enc = abi_uint256(chain_id)
+      contract_enc = abi_address(usdc_addr)
+
+      domain_data = domain_type_hash + name_hash + version_hash + chain_id_enc + contract_enc
+      domain_sep = keccak256_raw(domain_data)
+
+      # Permit struct hash
+      type_hash = keccak256_raw(
+        "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+      )
+      owner_enc    = abi_address(address)
+      spender_enc  = abi_address(spender)
+      value_enc    = abi_uint256(value)
+      nonce_enc    = abi_uint256(nonce)
+      deadline_enc = abi_uint256(deadline)
+
+      struct_data = type_hash + owner_enc + spender_enc + value_enc + nonce_enc + deadline_enc
+      struct_hash = keccak256_raw(struct_data)
+
+      # EIP-712 digest
+      digest = keccak256_raw("\x19\x01".b + domain_sep + struct_hash)
+      sig_hex = @signer.sign(digest)
+
+      # Parse r, s, v from the 65-byte signature
+      sig_bytes = sig_hex.delete_prefix("0x")
+      r = "0x#{sig_bytes[0, 64]}"
+      s = "0x#{sig_bytes[64, 64]}"
+      v = sig_bytes[128, 2].to_i(16)
+
+      PermitSignature.new(value: value, deadline: deadline, v: v, r: r, s: s)
+    end
+
+    # Convenience: sign a USDC permit. Auto-fetches nonce, defaults deadline to 1 hour.
+    # @param spender [String] contract address to approve (e.g. router, escrow)
+    # @param amount [Numeric] amount in USDC (e.g. 5.0 for $5.00)
+    # @param deadline [Integer, nil] optional Unix timestamp; defaults to 1 hour from now
+    # @return [PermitSignature]
+    def sign_permit(spender, amount, deadline: nil)
+      usdc_addr = USDC_ADDRESSES[@chain_key] || ""
+      nonce = fetch_usdc_nonce(usdc_addr)
+      dl = deadline || (Time.now.to_i + 3600)
+      raw = (amount * 1_000_000).round.to_i
+      sign_usdc_permit(spender, raw, dl, nonce, usdc_address: usdc_addr)
+    end
+
     # ─── Streams (Payment Streaming) ─────────────────────────────────────────
 
     # Create a real-time payment stream.
     # @param payee [String] 0x-prefixed address of the stream recipient
     # @param rate_per_second [Numeric] USDC per second
     # @param max_total [Numeric] maximum total USDC for the stream
-    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
+    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
     # @return [Stream]
     def create_stream(payee, rate_per_second, max_total, permit: nil)
       validate_address!(payee)
       validate_amount!(rate_per_second)
       validate_amount!(max_total)
+      resolved = permit || auto_permit("stream", max_total.to_f)
       body = {
         chain: @chain,
         payee: payee,
         rate_per_second: rate_per_second.to_s,
-        max_total: max_total.to_s
+        max_total: max_total.to_s,
+        permit: resolved.to_h
       }
-      body[:permit] = permit.to_h if permit
       Stream.new(@transport.post("/streams", body))
     end
 
@@ -353,18 +448,19 @@ module Remitmd
     # @param task_description [String] task description
     # @param deadline [Integer] deadline as Unix timestamp
     # @param max_attempts [Integer] maximum submission attempts (default: 10)
-    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
+    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
     # @return [Bounty]
     def create_bounty(amount, task_description, deadline, max_attempts: 10, permit: nil)
       validate_amount!(amount)
+      resolved = permit || auto_permit("bounty", amount.to_f)
       body = {
         chain: @chain,
         amount: amount.to_f,
         task_description: task_description,
         deadline: deadline,
-        max_attempts: max_attempts
+        max_attempts: max_attempts,
+        permit: resolved.to_h
       }
-      body[:permit] = permit.to_h if permit
       Bounty.new(@transport.post("/bounties", body))
     end
 
@@ -406,18 +502,19 @@ module Remitmd
     # @param provider [String] 0x-prefixed provider address
     # @param amount [Numeric] amount in USDC
     # @param expires_in_secs [Integer] expiry duration in seconds (default: 3600)
-    # @param permit [PermitSignature, nil] optional EIP-2612 permit for gasless approval
+    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
     # @return [Deposit]
     def place_deposit(provider, amount, expires_in_secs: 3600, permit: nil)
       validate_address!(provider)
       validate_amount!(amount)
+      resolved = permit || auto_permit("deposit", amount.to_f)
       body = {
         chain: @chain,
         provider: provider,
         amount: amount.to_f,
-        expiry: Time.now.to_i + expires_in_secs
+        expiry: Time.now.to_i + expires_in_secs,
+        permit: resolved.to_h
       }
-      body[:permit] = permit.to_h if permit
       Deposit.new(@transport.post("/deposits", body))
     end
 
@@ -514,7 +611,7 @@ module Remitmd
       )
     end
 
-    # ─── EIP-712 helpers (used by sign_tab_charge) ────────────────────────
+    # ─── EIP-712 helpers (used by sign_tab_charge / sign_usdc_permit) ─────
 
     def keccak256_raw(data)
       Remitmd::Keccak.digest(data.b)
@@ -528,5 +625,69 @@ module Remitmd
       hex = addr.to_s.delete_prefix("0x").rjust(64, "0")
       [hex].pack("H*")
     end
+
+    # ─── Permit helpers ──────────────────────────────────────────────────
+
+    # Fetch the current EIP-2612 nonce for this wallet from the USDC contract.
+    # Uses JSON-RPC eth_call with selector 0x7ecebe00 (nonces(address)).
+    # @param usdc_address [String] the USDC contract address
+    # @return [Integer] current nonce
+    def fetch_usdc_nonce(usdc_address)
+      return 0 if @mock_mode
+
+      padded = address.downcase.delete_prefix("0x").rjust(64, "0")
+      data = "0x7ecebe00#{padded}"
+      payload = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_call",
+        params: [{ to: usdc_address, data: data }, "latest"]
+      }
+
+      uri = URI.parse(@rpc_url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = (uri.scheme == "https")
+      http.read_timeout = 10
+      http.open_timeout = 5
+
+      req = Net::HTTP::Post.new(uri.request_uri)
+      req["Content-Type"] = "application/json"
+      req.body = payload.to_json
+
+      resp = http.request(req)
+      result = JSON.parse(resp.body)
+
+      if result["error"]
+        msg = result["error"].is_a?(Hash) ? result["error"]["message"] : result["error"].to_s
+        raise RemitError.new(RemitError::NETWORK_ERROR, "RPC error fetching nonce: #{msg}")
+      end
+
+      (result["result"] || "0x0").to_i(16)
+    end
+
+    # Auto-sign a permit for the given contract type and amount.
+    # @param contract [String] contract key — "router", "escrow", "tab", etc.
+    # @param amount [Numeric] amount in USDC
+    # @return [PermitSignature]
+    def auto_permit(contract, amount)
+      contracts = get_contracts
+      spender = contracts.send(contract.to_sym)
+      raise RemitError.new(
+        RemitError::SERVER_ERROR,
+        "No #{contract} contract address available"
+      ) unless spender
+
+      sign_permit(spender, amount)
+    end
+
+    # Spender contract mapping for auto_permit.
+    PERMIT_SPENDER = {
+      pay:            :router,
+      create_escrow:  :escrow,
+      create_tab:     :tab,
+      create_stream:  :stream,
+      create_bounty:  :bounty,
+      place_deposit:  :deposit,
+    }.freeze
   end
 end

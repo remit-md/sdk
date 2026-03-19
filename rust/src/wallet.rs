@@ -3,10 +3,14 @@ use serde_json::{json, Value};
 use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 
 use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
-use crate::http::{chain_config, HttpTransport, Transport};
+use crate::http::{
+    chain_config, compute_permit_digest, default_rpc_url, fetch_usdc_nonce, usdc_address,
+    HttpTransport, Transport,
+};
 use crate::models::*;
 use crate::signer::{PrivateKeySigner, Signer};
 
@@ -51,7 +55,13 @@ pub struct Wallet {
     pub(crate) address: String,
     pub(crate) chain_id: ChainId,
     pub(crate) chain: String,
+    /// Full chain key (e.g. "base-sepolia") for USDC/RPC lookups.
+    pub(crate) chain_key: String,
     pub(crate) contracts_cache: Mutex<Option<ContractAddresses>>,
+    /// JSON-RPC URL for on-chain reads (nonce fetching).
+    pub(crate) rpc_url: String,
+    /// Retained signer reference for permit signing.
+    pub(crate) signer: Arc<dyn Signer>,
 }
 
 impl Wallet {
@@ -71,6 +81,7 @@ impl Wallet {
             testnet: false,
             base_url: None,
             router_address: None,
+            rpc_url: None,
         }
     }
 
@@ -82,6 +93,7 @@ impl Wallet {
             testnet: false,
             base_url: None,
             router_address: None,
+            rpc_url: None,
         }
     }
 
@@ -90,6 +102,7 @@ impl Wallet {
     /// - `REMITMD_CHAIN` — chain name (default: `"base"`)
     /// - `REMITMD_TESTNET` — `"1"`, `"true"`, or `"yes"` for testnet
     /// - `REMITMD_ROUTER_ADDRESS` — EIP-712 verifying contract address
+    /// - `REMITMD_RPC_URL` — JSON-RPC URL for on-chain reads (optional, defaults per chain)
     pub fn from_env() -> Result<Self, RemitError> {
         let key = env::var("REMITMD_KEY").map_err(|_| {
             remit_err_ctx(
@@ -106,6 +119,7 @@ impl Wallet {
             Ok("1") | Ok("true") | Ok("yes")
         );
         let router_address = env::var("REMITMD_ROUTER_ADDRESS").unwrap_or_default();
+        let rpc_url = env::var("REMITMD_RPC_URL").ok();
 
         let mut builder = Self::new(&key).chain(&chain);
         if testnet {
@@ -113,6 +127,9 @@ impl Wallet {
         }
         if !router_address.is_empty() {
             builder = builder.router_address(&router_address);
+        }
+        if let Some(url) = rpc_url {
+            builder = builder.rpc_url(&url);
         }
         builder.build()
     }
@@ -154,6 +171,117 @@ impl Wallet {
     }
 }
 
+// ─── EIP-2612 Permit ─────────────────────────────────────────────────────────
+
+impl Wallet {
+    /// Sign an EIP-2612 permit for USDC approval.
+    ///
+    /// Auto-fetches the on-chain nonce and sets a default deadline of 1 hour from now.
+    ///
+    /// # Arguments
+    /// - `spender` — contract address that will call `transferFrom` (e.g. Router, Escrow)
+    /// - `amount` — USDC amount (e.g. 1.50 for $1.50)
+    /// - `deadline` — optional Unix timestamp; defaults to 1 hour from now
+    pub async fn sign_permit(
+        &self,
+        spender: &str,
+        amount: f64,
+        deadline: Option<u64>,
+    ) -> Result<PermitSignature, RemitError> {
+        validate_address(spender)?;
+
+        let usdc_addr = usdc_address(&self.chain_key).ok_or_else(|| {
+            remit_err(
+                codes::CHAIN_MISMATCH,
+                format!("no USDC address known for chain {:?}", self.chain_key),
+            )
+        })?;
+
+        let nonce = fetch_usdc_nonce(&self.rpc_url, usdc_addr, &self.address).await?;
+
+        let dl = deadline.unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                + 3600
+        });
+
+        // Convert human amount (e.g. 1.50) to base units (1_500_000).
+        let raw_amount = (amount * 1_000_000.0).round() as u64;
+
+        let digest = compute_permit_digest(
+            self.chain_id.0,
+            usdc_addr,
+            &self.address,
+            spender,
+            raw_amount,
+            nonce,
+            dl,
+        );
+
+        let sig_bytes = self.signer.sign(&digest)?;
+
+        // Split 65-byte signature into r (32), s (32), v (1).
+        if sig_bytes.len() != 65 {
+            return Err(remit_err(
+                codes::INVALID_SIGNATURE,
+                format!("expected 65-byte signature, got {}", sig_bytes.len()),
+            ));
+        }
+        let r = format!("0x{}", hex::encode(&sig_bytes[0..32]));
+        let s = format!("0x{}", hex::encode(&sig_bytes[32..64]));
+        let v = sig_bytes[64];
+
+        Ok(PermitSignature {
+            value: raw_amount,
+            deadline: dl,
+            v,
+            r,
+            s,
+        })
+    }
+
+    /// Auto-sign a permit for the given contract type and USDC amount.
+    ///
+    /// Looks up the contract address from `get_contracts()`, then calls `sign_permit`.
+    async fn auto_permit(
+        &self,
+        contract: &str,
+        amount: f64,
+    ) -> Result<PermitSignature, RemitError> {
+        let contracts = self.get_contracts().await?;
+        let spender = match contract {
+            "router" => &contracts.router,
+            "escrow" => &contracts.escrow,
+            "tab" => &contracts.tab,
+            "stream" => &contracts.stream,
+            "bounty" => &contracts.bounty,
+            "deposit" => &contracts.deposit,
+            _ => {
+                return Err(remit_err(
+                    codes::SERVER_ERROR,
+                    format!("unknown contract type: {contract}"),
+                ))
+            }
+        };
+        self.sign_permit(spender, amount, None).await
+    }
+
+    /// Try to auto-sign a permit. Returns `Some(permit)` on success, `None` on failure.
+    ///
+    /// This is used by the convenience payment methods so they gracefully fall back
+    /// to server-side approval when the RPC is unreachable (e.g., in mock tests).
+    async fn try_auto_permit(
+        &self,
+        contract: &str,
+        amount: Decimal,
+    ) -> Option<PermitSignature> {
+        let amount_f64 = decimal_to_f64(amount);
+        self.auto_permit(contract, amount_f64).await.ok()
+    }
+}
+
 // ─── Payment methods ─────────────────────────────────────────────────────────
 
 impl Wallet {
@@ -177,7 +305,8 @@ impl Wallet {
     /// let tx = wallet.pay("0xAgent...", dec!(0.003)).await?;
     /// ```
     pub async fn pay(&self, to: &str, amount: Decimal) -> Result<Transaction, RemitError> {
-        self.pay_with_memo(to, amount, "").await
+        let permit = self.try_auto_permit("router", amount).await;
+        self.pay_full(to, amount, "", permit).await
     }
 
     /// Send a direct USDC payment with a permit for gasless approval.
@@ -197,7 +326,8 @@ impl Wallet {
         amount: Decimal,
         memo: &str,
     ) -> Result<Transaction, RemitError> {
-        self.pay_full(to, amount, memo, None).await
+        let permit = self.try_auto_permit("router", amount).await;
+        self.pay_full(to, amount, memo, permit).await
     }
 
     /// Send a direct USDC payment with an optional memo and permit.
@@ -271,7 +401,8 @@ impl Wallet {
     /// - `payee` — the agent that will receive funds on release
     /// - `amount` — total USDC to lock
     pub async fn create_escrow(&self, payee: &str, amount: Decimal) -> Result<Escrow, RemitError> {
-        self.create_escrow_full(payee, amount, "", &[], &[], None, None)
+        let permit = self.try_auto_permit("escrow", amount).await;
+        self.create_escrow_full(payee, amount, "", &[], &[], None, permit)
             .await
     }
 
@@ -389,7 +520,8 @@ impl Wallet {
         limit_amount: Decimal,
         per_unit: Decimal,
     ) -> Result<Tab, RemitError> {
-        self.create_tab_full(provider, limit_amount, per_unit, None, None)
+        let permit = self.try_auto_permit("tab", limit_amount).await;
+        self.create_tab_full(provider, limit_amount, per_unit, None, permit)
             .await
     }
 
@@ -413,7 +545,8 @@ impl Wallet {
         per_unit: Decimal,
         expiry: u64,
     ) -> Result<Tab, RemitError> {
-        self.create_tab_full(provider, limit_amount, per_unit, Some(expiry), None)
+        let permit = self.try_auto_permit("tab", limit_amount).await;
+        self.create_tab_full(provider, limit_amount, per_unit, Some(expiry), permit)
             .await
     }
 
@@ -540,7 +673,8 @@ impl Wallet {
         rate_per_second: Decimal,
         max_total: Decimal,
     ) -> Result<Stream, RemitError> {
-        self.create_stream_with_permit(payee, rate_per_second, max_total, None)
+        let permit = self.try_auto_permit("stream", max_total).await;
+        self.create_stream_with_permit(payee, rate_per_second, max_total, permit)
             .await
     }
 
@@ -594,7 +728,8 @@ impl Wallet {
         task_description: &str,
         deadline: u64,
     ) -> Result<Bounty, RemitError> {
-        self.create_bounty_full(amount, task_description, deadline, None, None)
+        let permit = self.try_auto_permit("bounty", amount).await;
+        self.create_bounty_full(amount, task_description, deadline, None, permit)
             .await
     }
 
@@ -721,7 +856,9 @@ impl Wallet {
         amount: Decimal,
         expiry: u64,
     ) -> Result<Deposit, RemitError> {
-        self.lock_deposit_full(provider, amount, expiry, None).await
+        let permit = self.try_auto_permit("deposit", amount).await;
+        self.lock_deposit_full(provider, amount, expiry, permit)
+            .await
     }
 
     /// Lock a security deposit with a permit for gasless approval.
@@ -875,6 +1012,7 @@ pub struct WalletBuilder<S> {
     pub(crate) testnet: bool,
     pub(crate) base_url: Option<String>,
     pub(crate) router_address: Option<String>,
+    pub(crate) rpc_url: Option<String>,
 }
 
 impl<S> WalletBuilder<S> {
@@ -902,6 +1040,13 @@ impl<S> WalletBuilder<S> {
         self.router_address = Some(addr.to_string());
         self
     }
+
+    /// Set the JSON-RPC URL for on-chain reads (permit nonce fetching).
+    /// Falls back to `REMITMD_RPC_URL` env var, then chain defaults.
+    pub fn rpc_url(mut self, url: &str) -> Self {
+        self.rpc_url = Some(url.to_string());
+        self
+    }
 }
 
 impl WalletBuilder<WithKey> {
@@ -914,6 +1059,7 @@ impl WalletBuilder<WithKey> {
             self.testnet,
             self.base_url,
             self.router_address,
+            self.rpc_url,
         )
     }
 }
@@ -927,6 +1073,7 @@ impl WalletBuilder<WithSigner> {
             self.testnet,
             self.base_url,
             self.router_address,
+            self.rpc_url,
         )
     }
 }
@@ -937,6 +1084,7 @@ fn build_wallet(
     testnet: bool,
     base_url_override: Option<String>,
     router_address: Option<String>,
+    rpc_url_override: Option<String>,
 ) -> Result<Wallet, RemitError> {
     let chain_key = if testnet {
         format!("{chain}-sepolia")
@@ -956,11 +1104,21 @@ fn build_wallet(
     let api_url = base_url_override.unwrap_or_else(|| cfg.api_url.to_string());
     let router_addr = router_address.unwrap_or_default();
     let address = signer.address().to_string();
+
+    // Resolve RPC URL: explicit override > env var > chain default.
+    let resolved_rpc_url = rpc_url_override
+        .or_else(|| env::var("REMITMD_RPC_URL").ok())
+        .unwrap_or_else(|| {
+            default_rpc_url(&chain_key)
+                .unwrap_or("https://sepolia.base.org")
+                .to_string()
+        });
+
     let transport = Arc::new(HttpTransport::new(
         api_url,
         cfg.chain_id,
         router_addr,
-        signer,
+        signer.clone(),
     ));
 
     Ok(Wallet {
@@ -968,7 +1126,10 @@ fn build_wallet(
         address,
         chain_id: ChainId(cfg.chain_id),
         chain: chain.to_string(),
+        chain_key,
         contracts_cache: Mutex::new(None),
+        rpc_url: resolved_rpc_url,
+        signer,
     })
 }
 
@@ -993,6 +1154,11 @@ pub(crate) fn validate_address(addr: &str) -> Result<(), RemitError> {
         ));
     }
     Ok(())
+}
+
+/// Convert a `Decimal` USDC amount to `f64` for permit signing.
+fn decimal_to_f64(d: Decimal) -> f64 {
+    d.to_string().parse::<f64>().unwrap_or(0.0)
 }
 
 /// Validate a USDC amount. Returns descriptive errors for out-of-range values.

@@ -71,6 +71,8 @@ public final class RemitMd {
         }
         String routerAddress = System.getenv("REMITMD_ROUTER_ADDRESS");
         if (routerAddress != null && !routerAddress.isBlank()) b = b.routerAddress(routerAddress);
+        String rpcUrl = System.getenv("REMITMD_RPC_URL");
+        if (rpcUrl != null && !rpcUrl.isBlank()) b = b.rpcUrl(rpcUrl);
         return b.build();
     }
 
@@ -91,6 +93,7 @@ public final class RemitMd {
         private boolean testnet = false;
         private String baseUrl = null;
         private String routerAddress = null;
+        private String rpcUrl = null;
 
         private Builder(Signer signer) {
             this.signer = signer;
@@ -120,6 +123,12 @@ public final class RemitMd {
             return this;
         }
 
+        /** Sets the JSON-RPC URL for on-chain calls (e.g. fetching USDC nonce). */
+        public Builder rpcUrl(String url) {
+            this.rpcUrl = url;
+            return this;
+        }
+
         /** Builds the {@link Wallet}. */
         public Wallet build() {
             String chainKey = testnet ? chain + "-sepolia" : chain;
@@ -133,7 +142,7 @@ public final class RemitMd {
             String apiUrl = baseUrl != null ? baseUrl : API_URLS.get(chainKey);
             long chainId = CHAIN_IDS.get(chainKey);
             ApiClient client = new ApiClient(apiUrl, chainId, routerAddress, signer);
-            return new Wallet(client, signer, chainId, chain);
+            return new Wallet(client, signer, chainId, chainKey, rpcUrl);
         }
     }
 }

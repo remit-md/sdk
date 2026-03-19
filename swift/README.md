@@ -58,20 +58,34 @@ final class PaymentTests: XCTestCase {
 
 ## Permits (Gasless USDC Approval)
 
-```swift
-let contracts = try await wallet.getContracts()
+All payment methods auto-sign EIP-2612 permits when no explicit permit is provided.
+The wallet fetches the on-chain nonce, signs the permit, and includes it in the request automatically.
 
-// Use permits on any payment method
+```swift
+// Auto-permit (recommended) — just call the method, permit is handled internally
+let tx = try await wallet.pay(to: "0xRecipient...", amount: 5.0)
+
+// Manual permit — sign yourself if you need control over deadline/nonce
+let contracts = try await wallet.getContracts()
+let permit = try await wallet.signPermit(spender: contracts.router, amount: 5.0)
 let tx = try await wallet.pay(to: "0xRecipient...", amount: 5.0, permit: permit)
+
+// Low-level permit — full control over all parameters
+let permit = try wallet.signUsdcPermit(
+    spender: contracts.router,
+    value: 5_000_000,    // base units (6 decimals)
+    deadline: Int(Date().timeIntervalSince1970) + 3600,
+    nonce: 0
+)
 ```
 
-Permits are optional on: `pay`, `createEscrow`, `openTab`, `startStream`, `postBounty`, `placeDeposit`.
+Auto-permit works on: `pay`, `createEscrow`, `openTab`, `startStream`, `postBounty`, `placeDeposit`.
 
 ## Payment models
 
 ### Direct payment
 ```swift
-let tx = try await wallet.pay(to: "0xRecipient...", amount: 0.10, memo: "API call", permit: permit)
+let tx = try await wallet.pay(to: "0xRecipient...", amount: 0.10, memo: "API call")
 ```
 
 ### Escrow (conditional release)
@@ -85,7 +99,7 @@ let released = try await wallet.releaseEscrow(id: escrow.id)
 
 ### Metered tab (pay-as-you-go)
 ```swift
-let tab = try await wallet.openTab(provider: "0xService...", limitAmount: 10.0, perUnit: 0.001, permit: permit)
+let tab = try await wallet.openTab(provider: "0xService...", limitAmount: 10.0, perUnit: 0.001)
 
 // Provider charges with EIP-712 signature
 let sig = try RemitWallet.signTabCharge(
@@ -115,7 +129,7 @@ let awarded = try await wallet.awardBounty(id: bounty.id, winner: "0xWinner...")
 
 ### Security deposit
 ```swift
-let deposit = try await wallet.placeDeposit(provider: "0xOperator...", amount: 100.0, permit: permit)
+let deposit = try await wallet.placeDeposit(provider: "0xOperator...", amount: 100.0)
 let returned = try await wallet.returnDeposit(id: deposit.id)
 ```
 

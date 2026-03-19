@@ -30,23 +30,15 @@ Or pass a key directly:
 var wallet = new Wallet("0xYourPrivateKey");
 ```
 
-## Permits (Gasless USDC Approval)
-
-```csharp
-var contracts = await wallet.GetContractsAsync();
-
-// Use permits with any payment method
-var tx = await wallet.PayAsync("0xAgent...", 1.00m, permit: permit);
-```
-
-Permits are optional on: `PayAsync`, `CreateEscrowAsync`, `CreateTabAsync`, `CreateStreamAsync`, `CreateBountyAsync`, `LockDepositAsync`.
-
 ## Payment Primitives
+
+Permits are **automatic** — the SDK signs an EIP-2612 USDC permit before every
+payment, so you never need to deal with `approve()` transactions.
 
 ### Direct Payment
 
 ```csharp
-var tx = await wallet.PayAsync("0xAgent...", 1.00m, "for data analysis", permit);
+var tx = await wallet.PayAsync("0xAgent...", 1.00m, "for data analysis");
 ```
 
 ### Escrow (pay-on-delivery)
@@ -60,7 +52,8 @@ var tx = await wallet.ReleaseEscrowAsync(escrow.Id);
 ### Tab (micro-payment channel)
 
 ```csharp
-var tab = await wallet.CreateTabAsync("0xAPIProvider...", 5m, 0.001m, permit: permit);
+var contracts = await wallet.GetContractsAsync();
+var tab = await wallet.CreateTabAsync("0xAPIProvider...", 5m, 0.001m);
 
 // Provider charges with EIP-712 signature
 var sig = wallet.SignTabCharge(contracts.Tab, tab.Id, 1000000L, 1);
@@ -74,7 +67,7 @@ await wallet.CloseTabAsync(tab.Id);
 
 ```csharp
 // Pay $1/hour = 0.000277 USDC/second
-var stream = await wallet.CreateStreamAsync("0xAgent...", ratePerSecond: 0.000277m, deposit: 10m);
+var stream = await wallet.CreateStreamAsync("0xAgent...", 0.000277m, 10m);
 ```
 
 ### Bounty (open reward)
@@ -194,6 +187,38 @@ var wallet = new Wallet(key, chain: "base", testnet: true);
 
 // Local / self-hosted
 var wallet = new Wallet(key, baseUrl: "http://localhost:3000/v0");
+```
+
+## Advanced: Manual Permits
+
+Permits are signed automatically by every payment method. If you need manual
+control (custom deadline, pre-signed permits, batching), use `SignPermitAsync`
+or `SignUsdcPermit` directly:
+
+```csharp
+// Auto-fetches nonce, defaults deadline to 1 hour
+var permit = await wallet.SignPermitAsync(spender: "0xRouterAddr...", amount: 5.00m);
+
+// Pass explicit permit to skip auto-signing
+var tx = await wallet.PayAsync("0xAgent...", 5.00m, permit: permit);
+```
+
+For full control over every parameter:
+
+```csharp
+var permit = wallet.SignUsdcPermit(
+    spender: "0xRouterAddr...",
+    value: 5_000_000,          // raw USDC base units (6 decimals)
+    nonce: 0,                  // fetch with FetchUsdcNonceAsync or track manually
+    deadline: DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 600
+);
+```
+
+You can also override the JSON-RPC URL used for nonce fetching:
+
+```csharp
+var wallet = new Wallet(key, chain: "base", testnet: true, rpcUrl: "https://my-rpc.example.com");
+// or via environment variable: REMITMD_RPC_URL
 ```
 
 ## License

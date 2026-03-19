@@ -5,12 +5,18 @@ import md.remit.models.*;
 import md.remit.signer.Signer;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 
 /**
  * Primary remit.md client for agents that send and receive payments.
@@ -26,17 +32,31 @@ import java.util.Map;
  */
 public class Wallet {
 
+    private static final Map<String, String> USDC_ADDRESSES = Map.of(
+        "base-sepolia", "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+        "base", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "localhost", "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    );
+
+    private static final Map<String, String> DEFAULT_RPC_URLS = Map.of(
+        "base-sepolia", "https://sepolia.base.org",
+        "base", "https://mainnet.base.org",
+        "localhost", "http://127.0.0.1:8545"
+    );
+
     private final ApiClient client;
     private final Signer signer;
     private final long chainId;
     private final String chain;
+    private final String rpcUrl;
     private volatile ContractAddresses contractsCache;
 
-    Wallet(ApiClient client, Signer signer, long chainId, String chain) {
+    Wallet(ApiClient client, Signer signer, long chainId, String chain, String rpcUrl) {
         this.client = client;
         this.signer = signer;
         this.chainId = chainId;
         this.chain = chain;
+        this.rpcUrl = rpcUrl;
     }
 
     /** The Ethereum address (0x-prefixed) of this wallet. */
@@ -90,6 +110,7 @@ public class Wallet {
     public Transaction pay(String to, BigDecimal amount, String memo, PermitSignature permit) {
         validateAddress(to);
         validateAmount(amount);
+        PermitSignature p = permit != null ? permit : autoPermit("router", amount);
         byte[] nb = new byte[16];
         new java.security.SecureRandom().nextBytes(nb);
         String nonce = java.util.HexFormat.of().formatHex(nb);
@@ -100,7 +121,7 @@ public class Wallet {
         body.put("chain", chain);
         body.put("nonce", nonce);
         body.put("signature", "0x");
-        if (permit != null) body.put("permit", permit);
+        if (p != null) body.put("permit", p);
         return client.post("/api/v0/payments/direct", body, Transaction.class);
     }
 
@@ -163,6 +184,7 @@ public class Wallet {
                                 PermitSignature permit) {
         validateAddress(payee);
         validateAmount(amount);
+        PermitSignature p = permit != null ? permit : autoPermit("escrow", amount);
 
         // Step 1: create invoice on server.
         byte[] nb = new byte[16];
@@ -187,7 +209,7 @@ public class Wallet {
         // Step 2: fund the escrow.
         Map<String, Object> escrowBody = new java.util.HashMap<>();
         escrowBody.put("invoice_id", invoiceId);
-        if (permit != null) escrowBody.put("permit", permit);
+        if (p != null) escrowBody.put("permit", p);
 
         return client.post("/api/v0/escrows", escrowBody, Escrow.class);
     }
@@ -245,6 +267,7 @@ public class Wallet {
     /** Opens a tab with an optional expiry and permit. */
     public Tab createTab(String provider, BigDecimal limitAmount, BigDecimal perUnit, int expiresInSeconds, PermitSignature permit) {
         validateAddress(provider);
+        PermitSignature p = permit != null ? permit : autoPermit("tab", limitAmount);
         long expiry = Instant.now().getEpochSecond() + expiresInSeconds;
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("chain", chain);
@@ -252,7 +275,7 @@ public class Wallet {
         body.put("limit_amount", limitAmount.toPlainString());
         body.put("per_unit", perUnit.toPlainString());
         body.put("expiry", expiry);
-        if (permit != null) body.put("permit", permit);
+        if (p != null) body.put("permit", p);
         return client.post("/api/v0/tabs", body, Tab.class);
     }
 
@@ -359,12 +382,13 @@ public class Wallet {
     /** Starts a per-second USDC payment stream with a permit for gasless approval. */
     public Stream createStream(String payee, BigDecimal ratePerSecond, BigDecimal maxTotal, PermitSignature permit) {
         validateAddress(payee);
+        PermitSignature p = permit != null ? permit : autoPermit("stream", maxTotal);
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("chain", chain);
         body.put("payee", payee);
         body.put("rate_per_second", ratePerSecond.toPlainString());
         body.put("max_total", maxTotal.toPlainString());
-        if (permit != null) body.put("permit", permit);
+        if (p != null) body.put("permit", p);
         return client.post("/api/v0/streams", body, Stream.class);
     }
 
@@ -399,13 +423,14 @@ public class Wallet {
     /** Posts a bounty with max attempts and an optional permit. */
     public Bounty createBounty(BigDecimal amount, String taskDescription, long deadline, int maxAttempts, PermitSignature permit) {
         validateAmount(amount);
+        PermitSignature p = permit != null ? permit : autoPermit("bounty", amount);
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("chain", chain);
         body.put("amount", amount.toPlainString());
         body.put("task_description", taskDescription);
         body.put("deadline", deadline);
         body.put("max_attempts", maxAttempts);
-        if (permit != null) body.put("permit", permit);
+        if (p != null) body.put("permit", p);
         return client.post("/api/v0/bounties", body, Bounty.class);
     }
 
@@ -472,13 +497,14 @@ public class Wallet {
     public Deposit lockDeposit(String provider, BigDecimal amount, int expiresIn, PermitSignature permit) {
         validateAddress(provider);
         validateAmount(amount);
+        PermitSignature p = permit != null ? permit : autoPermit("deposit", amount);
         long expiry = Instant.now().getEpochSecond() + expiresIn;
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("chain", chain);
         body.put("provider", provider);
         body.put("amount", amount.toPlainString());
         body.put("expiry", expiry);
-        if (permit != null) body.put("permit", permit);
+        if (p != null) body.put("permit", p);
         return client.post("/api/v0/deposits", body, Deposit.class);
     }
 
@@ -578,6 +604,206 @@ public class Wallet {
     /** Generates a one-time URL for the operator to withdraw funds. */
     public LinkResponse createWithdrawLink() {
         return client.post("/api/v0/links/withdraw", Map.of(), LinkResponse.class);
+    }
+
+    // ─── Permit Signing ────────────────────────────────────────────────────
+
+    /**
+     * Signs an EIP-2612 permit for USDC approval (low-level).
+     *
+     * <p>Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address.
+     * Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline).
+     *
+     * @param spender   contract address that will call transferFrom
+     * @param value     amount in USDC base units (6 decimals, e.g. 1_000_000 = $1.00)
+     * @param deadline  Unix timestamp after which the permit is invalid
+     * @param nonce     the owner's current EIP-2612 nonce on the USDC contract
+     * @return PermitSignature with v, r, s, value, deadline
+     */
+    public PermitSignature signUsdcPermit(String spender, long value, long deadline, long nonce) {
+        return signUsdcPermit(spender, value, deadline, nonce, null);
+    }
+
+    /**
+     * Signs an EIP-2612 permit for USDC approval (low-level, custom USDC address).
+     *
+     * @param spender       contract address that will call transferFrom
+     * @param value         amount in USDC base units (6 decimals)
+     * @param deadline      Unix timestamp after which the permit is invalid
+     * @param nonce         the owner's current EIP-2612 nonce on the USDC contract
+     * @param usdcAddress   override USDC contract address (null = chain default)
+     * @return PermitSignature with v, r, s, value, deadline
+     */
+    public PermitSignature signUsdcPermit(String spender, long value, long deadline, long nonce, String usdcAddress) {
+        String usdc = usdcAddress != null ? usdcAddress : USDC_ADDRESSES.getOrDefault(chain, "");
+        if (usdc.isEmpty()) {
+            throw new RemitError(ErrorCodes.INVALID_CHAIN,
+                "No USDC address known for chain \"" + chain + "\". Pass usdcAddress explicitly.",
+                Map.of("chain", chain));
+        }
+
+        // Domain: name="USD Coin", version="2"
+        byte[] domainTypeHash = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                .getBytes(StandardCharsets.UTF_8));
+        byte[] nameHash = keccak256("USD Coin".getBytes(StandardCharsets.UTF_8));
+        byte[] versionHash = keccak256("2".getBytes(StandardCharsets.UTF_8));
+        byte[] chainIdBytes = ApiClient.toUint256(chainId);
+        byte[] contractBytes = addressToBytes32(usdc);
+
+        byte[] domainSep = keccak256(concatBytes(domainTypeHash, nameHash, versionHash, chainIdBytes, contractBytes));
+
+        // Struct hash: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline)
+        byte[] typeHash = keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+                .getBytes(StandardCharsets.UTF_8));
+
+        byte[] structHash = keccak256(concatBytes(
+            typeHash,
+            addressToBytes32(signer.address()),
+            addressToBytes32(spender),
+            ApiClient.toUint256(value),
+            ApiClient.toUint256(nonce),
+            ApiClient.toUint256(deadline)));
+
+        // EIP-712 digest: "\x19\x01" || domainSeparator || structHash
+        byte[] finalData = new byte[2 + 32 + 32];
+        finalData[0] = 0x19;
+        finalData[1] = 0x01;
+        System.arraycopy(domainSep, 0, finalData, 2, 32);
+        System.arraycopy(structHash, 0, finalData, 34, 32);
+        byte[] digest = keccak256(finalData);
+
+        try {
+            byte[] sig = signer.sign(digest);
+            String r = "0x" + HexFormat.of().formatHex(sig, 0, 32);
+            String s = "0x" + HexFormat.of().formatHex(sig, 32, 64);
+            int v = sig[64] & 0xFF;
+            return new PermitSignature(value, deadline, v, r, s);
+        } catch (Exception e) {
+            throw new RemitError(ErrorCodes.INVALID_SIGNATURE,
+                "Failed to sign USDC permit. Check that your private key is valid.",
+                Map.of());
+        }
+    }
+
+    /**
+     * Convenience: sign an EIP-2612 permit for USDC approval.
+     * Auto-fetches the on-chain nonce and sets a default deadline (1 hour from now).
+     *
+     * @param spender  contract address that will call transferFrom (e.g. Router, Escrow)
+     * @param amount   amount in USDC (e.g. 1.50 for $1.50)
+     * @return PermitSignature ready to pass to any payment method
+     */
+    public PermitSignature signPermit(String spender, BigDecimal amount) {
+        return signPermit(spender, amount, OptionalLong.empty());
+    }
+
+    /**
+     * Convenience: sign an EIP-2612 permit for USDC approval with optional deadline.
+     *
+     * @param spender  contract address that will call transferFrom
+     * @param amount   amount in USDC (e.g. 1.50 for $1.50)
+     * @param deadline optional Unix timestamp; defaults to 1 hour from now if empty
+     * @return PermitSignature ready to pass to any payment method
+     */
+    public PermitSignature signPermit(String spender, BigDecimal amount, OptionalLong deadline) {
+        String usdc = USDC_ADDRESSES.getOrDefault(chain, "");
+        if (usdc.isEmpty()) {
+            throw new RemitError(ErrorCodes.INVALID_CHAIN,
+                "No USDC address known for chain \"" + chain + "\". Cannot auto-sign permit.",
+                Map.of("chain", chain));
+        }
+        long nonce = fetchUsdcNonce(usdc);
+        long dl = deadline.orElse(Instant.now().getEpochSecond() + 3600);
+        long rawAmount = amount.movePointRight(6).longValueExact();
+        return signUsdcPermit(spender, rawAmount, dl, nonce);
+    }
+
+    /**
+     * Auto-signs a permit for the given contract type and amount.
+     * Used internally by payment methods when no explicit permit is provided.
+     * Returns null if permit signing is unavailable (e.g. mock context, no RPC).
+     */
+    private PermitSignature autoPermit(String contractField, BigDecimal amount) {
+        try {
+            ContractAddresses contracts = getContracts();
+            String spender;
+            switch (contractField) {
+                case "router":  spender = contracts.router;  break;
+                case "escrow":  spender = contracts.escrow;  break;
+                case "tab":     spender = contracts.tab;     break;
+                case "stream":  spender = contracts.stream;  break;
+                case "bounty":  spender = contracts.bounty;  break;
+                case "deposit": spender = contracts.deposit;  break;
+                default:        return null;
+            }
+            if (spender == null || spender.isBlank()) return null;
+            return signPermit(spender, amount);
+        } catch (Exception e) {
+            // Permit signing unavailable (no RPC, mock context, etc.)
+            // Fall through — server will handle approval via other means
+            return null;
+        }
+    }
+
+    /**
+     * Fetches the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
+     */
+    private long fetchUsdcNonce(String usdcAddress) {
+        // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
+        String addr = signer.address().toLowerCase().replace("0x", "");
+        String paddedAddress = String.format("%64s", addr).replace(' ', '0');
+        String data = "0x7ecebe00" + paddedAddress;
+
+        String rpc = this.rpcUrl;
+        if (rpc == null || rpc.isBlank()) {
+            rpc = DEFAULT_RPC_URLS.getOrDefault(chain, "");
+        }
+        if (rpc.isEmpty()) {
+            throw new RemitError(ErrorCodes.INVALID_CHAIN,
+                "No RPC URL available for chain \"" + chain + "\". " +
+                "Set REMITMD_RPC_URL or pass rpcUrl in the builder.",
+                Map.of("chain", chain));
+        }
+
+        String jsonBody = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_call\"," +
+            "\"params\":[{\"to\":\"" + usdcAddress + "\",\"data\":\"" + data + "\"},\"latest\"]}";
+
+        try {
+            HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+            HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(rpc))
+                .header("Content-Type", "application/json")
+                .timeout(Duration.ofSeconds(15))
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+
+            // Parse "result" field from JSON-RPC response
+            String body = resp.body();
+            int resultIdx = body.indexOf("\"result\"");
+            if (resultIdx == -1) {
+                throw new RemitError(ErrorCodes.CHAIN_ERROR,
+                    "RPC call to nonces() failed: no result in response.",
+                    Map.of("response", body.length() > 200 ? body.substring(0, 200) : body));
+            }
+            // Extract hex value between quotes after "result":
+            int colonIdx = body.indexOf(':', resultIdx);
+            int startQuote = body.indexOf('"', colonIdx);
+            int endQuote = body.indexOf('"', startQuote + 1);
+            String hex = body.substring(startQuote + 1, endQuote);
+            if (hex.startsWith("0x") || hex.startsWith("0X")) hex = hex.substring(2);
+            return new BigInteger(hex, 16).longValueExact();
+        } catch (RemitError e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RemitError(ErrorCodes.CHAIN_ERROR,
+                "Failed to fetch USDC nonce via RPC: " + e.getMessage(),
+                Map.of("rpc_url", rpc));
+        }
     }
 
     // ─── Private crypto helpers ──────────────────────────────────────────────

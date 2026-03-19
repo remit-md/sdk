@@ -27,14 +27,30 @@ defmodule RemitMd.Wallet do
 
   @min_amount Decimal.new("0.000001")
 
-  defstruct [:signer, :transport, :mock_pid, :address, :chain]
+  # Known USDC contract addresses per chain (EIP-2612 compatible).
+  @usdc_addresses %{
+    "base-sepolia" => "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+    "base"         => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "localhost"    => "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  }
+
+  # Default JSON-RPC URLs per chain (for nonce fetching).
+  @default_rpc_urls %{
+    "base-sepolia" => "https://sepolia.base.org",
+    "base"         => "https://mainnet.base.org",
+    "localhost"    => "http://127.0.0.1:8545"
+  }
+
+  defstruct [:signer, :transport, :mock_pid, :address, :chain, :chain_key, :rpc_url]
 
   @type t :: %__MODULE__{
     signer:    term(),
     transport: term(),
     mock_pid:  pid() | nil,
     address:   String.t(),
-    chain:     String.t() | nil
+    chain:     String.t() | nil,
+    chain_key: String.t() | nil,
+    rpc_url:   String.t() | nil
   }
 
   # ─── Constructors ─────────────────────────────────────────────────────────
@@ -56,7 +72,10 @@ defmodule RemitMd.Wallet do
 
     if mock_pid do
       signer = MockSigner.new(Keyword.get(opts, :address, MockSigner.new().address))
-      %__MODULE__{signer: signer, transport: nil, mock_pid: mock_pid, address: signer.address, chain: "base"}
+      %__MODULE__{
+        signer: signer, transport: nil, mock_pid: mock_pid, address: signer.address,
+        chain: "base", chain_key: "base-sepolia", rpc_url: @default_rpc_urls["base-sepolia"]
+      }
     else
       signer =
         cond do
@@ -72,10 +91,20 @@ defmodule RemitMd.Wallet do
 
       transport = Http.new(opts |> Keyword.put(:signer, signer))
       address = get_address(signer)
+      raw_chain = opts |> Keyword.get(:chain, "base")
+      # chain_key preserves the full name for USDC/RPC lookups (e.g. "base_sepolia" → "base-sepolia")
+      chain_key = raw_chain |> String.replace("_", "-")
       # Normalize to base chain name (strip testnet suffix) for use in pay body.
       # The server accepts "base" — not "base_sepolia" etc.
-      chain = opts |> Keyword.get(:chain, "base") |> base_chain_name()
-      %__MODULE__{signer: signer, transport: transport, mock_pid: nil, address: address, chain: chain}
+      chain = base_chain_name(raw_chain)
+      rpc_url = Keyword.get(opts, :rpc_url)
+        || System.get_env("REMITMD_RPC_URL")
+        || @default_rpc_urls[chain_key]
+        || @default_rpc_urls["base-sepolia"]
+      %__MODULE__{
+        signer: signer, transport: transport, mock_pid: nil, address: address,
+        chain: chain, chain_key: chain_key, rpc_url: rpc_url
+      }
     end
   end
 
@@ -93,10 +122,12 @@ defmodule RemitMd.Wallet do
     chain          = System.get_env("REMITMD_CHAIN", "base")
     api_url        = System.get_env("REMITMD_API_URL")
     router_address = System.get_env("REMITMD_ROUTER_ADDRESS")
+    rpc_url        = System.get_env("REMITMD_RPC_URL")
 
     opts = [private_key: key, chain: chain]
     opts = if api_url, do: Keyword.put(opts, :api_url, api_url), else: opts
     opts = if router_address, do: Keyword.put(opts, :router_address, router_address), else: opts
+    opts = if rpc_url, do: Keyword.put(opts, :rpc_url, rpc_url), else: opts
 
     new(opts)
   end
@@ -202,6 +233,7 @@ defmodule RemitMd.Wallet do
   def pay(%__MODULE__{} = w, to, amount_usdc, opts \\ []) do
     with :ok <- validate_address(to),
          :ok <- validate_amount(amount_usdc) do
+      permit = resolve_permit(w, "router", amount_usdc, opts)
       nonce = :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
       body = %{
         to: to,
@@ -212,7 +244,7 @@ defmodule RemitMd.Wallet do
         signature: "0x",
         metadata: Keyword.get(opts, :metadata)
       }
-      body = maybe_add_permit(body, opts)
+      body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
 
       with {:ok, data} <- call_mock_or_http(w, fn pid ->
              MockRemit.do_pay(pid, w.address, to, amount_usdc, opts)
@@ -241,6 +273,7 @@ defmodule RemitMd.Wallet do
   def create_escrow(%__MODULE__{} = w, to, amount_usdc, opts \\ []) do
     with :ok <- validate_address(to),
          :ok <- validate_amount(amount_usdc) do
+      permit = resolve_permit(w, "escrow", amount_usdc, opts)
       milestones  = Keyword.get(opts, :milestones, ["complete"])
       description = Keyword.get(opts, :description)
       expires_in  = Keyword.get(opts, :expires_in, 7 * 86_400)
@@ -252,7 +285,7 @@ defmodule RemitMd.Wallet do
         description: description,
         expires_in:  expires_in
       }
-      body = maybe_add_permit(body, opts)
+      body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
 
       with {:ok, data} <- call_mock_or_http(w, fn pid ->
              MockRemit.do_create_escrow(pid, w.address, to, amount_usdc, opts)
@@ -325,6 +358,7 @@ defmodule RemitMd.Wallet do
   def create_tab(%__MODULE__{} = w, provider, limit_amount, per_unit, opts \\ []) do
     with :ok <- validate_address(provider),
          :ok <- validate_amount(limit_amount) do
+      permit = resolve_permit(w, "tab", limit_amount, opts)
       expires_in = Keyword.get(opts, :expires_in, 86_400)
       expiry = :os.system_time(:second) + expires_in
 
@@ -335,7 +369,7 @@ defmodule RemitMd.Wallet do
         per_unit: per_unit,
         expiry: expiry
       }
-      body = maybe_add_permit(body, opts)
+      body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
 
       with {:ok, data} <- do_call(w, :post, "/tabs", body) do
         {:ok, Tab.from_map(data)}
@@ -432,6 +466,95 @@ defmodule RemitMd.Wallet do
     call_sign(w.signer, digest)
   end
 
+  # ─── EIP-2612 Permit ─────────────────────────────────────────────────
+
+  @doc """
+  Sign an EIP-2612 permit for USDC approval.
+
+  Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address
+  Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline)
+
+  ## Parameters
+
+  - `spender` — contract address that will be approved as spender
+  - `value` — amount in USDC base units (6 decimals, integer)
+  - `deadline` — permit deadline (Unix timestamp)
+
+  ## Options
+
+  - `:nonce` — current permit nonce for this wallet (default: 0)
+  - `:usdc_address` — override the USDC contract address
+
+  Returns `%PermitSignature{}`.
+  """
+  def sign_usdc_permit(%__MODULE__{} = w, spender, value, deadline, opts \\ []) do
+    keccak = &RemitMd.Keccak.hash/1
+
+    nonce = Keyword.get(opts, :nonce, 0)
+    usdc_addr = Keyword.get(opts, :usdc_address) || @usdc_addresses[w.chain_key] || ""
+
+    # Domain separator for USDC (EIP-2612)
+    domain_type_hash =
+      keccak.("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+
+    name_hash = keccak.("USD Coin")
+    version_hash = keccak.("2")
+    chain_id_enc = <<chain_id(w)::unsigned-big-integer-size(256)>>
+    contract_enc = address_to_bytes32(usdc_addr)
+
+    domain_separator =
+      keccak.(domain_type_hash <> name_hash <> version_hash <> chain_id_enc <> contract_enc)
+
+    # Permit struct hash
+    permit_type_hash =
+      keccak.("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+
+    owner_enc    = address_to_bytes32(w.address)
+    spender_enc  = address_to_bytes32(spender)
+    value_enc    = <<value::unsigned-big-integer-size(256)>>
+    nonce_enc    = <<nonce::unsigned-big-integer-size(256)>>
+    deadline_enc = <<deadline::unsigned-big-integer-size(256)>>
+
+    struct_hash =
+      keccak.(permit_type_hash <> owner_enc <> spender_enc <> value_enc <> nonce_enc <> deadline_enc)
+
+    # Final: keccak256(0x1901 || domainSeparator || structHash)
+    digest = keccak.(<<0x19, 0x01>> <> domain_separator <> struct_hash)
+
+    sig_hex = call_sign(w.signer, digest)
+
+    # Parse r, s, v from the 65-byte signature
+    sig_str = String.trim_leading(sig_hex, "0x")
+    r = "0x" <> String.slice(sig_str, 0, 64)
+    s = "0x" <> String.slice(sig_str, 64, 64)
+    v = String.slice(sig_str, 128, 2) |> String.to_integer(16)
+
+    %PermitSignature{value: value, deadline: deadline, v: v, r: r, s: s}
+  end
+
+  @doc """
+  Convenience: sign an EIP-2612 permit for USDC approval.
+  Auto-fetches the on-chain nonce and sets a default deadline (1 hour from now).
+
+  ## Parameters
+
+  - `spender` — contract address to approve (e.g. router, escrow)
+  - `amount` — amount in USDC (string, e.g. `"5.00"`)
+
+  ## Options
+
+  - `:deadline` — optional Unix timestamp; defaults to 1 hour from now
+
+  Returns `%PermitSignature{}`.
+  """
+  def sign_permit(%__MODULE__{} = w, spender, amount, opts \\ []) do
+    usdc_addr = @usdc_addresses[w.chain_key] || ""
+    nonce = fetch_usdc_nonce(w, usdc_addr)
+    deadline = Keyword.get(opts, :deadline) || (:os.system_time(:second) + 3600)
+    raw = amount |> to_string() |> Decimal.new() |> Decimal.mult(1_000_000) |> Decimal.round(0) |> Decimal.to_integer()
+    sign_usdc_permit(w, spender, raw, deadline, nonce: nonce, usdc_address: usdc_addr)
+  end
+
   @doc """
   Start a payment stream (continuous USDC flow per second).
 
@@ -451,13 +574,14 @@ defmodule RemitMd.Wallet do
   """
   def create_stream(%__MODULE__{} = w, payee, rate_per_second, max_total, opts \\ []) do
     with :ok <- validate_address(payee) do
+      permit = resolve_permit(w, "stream", max_total, opts)
       body = %{
         chain: w.chain,
         payee: payee,
         rate_per_second: rate_per_second,
         max_total: max_total
       }
-      body = maybe_add_permit(body, opts)
+      body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
 
       with {:ok, data} <- do_call(w, :post, "/streams", body) do
         {:ok, Stream.from_map(data)}
@@ -494,6 +618,7 @@ defmodule RemitMd.Wallet do
   """
   def create_bounty(%__MODULE__{} = w, amount, task_description, deadline, opts \\ []) do
     with :ok <- validate_amount(amount) do
+      permit = resolve_permit(w, "bounty", amount, opts)
       body = %{
         chain:            w.chain,
         amount:           amount,
@@ -501,7 +626,7 @@ defmodule RemitMd.Wallet do
         deadline:         deadline,
         max_attempts:     Keyword.get(opts, :max_attempts, 10)
       }
-      body = maybe_add_permit(body, opts)
+      body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
 
       with {:ok, data} <- do_call(w, :post, "/bounties", body) do
         {:ok, Bounty.from_map(data)}
@@ -642,6 +767,7 @@ defmodule RemitMd.Wallet do
   def place_deposit(%__MODULE__{} = w, provider, amount, opts \\ []) do
     with :ok <- validate_address(provider),
          :ok <- validate_amount(amount) do
+      permit = resolve_permit(w, "deposit", amount, opts)
       expires_in = Keyword.get(opts, :expires_in, 3600)
       expiry = :os.system_time(:second) + expires_in
 
@@ -651,7 +777,7 @@ defmodule RemitMd.Wallet do
         amount:   amount,
         expiry:   expiry
       }
-      body = maybe_add_permit(body, opts)
+      body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
 
       with {:ok, data} <- do_call(w, :post, "/deposits", body) do
         {:ok, Deposit.from_map(data)}
@@ -786,6 +912,69 @@ defmodule RemitMd.Wallet do
     case Keyword.get(opts, :permit) do
       %PermitSignature{} = p -> Map.put(body, :permit, PermitSignature.to_map(p))
       _ -> body
+    end
+  end
+
+  # Resolve permit: use explicit from opts, or auto-sign. Returns PermitSignature or nil (mock mode).
+  defp resolve_permit(%__MODULE__{mock_pid: pid}, _contract, _amount, _opts) when pid != nil, do: nil
+
+  defp resolve_permit(%__MODULE__{} = w, contract, amount, opts) do
+    case Keyword.get(opts, :permit) do
+      %PermitSignature{} = p -> p
+      _ -> auto_permit(w, contract, amount)
+    end
+  end
+
+  # ─── Permit helpers ──────────────────────────────────────────────
+
+  # Auto-sign a permit for the given contract type and amount.
+  # Used by payment methods when no explicit permit is provided.
+  defp auto_permit(%__MODULE__{} = w, contract, amount) do
+    {:ok, contracts} = get_contracts(w)
+    spender = Map.get(contracts, String.to_existing_atom(contract))
+
+    unless spender do
+      raise Error.new(Error.server_error(), "No #{contract} contract address available")
+    end
+
+    sign_permit(w, spender, amount)
+  end
+
+  # Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
+  # Uses eth_call with selector 0x7ecebe00 (nonces(address)).
+  defp fetch_usdc_nonce(%__MODULE__{mock_pid: pid}, _usdc_address) when pid != nil, do: 0
+
+  defp fetch_usdc_nonce(%__MODULE__{} = w, usdc_address) do
+    padded = w.address |> String.downcase() |> String.trim_leading("0x") |> String.pad_leading(64, "0")
+    data = "0x7ecebe00#{padded}"
+
+    payload = Jason.encode!(%{
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_call",
+      params: [%{to: usdc_address, data: data}, "latest"]
+    })
+
+    url = w.rpc_url |> String.to_charlist()
+    headers = [{~c"content-type", ~c"application/json"}]
+    body_charlist = String.to_charlist(payload)
+
+    case :httpc.request(:post, {url, headers, ~c"application/json", body_charlist},
+           [timeout: 10_000, connect_timeout: 5_000], []) do
+      {:ok, {{_version, _status, _reason}, _resp_headers, resp_body}} ->
+        result = Jason.decode!(to_string(resp_body))
+
+        if result["error"] do
+          msg = if is_map(result["error"]), do: result["error"]["message"], else: inspect(result["error"])
+          raise Error.new(Error.network_error(), "RPC error fetching nonce: #{msg}")
+        end
+
+        (result["result"] || "0x0")
+        |> String.trim_leading("0x")
+        |> String.to_integer(16)
+
+      {:error, reason} ->
+        raise Error.new(Error.network_error(), "Network error fetching nonce: #{inspect(reason)}")
     end
   end
 

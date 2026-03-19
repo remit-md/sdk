@@ -1052,7 +1052,7 @@ func (w *Wallet) fetchUsdcNonce(ctx context.Context, usdcAddr string) (uint64, e
 func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64) (*PermitSignature, error) {
 	contracts, err := w.GetContracts(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil // graceful: proceed without permit
 	}
 
 	var spender string
@@ -1070,12 +1070,16 @@ func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64
 	case "deposit":
 		spender = contracts.Deposit
 	default:
-		return nil, fmt.Errorf("unknown contract type: %s", contract)
+		return nil, nil
 	}
 	if spender == "" {
-		return nil, fmt.Errorf("no %s contract address available", contract)
+		return nil, nil // graceful: contract not available
 	}
-	return w.SignPermit(ctx, spender, amount)
+	p, err := w.SignPermit(ctx, spender, amount)
+	if err != nil {
+		return nil, nil // graceful: RPC unreachable
+	}
+	return p, nil
 }
 
 // ─── Webhooks ─────────────────────────────────────────────────────────────────

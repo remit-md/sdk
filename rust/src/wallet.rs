@@ -272,11 +272,7 @@ impl Wallet {
     ///
     /// This is used by the convenience payment methods so they gracefully fall back
     /// to server-side approval when the RPC is unreachable (e.g., in mock tests).
-    async fn try_auto_permit(
-        &self,
-        contract: &str,
-        amount: Decimal,
-    ) -> Option<PermitSignature> {
+    async fn try_auto_permit(&self, contract: &str, amount: Decimal) -> Option<PermitSignature> {
         let amount_f64 = decimal_to_f64(amount);
         self.auto_permit(contract, amount_f64).await.ok()
     }

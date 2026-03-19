@@ -398,10 +398,7 @@ pub(crate) async fn fetch_usdc_nonce(
     usdc_addr: &str,
     owner: &str,
 ) -> Result<u64, RemitError> {
-    let padded_owner = format!(
-        "{:0>64}",
-        owner.trim_start_matches("0x").to_lowercase()
-    );
+    let padded_owner = format!("{:0>64}", owner.trim_start_matches("0x").to_lowercase());
     let data = format!("0x7ecebe00{padded_owner}");
 
     let body = serde_json::json!({
@@ -445,10 +442,7 @@ pub(crate) async fn fetch_usdc_nonce(
     })?;
 
     if let Some(err) = json.get("error") {
-        return Err(remit_err(
-            codes::SERVER_ERROR,
-            format!("RPC error: {err}"),
-        ));
+        return Err(remit_err(codes::SERVER_ERROR, format!("RPC error: {err}")));
     }
 
     let result_hex = json["result"]

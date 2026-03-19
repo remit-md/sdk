@@ -49,6 +49,12 @@ USDC_ADDRESSES: dict[str, str] = {
     "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
 }
 
+DEFAULT_RPC_URLS: dict[str, str] = {
+    "base-sepolia": "https://sepolia.base.org",
+    "base": "https://mainnet.base.org",
+    "localhost": "http://127.0.0.1:8545",
+}
+
 
 class Wallet(RemitClient):
     """
@@ -70,6 +76,7 @@ class Wallet(RemitClient):
         api_url: str | None = None,
         signer: Signer | None = None,
         router_address: str | None = None,
+        rpc_url: str | None = None,
     ) -> None:
         if private_key is None and signer is None:
             private_key = os.environ.get("REMITMD_KEY")
@@ -93,6 +100,13 @@ class Wallet(RemitClient):
             url, signer=self._signer, chain_id=chain_id, verifying_contract=verifying_contract
         )
         self._contracts_cache = None
+
+        # RPC URL for on-chain queries (nonce fetching for auto-permit).
+        self._rpc_url = (
+            rpc_url
+            or os.environ.get("REMITMD_RPC_URL")
+            or DEFAULT_RPC_URLS.get(chain, DEFAULT_RPC_URLS["base-sepolia"])
+        )
 
         # Event callbacks: event_type → list of callables
         self._callbacks: dict[str, list[Callable[..., Any]]] = {}
@@ -179,6 +193,53 @@ class Wallet(RemitClient):
 
         return PermitSignature(value=value, deadline=deadline, v=v, r=r, s=s)
 
+    async def _fetch_usdc_nonce(self, usdc_address: str) -> int:
+        """Fetch the current EIP-2612 nonce for this wallet from the USDC contract."""
+        import httpx
+
+        padded = self.address.lower().replace("0x", "").zfill(64)
+        data = f"0x7ecebe00{padded}"
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "eth_call",
+            "params": [{"to": usdc_address, "data": data}, "latest"],
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(self._rpc_url, json=payload)
+            result = resp.json()
+        if "error" in result:
+            msg = result["error"].get("message", result["error"])
+            raise RuntimeError(f"RPC error fetching nonce: {msg}")
+        return int(result.get("result", "0x0"), 16)
+
+    async def sign_permit(
+        self,
+        spender: str,
+        amount: float,
+        deadline: int | None = None,
+    ) -> PermitSignature:
+        """Convenience: sign a USDC permit. Auto-fetches nonce, defaults deadline to 1 hour.
+
+        Args:
+            spender: Contract address to approve (e.g. router, escrow).
+            amount: Amount in USDC (e.g. 5.0 for $5.00).
+            deadline: Optional Unix timestamp. Defaults to 1 hour from now.
+        """
+        usdc_addr = USDC_ADDRESSES.get(self.chain, "")
+        nonce = await self._fetch_usdc_nonce(usdc_addr)
+        dl = deadline or (int(time.time()) + 3600)
+        raw = int(round(amount * 1_000_000))
+        return await self.sign_usdc_permit(spender, raw, dl, nonce, usdc_addr)
+
+    async def _auto_permit(self, contract: str, amount: float) -> PermitSignature:
+        """Internal: auto-sign a permit for the given contract type and amount."""
+        contracts = await self.get_contracts()
+        spender = contracts.get(contract)
+        if not spender:
+            raise ValueError(f"No {contract} contract address available")
+        return await self.sign_permit(spender, amount)
+
     # ─── Direct payment ───────────────────────────────────────────────────────
 
     async def pay_direct(
@@ -189,6 +250,7 @@ class Wallet(RemitClient):
         permit: PermitSignature | None = None,
     ) -> Transaction:
         """Send a direct USDC payment (no escrow, no refund)."""
+        resolved = permit if permit is not None else await self._auto_permit("router", amount)
         nonce = secrets.token_hex(16)
         body: dict[str, Any] = {
             "to": to,
@@ -197,9 +259,8 @@ class Wallet(RemitClient):
             "chain": self.chain,
             "nonce": nonce,
             "signature": "0x",
+            "permit": resolved.to_dict(),
         }
-        if permit is not None:
-            body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v0/payments/direct", body)
         return Transaction.model_validate(data)
 
@@ -233,9 +294,11 @@ class Wallet(RemitClient):
         await self._http.post("/api/v0/invoices", inv_body)
 
         # Step 2: fund the escrow.
-        escrow_body: dict[str, Any] = {"invoice_id": invoice_id}
-        if permit is not None:
-            escrow_body["permit"] = permit.to_dict()
+        resolved = permit or await self._auto_permit("escrow", invoice.amount)
+        escrow_body: dict[str, Any] = {
+            "invoice_id": invoice_id,
+            "permit": resolved.to_dict(),
+        }
         data = await self._http.post("/api/v0/escrows", escrow_body)
         return Escrow.model_validate(data)
 
@@ -280,6 +343,7 @@ class Wallet(RemitClient):
         expires: int = 86400,
         permit: PermitSignature | None = None,
     ) -> Tab:
+        resolved = permit if permit is not None else await self._auto_permit("tab", limit)
         expiry = int(time.time()) + expires
         body: dict[str, Any] = {
             "chain": self.chain,
@@ -287,9 +351,8 @@ class Wallet(RemitClient):
             "limit_amount": limit,
             "per_unit": per_unit,
             "expiry": expiry,
+            "permit": resolved.to_dict(),
         }
-        if permit is not None:
-            body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v0/tabs", body)
         return Tab.model_validate(data)
 
@@ -377,14 +440,14 @@ class Wallet(RemitClient):
         max_total: float,
         permit: PermitSignature | None = None,
     ) -> Stream:
+        resolved = permit if permit is not None else await self._auto_permit("stream", max_total)
         body: dict[str, Any] = {
             "chain": self.chain,
             "payee": to,
             "rate_per_second": rate,
             "max_total": max_total,
+            "permit": resolved.to_dict(),
         }
-        if permit is not None:
-            body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v0/streams", body)
         return Stream.model_validate(data)
 
@@ -402,15 +465,15 @@ class Wallet(RemitClient):
         max_attempts: int = 10,
         permit: PermitSignature | None = None,
     ) -> Bounty:
+        resolved = permit if permit is not None else await self._auto_permit("bounty", amount)
         body: dict[str, Any] = {
             "chain": self.chain,
             "amount": amount,
             "task_description": task,
             "deadline": deadline,
             "max_attempts": max_attempts,
+            "permit": resolved.to_dict(),
         }
-        if permit is not None:
-            body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v0/bounties", body)
         return Bounty.model_validate(data)
 
@@ -447,15 +510,15 @@ class Wallet(RemitClient):
         expires: int,
         permit: PermitSignature | None = None,
     ) -> Deposit:
+        resolved = permit if permit is not None else await self._auto_permit("deposit", amount)
         expiry = int(time.time()) + expires
         body: dict[str, Any] = {
             "chain": self.chain,
             "provider": to,
             "amount": amount,
             "expiry": expiry,
+            "permit": resolved.to_dict(),
         }
-        if permit is not None:
-            body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v0/deposits", body)
         return Deposit.model_validate(data)
 

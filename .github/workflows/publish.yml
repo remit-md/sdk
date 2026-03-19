@@ -197,16 +197,35 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Decode GPG key and publish
+      - name: Decode GPG key and publish to local repo
         working-directory: java
         run: |
           export GPG_PRIVATE_KEY_DECODED=$(echo "$GPG_PRIVATE_KEY_B64" | base64 -d)
-          gradle publish
+          gradle publishToMavenLocal
         env:
           GPG_PRIVATE_KEY_B64: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Bundle and upload to Maven Central
+        env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          VERSION: ${{ needs.bump-and-tag.outputs.version }}
+        run: |
+          cd ~/.m2/repository/md/remit/remit-sdk/$VERSION
+          jar -cvf bundle.jar *
+          TOKEN=$(echo -n "$MAVEN_CENTRAL_USERNAME:$MAVEN_CENTRAL_PASSWORD" | base64)
+          curl -s -w "\n%{http_code}" \
+            -X POST "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC" \
+            -H "Authorization: Bearer $TOKEN" \
+            -F "bundle=@bundle.jar;type=application/java-archive" \
+            | tee /tmp/upload_response.txt
+          HTTP_CODE=$(tail -1 /tmp/upload_response.txt)
+          if [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "200" ]; then
+            echo "Upload failed with HTTP $HTTP_CODE"
+            cat /tmp/upload_response.txt
+            exit 1
+          fi
+          echo "Upload successful!"
 
   ruby:
     name: Ruby -> RubyGems

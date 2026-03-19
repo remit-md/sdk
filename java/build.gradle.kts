@@ -126,16 +126,8 @@ publishing {
             }
         }
     }
-    repositories {
-        maven {
-            name = "central"
-            url = uri("https://central.sonatype.com/api/v1/publisher/deployments/download/")
-            credentials {
-                username = System.getenv("MAVEN_CENTRAL_USERNAME") ?: ""
-                password = System.getenv("MAVEN_CENTRAL_PASSWORD") ?: ""
-            }
-        }
-    }
+    // Publishing to Maven Central is handled via bundle upload in CI.
+    // Use `gradle publishToMavenLocal` to stage artifacts, then upload the bundle.
 }
 
 signing {

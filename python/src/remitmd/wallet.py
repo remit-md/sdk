@@ -232,13 +232,16 @@ class Wallet(RemitClient):
         raw = int(round(amount * 1_000_000))
         return await self.sign_usdc_permit(spender, raw, dl, nonce, usdc_addr)
 
-    async def _auto_permit(self, contract: str, amount: float) -> PermitSignature:
+    async def _auto_permit(self, contract: str, amount: float) -> PermitSignature | None:
         """Internal: auto-sign a permit for the given contract type and amount."""
-        contracts = await self.get_contracts()
-        spender = str(contracts.get(contract, ""))
-        if not spender:
-            raise ValueError(f"No {contract} contract address available")
-        return await self.sign_permit(spender, amount)
+        try:
+            contracts = await self.get_contracts()
+            spender = str(contracts.get(contract, ""))
+            if not spender:
+                return None
+            return await self.sign_permit(spender, amount)
+        except Exception:
+            return None
 
     # ─── Direct payment ───────────────────────────────────────────────────────
 
@@ -259,8 +262,9 @@ class Wallet(RemitClient):
             "chain": self.chain,
             "nonce": nonce,
             "signature": "0x",
-            "permit": resolved.to_dict(),
         }
+        if resolved is not None:
+            body["permit"] = resolved.to_dict()
         data = await self._http.post("/api/v0/payments/direct", body)
         return Transaction.model_validate(data)
 
@@ -295,10 +299,9 @@ class Wallet(RemitClient):
 
         # Step 2: fund the escrow.
         resolved = permit or await self._auto_permit("escrow", invoice.amount)
-        escrow_body: dict[str, Any] = {
-            "invoice_id": invoice_id,
-            "permit": resolved.to_dict(),
-        }
+        escrow_body: dict[str, Any] = {"invoice_id": invoice_id}
+        if resolved is not None:
+            escrow_body["permit"] = resolved.to_dict()
         data = await self._http.post("/api/v0/escrows", escrow_body)
         return Escrow.model_validate(data)
 
@@ -351,8 +354,9 @@ class Wallet(RemitClient):
             "limit_amount": limit,
             "per_unit": per_unit,
             "expiry": expiry,
-            "permit": resolved.to_dict(),
         }
+        if resolved is not None:
+            body["permit"] = resolved.to_dict()
         data = await self._http.post("/api/v0/tabs", body)
         return Tab.model_validate(data)
 
@@ -446,8 +450,9 @@ class Wallet(RemitClient):
             "payee": to,
             "rate_per_second": rate,
             "max_total": max_total,
-            "permit": resolved.to_dict(),
         }
+        if resolved is not None:
+            body["permit"] = resolved.to_dict()
         data = await self._http.post("/api/v0/streams", body)
         return Stream.model_validate(data)
 
@@ -472,8 +477,9 @@ class Wallet(RemitClient):
             "task_description": task,
             "deadline": deadline,
             "max_attempts": max_attempts,
-            "permit": resolved.to_dict(),
         }
+        if resolved is not None:
+            body["permit"] = resolved.to_dict()
         data = await self._http.post("/api/v0/bounties", body)
         return Bounty.model_validate(data)
 
@@ -517,8 +523,9 @@ class Wallet(RemitClient):
             "provider": to,
             "amount": amount,
             "expiry": expiry,
-            "permit": resolved.to_dict(),
         }
+        if resolved is not None:
+            body["permit"] = resolved.to_dict()
         data = await self._http.post("/api/v0/deposits", body)
         return Deposit.model_validate(data)
 

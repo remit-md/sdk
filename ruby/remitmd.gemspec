@@ -8,8 +8,14 @@ Gem::Specification.new do |s|
                   "escrow, metered tabs, payment streams, bounties, and security deposits. " \
                   "Includes MockRemit for zero-network testing."
   s.authors     = ["remit.md"]
+  s.email       = ["hello@remit.md"]
   s.homepage    = "https://remit.md"
   s.license     = "MIT"
+  s.metadata    = {
+    "homepage_uri"      => "https://remit.md",
+    "source_code_uri"   => "https://github.com/remit-md/sdk",
+    "changelog_uri"     => "https://github.com/remit-md/sdk/releases",
+  }
 
   s.required_ruby_version = ">= 3.0"
 

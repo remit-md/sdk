@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     java
     jacoco
+    signing
     kotlin("jvm") version "1.9.23"
     `maven-publish`
 }
@@ -12,6 +13,7 @@ version = "0.1.0"
 
 java {
     withSourcesJar()
+    withJavadocJar()
 }
 
 kotlin {
@@ -98,7 +100,7 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
-            artifactId = "remitmd-sdk"
+            artifactId = "remit-sdk"
             pom {
                 name.set("remit.md Java/Kotlin SDK")
                 description.set("Java and Kotlin SDK for remit.md — universal USDC payment protocol for AI agents")
@@ -109,7 +111,38 @@ publishing {
                         url.set("https://opensource.org/licenses/MIT")
                     }
                 }
+                developers {
+                    developer {
+                        id.set("remit-md")
+                        name.set("remit.md")
+                        email.set("hello@remit.md")
+                    }
+                }
+                scm {
+                    connection.set("scm:git:git://github.com/remit-md/sdk.git")
+                    developerConnection.set("scm:git:ssh://github.com/remit-md/sdk.git")
+                    url.set("https://github.com/remit-md/sdk")
+                }
             }
         }
+    }
+    repositories {
+        maven {
+            name = "central"
+            url = uri("https://central.sonatype.com/api/v1/publisher/deployments/download/")
+            credentials {
+                username = System.getenv("MAVEN_CENTRAL_USERNAME") ?: ""
+                password = System.getenv("MAVEN_CENTRAL_PASSWORD") ?: ""
+            }
+        }
+    }
+}
+
+signing {
+    val signingKey = System.getenv("GPG_PRIVATE_KEY")
+    val signingPassword = System.getenv("GPG_PASSPHRASE")
+    if (signingKey != null && signingPassword != null) {
+        useInMemoryPgpKeys(signingKey, signingPassword)
+        sign(publishing.publications["mavenJava"])
     }
 }

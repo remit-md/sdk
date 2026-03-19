@@ -3,12 +3,24 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "remitmd"
+name = "remit"
 version = "0.1.0"
 description = "Python SDK for the remit.md universal AI payment protocol"
-readme = {text = "", content-type = "text/plain"}
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [{name = "remit.md", email = "hello@remit.md"}]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial",
+]
+
+[project.urls]
+Homepage = "https://remit.md"
+Repository = "https://github.com/remit-md/sdk"
+Documentation = "https://remit.md"
 dependencies = [
     "httpx>=0.27",
     "eth-account>=0.12",

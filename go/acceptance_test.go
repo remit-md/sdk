@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	remitmd "github.com/remit-md/sdk-go"
+	remitmd "github.com/remit-md/sdk/go"
 	"github.com/shopspring/decimal"
 )
 

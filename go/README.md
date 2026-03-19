@@ -7,7 +7,7 @@ Universal AI payment protocol for agents on EVM L2 chains.
 ## Install
 
 ```bash
-go get github.com/remit-md/sdk-go
+go get github.com/remit-md/sdk/go
 ```
 
 ## Quick Start
@@ -15,7 +15,7 @@ go get github.com/remit-md/sdk-go
 ```go
 import (
     "context"
-    "github.com/remit-md/sdk-go"
+    "github.com/remit-md/sdk/go"
     "github.com/shopspring/decimal"
 )
 
@@ -42,7 +42,7 @@ assert.True(t, mock.WasPaid("0xRecipient", decimal.NewFromFloat(1.50)))
 ## LangChain/LangGraph Integration
 
 ```go
-import "github.com/remit-md/sdk-go/langchain"
+import "github.com/remit-md/sdk/go/langchain"
 
 tools := langchain.NewTools(wallet)
 // Register with your agent framework

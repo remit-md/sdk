@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/remit-md/sdk-go"
+	"github.com/remit-md/sdk/go"
 	"github.com/shopspring/decimal"
 )
 

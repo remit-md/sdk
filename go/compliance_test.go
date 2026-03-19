@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	remitmd "github.com/remit-md/sdk-go"
+	remitmd "github.com/remit-md/sdk/go"
 	"github.com/shopspring/decimal"
 )
 

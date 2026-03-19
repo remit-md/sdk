@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/remit-md/sdk-go"
+	"github.com/remit-md/sdk/go"
 	"github.com/shopspring/decimal"
 )
 

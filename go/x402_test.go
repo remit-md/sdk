@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	remitmd "github.com/remit-md/sdk-go"
+	remitmd "github.com/remit-md/sdk/go"
 )
 
 const (

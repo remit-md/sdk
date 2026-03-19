@@ -9,7 +9,8 @@
     <NoWarn>CS1573;CS1591</NoWarn>
 
     <!-- NuGet package metadata -->
-    <PackageId>RemitMd</PackageId>
+    <PackageId>Remit</PackageId>
+    <PackageProjectUrl>https://remit.md</PackageProjectUrl>
     <Version>0.1.0</Version>
     <Authors>remit-md</Authors>
     <Description>C#/.NET SDK for the remit.md universal AI payment protocol. Pay any AI agent in USDC with three lines of code.</Description>

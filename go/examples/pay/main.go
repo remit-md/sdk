@@ -12,7 +12,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/remit-md/sdk-go"
+	"github.com/remit-md/sdk/go"
 	"github.com/shopspring/decimal"
 )
 

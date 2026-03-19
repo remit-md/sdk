@@ -3,7 +3,7 @@ defmodule RemitMd.MixProject do
 
   def project do
     [
-      app: :remitmd,
+      app: :remit,
       version: "0.1.0",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
@@ -37,7 +37,9 @@ defmodule RemitMd.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/remit-md/sdk"}
+      links: %{"GitHub" => "https://github.com/remit-md/sdk"},
+      files: ~w(lib mix.exs README.md LICENSE),
+      maintainers: ["remit.md"]
     ]
   end
 end

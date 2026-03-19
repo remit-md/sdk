@@ -1,4 +1,4 @@
-module github.com/remit-md/sdk-go
+module github.com/remit-md/sdk/go
 
 go 1.22
 

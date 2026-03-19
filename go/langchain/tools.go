@@ -17,7 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/remit-md/sdk-go"
+	"github.com/remit-md/sdk/go"
 	"github.com/shopspring/decimal"
 )
 

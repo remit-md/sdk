@@ -209,7 +209,8 @@ class Wallet(RemitClient):
             resp = await client.post(self._rpc_url, json=payload)
             result = resp.json()
         if "error" in result:
-            raise RuntimeError(f"RPC error fetching nonce: {result['error'].get('message', result['error'])}")
+            msg = result["error"].get("message", result["error"])
+            raise RuntimeError(f"RPC error fetching nonce: {msg}")
         return int(result.get("result", "0x0"), 16)
 
     async def sign_permit(
@@ -293,8 +294,11 @@ class Wallet(RemitClient):
         await self._http.post("/api/v0/invoices", inv_body)
 
         # Step 2: fund the escrow.
-        resolved = permit if permit is not None else await self._auto_permit("escrow", invoice.amount)
-        escrow_body: dict[str, Any] = {"invoice_id": invoice_id, "permit": resolved.to_dict()}
+        resolved = permit or await self._auto_permit("escrow", invoice.amount)
+        escrow_body: dict[str, Any] = {
+            "invoice_id": invoice_id,
+            "permit": resolved.to_dict(),
+        }
         data = await self._http.post("/api/v0/escrows", escrow_body)
         return Escrow.model_validate(data)
 

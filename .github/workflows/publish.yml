@@ -166,7 +166,7 @@ jobs:
         with:
           ref: ${{ needs.bump-and-tag.outputs.tag }}
       - uses: dtolnay/rust-toolchain@stable
-      - run: cd rust && cargo publish
+      - run: cd rust && cargo publish --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 

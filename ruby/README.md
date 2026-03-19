@@ -38,26 +38,17 @@ Or from environment variables:
 ```ruby
 wallet = Remitmd::RemitWallet.from_env
 # Requires: REMITMD_PRIVATE_KEY
-# Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL
+# Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL, REMITMD_RPC_URL
 ```
 
-## Permits (Gasless USDC Approval)
-
-```ruby
-contracts = wallet.get_contracts
-
-# Use permits on any payment method
-tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
-```
-
-Permits are optional on: `pay`, `create_escrow`, `create_tab`, `create_stream`, `create_bounty`, `place_deposit`.
+Permits are auto-signed. Every payment method fetches the on-chain USDC nonce, signs an EIP-2612 permit, and includes it automatically.
 
 ## Payment Models
 
 ### Direct Payment
 
 ```ruby
-tx = wallet.pay("0xRecipient...", 5.00, memo: "AI inference fee", permit: permit)
+tx = wallet.pay("0xRecipient...", 5.00, memo: "AI inference fee")
 ```
 
 ### Escrow
@@ -73,10 +64,11 @@ tx = wallet.cancel_escrow(escrow.id)    # refund yourself
 ### Metered Tab (off-chain billing)
 
 ```ruby
-tab = wallet.create_tab("0xProvider...", 50.00, 0.003, permit: permit)
+tab = wallet.create_tab("0xProvider...", 50.00, 0.003)
 
 # Provider charges with EIP-712 signature
-sig = wallet.sign_tab_charge(contracts["tab"], tab.id, 3_000_000, 1)
+contracts = wallet.get_contracts
+sig = wallet.sign_tab_charge(contracts.tab, tab.id, 3_000_000, 1)
 wallet.charge_tab(tab.id, 0.003, 0.003, 1, sig)
 
 # Close when done — unused funds return
@@ -104,7 +96,7 @@ tx = wallet.award_bounty(bounty.id, "0xWinner...")
 ### Security Deposit
 
 ```ruby
-dep = wallet.place_deposit("0xCounterpart...", 100.00, expires_in_secs: 86_400, permit: permit)
+dep = wallet.place_deposit("0xCounterpart...", 100.00, expires_in_secs: 86_400)
 wallet.return_deposit(dep.id)
 ```
 
@@ -181,6 +173,10 @@ wallet.close_tab(tab_id, final_amount: nil, provider_sig: nil)                  
 # Tab provider (signing charges)
 wallet.sign_tab_charge(tab_contract, tab_id, total_charged, call_count)  # String
 
+# EIP-2612 Permit (auto-signed when omitted from payment methods)
+wallet.sign_permit(spender, amount, deadline: nil)                       # PermitSignature
+wallet.sign_usdc_permit(spender, value, deadline, nonce, usdc_address: nil) # PermitSignature
+
 # Streams
 wallet.create_stream(payee, rate_per_second, max_total, permit: nil)  # Stream
 wallet.close_stream(stream_id)                              # Stream
@@ -247,6 +243,41 @@ wallet = Remitmd::RemitWallet.new(signer: MyHsmSigner.new)
 ```ruby
 Remitmd::RemitWallet.new(private_key: key, chain: "base")          # Base mainnet (default)
 Remitmd::RemitWallet.new(private_key: key, chain: "base_sepolia")  # Base Sepolia testnet
+```
+
+## Advanced
+
+### Manual Permit Signing
+
+Permits are auto-signed by default. If you need manual control (custom deadline, pre-signed permits, or offline signing), pass a `PermitSignature` explicitly:
+
+```ruby
+# sign_permit: convenience — auto-fetches nonce, converts amount to base units
+permit = wallet.sign_permit("0xRouterAddress...", 5.00, deadline: Time.now.to_i + 7200)
+tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
+
+# sign_usdc_permit: full control — raw base units, explicit nonce
+permit = wallet.sign_usdc_permit(
+  "0xRouterAddress...",   # spender
+  5_000_000,              # value in base units (6 decimals)
+  Time.now.to_i + 3600,  # deadline
+  0,                      # nonce
+  usdc_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+)
+tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
+```
+
+### Custom RPC URL
+
+Override the JSON-RPC endpoint used for nonce fetching:
+
+```ruby
+wallet = Remitmd::RemitWallet.new(
+  private_key: key,
+  chain: "base_sepolia",
+  rpc_url: "https://your-rpc-provider.com/v1/base-sepolia"
+)
+# Or via environment: REMITMD_RPC_URL
 ```
 
 ## License

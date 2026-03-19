@@ -106,7 +106,7 @@ module Remitmd
     attr_reader :address
 
     def sign(_message)
-      "0x" + SecureRandom.hex(32)
+      "0x" + SecureRandom.hex(32) + SecureRandom.hex(32) + "1b"
     end
   end
 
@@ -134,6 +134,22 @@ module Remitmd
 
     def handle(method, path, b) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       case [method, path]
+
+      # Contracts (for auto_permit)
+      in ["GET", "/contracts"]
+        {
+          "chain_id"       => ChainId::BASE_SEPOLIA,
+          "usdc"           => "0xMockUSDC0000000000000000000000000000001",
+          "router"         => "0xMockRouter000000000000000000000000001",
+          "escrow"         => "0xMockEscrow000000000000000000000000001",
+          "tab"            => "0xMockTab00000000000000000000000000001",
+          "stream"         => "0xMockStream000000000000000000000000001",
+          "bounty"         => "0xMockBounty000000000000000000000000001",
+          "deposit"        => "0xMockDeposit00000000000000000000000001",
+          "fee_calculator" => "0xMockFeeCalc0000000000000000000000001",
+          "key_registry"   => "0xMockKeyReg000000000000000000000000001",
+          "arbitration"    => "0xMockArbitr000000000000000000000000001",
+        }
 
       # Balance
       in ["GET", "/wallet/balance"]

@@ -37,7 +37,7 @@ Requires **Java 11+**.
 
 ### Java
 ```java
-// 3-line integration
+// 2-line integration — permits are handled automatically
 Wallet wallet = RemitMd.fromEnv();  // reads REMITMD_KEY env var
 wallet.pay("0xRecipient...", new BigDecimal("1.50"));
 ```
@@ -65,6 +65,12 @@ Wallet wallet = RemitMd.withKey("0x...")
     .testnet(true)
     .build();
 
+// Custom RPC URL
+Wallet wallet = RemitMd.withKey("0x...")
+    .testnet(true)
+    .rpcUrl("https://my-rpc.example.com")
+    .build();
+
 // Custom signer (KMS, HSM, etc.)
 Wallet wallet = RemitMd.withSigner(hash -> myKmsClient.sign(hash))
     .build();
@@ -72,23 +78,13 @@ Wallet wallet = RemitMd.withSigner(hash -> myKmsClient.sign(hash))
 
 ---
 
-## Permits (Gasless USDC Approval)
-
-```java
-ContractAddresses contracts = wallet.getContracts();
-
-// Use permits with any payment method
-Transaction tx = wallet.pay("0xRecipient...", new BigDecimal("1.50"), permit);
-```
-
-Permits are optional on: `pay`, `createEscrow`, `createTab`, `createStream`, `createBounty`, `lockDeposit`.
-
 ## Payment Methods
+
+All payment methods auto-sign EIP-2612 permits. No manual permit handling needed.
 
 ### Direct Payment
 ```java
-PermitSignature permit = wallet.signPermit(contracts.router, new BigDecimal("1.50"));
-Transaction tx = wallet.pay("0xRecipient...", new BigDecimal("1.50"), "API call fee", permit);
+Transaction tx = wallet.pay("0xRecipient...", new BigDecimal("1.50"), "API call fee");
 ```
 
 ### Escrow
@@ -106,9 +102,10 @@ wallet.cancelEscrow(escrow.id);
 ### Tabs (Micro-payment Channels)
 ```java
 // Open a channel for high-frequency micro-payments
-Tab tab = wallet.createTab("0xApiService...", new BigDecimal("5.00"), new BigDecimal("0.003"), permit);
+Tab tab = wallet.createTab("0xApiService...", new BigDecimal("5.00"), new BigDecimal("0.003"));
 
 // Provider charges with EIP-712 signature
+ContractAddresses contracts = wallet.getContracts();
 String sig = wallet.signTabCharge(contracts.tab, tab.id, 3000000L, 1);
 wallet.chargeTab(tab.id, new BigDecimal("0.003"), new BigDecimal("0.003"), 1, sig);
 
@@ -265,6 +262,35 @@ LinkResponse link = wallet.createWithdrawLink();
 
 // Testnet funding
 MintResponse result = wallet.mint(100.0);  // $100 testnet USDC
+```
+
+---
+
+## Advanced: Manual Permits
+
+All payment methods auto-sign permits. Use these methods only if you need explicit control over nonce, deadline, or USDC address.
+
+### signPermit (recommended)
+
+Auto-fetches the on-chain nonce and defaults deadline to 1 hour:
+
+```java
+ContractAddresses contracts = wallet.getContracts();
+PermitSignature permit = wallet.signPermit(contracts.router, new BigDecimal("5.00"));
+wallet.pay("0xRecipient...", new BigDecimal("5.00"), "task", permit);
+```
+
+### signUsdcPermit (low-level)
+
+Full control over all permit parameters:
+
+```java
+PermitSignature permit = wallet.signUsdcPermit(
+    contracts.router,     // spender
+    5_000_000L,           // value in base units (6 decimals)
+    1999999999L,          // deadline (unix timestamp)
+    0L                    // nonce
+);
 ```
 
 ---

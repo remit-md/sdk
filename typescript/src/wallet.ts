@@ -270,11 +270,15 @@ export class Wallet extends RemitClient {
   async #autoPermit(
     contract: "router" | "escrow" | "tab" | "stream" | "bounty" | "deposit",
     amount: number,
-  ): Promise<PermitSignature> {
-    const contracts = await this.getContracts();
-    const spender = contracts[contract];
-    if (!spender) throw new Error(`No ${contract} contract address available`);
-    return this.signPermit(spender, amount);
+  ): Promise<PermitSignature | undefined> {
+    try {
+      const contracts = await this.getContracts();
+      const spender = contracts[contract];
+      if (!spender) return undefined;
+      return await this.signPermit(spender, amount);
+    } catch {
+      return undefined;
+    }
   }
 
   /** Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC. */
@@ -310,7 +314,7 @@ export class Wallet extends RemitClient {
       chain: this._chain,
       nonce: randomBytes(16).toString("hex"),
       signature: "0x",
-      permit,
+      ...(permit ? { permit } : {}),
     });
   }
 
@@ -335,7 +339,7 @@ export class Wallet extends RemitClient {
     const permit = options?.permit ?? await this.#autoPermit("escrow", invoice.amount);
     return this.#auth.post<Escrow>("/escrows", {
       invoice_id: invoiceId,
-      permit,
+      ...(permit ? { permit } : {}),
     });
   }
 
@@ -372,7 +376,7 @@ export class Wallet extends RemitClient {
       limit_amount: options.limit,
       per_unit: options.perUnit,
       expiry: Math.floor(Date.now() / 1000) + (options.expires ?? 86400),
-      permit,
+      ...(permit ? { permit } : {}),
     });
   }
 
@@ -451,7 +455,7 @@ export class Wallet extends RemitClient {
       task_description: options.task,
       deadline: options.deadline,
       max_attempts: options.maxAttempts ?? 10,
-      permit,
+      ...(permit ? { permit } : {}),
     });
   }
 
@@ -475,7 +479,7 @@ export class Wallet extends RemitClient {
       provider: options.to,
       amount: options.amount,
       expiry: Math.floor(Date.now() / 1000) + options.expires,
-      permit,
+      ...(permit ? { permit } : {}),
     });
   }
 

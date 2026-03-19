@@ -32,14 +32,27 @@ IO.puts("tx_hash: #{tx.tx_hash}")
 
 ## Permits (Gasless USDC Approval)
 
-```elixir
-{:ok, contracts} = RemitMd.Wallet.get_contracts(wallet)
+All payment methods auto-sign EIP-2612 permits when no explicit permit is provided.
+The wallet fetches the on-chain nonce, signs the permit, and includes it in the request automatically.
 
-# Use permits on any payment method
+```elixir
+# Auto-permit (recommended) — just call the method, permit is handled internally
+{:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "5.00")
+
+# Manual permit — sign yourself if you need control over deadline/nonce
+{:ok, contracts} = RemitMd.Wallet.get_contracts(wallet)
+permit = RemitMd.Wallet.sign_permit(wallet, contracts.router, "5.00")
 {:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "5.00", permit: permit)
+
+# Low-level permit — full control over all parameters
+permit = RemitMd.Wallet.sign_usdc_permit(wallet, contracts.router,
+  5_000_000,          # base units (6 decimals)
+  :os.system_time(:second) + 3600,  # deadline
+  nonce: 0
+)
 ```
 
-Permits are optional on: `pay`, `create_escrow`, `create_tab` (via `open_tab`), `create_stream`, `create_bounty` (via `post_bounty`), `place_deposit`.
+Auto-permit works on: `pay`, `create_escrow`, `create_tab`, `create_stream`, `create_bounty`, `place_deposit`.
 
 ## Payment Models
 
@@ -99,6 +112,7 @@ wallet = RemitMd.Wallet.from_env()
 | `REMITMD_PRIVATE_KEY` | — | secp256k1 private key (required for production) |
 | `REMITMD_CHAIN` | `"base"` | Chain: `base`, `base_sepolia` |
 | `REMITMD_API_URL` | _(chain default)_ | Override API base URL |
+| `REMITMD_RPC_URL` | _(chain default)_ | JSON-RPC URL for on-chain reads (nonce fetching) |
 
 ## Custom Signer
 

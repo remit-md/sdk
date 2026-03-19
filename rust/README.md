@@ -30,15 +30,17 @@ println!("paid {} in {}", tx.amount, tx.tx_hash);
 ```rust
 // From environment variables (recommended for agents)
 let wallet = Wallet::from_env()?;
-// REMITMD_KEY=0x...       (required)
-// REMITMD_CHAIN=base      (optional, default: "base")
-// REMITMD_TESTNET=true    (optional)
+// REMITMD_KEY=0x...         (required)
+// REMITMD_CHAIN=base        (optional, default: "base")
+// REMITMD_TESTNET=true      (optional)
+// REMITMD_RPC_URL=https://… (optional, for permit nonce fetching)
 
 // Builder pattern
 let wallet = Wallet::new("0x<private-key>")
     .chain("base")          // "base" (only supported chain)
     .testnet()              // use testnet
     .base_url("http://localhost:3000")  // self-hosted
+    .rpc_url("https://sepolia.base.org") // custom RPC
     .build()?;
 
 // Custom signer (KMS, hardware wallet, etc.)
@@ -47,19 +49,7 @@ let wallet = Wallet::with_signer(my_kms_signer)
     .build()?;
 ```
 
-## Permits (Gasless USDC Approval)
-
-```rust
-let contracts = wallet.get_contracts().await?;
-
-// Use permits on any payment method
-let tx = wallet.pay_with_permit("0xAgent...", dec!(0.003), permit).await?;
-
-// Or via full variants with optional permit
-let tx = wallet.pay_full("0xAgent...", dec!(0.003), "memo", Some(permit)).await?;
-```
-
-Permit variants available: `pay_with_permit`, `create_escrow_with_permit`, `create_tab_with_permit`, `create_stream_with_permit`, `create_bounty_with_permit`, `lock_deposit_with_permit`.
+All payment methods (`pay`, `create_escrow`, `create_tab`, `create_stream`, `create_bounty`, `lock_deposit`) automatically sign an EIP-2612 permit for gasless USDC approval. No manual permit handling needed.
 
 ## Payment Models
 
@@ -228,6 +218,21 @@ match wallet.pay(address, amount).await {
     Err(e) => eprintln!("error [{}]: {} (see: {})", e.code, e.message, e.doc_url),
 }
 ```
+
+## Advanced: Manual Permits
+
+By default, all payment methods auto-sign EIP-2612 permits. If you need manual control:
+
+```rust
+// Sign a permit yourself
+let permit = wallet.sign_permit("0xContractAddr...", 1.50, None).await?;
+
+// Pass it explicitly to any _with_permit or _full variant
+let tx = wallet.pay_with_permit("0xAgent...", dec!(0.003), permit).await?;
+let tx = wallet.pay_full("0xAgent...", dec!(0.003), "memo", Some(permit)).await?;
+```
+
+Manual permit variants: `pay_with_permit`, `create_escrow_with_permit`, `create_tab_with_permit`, `create_stream_with_permit`, `create_bounty_with_permit`, `lock_deposit_with_permit`.
 
 ## License
 

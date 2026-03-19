@@ -25,9 +25,15 @@ wallet, err := remitmd.FromEnv()
 // Or with explicit key
 wallet, err := remitmd.NewWallet(os.Getenv("REMITMD_KEY"), remitmd.WithChain("base"))
 
-// Send 1.50 USDC
+// Send 1.50 USDC — permit is signed automatically
 tx, err := wallet.Pay(ctx, "0xRecipient...", decimal.NewFromFloat(1.50))
+
+// Create an escrow — one call, no permit boilerplate
+escrow, err := wallet.CreateEscrow(ctx, "0xPayee...", decimal.NewFromFloat(10.0),
+    remitmd.WithEscrowMemo("design work"))
 ```
+
+All payment methods (`Pay`, `CreateEscrow`, `CreateTab`, `CreateStream`, `CreateBounty`, `PlaceDeposit`) auto-sign an EIP-2612 permit when none is provided. No manual approval step needed.
 
 ## Testing (Zero Network)
 
@@ -51,54 +57,45 @@ for _, tool := range tools {
 }
 ```
 
-## Permits (Gasless USDC Approval)
-
-```go
-contracts, _ := wallet.GetContracts(ctx)
-
-// Use permits with any payment method
-tx, _ := wallet.Pay(ctx, "0xRecipient...", decimal.NewFromFloat(5.0),
-    remitmd.WithPermit(permit))
-```
-
-Permit support is available on: `Pay`, `CreateEscrow`, `CreateTab`, `CreateStream`, `CreateBounty`, `PlaceDeposit`.
-
 ## All Methods
 
 ```go
 // Contract discovery (cached per session)
 wallet.GetContracts(ctx)                                    // *ContractAddresses
 
-// Payments
-wallet.Pay(ctx, to, amount, ...PayOption)                   // *Transaction (opts: WithMemo, WithPermit)
+// Permits (auto-signed when omitted — see Advanced section)
+wallet.SignPermit(ctx, spender, amount, deadline...)        // *PermitSignature
+
+// Payments (auto-permit built in)
+wallet.Pay(ctx, to, amount, ...PayOption)                   // *Transaction (opts: WithMemo, WithPayPermit)
 wallet.Balance(ctx)                                         // *Balance
 
-// Escrow
-wallet.CreateEscrow(ctx, payee, amount, ...EscrowOption)    // *Escrow (opts: WithMemo, WithPermit, WithMilestones)
+// Escrow (auto-permit built in)
+wallet.CreateEscrow(ctx, payee, amount, ...EscrowOption)    // *Escrow (opts: WithMemo, WithEscrowPermit, WithMilestones)
 wallet.ClaimStart(ctx, escrowID)                            // *Escrow
 wallet.ReleaseEscrow(ctx, escrowID, milestoneIDs...)        // *Escrow
 wallet.CancelEscrow(ctx, escrowID)                          // *Escrow
 wallet.GetEscrow(ctx, escrowID)                             // *Escrow
 
-// Tabs
-wallet.CreateTab(ctx, provider, limit, perUnit, ...TabOption) // *Tab (opts: WithPermit, WithExpiresIn)
+// Tabs (auto-permit built in)
+wallet.CreateTab(ctx, provider, limit, perUnit, ...TabOption) // *Tab (opts: WithTabPermit, WithTabExpiry)
 wallet.ChargeTab(ctx, tabID, amount, cumulative, callCount, providerSig) // *TabCharge
-wallet.CloseTab(ctx, tabID, ...CloseTabOption)              // *Tab (opts: WithFinalAmount, WithProviderSig)
+wallet.CloseTab(ctx, tabID, ...CloseTabOption)              // *Tab (opts: WithCloseTabAmount, WithCloseTabSig)
 wallet.GetTab(ctx, tabID)                                   // *Tab
 
-// Streams
-wallet.CreateStream(ctx, payee, rate, maxTotal, ...StreamOption) // *Stream (opts: WithPermit)
+// Streams (auto-permit built in)
+wallet.CreateStream(ctx, payee, rate, maxTotal, ...StreamOption) // *Stream (opts: WithStreamPermit)
 wallet.CloseStream(ctx, streamID)                           // *Stream
 wallet.WithdrawStream(ctx, streamID)                        // *Transaction
 
-// Bounties
-wallet.CreateBounty(ctx, amount, task, deadline, ...BountyOption) // *Bounty (opts: WithPermit, WithMaxAttempts)
+// Bounties (auto-permit built in)
+wallet.CreateBounty(ctx, amount, task, deadline, ...BountyOption) // *Bounty (opts: WithBountyPermit, WithBountyMaxAttempts)
 wallet.SubmitBounty(ctx, bountyID, evidenceHash)            // *BountySubmission
 wallet.AwardBounty(ctx, bountyID, submissionID)             // *Bounty
 wallet.ListBounties(ctx, opts)                              // []Bounty
 
-// Deposits
-wallet.PlaceDeposit(ctx, provider, amount, expires, ...DepositOption) // *Deposit (opts: WithPermit)
+// Deposits (auto-permit built in)
+wallet.PlaceDeposit(ctx, provider, amount, expires, ...DepositOption) // *Deposit (opts: WithDepositPermit)
 wallet.ReturnDeposit(ctx, depositID)                        // *Transaction
 
 // Status & analytics
@@ -138,3 +135,30 @@ if errors.As(err, &remitErr) {
 |-------|-----------|--------|
 | Base | `"base"` | Mainnet |
 | Base Sepolia | `"base"` + `WithTestnet()` | Testnet |
+
+## Advanced: Manual Permits
+
+All payment methods auto-sign an EIP-2612 permit internally. If you need manual control
+(e.g., custom deadline, pre-signed permit from another signer), use `SignPermit` and pass
+the result via the `With*Permit` option:
+
+```go
+// Sign a permit manually with a custom deadline (2 hours)
+deadline := time.Now().Unix() + 7200
+permit, err := wallet.SignPermit(ctx, routerAddress, 5.0, deadline)
+
+// Pass it explicitly — skips auto-permit
+tx, err := wallet.Pay(ctx, "0xRecipient...", decimal.NewFromFloat(5.0),
+    remitmd.WithPayPermit(permit))
+```
+
+You can also override the RPC URL used for nonce fetching:
+
+```go
+wallet, err := remitmd.NewWallet(key,
+    remitmd.WithTestnet(),
+    remitmd.WithRPCURL("https://my-rpc.example.com"),
+)
+```
+
+Or via environment variable: `REMITMD_RPC_URL`.

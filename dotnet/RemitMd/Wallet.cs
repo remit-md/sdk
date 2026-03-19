@@ -16,13 +16,32 @@ public sealed class Wallet
     private readonly IRemitSigner _signer;
     private readonly long _chainId;
     private readonly string _chain;
+    private readonly string _chainKey;
+    private readonly string _rpcUrl;
     private ContractAddresses? _cachedContracts;
+    private static readonly HttpClient RpcClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 
     // Chain → API base URL map
     private static readonly Dictionary<string, (long ChainId, string ApiUrl)> Chains = new()
     {
         ["base"]               = (8453,  "https://api.remit.md"),
         ["base-sepolia"]       = (84532, "https://api-sepolia.remit.md"),
+    };
+
+    // Chain → USDC contract address
+    private static readonly Dictionary<string, string> UsdcAddresses = new()
+    {
+        ["base-sepolia"] = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+        ["base"]         = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        ["localhost"]    = "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    };
+
+    // Chain → default public RPC URL
+    private static readonly Dictionary<string, string> DefaultRpcUrls = new()
+    {
+        ["base-sepolia"] = "https://sepolia.base.org",
+        ["base"]         = "https://mainnet.base.org",
+        ["localhost"]    = "http://127.0.0.1:8545",
     };
 
     // ─── Constructors ─────────────────────────────────────────────────────────
@@ -34,15 +53,17 @@ public sealed class Wallet
     /// <param name="chain">Target chain name: "base". Default: "base".</param>
     /// <param name="testnet">When true, targets the testnet variant of <paramref name="chain"/>.</param>
     /// <param name="baseUrl">Override the API base URL (useful for local or self-hosted setups).</param>
-    public Wallet(string privateKeyHex, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null)
-        : this(new PrivateKeySigner(privateKeyHex), chain, testnet, baseUrl, routerAddress)
+    /// <param name="rpcUrl">JSON-RPC URL for on-chain reads (nonce fetching). Falls back to REMITMD_RPC_URL env var, then public defaults.</param>
+    public Wallet(string privateKeyHex, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null, string? rpcUrl = null)
+        : this(new PrivateKeySigner(privateKeyHex), chain, testnet, baseUrl, routerAddress, rpcUrl)
     { }
 
     /// <summary>
     /// Creates a Wallet with a custom <see cref="IRemitSigner"/> (KMS, HSM, etc.).
     /// </summary>
     /// <param name="routerAddress">EIP-712 verifying contract address. Required for production use.</param>
-    public Wallet(IRemitSigner signer, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null)
+    /// <param name="rpcUrl">JSON-RPC URL for on-chain reads (nonce fetching). Falls back to REMITMD_RPC_URL env var, then public defaults.</param>
+    public Wallet(IRemitSigner signer, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null, string? rpcUrl = null)
     {
         var key = testnet ? $"{chain}-sepolia" : chain;
 
@@ -58,6 +79,10 @@ public sealed class Wallet
         _signer = signer;
         _chainId = cc.ChainId;
         _chain = chain;
+        _chainKey = key;
+        _rpcUrl = rpcUrl
+            ?? Environment.GetEnvironmentVariable("REMITMD_RPC_URL")
+            ?? (DefaultRpcUrls.TryGetValue(key, out var defaultRpc) ? defaultRpc : DefaultRpcUrls["base-sepolia"]);
         _transport = new HttpTransport(signer, cc.ChainId, routerAddress ?? string.Empty, baseUrl ?? cc.ApiUrl);
     }
 
@@ -76,8 +101,9 @@ public sealed class Wallet
         var chain         = Environment.GetEnvironmentVariable("REMITMD_CHAIN") ?? "base";
         var testnet       = Environment.GetEnvironmentVariable("REMITMD_TESTNET") is "1" or "true";
         var routerAddress = Environment.GetEnvironmentVariable("REMITMD_ROUTER_ADDRESS");
+        var rpcUrl        = Environment.GetEnvironmentVariable("REMITMD_RPC_URL");
 
-        return new Wallet(new PrivateKeySigner(key), chain, testnet, null, routerAddress);
+        return new Wallet(new PrivateKeySigner(key), chain, testnet, null, routerAddress, rpcUrl);
     }
 
     /// <summary>The agent's Ethereum address (derived from the private key).</summary>
@@ -91,6 +117,8 @@ public sealed class Wallet
         _signer = signer;
         _chainId = chainId;
         _chain = "base";
+        _chainKey = "base";
+        _rpcUrl = "";  // empty = mock mode, FetchUsdcNonceAsync returns 0
     }
 
     // ─── Direct payments ──────────────────────────────────────────────────────
@@ -103,7 +131,7 @@ public sealed class Wallet
     /// <param name="amount">Payment amount in USDC (e.g. 1.50 for $1.50).</param>
     /// <param name="memo">Optional memo attached to the payment.</param>
     /// <param name="ct">Cancellation token.</param>
-    public Task<Transaction> PayAsync(
+    public async Task<Transaction> PayAsync(
         string recipient,
         decimal amount,
         string memo = "",
@@ -112,6 +140,8 @@ public sealed class Wallet
     {
         ValidateAddress(recipient, nameof(recipient));
         ValidateAmount(amount);
+
+        permit ??= await AutoPermitAsync("router", amount);
 
         var nonce = Convert.ToHexString(
             System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
@@ -123,9 +153,9 @@ public sealed class Wallet
             ["chain"]     = _chain,
             ["nonce"]     = nonce,
             ["signature"] = "0x",
+            ["permit"]    = permit,
         };
-        if (permit is not null) body["permit"] = permit;
-        return _transport.PostAsync<Transaction>("/api/v0/payments/direct", body, ct);
+        return await _transport.PostAsync<Transaction>("/api/v0/payments/direct", body, ct);
     }
 
     // ─── Balance & reputation ─────────────────────────────────────────────────
@@ -190,8 +220,12 @@ public sealed class Wallet
         await _transport.PostAsync<object>("/api/v0/invoices", invoiceBody, ct);
 
         // Step 2: fund the escrow.
-        var escrowBody = new Dictionary<string, object?> { ["invoice_id"] = invoiceId };
-        if (permit is not null) escrowBody["permit"] = permit;
+        permit ??= await AutoPermitAsync("escrow", amount);
+        var escrowBody = new Dictionary<string, object?>
+        {
+            ["invoice_id"] = invoiceId,
+            ["permit"]     = permit,
+        };
         return await _transport.PostAsync<Escrow>("/api/v0/escrows", escrowBody, ct);
     }
 
@@ -218,7 +252,7 @@ public sealed class Wallet
     /// <param name="limitAmount">Maximum USDC spend limit for this Tab.</param>
     /// <param name="perUnit">Cost per unit/call in USDC.</param>
     /// <param name="expiresSecs">Seconds until Tab expires (default: 86400 = 24h).</param>
-    public Task<Tab> CreateTabAsync(
+    public async Task<Tab> CreateTabAsync(
         string provider,
         decimal limitAmount,
         decimal perUnit,
@@ -229,6 +263,8 @@ public sealed class Wallet
         ValidateAddress(provider, nameof(provider));
         ValidateAmount(limitAmount, "limitAmount");
 
+        permit ??= await AutoPermitAsync("tab", limitAmount);
+
         var expiry = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + expiresSecs;
         var body = new Dictionary<string, object?>
         {
@@ -237,9 +273,9 @@ public sealed class Wallet
             ["limit_amount"] = limitAmount.ToString("F6"),
             ["per_unit"]     = perUnit.ToString("F6"),
             ["expiry"]       = expiry,
+            ["permit"]       = permit,
         };
-        if (permit is not null) body["permit"] = permit;
-        return _transport.PostAsync<Tab>("/api/v0/tabs", body, ct);
+        return await _transport.PostAsync<Tab>("/api/v0/tabs", body, ct);
     }
 
     /// <summary>Charges an amount against an open Tab with a provider EIP-712 signature.</summary>
@@ -332,7 +368,7 @@ public sealed class Wallet
     /// <param name="payee">Address receiving the stream.</param>
     /// <param name="ratePerSecond">USDC per second (e.g. 0.000277m = $1/hour).</param>
     /// <param name="maxTotal">Maximum total USDC the stream can pay out.</param>
-    public Task<Stream> CreateStreamAsync(
+    public async Task<Stream> CreateStreamAsync(
         string payee,
         decimal ratePerSecond,
         decimal maxTotal,
@@ -343,15 +379,17 @@ public sealed class Wallet
         ValidateAmount(ratePerSecond, "ratePerSecond");
         ValidateAmount(maxTotal, "maxTotal");
 
+        permit ??= await AutoPermitAsync("stream", maxTotal);
+
         var body = new Dictionary<string, object?>
         {
             ["chain"]           = _chain,
             ["payee"]           = payee,
             ["rate_per_second"] = ratePerSecond.ToString("F9"),
             ["max_total"]       = maxTotal.ToString("F6"),
+            ["permit"]          = permit,
         };
-        if (permit is not null) body["permit"] = permit;
-        return _transport.PostAsync<Stream>("/api/v0/streams", body, ct);
+        return await _transport.PostAsync<Stream>("/api/v0/streams", body, ct);
     }
 
     /// <summary>Closes a stream, stopping further payments and settling on-chain.</summary>
@@ -365,7 +403,7 @@ public sealed class Wallet
     /// <param name="taskDescription">Human (and agent) readable task description.</param>
     /// <param name="deadlineSecs">Seconds until bounty deadline (default: 86400 = 24h).</param>
     /// <param name="maxAttempts">Maximum number of submission attempts (default: 10).</param>
-    public Task<Bounty> CreateBountyAsync(
+    public async Task<Bounty> CreateBountyAsync(
         decimal amount,
         string taskDescription,
         int deadlineSecs = 86400,
@@ -374,6 +412,9 @@ public sealed class Wallet
         CancellationToken ct = default)
     {
         ValidateAmount(amount);
+
+        permit ??= await AutoPermitAsync("bounty", amount);
+
         var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + deadlineSecs;
         var body = new Dictionary<string, object?>
         {
@@ -382,9 +423,9 @@ public sealed class Wallet
             ["task_description"] = taskDescription,
             ["deadline"]         = deadline,
             ["max_attempts"]     = maxAttempts,
+            ["permit"]           = permit,
         };
-        if (permit is not null) body["permit"] = permit;
-        return _transport.PostAsync<Bounty>("/api/v0/bounties", body, ct);
+        return await _transport.PostAsync<Bounty>("/api/v0/bounties", body, ct);
     }
 
     /// <summary>Submits evidence for a bounty.</summary>
@@ -437,7 +478,7 @@ public sealed class Wallet
     /// <param name="provider">Address of the provider holding the deposit.</param>
     /// <param name="amount">USDC amount to deposit.</param>
     /// <param name="expireSecs">Seconds until deposit expires (default: 86400 = 24h).</param>
-    public Task<Deposit> LockDepositAsync(
+    public async Task<Deposit> LockDepositAsync(
         string provider,
         decimal amount,
         int expireSecs = 86400,
@@ -446,6 +487,9 @@ public sealed class Wallet
     {
         ValidateAddress(provider, nameof(provider));
         ValidateAmount(amount);
+
+        permit ??= await AutoPermitAsync("deposit", amount);
+
         var expiry = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + expireSecs;
         var body = new Dictionary<string, object?>
         {
@@ -453,9 +497,9 @@ public sealed class Wallet
             ["provider"] = provider,
             ["amount"]   = amount.ToString("F6"),
             ["expiry"]   = expiry,
+            ["permit"]   = permit,
         };
-        if (permit is not null) body["permit"] = permit;
-        return _transport.PostAsync<Deposit>("/api/v0/deposits", body, ct);
+        return await _transport.PostAsync<Deposit>("/api/v0/deposits", body, ct);
     }
 
     /// <summary>Returns a deposit to the depositor (provider-side, no fee).</summary>
@@ -541,6 +585,132 @@ public sealed class Wallet
             wallet = Address,
             amount = amount.ToString("F6"),
         }, ct);
+    }
+
+    // ─── EIP-2612 Permit ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Signs an EIP-2612 permit for USDC approval with explicit parameters.
+    /// </summary>
+    /// <param name="spender">Contract address that will call transferFrom.</param>
+    /// <param name="value">Raw USDC amount in base units (6 decimals, e.g. 1_000_000 = $1).</param>
+    /// <param name="nonce">Current EIP-2612 nonce for this wallet on the USDC contract.</param>
+    /// <param name="deadline">Unix timestamp after which the permit expires.</param>
+    /// <param name="usdcAddress">Optional USDC contract address override.</param>
+    public PermitSignature SignUsdcPermit(string spender, long value, long nonce, long deadline, string? usdcAddress = null)
+    {
+        var usdc = usdcAddress ?? (UsdcAddresses.TryGetValue(_chainKey, out var addr) ? addr : "");
+
+        // EIP-712 domain: name="USD Coin", version="2", chainId, verifyingContract=USDC
+        var domainTypeHash = Eip712.Keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+        var nameHash = Eip712.Keccak256("USD Coin");
+        var versionHash = Eip712.Keccak256("2");
+        var domainData = ConcatBytes(domainTypeHash, nameHash, versionHash,
+            PadUint256Long(_chainId), PadAddressBytes(usdc));
+        var domainSep = Eip712.Keccak256(domainData);
+
+        // Permit struct hash
+        var typeHash = Eip712.Keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+        var structData = ConcatBytes(typeHash,
+            PadAddressBytes(Address),
+            PadAddressBytes(spender),
+            PadUint256Long(value),
+            PadUint256Long(nonce),
+            PadUint256Long(deadline));
+        var structHash = Eip712.Keccak256(structData);
+
+        // Final EIP-712 digest: "\x19\x01" || domainSeparator || structHash
+        var payload = new byte[66];
+        payload[0] = 0x19;
+        payload[1] = 0x01;
+        Buffer.BlockCopy(domainSep, 0, payload, 2, 32);
+        Buffer.BlockCopy(structHash, 0, payload, 34, 32);
+        var digest = Eip712.Keccak256(payload);
+
+        var sig = _signer.Sign(digest);
+
+        // Parse r, s, v from the 65-byte signature
+        var sigHex = sig.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? sig[2..] : sig;
+        var sigBytes = Convert.FromHexString(sigHex);
+        var r = "0x" + Convert.ToHexString(sigBytes, 0, 32).ToLowerInvariant();
+        var s = "0x" + Convert.ToHexString(sigBytes, 32, 32).ToLowerInvariant();
+        var v = (int)sigBytes[64];
+
+        return new PermitSignature(value, deadline, v, r, s);
+    }
+
+    /// <summary>
+    /// Signs a USDC permit for <paramref name="spender"/> with automatic nonce fetching.
+    /// </summary>
+    /// <param name="spender">Contract address that will call transferFrom (e.g. Router, Escrow).</param>
+    /// <param name="amount">Amount in USDC (e.g. 1.50 for $1.50).</param>
+    /// <param name="deadline">Optional Unix timestamp. Defaults to 1 hour from now.</param>
+    public async Task<PermitSignature> SignPermitAsync(string spender, decimal amount, long? deadline = null)
+    {
+        var usdcAddr = UsdcAddresses.TryGetValue(_chainKey, out var addr) ? addr : "";
+        var nonce = await FetchUsdcNonceAsync(usdcAddr);
+        var dl = deadline ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
+        var rawAmount = (long)(amount * 1_000_000m);
+        return SignUsdcPermit(spender, rawAmount, nonce, dl, usdcAddr);
+    }
+
+    /// <summary>
+    /// Auto-signs a permit for the given contract type and amount.
+    /// Used internally by payment methods when no explicit permit is provided.
+    /// </summary>
+    private async Task<PermitSignature> AutoPermitAsync(string contract, decimal amount)
+    {
+        var contracts = await GetContractsAsync();
+        var spender = contract switch
+        {
+            "router"  => contracts.Router,
+            "escrow"  => contracts.Escrow,
+            "tab"     => contracts.Tab,
+            "stream"  => contracts.Stream,
+            "bounty"  => contracts.Bounty,
+            "deposit" => contracts.Deposit,
+            _ => throw new ArgumentException($"Unknown contract type: {contract}", nameof(contract)),
+        };
+        if (string.IsNullOrEmpty(spender))
+            throw new RemitError(ErrorCodes.ServerError, $"No {contract} contract address available from /contracts endpoint.");
+        return await SignPermitAsync(spender, amount);
+    }
+
+    /// <summary>Fetches the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.</summary>
+    private async Task<long> FetchUsdcNonceAsync(string usdcAddress)
+    {
+        // Mock mode: no RPC URL means return 0 (used by MockRemit)
+        if (string.IsNullOrEmpty(_rpcUrl))
+            return 0;
+
+        // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
+        var paddedAddress = Address.ToLowerInvariant().Replace("0x", "").PadLeft(64, '0');
+        var data = $"0x7ecebe00{paddedAddress}";
+
+        var requestBody = new
+        {
+            jsonrpc = "2.0",
+            id = 1,
+            method = "eth_call",
+            @params = new object[]
+            {
+                new { to = usdcAddress, data },
+                "latest"
+            }
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var response = await RpcClient.PostAsync(_rpcUrl, content);
+        var responseBody = await response.Content.ReadAsStringAsync();
+
+        using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+        var result = doc.RootElement.GetProperty("result").GetString()
+            ?? throw new RemitError(ErrorCodes.ServerError, "RPC returned null for nonces() call.");
+
+        return Convert.ToInt64(result, 16);
     }
 
     // ─── Validation helpers ───────────────────────────────────────────────────

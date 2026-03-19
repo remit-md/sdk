@@ -3,12 +3,29 @@ import Foundation
 /// Main entry point for remit.md payments.
 public final class RemitWallet: @unchecked Sendable {
     private let transport: any Transport
+    private let signer: (any Signer)?
     private let signerAddress: String
+    private let chain: RemitChain
     private let chainName: String
+    private let rpcUrl: String
     private var contractsCache: ContractAddresses?
     private let cacheLock = NSLock()
 
-    public init(privateKey: String, chain: RemitChain = .baseSepolia, baseURL: String? = nil, routerAddress: String? = nil) throws {
+    /// Known USDC contract addresses per chain (EIP-2612 compatible).
+    public static let usdcAddresses: [String: String] = [
+        "base-sepolia": "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+        "base": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    ]
+
+    /// Default JSON-RPC URLs per chain (for nonce fetching).
+    public static let defaultRpcUrls: [String: String] = [
+        "base-sepolia": "https://sepolia.base.org",
+        "base": "https://mainnet.base.org",
+        "localhost": "http://127.0.0.1:8545",
+    ]
+
+    public init(privateKey: String, chain: RemitChain = .baseSepolia, baseURL: String? = nil, routerAddress: String? = nil, rpcUrl: String? = nil) throws {
         let signer = try PrivateKeySigner(privateKey: privateKey)
         self.transport = HttpTransport(
             baseURL: baseURL ?? chain.baseURL,
@@ -16,14 +33,23 @@ public final class RemitWallet: @unchecked Sendable {
             routerAddress: routerAddress ?? "",
             signer: signer
         )
+        self.signer = signer
         self.signerAddress = signer.address
+        self.chain = chain
         self.chainName = chain.chainName
+        self.rpcUrl = rpcUrl
+            ?? ProcessInfo.processInfo.environment["REMITMD_RPC_URL"]
+            ?? RemitWallet.defaultRpcUrls[chain.chainName]
+            ?? RemitWallet.defaultRpcUrls["base-sepolia"]!
     }
 
     public init(mock: MockRemit) {
         self.transport = MockTransport(mock: mock)
+        self.signer = nil
         self.signerAddress = mock.walletAddress
+        self.chain = .baseSepolia
         self.chainName = "base"
+        self.rpcUrl = RemitWallet.defaultRpcUrls["base-sepolia"]!
     }
 
     public static func fromEnvironment() throws -> RemitWallet {
@@ -34,7 +60,8 @@ public final class RemitWallet: @unchecked Sendable {
         let chainStr = env["REMITMD_CHAIN"] ?? "base-sepolia"
         let chain: RemitChain = chainStr == "base" ? .base : .baseSepolia
         let routerAddress = env["REMITMD_ROUTER_ADDRESS"]
-        return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress)
+        let rpcUrl = env["REMITMD_RPC_URL"]
+        return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress, rpcUrl: rpcUrl)
     }
 
     /// The Ethereum address (0x-prefixed) of this wallet.
@@ -64,9 +91,17 @@ public final class RemitWallet: @unchecked Sendable {
     public func pay(to recipient: String, amount: Double, memo: String? = nil, permit: PermitSignature? = nil) async throws -> Transaction {
         try validateAddress(recipient)
         try validateAmount(amount)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "router", amount: amount)
+        } else {
+            resolved = nil
+        }
         return try await transport.request(
             method: "POST", path: "/api/v0/payments/direct",
-            body: PayBody(to: recipient, amount: amount, memo: memo, permit: permit)
+            body: PayBody(to: recipient, amount: amount, memo: memo, permit: resolved)
         )
     }
 
@@ -75,6 +110,14 @@ public final class RemitWallet: @unchecked Sendable {
     public func createEscrow(recipient: String, amount: Double, conditions: String? = nil, permit: PermitSignature? = nil) async throws -> Escrow {
         try validateAddress(recipient)
         try validateAmount(amount)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "escrow", amount: amount)
+        } else {
+            resolved = nil
+        }
 
         // Step 1: create invoice on server.
         let invoiceId = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(32).lowercased()
@@ -92,7 +135,7 @@ public final class RemitWallet: @unchecked Sendable {
         // Step 2: fund the escrow.
         return try await transport.request(
             method: "POST", path: "/api/v0/escrows",
-            body: EscrowFundBody(invoice_id: String(invoiceId), permit: permit)
+            body: EscrowFundBody(invoice_id: String(invoiceId), permit: resolved)
         )
     }
 
@@ -128,11 +171,19 @@ public final class RemitWallet: @unchecked Sendable {
                         expiresIn: TimeInterval = 86400, permit: PermitSignature? = nil) async throws -> Tab {
         try validateAddress(provider)
         try validateAmount(limitAmount)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "tab", amount: limitAmount)
+        } else {
+            resolved = nil
+        }
         let expiry = Int(Date().timeIntervalSince1970) + Int(expiresIn)
         return try await transport.request(
             method: "POST", path: "/api/v0/tabs",
             body: TabBody(chain: chainName, provider: provider, limit_amount: limitAmount,
-                          per_unit: perUnit, expiry: expiry, permit: permit)
+                          per_unit: perUnit, expiry: expiry, permit: resolved)
         )
     }
 
@@ -165,10 +216,18 @@ public final class RemitWallet: @unchecked Sendable {
             throw RemitError(RemitError.invalidAmount, "ratePerSecond must be positive")
         }
         try validateAmount(maxTotal)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "stream", amount: maxTotal)
+        } else {
+            resolved = nil
+        }
         return try await transport.request(
             method: "POST", path: "/api/v0/streams",
             body: StreamBody(chain: chainName, payee: payee, rate_per_second: ratePerSecond,
-                             max_total: maxTotal, permit: permit)
+                             max_total: maxTotal, permit: resolved)
         )
     }
 
@@ -189,10 +248,18 @@ public final class RemitWallet: @unchecked Sendable {
         guard !taskDescription.isEmpty else {
             throw RemitError(RemitError.serverError, "bounty task_description must not be empty")
         }
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "bounty", amount: amount)
+        } else {
+            resolved = nil
+        }
         return try await transport.request(
             method: "POST", path: "/api/v0/bounties",
             body: BountyBody(chain: chainName, amount: amount, task_description: taskDescription,
-                             deadline: deadline, max_attempts: maxAttempts, permit: permit)
+                             deadline: deadline, max_attempts: maxAttempts, permit: resolved)
         )
     }
 
@@ -237,11 +304,19 @@ public final class RemitWallet: @unchecked Sendable {
                              permit: PermitSignature? = nil) async throws -> Deposit {
         try validateAddress(provider)
         try validateAmount(amount)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "deposit", amount: amount)
+        } else {
+            resolved = nil
+        }
         let expiry = Int(Date().timeIntervalSince1970) + Int(expiresIn)
         return try await transport.request(
             method: "POST", path: "/api/v0/deposits",
             body: DepositBody(chain: chainName, provider: provider, amount: amount,
-                              expiry: expiry, permit: permit)
+                              expiry: expiry, permit: resolved)
         )
     }
 
@@ -354,6 +429,155 @@ public final class RemitWallet: @unchecked Sendable {
         let digest = keccak256(finalData)
 
         return try signer.sign(digest: digest)
+    }
+
+    // MARK: - EIP-2612 Permit
+
+    /// Sign an EIP-2612 permit for USDC approval.
+    ///
+    /// Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address
+    /// Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline)
+    ///
+    /// - Parameters:
+    ///   - spender: Contract address that will be approved as spender (e.g. Router, Escrow).
+    ///   - value: Amount in USDC base units (6 decimals).
+    ///   - deadline: Permit deadline (Unix timestamp).
+    ///   - nonce: Current permit nonce for this wallet (default: 0).
+    ///   - usdcAddress: Override the USDC contract address. Defaults to the chain's known address.
+    /// - Returns: A `PermitSignature` with value, deadline, v, r, s.
+    public func signUsdcPermit(
+        spender: String,
+        value: UInt64,
+        deadline: Int,
+        nonce: Int = 0,
+        usdcAddress: String? = nil
+    ) throws -> PermitSignature {
+        guard let signer = self.signer else {
+            throw RemitError(RemitError.signatureInvalid, "Cannot sign permits in mock mode — no signer available")
+        }
+
+        let usdcAddr = usdcAddress ?? RemitWallet.usdcAddresses[chain.chainName] ?? ""
+
+        // Domain separator for USDC (EIP-2612)
+        let domainTypeHash = keccak256(Data("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".utf8))
+        let nameHash = keccak256(Data("USD Coin".utf8))
+        let versionHash = keccak256(Data("2".utf8))
+
+        var domainData = Data()
+        domainData.append(domainTypeHash)
+        domainData.append(nameHash)
+        domainData.append(versionHash)
+        domainData.append(permitEncodeUint256(UInt64(chain.rawValue)))
+        domainData.append(permitEncodeAddress(usdcAddr))
+        let domainSep = keccak256(domainData)
+
+        // Permit struct hash
+        let typeHash = keccak256(Data("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)".utf8))
+
+        var structData = Data()
+        structData.append(typeHash)
+        structData.append(permitEncodeAddress(signerAddress))
+        structData.append(permitEncodeAddress(spender))
+        structData.append(permitEncodeUint256(value))
+        structData.append(permitEncodeUint256(UInt64(nonce)))
+        structData.append(permitEncodeUint256(UInt64(deadline)))
+        let structHash = keccak256(structData)
+
+        // Final EIP-712 digest
+        var finalData = Data([0x19, 0x01])
+        finalData.append(domainSep)
+        finalData.append(structHash)
+        let digest = keccak256(finalData)
+
+        let sigHex = try signer.sign(digest: digest)
+
+        // Parse r, s, v from 65-byte signature
+        let sigStr = sigHex.hasPrefix("0x") ? String(sigHex.dropFirst(2)) : sigHex
+        let r = "0x" + String(sigStr.prefix(64))
+        let s = "0x" + String(sigStr.dropFirst(64).prefix(64))
+        let vHex = String(sigStr.dropFirst(128).prefix(2))
+        let v = Int(vHex, radix: 16) ?? 27
+
+        return PermitSignature(value: Double(value), deadline: deadline, v: v, r: r, s: s)
+    }
+
+    /// Convenience: sign an EIP-2612 permit for USDC approval.
+    /// Auto-fetches the on-chain nonce and sets a default deadline (1 hour from now).
+    ///
+    /// - Parameters:
+    ///   - spender: Contract address that will call transferFrom (e.g. Router, Escrow).
+    ///   - amount: Amount in USDC (e.g. 1.50 for $1.50).
+    ///   - deadline: Optional Unix timestamp. Defaults to 1 hour from now.
+    /// - Returns: A `PermitSignature`.
+    public func signPermit(spender: String, amount: Double, deadline: Int? = nil) async throws -> PermitSignature {
+        let usdcAddr = RemitWallet.usdcAddresses[chain.chainName] ?? ""
+        let nonce = try await fetchUsdcNonce(usdcAddress: usdcAddr)
+        let dl = deadline ?? (Int(Date().timeIntervalSince1970) + 3600)
+        let rawAmount = UInt64(round(amount * 1_000_000))
+        return try signUsdcPermit(spender: spender, value: rawAmount, deadline: dl, nonce: nonce, usdcAddress: usdcAddr)
+    }
+
+    /// Internal: auto-sign a permit for the given contract type and amount.
+    /// Used by payment methods when no explicit permit is provided.
+    private func autoPermit(
+        contract: String,
+        amount: Double
+    ) async throws -> PermitSignature {
+        let contracts = try await getContracts()
+        let spender: String
+        switch contract {
+        case "router":  spender = contracts.router
+        case "escrow":  spender = contracts.escrow
+        case "tab":     spender = contracts.tab
+        case "stream":  spender = contracts.stream
+        case "bounty":  spender = contracts.bounty
+        case "deposit": spender = contracts.deposit
+        default:
+            throw RemitError(RemitError.serverError, "No \(contract) contract address available")
+        }
+        guard !spender.isEmpty else {
+            throw RemitError(RemitError.serverError, "No \(contract) contract address available")
+        }
+        return try await signPermit(spender: spender, amount: amount)
+    }
+
+    /// Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
+    private func fetchUsdcNonce(usdcAddress: String) async throws -> Int {
+        // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
+        let paddedAddress = signerAddress.lowercased()
+            .replacingOccurrences(of: "0x", with: "")
+            .leftPad(toLength: 64, withPad: "0")
+        let data = "0x7ecebe00\(paddedAddress)"
+
+        let payload: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "eth_call",
+            "params": [["to": usdcAddress, "data": data], "latest"]
+        ]
+
+        guard let url = URL(string: rpcUrl) else {
+            throw RemitError(RemitError.serverError, "Invalid RPC URL: \(rpcUrl)")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (responseData, _) = try await URLSession.shared.data(for: request)
+
+        guard let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any] else {
+            throw RemitError(RemitError.serverError, "Invalid JSON-RPC response")
+        }
+
+        if let error = json["error"] as? [String: Any], let message = error["message"] as? String {
+            throw RemitError(RemitError.serverError, "RPC error fetching nonce: \(message)")
+        }
+
+        let resultHex = (json["result"] as? String) ?? "0x0"
+        let hexStr = resultHex.hasPrefix("0x") ? String(resultHex.dropFirst(2)) : resultHex
+        return Int(hexStr, radix: 16) ?? 0
     }
 
     // MARK: - Validation
@@ -479,4 +703,37 @@ private func tabEncodeAddress(_ address: String) -> Data {
     guard hex.count == 40, let addrData = Data(hexString: hex) else { return result }
     result.replaceSubrange(12..<32, with: addrData)
     return result
+}
+
+// MARK: - EIP-2612 Permit helpers (file-level)
+
+/// Encode a UInt64 as ABI uint256 (32-byte big-endian, zero-padded on the left).
+private func permitEncodeUint256(_ value: UInt64) -> Data {
+    var result = Data(repeating: 0, count: 32)
+    var v = value
+    for i in stride(from: 31, through: 24, by: -1) {
+        result[i] = UInt8(v & 0xFF)
+        v >>= 8
+    }
+    return result
+}
+
+/// Encode an Ethereum address as ABI bytes32 (12 zero bytes + 20 address bytes).
+private func permitEncodeAddress(_ address: String) -> Data {
+    var result = Data(repeating: 0, count: 32)
+    let hex = address.hasPrefix("0x") ? String(address.dropFirst(2)) : address
+    guard hex.count == 40, let addrData = Data(hexString: hex) else { return result }
+    result.replaceSubrange(12..<32, with: addrData)
+    return result
+}
+
+// MARK: - String helpers
+
+extension String {
+    /// Left-pad a string to a specified length.
+    func leftPad(toLength: Int, withPad pad: Character) -> String {
+        let deficit = toLength - count
+        guard deficit > 0 else { return self }
+        return String(repeating: pad, count: deficit) + self
+    }
 }

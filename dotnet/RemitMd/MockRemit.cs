@@ -116,6 +116,19 @@ public sealed class MockRemit
                         ? (object)e
                         : throw new RemitError(ErrorCodes.EscrowNotFound, $"Escrow not found: {PathId(p)}"),
 
+                "/api/v0/contracts" => new ContractAddresses(
+                    84532,
+                    "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+                    "0xb3E96ebE54138d1c0caea00Ae098309C7E0138eC",
+                    "0x9AC531dd432d5dcF637D288290E5A23F2eE36594",
+                    "0xE6D1Bc6dE70Dbc432d5fFbE8Bcd2C578C49Eb23b",
+                    "0x9e54bFB3Dcd1dB1235655a4D22b1c1d74b62C883",
+                    "0x2D08DD3093De3F22f85300330671122300F1e01b",
+                    "0x5DC44bd61729Dc06187D0F2B1612ea21e69B6a52",
+                    "0x853CFc2387C184E4492892475adfc19A23FF2e4F",
+                    "0x97ff63c9E24Fc074023F5d1251E544dCDaC93886",
+                    "0x3b2C97AafCdFBD5F6C9cF86dDa684Faa248008B1"),
+
                 _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled GET {path}"),
             };
 
@@ -492,6 +505,14 @@ public sealed class MockRemit
     private sealed class MockSigner : IRemitSigner
     {
         public string Address => "0x1234567890abcdef1234567890abcdef12345678";
-        public string Sign(byte[] hash) => "0x" + Convert.ToHexString(hash).ToLower() + "00";
+        public string Sign(byte[] hash)
+        {
+            // Return a valid 65-byte signature (r:32 + s:32 + v:1)
+            var sig = new byte[65];
+            Buffer.BlockCopy(hash, 0, sig, 0, Math.Min(hash.Length, 32)); // r = hash
+            Buffer.BlockCopy(hash, 0, sig, 32, Math.Min(hash.Length, 32)); // s = hash
+            sig[64] = 27; // v
+            return "0x" + Convert.ToHexString(sig).ToLowerInvariant();
+        }
     }
 }

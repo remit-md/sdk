@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "remit"
+name = "remitmd"
 version = "0.1.0"
 description = "Python SDK for the remit.md universal AI payment protocol"
 readme = "README.md"

@@ -235,7 +235,7 @@ class Wallet(RemitClient):
     async def _auto_permit(self, contract: str, amount: float) -> PermitSignature:
         """Internal: auto-sign a permit for the given contract type and amount."""
         contracts = await self.get_contracts()
-        spender = contracts.get(contract)
+        spender = str(contracts.get(contract, ""))
         if not spender:
             raise ValueError(f"No {contract} contract address available")
         return await self.sign_permit(spender, amount)

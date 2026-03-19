@@ -91,7 +91,14 @@ public final class RemitWallet: @unchecked Sendable {
     public func pay(to recipient: String, amount: Double, memo: String? = nil, permit: PermitSignature? = nil) async throws -> Transaction {
         try validateAddress(recipient)
         try validateAmount(amount)
-        let resolved = permit ?? (signer != nil ? try await autoPermit(contract: "router", amount: amount) : nil)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "router", amount: amount)
+        } else {
+            resolved = nil
+        }
         return try await transport.request(
             method: "POST", path: "/api/v0/payments/direct",
             body: PayBody(to: recipient, amount: amount, memo: memo, permit: resolved)
@@ -103,7 +110,14 @@ public final class RemitWallet: @unchecked Sendable {
     public func createEscrow(recipient: String, amount: Double, conditions: String? = nil, permit: PermitSignature? = nil) async throws -> Escrow {
         try validateAddress(recipient)
         try validateAmount(amount)
-        let resolved = permit ?? (signer != nil ? try await autoPermit(contract: "escrow", amount: amount) : nil)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "escrow", amount: amount)
+        } else {
+            resolved = nil
+        }
 
         // Step 1: create invoice on server.
         let invoiceId = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(32).lowercased()
@@ -157,7 +171,14 @@ public final class RemitWallet: @unchecked Sendable {
                         expiresIn: TimeInterval = 86400, permit: PermitSignature? = nil) async throws -> Tab {
         try validateAddress(provider)
         try validateAmount(limitAmount)
-        let resolved = permit ?? (signer != nil ? try await autoPermit(contract: "tab", amount: limitAmount) : nil)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "tab", amount: limitAmount)
+        } else {
+            resolved = nil
+        }
         let expiry = Int(Date().timeIntervalSince1970) + Int(expiresIn)
         return try await transport.request(
             method: "POST", path: "/api/v0/tabs",
@@ -195,7 +216,14 @@ public final class RemitWallet: @unchecked Sendable {
             throw RemitError(RemitError.invalidAmount, "ratePerSecond must be positive")
         }
         try validateAmount(maxTotal)
-        let resolved = permit ?? (signer != nil ? try await autoPermit(contract: "stream", amount: maxTotal) : nil)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "stream", amount: maxTotal)
+        } else {
+            resolved = nil
+        }
         return try await transport.request(
             method: "POST", path: "/api/v0/streams",
             body: StreamBody(chain: chainName, payee: payee, rate_per_second: ratePerSecond,
@@ -220,7 +248,14 @@ public final class RemitWallet: @unchecked Sendable {
         guard !taskDescription.isEmpty else {
             throw RemitError(RemitError.serverError, "bounty task_description must not be empty")
         }
-        let resolved = permit ?? (signer != nil ? try await autoPermit(contract: "bounty", amount: amount) : nil)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "bounty", amount: amount)
+        } else {
+            resolved = nil
+        }
         return try await transport.request(
             method: "POST", path: "/api/v0/bounties",
             body: BountyBody(chain: chainName, amount: amount, task_description: taskDescription,
@@ -269,7 +304,14 @@ public final class RemitWallet: @unchecked Sendable {
                              permit: PermitSignature? = nil) async throws -> Deposit {
         try validateAddress(provider)
         try validateAmount(amount)
-        let resolved = permit ?? (signer != nil ? try await autoPermit(contract: "deposit", amount: amount) : nil)
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try await autoPermit(contract: "deposit", amount: amount)
+        } else {
+            resolved = nil
+        }
         let expiry = Int(Date().timeIntervalSince1970) + Int(expiresIn)
         return try await transport.request(
             method: "POST", path: "/api/v0/deposits",

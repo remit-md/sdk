@@ -417,7 +417,12 @@ pub(crate) async fn fetch_usdc_nonce(
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
-        .map_err(|e| remit_err(codes::NETWORK_ERROR, format!("HTTP client build failed: {e}")))?;
+        .map_err(|e| {
+            remit_err(
+                codes::NETWORK_ERROR,
+                format!("HTTP client build failed: {e}"),
+            )
+        })?;
 
     let resp = client
         .post(rpc_url)

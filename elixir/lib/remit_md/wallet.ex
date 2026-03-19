@@ -908,13 +908,6 @@ defmodule RemitMd.Wallet do
   defp get_address(%{address: addr}), do: addr
   defp get_address(%_{} = s), do: Map.get(s, :address)
 
-  defp maybe_add_permit(body, opts) do
-    case Keyword.get(opts, :permit) do
-      %PermitSignature{} = p -> Map.put(body, :permit, PermitSignature.to_map(p))
-      _ -> body
-    end
-  end
-
   # Resolve permit: use explicit from opts, or auto-sign. Returns PermitSignature or nil (mock mode).
   defp resolve_permit(%__MODULE__{mock_pid: pid}, _contract, _amount, _opts) when pid != nil, do: nil
 

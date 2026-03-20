@@ -13,6 +13,7 @@ from .conftest import (
     fund_wallet,
     get_fee_wallet_balance,
     get_usdc_balance,
+    log_tx,
     wait_for_balance_change,
 )
 
@@ -51,6 +52,8 @@ async def test_deposit_lifecycle() -> None:
         permit=permit,
     )
     assert deposit.id, "deposit should have an id"
+    if hasattr(deposit, "tx_hash") and deposit.tx_hash:
+        log_tx("deposit", "place", deposit.tx_hash)
 
     # Wait for on-chain deposit lock
     agent_mid = await wait_for_balance_change(agent.address, agent_before)
@@ -59,6 +62,8 @@ async def test_deposit_lifecycle() -> None:
     # Step 2: Provider returns the deposit
     returned = await provider.return_deposit(deposit.id)
     assert returned.status == "returned", f"deposit should be returned, got {returned.status}"
+    if hasattr(returned, "tx_hash") and returned.tx_hash:
+        log_tx("deposit", "return", returned.tx_hash)
 
     # Wait for return settlement (agent gets full refund)
     agent_after = await wait_for_balance_change(agent.address, agent_mid)

@@ -111,3 +111,24 @@ export function assertBalanceChange(
     );
   }
 }
+
+/** Assert fee wallet balance increased (shared fee wallet, "at least" pattern). */
+export function assertFeeIncrease(
+  label: string,
+  before: number,
+  after: number,
+  minExpected: number,
+): void {
+  const delta = after - before;
+  if (delta < minExpected - 0.001) {
+    throw new Error(
+      `${label}: fee wallet should have increased by at least ${minExpected}, ` +
+      `got delta=${delta} (before=${before}, after=${after})`,
+    );
+  }
+}
+
+/** Log a transaction hash with a basescan link. */
+export function logTx(flow: string, step: string, txHash: string): void {
+  console.log(`[TX] ${flow} | ${step} | ${txHash} | https://sepolia.basescan.org/tx/${txHash}`);
+}

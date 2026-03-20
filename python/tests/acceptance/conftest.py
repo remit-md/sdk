@@ -107,6 +107,25 @@ def assert_balance_change(
     )
 
 
+def assert_fee_increase(
+    label: str,
+    before: float,
+    after: float,
+    min_expected: float,
+) -> None:
+    """Assert fee wallet balance increased (shared fee wallet, 'at least' pattern)."""
+    delta = after - before
+    assert delta >= min_expected - 0.001, (
+        f"{label}: fee wallet should have increased by at least {min_expected}, "
+        f"got delta={delta} (before={before}, after={after})"
+    )
+
+
+def log_tx(flow: str, step: str, tx_hash: str) -> None:
+    """Log a transaction hash with a basescan link."""
+    print(f"[TX] {flow} | {step} | {tx_hash} | https://sepolia.basescan.org/tx/{tx_hash}")
+
+
 async def fund_wallet(wallet: Wallet, amount: float = 100) -> None:
     """Mint testnet USDC and wait for on-chain confirmation."""
     await wallet.mint(amount)

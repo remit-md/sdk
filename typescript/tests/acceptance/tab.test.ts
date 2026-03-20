@@ -12,7 +12,9 @@ import {
   getUsdcBalance,
   getFeeWalletBalance,
   assertBalanceChange,
+  assertFeeIncrease,
   waitForBalanceChange,
+  logTx,
 } from "./setup.js";
 
 describe("SDK: Tab Lifecycle", { timeout: 180_000 }, () => {
@@ -48,6 +50,8 @@ describe("SDK: Tab Lifecycle", { timeout: 180_000 }, () => {
     });
 
     assert.ok(tab.id, "tab should have an id");
+    const openTxHash = (tab as unknown as Record<string, string>).txHash ?? (tab as unknown as Record<string, string>).tx_hash;
+    if (openTxHash) logTx("tab", "open", openTxHash);
 
     // Wait for on-chain lock (agent USDC moves to Tab contract)
     await waitForBalanceChange(agent.address, agentBefore);
@@ -70,6 +74,8 @@ describe("SDK: Tab Lifecycle", { timeout: 180_000 }, () => {
 
     const chargeTabId = charge.tabId ?? (charge as unknown as Record<string, string>).tab_id;
     assert.equal(chargeTabId, tab.id, "charge should reference the tab");
+    const chargeTxHash = (charge as unknown as Record<string, string>).txHash ?? (charge as unknown as Record<string, string>).tx_hash;
+    if (chargeTxHash) logTx("tab", "charge", chargeTxHash);
 
     // Step 3: Close tab (agent, with provider's close signature on final state)
     const closeSig = await provider.signTabCharge(
@@ -92,6 +98,7 @@ describe("SDK: Tab Lifecycle", { timeout: 180_000 }, () => {
       (closed as unknown as Record<string, string>).closedTxHash ??
       (closed as unknown as Record<string, string>).closed_tx_hash;
     assert.ok(closedTxHash?.startsWith("0x"), `close should return tx hash, got: ${closedTxHash}`);
+    logTx("tab", "close", closedTxHash);
 
     // Verify balances
     const providerAfter = await waitForBalanceChange(provider.address, providerBefore);
@@ -102,7 +109,7 @@ describe("SDK: Tab Lifecycle", { timeout: 180_000 }, () => {
     assertBalanceChange("agent", agentBefore, agentAfter, -chargeAmount);
     // Provider: received $2 minus 1% fee = $1.98
     assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    // Fee wallet: received 1% of $2 = $0.02
-    assertBalanceChange("fee wallet", feeBefore, feeAfter, fee);
+    // Fee wallet: received at least 1% of $2 = $0.02
+    assertFeeIncrease("fee wallet", feeBefore, feeAfter, fee);
   });
 });

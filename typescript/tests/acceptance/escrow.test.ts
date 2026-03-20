@@ -11,7 +11,9 @@ import {
   getUsdcBalance,
   getFeeWalletBalance,
   assertBalanceChange,
+  assertFeeIncrease,
   waitForBalanceChange,
+  logTx,
 } from "./setup.js";
 
 describe("SDK: Escrow Lifecycle", { timeout: 180_000 }, () => {
@@ -44,16 +46,22 @@ describe("SDK: Escrow Lifecycle", { timeout: 180_000 }, () => {
     );
     const escrowId = escrow.invoiceId ?? (escrow as unknown as Record<string, string>).invoice_id;
     assert.ok(escrowId, "escrow should have id");
+    const escrowTxHash = escrow.txHash ?? (escrow as unknown as Record<string, string>).tx_hash;
+    if (escrowTxHash) logTx("escrow", "fund", escrowTxHash);
 
     // Wait for lock
     await waitForBalanceChange(agent.address, agentBefore);
 
     // Provider claims
-    await provider.claimStart(escrowId);
+    const claim = await provider.claimStart(escrowId);
+    const claimTxHash = (claim as unknown as Record<string, string>).txHash ?? (claim as unknown as Record<string, string>).tx_hash;
+    if (claimTxHash) logTx("escrow", "claimStart", claimTxHash);
     await new Promise((r) => setTimeout(r, 5000));
 
     // Agent releases
-    await agent.releaseEscrow(escrowId);
+    const release = await agent.releaseEscrow(escrowId);
+    const releaseTxHash = (release as unknown as Record<string, string>).txHash ?? (release as unknown as Record<string, string>).tx_hash;
+    if (releaseTxHash) logTx("escrow", "release", releaseTxHash);
 
     // Verify balances
     const providerAfter = await waitForBalanceChange(provider.address, providerBefore);
@@ -62,6 +70,6 @@ describe("SDK: Escrow Lifecycle", { timeout: 180_000 }, () => {
 
     assertBalanceChange("agent", agentBefore, agentAfter, -amount);
     assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    assertBalanceChange("fee wallet", feeBefore, feeAfter, fee);
+    assertFeeIncrease("fee wallet", feeBefore, feeAfter, fee);
   });
 });

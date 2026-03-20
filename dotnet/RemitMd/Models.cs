@@ -13,22 +13,16 @@ public enum ChainId
 
 // ─── Status enums ─────────────────────────────────────────────────────────────
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum InvoiceStatus { Pending, Funded, Released, Cancelled, Expired }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
-public enum EscrowStatus { Pending, Funded, Active, Released, Cancelled, Expired }
+public enum EscrowStatus { Funded, Active, Completed, Cancelled, TimedOut }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum TabStatus { Open, Closed, Settled }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum StreamStatus { Active, Paused, Ended, Cancelled }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum BountyStatus { Open, Awarded, Expired, Reclaimed }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum DepositStatus { Locked, Returned, Forfeited }
 
 // ─── Core models ──────────────────────────────────────────────────────────────

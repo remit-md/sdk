@@ -12,7 +12,9 @@ import {
   getUsdcBalance,
   getFeeWalletBalance,
   assertBalanceChange,
+  assertFeeIncrease,
   waitForBalanceChange,
+  logTx,
 } from "./setup.js";
 
 describe("SDK: Bounty Lifecycle", { timeout: 180_000 }, () => {
@@ -47,6 +49,8 @@ describe("SDK: Bounty Lifecycle", { timeout: 180_000 }, () => {
     });
 
     assert.ok(bounty.id, "bounty should have an id");
+    const postTxHash = (bounty as unknown as Record<string, string>).txHash ?? (bounty as unknown as Record<string, string>).tx_hash;
+    if (postTxHash) logTx("bounty", "post", postTxHash);
 
     // Wait for on-chain bounty creation (poster USDC locked in Bounty contract)
     await waitForBalanceChange(poster.address, posterBefore);
@@ -66,6 +70,8 @@ describe("SDK: Bounty Lifecycle", { timeout: 180_000 }, () => {
     const awardedStatus =
       awarded.status ?? (awarded as unknown as Record<string, string>).status;
     assert.equal(awardedStatus, "awarded", "bounty should be awarded");
+    const awardTxHash = (awarded as unknown as Record<string, string>).txHash ?? (awarded as unknown as Record<string, string>).tx_hash;
+    if (awardTxHash) logTx("bounty", "award", awardTxHash);
 
     // Verify balances
     const providerAfter = await waitForBalanceChange(provider.address, providerBefore);
@@ -76,7 +82,7 @@ describe("SDK: Bounty Lifecycle", { timeout: 180_000 }, () => {
     assertBalanceChange("poster", posterBefore, posterAfter, -amount);
     // Provider: received $5 minus 1% fee = $4.95
     assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    // Fee wallet: received 1% of $5 = $0.05
-    assertBalanceChange("fee wallet", feeBefore, feeAfter, fee);
+    // Fee wallet: received at least 1% of $5 = $0.05
+    assertFeeIncrease("fee wallet", feeBefore, feeAfter, fee);
   });
 });

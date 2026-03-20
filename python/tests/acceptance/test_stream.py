@@ -16,6 +16,7 @@ from .conftest import (
     fund_wallet,
     get_fee_wallet_balance,
     get_usdc_balance,
+    log_tx,
     wait_for_balance_change,
 )
 
@@ -55,6 +56,8 @@ async def test_stream_lifecycle() -> None:
         permit=permit,
     )
     assert stream.id, "stream should have an id"
+    if hasattr(stream, "tx_hash") and stream.tx_hash:
+        log_tx("stream", "open", stream.tx_hash)
 
     # Wait for on-chain creation (agent locks maxTotal in Stream contract)
     await wait_for_balance_change(agent.address, agent_before)
@@ -65,6 +68,8 @@ async def test_stream_lifecycle() -> None:
     # Step 3: Close stream (payer only)
     closed = await agent.close_stream(stream.id)
     assert closed.status == "closed", f"stream should be closed, got {closed.status}"
+    if hasattr(closed, "tx_hash") and closed.tx_hash:
+        log_tx("stream", "close", closed.tx_hash)
 
     # Wait for settlement (provider balance should increase)
     provider_after = await wait_for_balance_change(provider.address, provider_before)

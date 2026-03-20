@@ -9,10 +9,12 @@ import pytest
 
 from .conftest import (
     assert_balance_change,
+    assert_fee_increase,
     create_wallet,
     fund_wallet,
     get_fee_wallet_balance,
     get_usdc_balance,
+    log_tx,
     wait_for_balance_change,
 )
 
@@ -55,6 +57,7 @@ async def test_pay_direct_with_permit() -> None:
         permit=permit,
     )
     assert tx.tx_hash is not None and tx.tx_hash.startswith("0x"), f"bad tx_hash: {tx.tx_hash}"
+    log_tx("direct", "pay", tx.tx_hash)
 
     agent_after = await wait_for_balance_change(agent.address, agent_before)
     provider_after = await get_usdc_balance(provider.address)
@@ -62,4 +65,4 @@ async def test_pay_direct_with_permit() -> None:
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change("provider", provider_before, provider_after, provider_receives)
-    assert_balance_change("fee wallet", fee_before, fee_after, fee)
+    assert_fee_increase("fee wallet", fee_before, fee_after, fee)

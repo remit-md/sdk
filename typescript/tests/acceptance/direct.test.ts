@@ -12,7 +12,9 @@ import {
   getUsdcBalance,
   getFeeWalletBalance,
   assertBalanceChange,
+  assertFeeIncrease,
   waitForBalanceChange,
+  logTx,
 } from "./setup.js";
 
 describe("SDK: Direct Payment", { timeout: 120_000 }, () => {
@@ -41,6 +43,7 @@ describe("SDK: Direct Payment", { timeout: 120_000 }, () => {
 
     const txHash = tx.txHash ?? (tx as unknown as Record<string, string>).tx_hash;
     assert.ok(txHash?.startsWith("0x"), `should return tx hash, got: ${txHash}`);
+    logTx("direct", "pay", txHash);
 
     const agentAfter = await waitForBalanceChange(agent.address, agentBefore);
     const providerAfter = await getUsdcBalance(provider.address);
@@ -48,6 +51,6 @@ describe("SDK: Direct Payment", { timeout: 120_000 }, () => {
 
     assertBalanceChange("agent", agentBefore, agentAfter, -amount);
     assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    assertBalanceChange("fee wallet", feeBefore, feeAfter, fee);
+    assertFeeIncrease("fee wallet", feeBefore, feeAfter, fee);
   });
 });

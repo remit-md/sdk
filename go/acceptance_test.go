@@ -193,6 +193,11 @@ func assertBalanceChange(t *testing.T, label string, before, after, expected flo
 
 // ─── Funding ──────────────────────────────────────────────────────────────────
 
+func logTx(t *testing.T, flow, step, txHash string) {
+	t.Helper()
+	t.Logf("[TX] %s | %s | %s | https://sepolia.basescan.org/tx/%s", flow, step, txHash, txHash)
+}
+
 func fundTestWallet(t *testing.T, w *testWallet, amount float64) {
 	t.Helper()
 	ctx := context.Background()
@@ -312,6 +317,7 @@ func TestPayDirectWithPermit(t *testing.T) {
 	if !strings.HasPrefix(tx.TxHash, "0x") {
 		t.Fatalf("expected tx hash starting with 0x, got: %s", tx.TxHash)
 	}
+	logTx(t, "direct", "pay", tx.TxHash)
 
 	agentAfter := waitForBalanceChange(t, agent.Address(), agentBefore)
 	providerAfter := getUsdcBalance(t, provider.Address())
@@ -360,21 +366,30 @@ func TestEscrowLifecycle(t *testing.T) {
 	if escrow.InvoiceID == "" {
 		t.Fatal("escrow should have an InvoiceID")
 	}
+	if escrow.TxHash != "" {
+		logTx(t, "escrow", "fund", escrow.TxHash)
+	}
 
 	// Wait for on-chain lock
 	waitForBalanceChange(t, agent.Address(), agentBefore)
 
 	// Provider claims start
-	_, err = provider.ClaimStart(ctx, escrow.InvoiceID)
+	claimResult, err := provider.ClaimStart(ctx, escrow.InvoiceID)
 	if err != nil {
 		t.Fatalf("ClaimStart: %v", err)
+	}
+	if claimResult != nil && claimResult.TxHash != "" {
+		logTx(t, "escrow", "claimStart", claimResult.TxHash)
 	}
 	time.Sleep(5 * time.Second)
 
 	// Agent releases
-	_, err = agent.ReleaseEscrow(ctx, escrow.InvoiceID)
+	releaseResult, err := agent.ReleaseEscrow(ctx, escrow.InvoiceID)
 	if err != nil {
 		t.Fatalf("ReleaseEscrow: %v", err)
+	}
+	if releaseResult != nil && releaseResult.TxHash != "" {
+		logTx(t, "escrow", "release", releaseResult.TxHash)
 	}
 
 	// Verify balances
@@ -502,6 +517,9 @@ func TestTabLifecycle(t *testing.T) {
 	if tab.ID == "" {
 		t.Fatal("tab ID should not be empty")
 	}
+	if tab.TxHash != "" {
+		logTx(t, "tab", "open", tab.TxHash)
+	}
 	t.Logf("Tab created: %s", tab.ID)
 
 	// Wait for on-chain funding
@@ -540,6 +558,11 @@ func TestTabLifecycle(t *testing.T) {
 	}
 	if closed.Status == "open" {
 		t.Fatal("tab should not be open after close")
+	}
+	if closed.ClosedTxHash != "" {
+		logTx(t, "tab", "close", closed.ClosedTxHash)
+	} else if closed.TxHash != "" {
+		logTx(t, "tab", "close", closed.TxHash)
 	}
 	t.Logf("Tab closed: status=%s", closed.Status)
 
@@ -589,6 +612,9 @@ func TestStreamLifecycle(t *testing.T) {
 	if stream.ID == "" {
 		t.Fatal("stream ID should not be empty")
 	}
+	if stream.TxHash != "" {
+		logTx(t, "stream", "open", stream.TxHash)
+	}
 	t.Logf("Stream created: %s, status=%s", stream.ID, stream.Status)
 
 	// Wait for on-chain lock
@@ -605,6 +631,9 @@ func TestStreamLifecycle(t *testing.T) {
 	}
 	if closed.Status != "closed" {
 		t.Logf("stream status after close: %s (expected closed)", closed.Status)
+	}
+	if closed.TxHash != "" {
+		logTx(t, "stream", "close", closed.TxHash)
 	}
 	t.Logf("Stream closed: status=%s", closed.Status)
 
@@ -657,6 +686,9 @@ func TestBountyLifecycle(t *testing.T) {
 	if bounty.ID == "" {
 		t.Fatal("bounty ID should not be empty")
 	}
+	if bounty.TxHash != "" {
+		logTx(t, "bounty", "post", bounty.TxHash)
+	}
 	t.Logf("Bounty created: %s, status=%s", bounty.ID, bounty.Status)
 
 	// Wait for on-chain lock
@@ -680,6 +712,9 @@ func TestBountyLifecycle(t *testing.T) {
 	}
 	if awarded.Status != "awarded" {
 		t.Logf("bounty status after award: %s (expected awarded)", awarded.Status)
+	}
+	if awarded.TxHash != "" {
+		logTx(t, "bounty", "award", awarded.TxHash)
 	}
 	t.Logf("Bounty awarded: status=%s", awarded.Status)
 
@@ -727,6 +762,9 @@ func TestDepositLifecycle(t *testing.T) {
 	if deposit.ID == "" {
 		t.Fatal("deposit ID should not be empty")
 	}
+	if deposit.TxHash != "" {
+		logTx(t, "deposit", "place", deposit.TxHash)
+	}
 	t.Logf("Deposit placed: %s, status=%s", deposit.ID, deposit.Status)
 
 	// Wait for on-chain lock
@@ -734,9 +772,12 @@ func TestDepositLifecycle(t *testing.T) {
 	payerAfterDeposit := getUsdcBalance(t, payer.Address())
 
 	// 2. Return deposit (by provider)
-	_, err = provider.ReturnDeposit(ctx, deposit.ID)
+	returnResult, err := provider.ReturnDeposit(ctx, deposit.ID)
 	if err != nil {
 		t.Fatalf("ReturnDeposit: %v", err)
+	}
+	if returnResult != nil && returnResult.TxHash != "" {
+		logTx(t, "deposit", "return", returnResult.TxHash)
 	}
 	t.Log("Deposit returned")
 

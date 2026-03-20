@@ -14,6 +14,7 @@ using System.Text.Json;
 using Nethereum.Signer;
 using RemitMd;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace RemitMd.Tests;
 
@@ -153,6 +154,16 @@ public class AcceptanceTests
         return result;
     }
 
+    private readonly ITestOutputHelper _output;
+
+    public AcceptanceTests(ITestOutputHelper output) { _output = output; }
+
+    private void LogTx(string flow, string step, string? txHash)
+    {
+        if (string.IsNullOrEmpty(txHash)) return;
+        _output.WriteLine($"[TX] {flow} | {step} | {txHash} | https://sepolia.basescan.org/tx/{txHash}");
+    }
+
     // ─── Tests ──────────────────────────────────────────────────────────────
 
     [Fact]
@@ -182,6 +193,7 @@ public class AcceptanceTests
                                              memo: "dotnet-sdk-acceptance", permit: permit);
         Assert.NotNull(tx.TxHash);
         Assert.StartsWith("0x", tx.TxHash);
+        LogTx("direct", "pay", tx.TxHash);
 
         var agentAfter = await WaitForBalanceChange(agent.Wallet.Address, agentBefore);
         var providerAfter = await GetUsdcBalance(provider.Wallet.Address);
@@ -224,7 +236,8 @@ public class AcceptanceTests
         await provider.Wallet.ClaimStartAsync(escrow.Id);
         await Task.Delay(5000);
 
-        await agent.Wallet.ReleaseEscrowAsync(escrow.Id);
+        var released = await agent.Wallet.ReleaseEscrowAsync(escrow.Id);
+        LogTx("escrow", "release", released.TxHash);
 
         var providerAfter = await WaitForBalanceChange(provider.Wallet.Address, providerBefore);
         var feeAfter = await GetFeeBalance();
@@ -313,6 +326,7 @@ public class AcceptanceTests
         var tx = await agent.Wallet.CloseStreamAsync(stream.Id);
         Assert.NotNull(tx.TxHash);
         Assert.StartsWith("0x", tx.TxHash);
+        LogTx("stream", "close", tx.TxHash);
     }
 
     // ─── Bounty lifecycle ────────────────────────────────────────────────────
@@ -380,6 +394,7 @@ public class AcceptanceTests
         // 2. Return deposit (by provider)
         var tx = await provider.Wallet.ReturnDepositAsync(deposit.Id);
         Assert.NotNull(tx.TxHash);
+        LogTx("deposit", "return", tx.TxHash);
 
         // 3. Verify full refund (deposits have no fee)
         var agentAfterReturn = await WaitForBalanceChange(agent.Wallet.Address, agentAfterLock);

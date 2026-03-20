@@ -73,7 +73,7 @@ jobs:
         env:
           ACCEPTANCE_API_URL: https://remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: cd python && python -m pytest tests/acceptance/ -v --timeout=180
+        run: cd python && python -m pytest tests/acceptance/ -v -s --timeout=180
 
   go:
     name: Go SDK Acceptance

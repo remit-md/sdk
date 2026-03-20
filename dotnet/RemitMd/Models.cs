@@ -107,7 +107,7 @@ public record Tab(
     [property: JsonPropertyName("remaining")] decimal Remaining,
     [property: JsonPropertyName("status")] TabStatus Status,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("expiry")] long? Expiry
+    [property: JsonPropertyName("expiry")] string? Expiry
 );
 
 /// <summary>A single charge against a Tab (returned by POST /tabs/{id}/charge).</summary>
@@ -139,7 +139,7 @@ public record Bounty(
     [property: JsonPropertyName("amount")] decimal Amount,
     [property: JsonPropertyName("task_description")] string TaskDescription,
     [property: JsonPropertyName("status")] BountyStatus Status,
-    [property: JsonPropertyName("deadline")] long? Deadline,
+    [property: JsonPropertyName("deadline")] string? Deadline,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
 
@@ -158,7 +158,7 @@ public record Deposit(
     [property: JsonPropertyName("provider")] string Provider,
     [property: JsonPropertyName("amount")] decimal Amount,
     [property: JsonPropertyName("status")] DepositStatus Status,
-    [property: JsonPropertyName("expiry")] long? Expiry,
+    [property: JsonPropertyName("expiry")] string? Expiry,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
 

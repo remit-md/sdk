@@ -81,19 +81,10 @@ defmodule RemitMd.ComplianceTest do
   end
 
   defp register_and_get_key do
-    ts = :os.system_time(:millisecond)
-    email = "compliance.elixir.#{ts}@test.remitmd.local"
-
-    {201, reg} =
-      http_post("/api/v0/auth/register", %{email: email, password: "ComplianceTestPass1!"})
-
-    token       = reg["token"] || raise "register failed: #{inspect(reg)}"
-    wallet_addr = reg["wallet_address"] || raise "no wallet_address in register response"
-
-    {200, key_data} = http_get("/api/v0/auth/agent-key", token)
-    private_key = key_data["private_key"] || raise "agent-key failed: #{inspect(key_data)}"
-
-    {private_key, wallet_addr}
+    key_bytes = :crypto.strong_rand_bytes(32)
+    private_key = "0x" <> Base.encode16(key_bytes, case: :lower)
+    wallet = make_wallet(private_key)
+    {private_key, wallet.address}
   end
 
   defp fund_wallet(wallet_addr) do

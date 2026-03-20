@@ -11,8 +11,9 @@ package remitmd_test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -91,24 +92,14 @@ func doJSONC(t *testing.T, method, url string, body any, token string) map[strin
 
 func registerAndGetWalletC(t *testing.T) (privateKey string, walletAddress string) {
 	t.Helper()
-	email := fmt.Sprintf("compliance.go.%d@test.remitmd.local", time.Now().UnixMilli())
-
-	reg := doJSONC(t, "POST", compServerURL+"/api/v0/auth/register", map[string]string{
-		"email":    email,
-		"password": "ComplianceTestPass1!",
-	}, "")
-	token, _ := reg["token"].(string)
-	walletAddr, _ := reg["wallet_address"].(string)
-	if token == "" {
-		t.Fatalf("register: no token in response: %v", reg)
+	// Generate random 32-byte private key — no server registration needed.
+	keyBytes := make([]byte, 32)
+	if _, err := rand.Read(keyBytes); err != nil {
+		t.Fatalf("generate random key: %v", err)
 	}
-
-	keyData := doJSONC(t, "GET", compServerURL+"/api/v0/auth/agent-key", nil, token)
-	pk, _ := keyData["private_key"].(string)
-	if pk == "" {
-		t.Fatalf("agent-key: no private_key in response: %v", keyData)
-	}
-	return pk, walletAddr
+	pk := "0x" + hex.EncodeToString(keyBytes)
+	w := makeWalletC(t, pk)
+	return pk, w.Address()
 }
 
 func makeWalletC(t *testing.T, privateKey string) *remitmd.Wallet {

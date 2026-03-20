@@ -71,29 +71,12 @@ final class ComplianceTests: XCTestCase {
         return try JSONSerialization.jsonObject(with: data) as! [String: Any]
     }
 
-    /// Register a new operator. Returns (privateKey, walletAddress).
-    private static func registerAndGetKey() async throws -> (String, String) {
-        let email = "compliance.swift.\(Int(Date().timeIntervalSince1970 * 1000))@test.remitmd.local"
-        let reg = try await httpJSON(
-            method: "POST",
-            path: "/api/v0/auth/register",
-            body: ["email": email, "password": "ComplianceTestPass1!"]
-        )
-        guard let token = reg["token"] as? String,
-              let walletAddr = reg["wallet_address"] as? String else {
-            throw NSError(domain: "Compliance", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "register failed: \(reg)"])
-        }
-        let keyData = try await httpJSON(
-            method: "GET",
-            path: "/api/v0/auth/agent-key",
-            bearerToken: token
-        )
-        guard let privateKey = keyData["private_key"] as? String else {
-            throw NSError(domain: "Compliance", code: 2,
-                          userInfo: [NSLocalizedDescriptionKey: "agent-key failed: \(keyData)"])
-        }
-        return (privateKey, walletAddr)
+    /// Generate a random private key and derive the wallet address.
+    private static func generateWallet() throws -> (String, String) {
+        let keyBytes = (0..<32).map { _ in UInt8.random(in: 0...255) }
+        let privateKey = "0x" + keyBytes.map { String(format: "%02x", $0) }.joined()
+        let wallet = try makeWallet(privateKey: privateKey)
+        return (privateKey, wallet.address)
     }
 
     /// Fund a wallet via mint (no auth required in testnet mode).
@@ -122,7 +105,7 @@ final class ComplianceTests: XCTestCase {
         if let key = sharedPayerKey {
             return try makeWallet(privateKey: key)
         }
-        let (pk, addr) = try await registerAndGetKey()
+        let (pk, addr) = try generateWallet()
         try await fundWallet(addr)
         sharedPayerKey  = pk
         sharedPayerAddr = addr
@@ -134,7 +117,7 @@ final class ComplianceTests: XCTestCase {
     func testCompliance_AuthenticatedRequest_ReturnsBalance_Not401() async throws {
         guard await Self.isServerAvailable() else { return }
 
-        let (pk, _) = try await Self.registerAndGetKey()
+        let (pk, _) = try Self.generateWallet()
         let wallet = try Self.makeWallet(privateKey: pk)
 
         // balance() makes an authenticated GET — will throw on 401.
@@ -164,7 +147,7 @@ final class ComplianceTests: XCTestCase {
         guard await Self.isServerAvailable() else { return }
 
         let payer = try await Self.getSharedPayer()
-        let (_, payeeAddr) = try await Self.registerAndGetKey()
+        let (_, payeeAddr) = try Self.generateWallet()
 
         let tx = try await payer.pay(to: payeeAddr, amount: 5.0, memo: "swift compliance test")
 
@@ -176,7 +159,7 @@ final class ComplianceTests: XCTestCase {
         guard await Self.isServerAvailable() else { return }
 
         let payer = try await Self.getSharedPayer()
-        let (_, payeeAddr) = try await Self.registerAndGetKey()
+        let (_, payeeAddr) = try Self.generateWallet()
 
         do {
             _ = try await payer.pay(to: payeeAddr, amount: 0.0001)

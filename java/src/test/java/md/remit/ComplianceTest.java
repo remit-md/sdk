@@ -99,19 +99,24 @@ class ComplianceTest {
         return resp.body();
     }
 
-    /** Register a new operator and return (privateKey, walletAddress). */
+    /** Generate a random private key and derive the wallet address. */
     private static String[] registerAndGetKey() throws Exception {
-        String email = "compliance.java." + System.currentTimeMillis() + "@test.remitmd.local";
-        String regBody = MAPPER.writeValueAsString(
-            java.util.Map.of("email", email, "password", "ComplianceTestPass1!"));
-        JsonNode reg = MAPPER.readTree(post("/api/v0/auth/register", regBody, null));
-        String token = reg.get("token").asText();
-        String walletAddr = reg.get("wallet_address").asText();
+        byte[] keyBytes = new byte[32];
+        new java.security.SecureRandom().nextBytes(keyBytes);
+        StringBuilder sb = new StringBuilder("0x");
+        for (byte b : keyBytes) {
+            sb.append(String.format("%02x", b));
+        }
+        String privateKey = sb.toString();
 
-        JsonNode keyData = MAPPER.readTree(getWithAuth("/api/v0/auth/agent-key", token));
-        String privateKey = keyData.get("private_key").asText();
+        Wallet wallet = RemitMd.withKey(privateKey)
+            .chain("base")
+            .testnet(true)
+            .baseUrl(SERVER_URL)
+            .routerAddress(ROUTER_ADDRESS)
+            .build();
 
-        return new String[]{privateKey, walletAddr};
+        return new String[]{privateKey, wallet.address()};
     }
 
     /** Fund a wallet via mint (no auth required on testnet). */

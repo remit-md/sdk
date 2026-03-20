@@ -285,7 +285,7 @@ public sealed class MockRemit
             var prov    = d.GetValueOrDefault("provider")?.ToString() ?? "0x0";
             var limit   = decimal.Parse(d.GetValueOrDefault("limit_amount")?.ToString() ?? "0");
             var perUnit = decimal.Parse(d.GetValueOrDefault("per_unit")?.ToString() ?? "0");
-            var expiry  = long.TryParse(d.GetValueOrDefault("expiry")?.ToString(), out var exp) ? exp : (long?)null;
+            var expiry  = d.GetValueOrDefault("expiry")?.ToString();
 
             var tab = new Tab(id, MockAddress, prov, limit, perUnit, 0m, limit, TabStatus.Open, now, expiry);
             lock (_mock._lock) _mock._tabs[id] = tab;
@@ -375,7 +375,7 @@ public sealed class MockRemit
             var d      = Deserialize(body);
             var amount = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
             var desc   = d.GetValueOrDefault("task_description")?.ToString() ?? "";
-            var dl     = long.TryParse(d.GetValueOrDefault("deadline")?.ToString(), out var dv) ? dv : (long?)null;
+            var dl     = d.GetValueOrDefault("deadline")?.ToString();
 
             lock (_mock._lock)
             {
@@ -432,7 +432,7 @@ public sealed class MockRemit
             var d      = Deserialize(body);
             var prov   = d.GetValueOrDefault("provider")?.ToString() ?? "0x0";
             var amt    = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
-            var expiry = long.TryParse(d.GetValueOrDefault("expiry")?.ToString(), out var exp) ? exp : (long?)null;
+            var expiry = d.GetValueOrDefault("expiry")?.ToString();
 
             lock (_mock._lock)
             {

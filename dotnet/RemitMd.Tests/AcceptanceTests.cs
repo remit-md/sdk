@@ -252,11 +252,16 @@ public class AcceptanceTests
         var permit = SignUsdcPermit(agent.Signer, agent.Wallet.Address, tabAddr,
                                     20_000_000, 0, deadline);
 
+        var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
+
         // 1. Open tab
         var tab = await agent.Wallet.CreateTabAsync(
             provider.Wallet.Address, 10.0m, 0.50m, expiresSecs: 3600, permit: permit);
         Assert.NotEmpty(tab.Id);
         Assert.Equal(TabStatus.Open, tab.Status);
+
+        // Wait for on-chain confirmation + indexer
+        await WaitForBalanceChange(agent.Wallet.Address, agentBefore);
 
         // 2. Charge tab (provider signs EIP-712)
         var sig1 = provider.Wallet.SignTabCharge(tabAddr, tab.Id, 500_000, 1);
@@ -333,9 +338,9 @@ public class AcceptanceTests
         Assert.NotEmpty(bounty.Id);
         Assert.Equal(BountyStatus.Open, bounty.Status);
 
-        // 2. Submit evidence (by submitter)
-        var submission = await submitter.Wallet.SubmitBountyAsync(
-            bounty.Id, "0x" + Convert.ToHexString(Encoding.UTF8.GetBytes("evidence")).ToLowerInvariant());
+        // 2. Submit evidence (by submitter) — must be 32 bytes (64 hex chars)
+        var evidenceHash = "0x" + string.Concat(Enumerable.Repeat("ab", 32));
+        var submission = await submitter.Wallet.SubmitBountyAsync(bounty.Id, evidenceHash);
         Assert.True(submission.Id > 0);
         Assert.Equal(bounty.Id, submission.BountyId);
 

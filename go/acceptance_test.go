@@ -620,20 +620,20 @@ func TestStreamLifecycle(t *testing.T) {
 	// Wait for on-chain lock
 	waitForBalanceChange(t, payer.Address(), payerBefore)
 
-	// 2. Let it run for a few seconds
-	t.Log("Waiting 5 seconds for stream to accrue...")
-	time.Sleep(5 * time.Second)
+	// 2. Let it run and wait for indexer to catch up
+	t.Log("Waiting 10 seconds for stream accrual + indexer lag...")
+	time.Sleep(10 * time.Second)
 
-	// 3. Close stream (retry for indexer lag)
+	// 3. Close stream (retry for Ponder indexer lag — may take 30-90s)
 	var closed *remitmd.Stream
-	for attempt := 0; attempt < 10; attempt++ {
+	for attempt := 0; attempt < 20; attempt++ {
 		closed, err = payer.CloseStream(ctx, stream.ID)
 		if err == nil {
 			break
 		}
-		if attempt < 9 {
+		if attempt < 19 {
 			t.Logf("CloseStream attempt %d failed: %v, retrying...", attempt+1, err)
-			time.Sleep(3 * time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}
 	if err != nil {
@@ -671,12 +671,23 @@ func TestBountyLifecycle(t *testing.T) {
 	posterBefore := getUsdcBalance(t, poster.Address())
 	feeBefore := getFeeBalance(t)
 
-	// 1. Create bounty: $5 reward, 1 hour deadline (SDK auto-signs permit)
+	// Sign EIP-2612 permit for the Bounty contract
+	contracts := fetchContracts(t)
+	permit := signUSDCPermit(t, poster.key,
+		crypto.PubkeyToAddress(poster.key.PublicKey),
+		common.HexToAddress(contracts.Bounty),
+		big.NewInt(6_000_000), // $6 USDC (headroom for fees)
+		big.NewInt(0),         // nonce 0 (fresh wallet)
+		big.NewInt(time.Now().Unix()+3600),
+	)
+
+	// 1. Create bounty: $5 reward, 1 hour deadline
 	deadline := time.Now().Unix() + 3600
 	bounty, err := poster.CreateBounty(ctx,
 		decimal.NewFromFloat(5.0),
 		"Write a Go acceptance test",
 		deadline,
+		remitmd.WithBountyPermit(permit),
 	)
 	if err != nil {
 		t.Fatalf("CreateBounty: %v", err)

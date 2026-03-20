@@ -137,7 +137,7 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 		http:    newHTTPClient(apiURL, cc.ChainID, cfg.routerAddress, signer),
 		signer:  signer,
 		chainID: cc.ChainID,
-		chain:   cfg.chain,
+		chain:   chainKey,
 		chainKey: chainKey,
 		testnet: cfg.testnet,
 		rpcURL:  rpcURL,

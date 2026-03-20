@@ -540,7 +540,7 @@ func TestTabLifecycle(t *testing.T) {
 	if charge.TabID != tab.ID {
 		t.Fatalf("charge tab_id mismatch: got %s, want %s", charge.TabID, tab.ID)
 	}
-	t.Logf("Tab charged: amount=%.2f, cumulative=%.2f", charge.Amount, charge.Cumulative)
+	t.Logf("Tab charged: amount=%s, cumulative=%s", charge.Amount, charge.Cumulative)
 
 	// 3. Close tab with final settlement
 	closeSig := signTabCharge(t, provider.key,
@@ -624,8 +624,18 @@ func TestStreamLifecycle(t *testing.T) {
 	t.Log("Waiting 5 seconds for stream to accrue...")
 	time.Sleep(5 * time.Second)
 
-	// 3. Close stream
-	closed, err := payer.CloseStream(ctx, stream.ID)
+	// 3. Close stream (retry for indexer lag)
+	var closed *remitmd.Stream
+	for attempt := 0; attempt < 10; attempt++ {
+		closed, err = payer.CloseStream(ctx, stream.ID)
+		if err == nil {
+			break
+		}
+		if attempt < 9 {
+			t.Logf("CloseStream attempt %d failed: %v, retrying...", attempt+1, err)
+			time.Sleep(3 * time.Second)
+		}
+	}
 	if err != nil {
 		t.Fatalf("CloseStream: %v", err)
 	}
@@ -658,27 +668,15 @@ func TestBountyLifecycle(t *testing.T) {
 	submitter := createTestWallet(t)
 	fundTestWallet(t, poster, 100)
 
-	contracts := fetchContracts(t)
-
-	// Sign permit for the Bounty contract
-	permit := signUSDCPermit(t, poster.key,
-		crypto.PubkeyToAddress(poster.key.PublicKey),
-		common.HexToAddress(contracts.Bounty),
-		big.NewInt(10_000_000), // $10 USDC in base units
-		big.NewInt(0),
-		big.NewInt(time.Now().Unix()+3600),
-	)
-
 	posterBefore := getUsdcBalance(t, poster.Address())
 	feeBefore := getFeeBalance(t)
 
-	// 1. Create bounty: $5 reward, 1 hour deadline
+	// 1. Create bounty: $5 reward, 1 hour deadline (SDK auto-signs permit)
 	deadline := time.Now().Unix() + 3600
 	bounty, err := poster.CreateBounty(ctx,
 		decimal.NewFromFloat(5.0),
 		"Write a Go acceptance test",
 		deadline,
-		remitmd.WithBountyPermit(permit),
 	)
 	if err != nil {
 		t.Fatalf("CreateBounty: %v", err)

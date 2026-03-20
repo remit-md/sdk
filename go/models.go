@@ -179,14 +179,15 @@ type TabDebit struct {
 }
 
 // TabCharge records a single charge against a Tab (new server model).
+// Amount and Cumulative are strings because the server returns BigDecimal values.
 type TabCharge struct {
-	ID          int     `json:"id"`
-	TabID       string  `json:"tab_id"`
-	Amount      float64 `json:"amount"`
-	Cumulative  float64 `json:"cumulative"`
-	CallCount   int     `json:"call_count"`
-	ProviderSig string  `json:"provider_sig"`
-	ChargedAt   string  `json:"charged_at"`
+	ID          int    `json:"id"`
+	TabID       string `json:"tab_id"`
+	Amount      string `json:"amount"`
+	Cumulative  string `json:"cumulative"`
+	CallCount   int    `json:"call_count"`
+	ProviderSig string `json:"provider_sig"`
+	ChargedAt   string `json:"charged_at"`
 }
 
 // Stream is a time-based payment flow (pay-per-second).

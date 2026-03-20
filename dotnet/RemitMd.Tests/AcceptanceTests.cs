@@ -262,12 +262,24 @@ public class AcceptanceTests
 
         // Wait for on-chain confirmation + indexer to pick up the tab event
         await WaitForBalanceChange(agent.Wallet.Address, agentBefore);
-        await Task.Delay(5000); // extra delay for Ponder indexer lag
 
-        // 2. Charge tab (provider signs EIP-712)
+        // 2. Charge tab (provider signs EIP-712) — retry until indexer catches up
         var sig1 = provider.Wallet.SignTabCharge(tabAddr, tab.Id, 500_000, 1);
-        var charge1 = await agent.Wallet.ChargeTabAsync(tab.Id, 0.50m, 0.50m, 1, sig1);
-        Assert.Equal(tab.Id, charge1.TabId);
+        TabCharge? charge1 = null;
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            try
+            {
+                charge1 = await agent.Wallet.ChargeTabAsync(tab.Id, 0.50m, 0.50m, 1, sig1);
+                break;
+            }
+            catch (RemitError ex) when (ex.Message.Contains("not found"))
+            {
+                await Task.Delay(3000);
+            }
+        }
+        Assert.NotNull(charge1);
+        Assert.Equal(tab.Id, charge1!.TabId);
 
         // 3. Second charge
         var sig2 = provider.Wallet.SignTabCharge(tabAddr, tab.Id, 1_000_000, 2);

@@ -92,7 +92,7 @@ public sealed class MockPayTests
         Assert.Equal(payee, tx.To, StringComparer.OrdinalIgnoreCase);
 
         var updated = await _wallet.GetEscrowAsync(escrow.Id);
-        Assert.Equal(EscrowStatus.Released, updated.Status);
+        Assert.Equal(EscrowStatus.Completed, updated.Status);
     }
 
     [Fact]

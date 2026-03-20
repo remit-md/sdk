@@ -261,11 +261,11 @@ public sealed class MockRemit
                 if (!_mock._escrows.TryGetValue(escrowId, out var escrow))
                     throw new RemitError(ErrorCodes.EscrowNotFound, $"Escrow not found: {escrowId}");
 
-                if (escrow.Status == EscrowStatus.Released || escrow.Status == EscrowStatus.Cancelled)
+                if (escrow.Status == EscrowStatus.Completed || escrow.Status == EscrowStatus.Cancelled)
                     throw new RemitError(ErrorCodes.EscrowAlreadyClosed,
                         $"Escrow {escrowId} is already {escrow.Status.ToString().ToLower()}.");
 
-                var newStatus = action == "released" ? EscrowStatus.Released : EscrowStatus.Cancelled;
+                var newStatus = action == "released" ? EscrowStatus.Completed : EscrowStatus.Cancelled;
                 if (action == "cancelled") _mock._balance += escrow.Amount; // refund
                 _mock._escrows[escrowId] = escrow with { Status = newStatus };
 

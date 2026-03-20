@@ -13,7 +13,7 @@
  *   walletAddress: "0xYourProviderWallet",
  *   amountUsdc: 0.001,
  *   network: "eip155:84532",
- *   asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+ *   asset: "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
  *   facilitatorToken: "your-bearer-jwt",
  *   resource: "/v1/data",
  *   description: "Realtime market data feed",

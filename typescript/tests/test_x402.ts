@@ -8,7 +8,7 @@ import { AllowanceExceededError, X402Client } from "../src/x402.js";
 const TEST_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const TEST_ADDR = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 const PROVIDER = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
-const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+const USDC = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317";
 
 function makePaymentRequired(opts: {
   amount?: string;

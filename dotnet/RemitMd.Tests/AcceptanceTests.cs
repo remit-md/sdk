@@ -263,30 +263,17 @@ public class AcceptanceTests
         // Wait for on-chain confirmation + indexer to pick up the tab event
         await WaitForBalanceChange(agent.Wallet.Address, agentBefore);
 
-        // 2. Charge tab (provider signs EIP-712) — retry until indexer catches up
+        // 2. Charge tab — PROVIDER signs AND submits (server scopes by auth wallet)
         var sig1 = provider.Wallet.SignTabCharge(tabAddr, tab.Id, 500_000, 1);
-        TabCharge? charge1 = null;
-        for (var attempt = 0; attempt < 10; attempt++)
-        {
-            try
-            {
-                charge1 = await agent.Wallet.ChargeTabAsync(tab.Id, 0.50m, 0.50m, 1, sig1);
-                break;
-            }
-            catch (RemitError ex) when (ex.Message.Contains("not found"))
-            {
-                await Task.Delay(3000);
-            }
-        }
-        Assert.NotNull(charge1);
-        Assert.Equal(tab.Id, charge1!.TabId);
+        var charge1 = await provider.Wallet.ChargeTabAsync(tab.Id, 0.50m, 0.50m, 1, sig1);
+        Assert.Equal(tab.Id, charge1.TabId);
 
-        // 3. Second charge
+        // 3. Second charge (provider submits)
         var sig2 = provider.Wallet.SignTabCharge(tabAddr, tab.Id, 1_000_000, 2);
-        var charge2 = await agent.Wallet.ChargeTabAsync(tab.Id, 0.50m, 1.00m, 2, sig2);
+        var charge2 = await provider.Wallet.ChargeTabAsync(tab.Id, 0.50m, 1.00m, 2, sig2);
         Assert.Equal(2, charge2.CallCount);
 
-        // 4. Close tab
+        // 4. Close tab (agent closes)
         var sigClose = provider.Wallet.SignTabCharge(tabAddr, tab.Id, 1_000_000, 2);
         var closed = await agent.Wallet.CloseTabAsync(tab.Id, 1.00m, sigClose);
         Assert.NotNull(closed);

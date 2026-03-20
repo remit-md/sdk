@@ -45,47 +45,15 @@ mod compliance_tests {
         }
     }
 
-    /// Register a new operator. Returns (private_key, wallet_address).
-    async fn register_and_get_key(client: &reqwest::Client) -> (String, String) {
-        let email = format!(
-            "compliance.rust.{}@test.remitmd.local",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        );
-        let reg: serde_json::Value = client
-            .post(format!("{}/api/v0/auth/register", server_url()))
-            .json(&serde_json::json!({ "email": email, "password": "ComplianceTestPass1!" }))
-            .send()
-            .await
-            .expect("register POST")
-            .json()
-            .await
-            .expect("register JSON");
-
-        let token = reg["token"].as_str().expect("token in register response");
-        let wallet_addr = reg["wallet_address"]
-            .as_str()
-            .expect("wallet_address in register response")
-            .to_string();
-
-        let key_data: serde_json::Value = client
-            .get(format!("{}/api/v0/auth/agent-key", server_url()))
-            .header("Authorization", format!("Bearer {}", token))
-            .send()
-            .await
-            .expect("agent-key GET")
-            .json()
-            .await
-            .expect("agent-key JSON");
-
-        let private_key = key_data["private_key"]
-            .as_str()
-            .expect("private_key in agent-key response")
-            .to_string();
-
-        (private_key, wallet_addr)
+    /// Generate a random private key and derive the wallet address.
+    /// No server registration needed — the new auth model uses EIP-712 signatures.
+    fn generate_wallet() -> (String, String) {
+        use rand_core::{OsRng, RngCore};
+        let mut key_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut key_bytes);
+        let private_key = format!("0x{}", hex::encode(key_bytes));
+        let wallet = make_wallet(&private_key);
+        (private_key, wallet.address().to_string())
     }
 
     /// Fund a wallet via mint (no auth required in testnet mode).
@@ -124,7 +92,7 @@ mod compliance_tests {
         let key = if let Some(k) = SHARED_PAYER_KEY.get() {
             k.clone()
         } else {
-            let (pk, addr) = register_and_get_key(client).await;
+            let (pk, addr) = generate_wallet();
             fund_wallet(client, &addr).await;
             // OnceLock::set returns Err if already set — that's fine, another task beat us.
             let _ = SHARED_PAYER_KEY.set(pk.clone());
@@ -191,7 +159,7 @@ mod compliance_tests {
         }
         let client = reqwest::Client::new();
         let payer = get_shared_payer(&client).await;
-        let (_payee_key, payee_addr) = register_and_get_key(&client).await;
+        let (_payee_key, payee_addr) = generate_wallet();
 
         let tx = payer
             .pay_with_memo(
@@ -217,7 +185,7 @@ mod compliance_tests {
         }
         let client = reqwest::Client::new();
         let payer = get_shared_payer(&client).await;
-        let (_payee_key, payee_addr) = register_and_get_key(&client).await;
+        let (_payee_key, payee_addr) = generate_wallet();
 
         let result = payer
             .pay(&payee_addr, Decimal::from_str("0.0001").unwrap())

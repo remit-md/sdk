@@ -13,7 +13,7 @@ Environment variables:
 from __future__ import annotations
 
 import os
-import time
+import secrets
 
 import httpx
 import pytest
@@ -59,37 +59,14 @@ async def http() -> httpx.AsyncClient:
         yield client
 
 
-async def register_and_get_wallet(
-    http: httpx.AsyncClient,
-) -> tuple[str, str]:
-    """Register a new operator and return (private_key, wallet_address).
+def _generate_wallet() -> tuple[str, str]:
+    """Generate a random private key and derive the wallet address.
 
-    Uses a unique email per call so tests don't interfere with each other.
+    No server registration needed — the new auth model uses EIP-712 signatures.
     """
     from remitmd.wallet import Wallet
 
-    email = f"compliance.{int(time.time() * 1000)}@test.remitmd.local"
-    password = "ComplianceTestPass1!"  # noqa: S105
-
-    # Register
-    resp = await http.post(
-        "/api/v0/auth/register",
-        json={"email": email, "password": password},
-    )
-    assert resp.status_code == 201, f"register failed: {resp.text}"
-    reg_data = resp.json()
-    token = reg_data["token"]
-    wallet_address = reg_data["wallet_address"]
-
-    # Retrieve agent private key (returned once at registration time)
-    key_resp = await http.get(
-        "/api/v0/auth/agent-key",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert key_resp.status_code == 200, f"agent-key failed: {key_resp.text}"
-    private_key = key_resp.json()["private_key"]
-
-    # Sanity: SDK address must match server-assigned address
+    private_key = "0x" + secrets.token_hex(32)
     wallet = Wallet(
         private_key=private_key,
         chain="base-sepolia",
@@ -97,19 +74,15 @@ async def register_and_get_wallet(
         api_url=SERVER_URL,
         router_address=ROUTER_ADDRESS,
     )
-    assert wallet.address.lower() == wallet_address.lower(), (
-        f"Address mismatch: SDK={wallet.address} server={wallet_address}"
-    )
-
-    return private_key, wallet_address
+    return private_key, wallet.address
 
 
 @pytest_asyncio.fixture
-async def wallet(http: httpx.AsyncClient):
-    """A fully initialised Wallet backed by a freshly registered operator."""
+async def wallet():
+    """A fully initialised Wallet backed by a random keypair."""
     from remitmd.wallet import Wallet
 
-    private_key, _ = await register_and_get_wallet(http)
+    private_key, _ = _generate_wallet()
     w = Wallet(
         private_key=private_key,
         chain="base-sepolia",
@@ -130,12 +103,12 @@ async def funded_wallet(wallet):
 
 
 @pytest_asyncio.fixture
-async def wallet_pair(http: httpx.AsyncClient):
+async def wallet_pair():
     """Two separate wallets (payer and payee) for transfer tests."""
     from remitmd.wallet import Wallet
 
-    pk_a, _ = await register_and_get_wallet(http)
-    pk_b, addr_b = await register_and_get_wallet(http)
+    pk_a, _ = _generate_wallet()
+    pk_b, addr_b = _generate_wallet()
 
     payer = Wallet(
         private_key=pk_a,

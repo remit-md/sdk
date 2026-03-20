@@ -7,6 +7,8 @@
  *   REMIT_CHAIN_ID          Chain ID for EIP-712 domain (default: 84532)
  */
 
+import crypto from "node:crypto";
+
 import { Wallet } from "../../src/wallet.js";
 
 export const SERVER_URL =
@@ -26,38 +28,24 @@ export async function serverIsReachable(): Promise<boolean> {
   }
 }
 
-/** Register a new operator and return (privateKey, walletAddress). */
-export async function registerAndGetWallet(): Promise<{
+/** Generate a random private key and derive the wallet address. */
+export function generateWallet(): {
   privateKey: string;
   walletAddress: string;
-}> {
-  const email = `compliance.ts.${Date.now()}@test.remitmd.local`;
-  const password = "ComplianceTestPass1!";
-
-  const regResp = await fetch(`${SERVER_URL}/api/v0/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+} {
+  const privateKey = "0x" + crypto.randomBytes(32).toString("hex");
+  const wallet = new Wallet({
+    privateKey,
+    chain: "base-sepolia",
+    apiUrl: `${SERVER_URL}/api/v0`,
+    routerAddress: ROUTER_ADDRESS,
   });
-  if (!regResp.ok) {
-    throw new Error(`register failed: ${regResp.status} ${await regResp.text()}`);
-  }
-  const reg = (await regResp.json()) as { token: string; wallet_address: string };
-
-  const keyResp = await fetch(`${SERVER_URL}/api/v0/auth/agent-key`, {
-    headers: { Authorization: `Bearer ${reg.token}` },
-  });
-  if (!keyResp.ok) {
-    throw new Error(`agent-key failed: ${keyResp.status} ${await keyResp.text()}`);
-  }
-  const keyData = (await keyResp.json()) as { private_key: string };
-
-  return { privateKey: keyData.private_key, walletAddress: reg.wallet_address };
+  return { privateKey, walletAddress: wallet.address };
 }
 
-/** Create a Wallet backed by a freshly registered operator. */
-export async function makeWallet(): Promise<Wallet> {
-  const { privateKey } = await registerAndGetWallet();
+/** Create a Wallet backed by a random keypair. */
+export function makeWallet(): Wallet {
+  const { privateKey } = generateWallet();
   return new Wallet({
     privateKey,
     chain: "base-sepolia",
@@ -72,8 +60,8 @@ export async function makeFundedPair(): Promise<{
   payee: Wallet;
   payeeAddress: string;
 }> {
-  const { privateKey: pkA } = await registerAndGetWallet();
-  const { privateKey: pkB, walletAddress: addrB } = await registerAndGetWallet();
+  const { privateKey: pkA } = generateWallet();
+  const { privateKey: pkB, walletAddress: addrB } = generateWallet();
 
   const walletOpts = {
     chain: "base-sepolia" as const,

@@ -54,30 +54,12 @@ public class ComplianceTests
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private static async Task<(string PrivateKey, string WalletAddress)> RegisterAndGetKey()
+    private static (string PrivateKey, string WalletAddress) GenerateWallet()
     {
-        var email = $"compliance.dotnet.{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}@test.remitmd.local";
-        var regResp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v0/auth/register", new
-        {
-            email,
-            password = "ComplianceTestPass1!",
-        });
-        regResp.EnsureSuccessStatusCode();
-
-        using var regDoc = JsonDocument.Parse(await regResp.Content.ReadAsStringAsync());
-        var token      = regDoc.RootElement.GetProperty("token").GetString()!;
-        var walletAddr = regDoc.RootElement.GetProperty("wallet_address").GetString()!;
-
-        using var keyReq = new HttpRequestMessage(HttpMethod.Get, $"{ServerUrl}/api/v0/auth/agent-key");
-        keyReq.Headers.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        var keyResp = await Http.SendAsync(keyReq);
-        keyResp.EnsureSuccessStatusCode();
-
-        using var keyDoc = JsonDocument.Parse(await keyResp.Content.ReadAsStringAsync());
-        var privateKey = keyDoc.RootElement.GetProperty("private_key").GetString()!;
-
-        return (privateKey, walletAddr);
+        var keyBytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        var privateKey = "0x" + Convert.ToHexString(keyBytes).ToLowerInvariant();
+        var wallet = MakeWallet(privateKey);
+        return (privateKey, wallet.Address);
     }
 
     private static async Task FundWallet(string walletAddress)
@@ -106,7 +88,7 @@ public class ComplianceTests
         {
             if (_sharedPayer is not null) return _sharedPayer;
 
-            var (pk, addr) = await RegisterAndGetKey();
+            var (pk, addr) = GenerateWallet();
             await FundWallet(addr);
             _sharedPayer = MakeWallet(pk);
         }
@@ -128,7 +110,7 @@ public class ComplianceTests
             return;
         }
 
-        var (pk, _) = await RegisterAndGetKey();
+        var (pk, _) = GenerateWallet();
         var wallet = MakeWallet(pk);
 
         // BalanceAsync() makes an authenticated GET — will throw on 401.
@@ -157,7 +139,7 @@ public class ComplianceTests
         if (!await ServerAvailable.Value) return;
 
         var payer = await GetSharedPayer();
-        var (_, payeeAddr) = await RegisterAndGetKey();
+        var (_, payeeAddr) = GenerateWallet();
 
         var tx = await payer.PayAsync(payeeAddr, 5.0m, memo: "dotnet compliance test");
 
@@ -171,7 +153,7 @@ public class ComplianceTests
         if (!await ServerAvailable.Value) return;
 
         var payer = await GetSharedPayer();
-        var (_, payeeAddr) = await RegisterAndGetKey();
+        var (_, payeeAddr) = GenerateWallet();
 
         await Assert.ThrowsAsync<RemitError>(async () =>
             await payer.PayAsync(payeeAddr, 0.0001m));

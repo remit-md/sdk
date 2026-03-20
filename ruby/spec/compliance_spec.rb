@@ -5,6 +5,7 @@ require "net/http"
 require "uri"
 require "json"
 require "bigdecimal"
+require "securerandom"
 
 # Compliance tests: Ruby SDK against a real running server.
 #
@@ -44,18 +45,9 @@ module ComplianceHelpers
   end
 
   def register_and_get_key
-    email = "compliance.ruby.#{(Time.now.to_f * 1000).to_i}@test.remitmd.local"
-    reg_resp = http_post("/api/v0/auth/register",
-      { "email" => email, "password" => "ComplianceTestPass1!" })
-    reg = JSON.parse(reg_resp.body)
-    token       = reg["token"] || raise("register failed: #{reg_resp.body}")
-    wallet_addr = reg["wallet_address"] || raise("no wallet_address")
-
-    key_resp  = http_get("/api/v0/auth/agent-key", token: token)
-    key_data  = JSON.parse(key_resp.body)
-    private_key = key_data["private_key"] || raise("agent-key failed: #{key_resp.body}")
-
-    [private_key, wallet_addr]
+    private_key = "0x" + SecureRandom.hex(32)
+    wallet = make_wallet(private_key)
+    [private_key, wallet.address]
   end
 
   def fund_wallet(wallet_addr)

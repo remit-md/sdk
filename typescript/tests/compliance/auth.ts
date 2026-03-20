@@ -30,7 +30,7 @@ describe("TypeScript compliance: authentication", () => {
   it("authenticated GET /status returns 200", async (t) => {
     if (skip) return t.skip("server not available");
 
-    const wallet = await makeWallet();
+    const wallet = makeWallet();
     // status() uses #auth.get — if EIP-712 is wrong this returns 401 not 200.
     // Server returns { wallet, tier, monthly_volume, fee_rate_bps, ... }.
     const status = await wallet.status();
@@ -61,7 +61,7 @@ describe("TypeScript compliance: authentication", () => {
   it("mint credits testnet funds", async (t) => {
     if (skip) return t.skip("server not available");
 
-    const wallet = await makeWallet();
+    const wallet = makeWallet();
     const tx = await wallet.mint(100);
     assert.ok(tx.tx_hash, "tx_hash must be set after mint");
   });

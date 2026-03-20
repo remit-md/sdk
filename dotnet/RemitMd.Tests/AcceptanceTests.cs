@@ -260,8 +260,9 @@ public class AcceptanceTests
         Assert.NotEmpty(tab.Id);
         Assert.Equal(TabStatus.Open, tab.Status);
 
-        // Wait for on-chain confirmation + indexer
+        // Wait for on-chain confirmation + indexer to pick up the tab event
         await WaitForBalanceChange(agent.Wallet.Address, agentBefore);
+        await Task.Delay(5000); // extra delay for Ponder indexer lag
 
         // 2. Charge tab (provider signs EIP-712)
         var sig1 = provider.Wallet.SignTabCharge(tabAddr, tab.Id, 500_000, 1);

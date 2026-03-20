@@ -15,6 +15,7 @@ import {
   getUsdcBalance,
   getFeeWalletBalance,
   waitForBalanceChange,
+  logTx,
 } from "./setup.js";
 
 describe("SDK: Stream Lifecycle", { timeout: 180_000 }, () => {
@@ -47,6 +48,8 @@ describe("SDK: Stream Lifecycle", { timeout: 180_000 }, () => {
     });
 
     assert.ok(stream.id, "stream should have an id");
+    const openTxHash = (stream as unknown as Record<string, string>).txHash ?? (stream as unknown as Record<string, string>).tx_hash;
+    if (openTxHash) logTx("stream", "open", openTxHash);
 
     // Wait for on-chain creation (agent locks maxTotal in Stream contract)
     await waitForBalanceChange(agent.address, agentBefore);
@@ -58,6 +61,8 @@ describe("SDK: Stream Lifecycle", { timeout: 180_000 }, () => {
     const closed = await agent.closeStream(stream.id);
     const closedStatus = closed.status ?? (closed as unknown as Record<string, string>).status;
     assert.equal(closedStatus, "closed", "stream should be closed");
+    const closedTxHash = (closed as unknown as Record<string, string>).txHash ?? (closed as unknown as Record<string, string>).tx_hash;
+    if (closedTxHash) logTx("stream", "close", closedTxHash);
 
     // Wait for settlement (provider balance should increase)
     const providerAfter = await waitForBalanceChange(provider.address, providerBefore);

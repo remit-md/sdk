@@ -13,6 +13,7 @@ import {
   getFeeWalletBalance,
   assertBalanceChange,
   waitForBalanceChange,
+  logTx,
 } from "./setup.js";
 
 describe("SDK: Deposit Lifecycle", { timeout: 180_000 }, () => {
@@ -44,6 +45,8 @@ describe("SDK: Deposit Lifecycle", { timeout: 180_000 }, () => {
     });
 
     assert.ok(deposit.id, "deposit should have an id");
+    const placeTxHash = (deposit as unknown as Record<string, string>).txHash ?? (deposit as unknown as Record<string, string>).tx_hash;
+    if (placeTxHash) logTx("deposit", "place", placeTxHash);
 
     // Wait for on-chain deposit lock
     const agentMid = await waitForBalanceChange(agent.address, agentBefore);
@@ -54,6 +57,8 @@ describe("SDK: Deposit Lifecycle", { timeout: 180_000 }, () => {
     const returnedStatus =
       returned.status ?? (returned as unknown as Record<string, string>).status;
     assert.equal(returnedStatus, "returned", "deposit should be returned");
+    const returnTxHash = (returned as unknown as Record<string, string>).txHash ?? (returned as unknown as Record<string, string>).tx_hash;
+    if (returnTxHash) logTx("deposit", "return", returnTxHash);
 
     // Wait for return settlement (agent gets full refund)
     const agentAfter = await waitForBalanceChange(agent.address, agentMid);

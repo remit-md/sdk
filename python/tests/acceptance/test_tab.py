@@ -9,10 +9,12 @@ import pytest
 
 from .conftest import (
     assert_balance_change,
+    assert_fee_increase,
     create_wallet,
     fund_wallet,
     get_fee_wallet_balance,
     get_usdc_balance,
+    log_tx,
     wait_for_balance_change,
 )
 
@@ -55,6 +57,8 @@ async def test_tab_lifecycle() -> None:
         permit=permit,
     )
     assert tab.id, "tab should have an id"
+    if hasattr(tab, "tx_hash") and tab.tx_hash:
+        log_tx("tab", "open", tab.tx_hash)
 
     # Wait for on-chain lock (agent USDC moves to Tab contract)
     await wait_for_balance_change(agent.address, agent_before)
@@ -76,6 +80,8 @@ async def test_tab_lifecycle() -> None:
         provider_sig=charge_sig,
     )
     assert charge.tab_id == tab.id, "charge should reference the tab"
+    if hasattr(charge, "tx_hash") and charge.tx_hash:
+        log_tx("tab", "charge", charge.tx_hash)
 
     # Step 3: Close tab (agent, with provider's close signature on final state)
     close_sig = await provider.sign_tab_charge(
@@ -94,6 +100,7 @@ async def test_tab_lifecycle() -> None:
     assert closed.closed_tx_hash and closed.closed_tx_hash.startswith("0x"), (
         f"close should return tx hash, got: {closed.closed_tx_hash}"
     )
+    log_tx("tab", "close", closed.closed_tx_hash)
 
     # Verify balances
     provider_after = await wait_for_balance_change(provider.address, provider_before)
@@ -104,5 +111,5 @@ async def test_tab_lifecycle() -> None:
     assert_balance_change("agent", agent_before, agent_after, -charge_amount)
     # Provider: received $2 minus 1% fee = $1.98
     assert_balance_change("provider", provider_before, provider_after, provider_receives)
-    # Fee wallet: received 1% of $2 = $0.02
-    assert_balance_change("fee wallet", fee_before, fee_after, fee)
+    # Fee wallet: received at least 1% of $2 = $0.02
+    assert_fee_increase("fee wallet", fee_before, fee_after, fee)

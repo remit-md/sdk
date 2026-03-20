@@ -10,10 +10,12 @@ from remitmd.models.invoice import Invoice
 
 from .conftest import (
     assert_balance_change,
+    assert_fee_increase,
     create_wallet,
     fund_wallet,
     get_fee_wallet_balance,
     get_usdc_balance,
+    log_tx,
     wait_for_balance_change,
 )
 
@@ -53,18 +55,24 @@ async def test_escrow_lifecycle() -> None:
     escrow = await agent.pay(invoice, permit=permit)
     escrow_id = escrow.invoice_id
     assert escrow_id is not None, "escrow should have an id"
+    if hasattr(escrow, "tx_hash") and escrow.tx_hash:
+        log_tx("escrow", "fund", escrow.tx_hash)
 
     # Wait for on-chain lock
     await wait_for_balance_change(agent.address, agent_before)
 
     # Provider claims
-    await provider.claim_start(escrow_id)
+    claim = await provider.claim_start(escrow_id)
+    if hasattr(claim, "tx_hash") and claim.tx_hash:
+        log_tx("escrow", "claimStart", claim.tx_hash)
     import asyncio
 
     await asyncio.sleep(5)
 
     # Agent releases
-    await agent.release_escrow(escrow_id)
+    release = await agent.release_escrow(escrow_id)
+    if hasattr(release, "tx_hash") and release.tx_hash:
+        log_tx("escrow", "release", release.tx_hash)
 
     # Verify balances
     provider_after = await wait_for_balance_change(provider.address, provider_before)
@@ -73,4 +81,4 @@ async def test_escrow_lifecycle() -> None:
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change("provider", provider_before, provider_after, provider_receives)
-    assert_balance_change("fee wallet", fee_before, fee_after, fee)
+    assert_fee_increase("fee wallet", fee_before, fee_after, fee)

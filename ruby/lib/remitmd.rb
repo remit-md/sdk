@@ -22,5 +22,5 @@ require_relative "remitmd/mock"
 #   mock.was_paid?("0x0000000000000000000000000000000000000001", 1.00) # => true
 #
 module Remitmd
-  VERSION = "0.1.2"
+  VERSION = "0.1.3"
 end

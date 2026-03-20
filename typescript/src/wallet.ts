@@ -527,13 +527,19 @@ export class Wallet extends RemitClient {
   // ─── One-time operator links ─────────────────────────────────────────────────
 
   /** Generate a one-time URL for the operator to fund this wallet. */
-  createFundLink(): Promise<LinkResponse> {
-    return this.#auth.post<LinkResponse>("/links/fund", {});
+  createFundLink(options?: { messages?: { role: "agent" | "system"; text: string }[]; agentName?: string }): Promise<LinkResponse> {
+    return this.#auth.post<LinkResponse>("/links/fund", {
+      ...(options?.messages && { messages: options.messages }),
+      ...(options?.agentName && { agent_name: options.agentName }),
+    });
   }
 
   /** Generate a one-time URL for the operator to withdraw funds. */
-  createWithdrawLink(): Promise<LinkResponse> {
-    return this.#auth.post<LinkResponse>("/links/withdraw", {});
+  createWithdrawLink(options?: { messages?: { role: "agent" | "system"; text: string }[]; agentName?: string }): Promise<LinkResponse> {
+    return this.#auth.post<LinkResponse>("/links/withdraw", {
+      ...(options?.messages && { messages: options.messages }),
+      ...(options?.agentName && { agent_name: options.agentName }),
+    });
   }
 
   // ─── Testnet ────────────────────────────────────────────────────────────────

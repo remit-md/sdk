@@ -946,12 +946,46 @@ impl Wallet {
 
     /// Generate a one-time URL for the operator to fund this wallet.
     pub async fn create_fund_link(&self) -> Result<LinkResponse, RemitError> {
-        self.post("/api/v0/links/fund", json!({})).await
+        self.create_fund_link_with_options(None, None).await
+    }
+
+    /// Generate a one-time URL for the operator to fund this wallet,
+    /// with optional chat-style messages and agent name displayed on the funding page.
+    pub async fn create_fund_link_with_options(
+        &self,
+        messages: Option<&[LinkMessage]>,
+        agent_name: Option<&str>,
+    ) -> Result<LinkResponse, RemitError> {
+        let mut body = json!({});
+        if let Some(msgs) = messages {
+            body["messages"] = serde_json::to_value(msgs).unwrap();
+        }
+        if let Some(name) = agent_name {
+            body["agent_name"] = json!(name);
+        }
+        self.post("/api/v0/links/fund", body).await
     }
 
     /// Generate a one-time URL for the operator to withdraw funds.
     pub async fn create_withdraw_link(&self) -> Result<LinkResponse, RemitError> {
-        self.post("/api/v0/links/withdraw", json!({})).await
+        self.create_withdraw_link_with_options(None, None).await
+    }
+
+    /// Generate a one-time URL for the operator to withdraw funds,
+    /// with optional chat-style messages and agent name displayed on the withdraw page.
+    pub async fn create_withdraw_link_with_options(
+        &self,
+        messages: Option<&[LinkMessage]>,
+        agent_name: Option<&str>,
+    ) -> Result<LinkResponse, RemitError> {
+        let mut body = json!({});
+        if let Some(msgs) = messages {
+            body["messages"] = serde_json::to_value(msgs).unwrap();
+        }
+        if let Some(name) = agent_name {
+            body["agent_name"] = json!(name);
+        }
+        self.post("/api/v0/links/withdraw", body).await
     }
 
     // ─── Contracts ──────────────────────────────────────────────────────────

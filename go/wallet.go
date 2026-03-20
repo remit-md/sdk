@@ -903,19 +903,66 @@ func (w *Wallet) RequestTestnetFunds(ctx context.Context) (*FaucetResponse, erro
 
 // ─── One-time operator links ──────────────────────────────────────────────────
 
+// LinkMessage is a chat-style message shown on the fund/withdraw page.
+type LinkMessage struct {
+	Role string `json:"role"` // "agent" or "system"
+	Text string `json:"text"`
+}
+
+// LinkOptions configures optional fields for CreateFundLink / CreateWithdrawLink.
+type LinkOptions struct {
+	Messages  []LinkMessage // Chat-style messages displayed on the funding page.
+	AgentName string        // Agent display name shown on the page.
+}
+
+// LinkOption configures CreateFundLink / CreateWithdrawLink.
+type LinkOption func(*LinkOptions)
+
+// WithLinkMessages sets chat-style messages on the fund/withdraw page.
+func WithLinkMessages(msgs []LinkMessage) LinkOption {
+	return func(o *LinkOptions) { o.Messages = msgs }
+}
+
+// WithAgentName sets the agent display name shown on the fund/withdraw page.
+func WithAgentName(name string) LinkOption {
+	return func(o *LinkOptions) { o.AgentName = name }
+}
+
 // CreateFundLink generates a one-time URL for the operator to fund this wallet.
-func (w *Wallet) CreateFundLink(ctx context.Context) (*LinkResponse, error) {
+func (w *Wallet) CreateFundLink(ctx context.Context, opts ...LinkOption) (*LinkResponse, error) {
+	cfg := &LinkOptions{}
+	for _, o := range opts {
+		o(cfg)
+	}
+	body := map[string]any{}
+	if len(cfg.Messages) > 0 {
+		body["messages"] = cfg.Messages
+	}
+	if cfg.AgentName != "" {
+		body["agent_name"] = cfg.AgentName
+	}
 	var lr LinkResponse
-	if err := w.http.post(ctx, "/api/v0/links/fund", map[string]any{}, &lr); err != nil {
+	if err := w.http.post(ctx, "/api/v0/links/fund", body, &lr); err != nil {
 		return nil, err
 	}
 	return &lr, nil
 }
 
 // CreateWithdrawLink generates a one-time URL for the operator to withdraw funds.
-func (w *Wallet) CreateWithdrawLink(ctx context.Context) (*LinkResponse, error) {
+func (w *Wallet) CreateWithdrawLink(ctx context.Context, opts ...LinkOption) (*LinkResponse, error) {
+	cfg := &LinkOptions{}
+	for _, o := range opts {
+		o(cfg)
+	}
+	body := map[string]any{}
+	if len(cfg.Messages) > 0 {
+		body["messages"] = cfg.Messages
+	}
+	if cfg.AgentName != "" {
+		body["agent_name"] = cfg.AgentName
+	}
 	var lr LinkResponse
-	if err := w.http.post(ctx, "/api/v0/links/withdraw", map[string]any{}, &lr); err != nil {
+	if err := w.http.post(ctx, "/api/v0/links/withdraw", body, &lr); err != nil {
 		return nil, err
 	}
 	return &lr, nil

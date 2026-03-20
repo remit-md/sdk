@@ -596,14 +596,44 @@ public class Wallet {
 
     // ─── One-time operator links ──────────────────────────────────────────────
 
-    /** Generates a one-time URL for the operator to fund this wallet. */
+    /**
+     * Generates a one-time URL for the operator to fund this wallet.
+     */
     public LinkResponse createFundLink() {
-        return client.post("/api/v0/links/fund", Map.of(), LinkResponse.class);
+        return createFundLink(null, null);
     }
 
-    /** Generates a one-time URL for the operator to withdraw funds. */
+    /**
+     * Generates a one-time URL for the operator to fund this wallet.
+     *
+     * @param messages  optional chat-style messages shown on the funding page (each map has "role" and "text")
+     * @param agentName optional agent display name shown on the funding page
+     */
+    public LinkResponse createFundLink(List<Map<String, String>> messages, String agentName) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        if (messages != null && !messages.isEmpty()) body.put("messages", messages);
+        if (agentName != null && !agentName.isEmpty()) body.put("agent_name", agentName);
+        return client.post("/api/v0/links/fund", body, LinkResponse.class);
+    }
+
+    /**
+     * Generates a one-time URL for the operator to withdraw funds.
+     */
     public LinkResponse createWithdrawLink() {
-        return client.post("/api/v0/links/withdraw", Map.of(), LinkResponse.class);
+        return createWithdrawLink(null, null);
+    }
+
+    /**
+     * Generates a one-time URL for the operator to withdraw funds.
+     *
+     * @param messages  optional chat-style messages shown on the withdraw page (each map has "role" and "text")
+     * @param agentName optional agent display name shown on the withdraw page
+     */
+    public LinkResponse createWithdrawLink(List<Map<String, String>> messages, String agentName) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        if (messages != null && !messages.isEmpty()) body.put("messages", messages);
+        if (agentName != null && !agentName.isEmpty()) body.put("agent_name", agentName);
+        return client.post("/api/v0/links/withdraw", body, LinkResponse.class);
     }
 
     // ─── Permit Signing ────────────────────────────────────────────────────

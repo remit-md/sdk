@@ -556,12 +556,26 @@ public sealed class Wallet
     // ─── One-time operator links ──────────────────────────────────────────────
 
     /// <summary>Generates a one-time URL for the operator to fund this wallet.</summary>
-    public Task<LinkResponse> CreateFundLinkAsync(CancellationToken ct = default)
-        => _transport.PostAsync<LinkResponse>("/api/v0/links/fund", new { }, ct);
+    /// <param name="messages">Optional chat-style messages shown on the funding page (role: "agent" or "system", text: message).</param>
+    /// <param name="agentName">Optional agent display name shown on the funding page.</param>
+    public Task<LinkResponse> CreateFundLinkAsync(LinkMessage[]? messages = null, string? agentName = null, CancellationToken ct = default)
+    {
+        var body = new Dictionary<string, object>();
+        if (messages is { Length: > 0 }) body["messages"] = messages;
+        if (!string.IsNullOrEmpty(agentName)) body["agent_name"] = agentName!;
+        return _transport.PostAsync<LinkResponse>("/api/v0/links/fund", body, ct);
+    }
 
     /// <summary>Generates a one-time URL for the operator to withdraw funds.</summary>
-    public Task<LinkResponse> CreateWithdrawLinkAsync(CancellationToken ct = default)
-        => _transport.PostAsync<LinkResponse>("/api/v0/links/withdraw", new { }, ct);
+    /// <param name="messages">Optional chat-style messages shown on the withdraw page (role: "agent" or "system", text: message).</param>
+    /// <param name="agentName">Optional agent display name shown on the withdraw page.</param>
+    public Task<LinkResponse> CreateWithdrawLinkAsync(LinkMessage[]? messages = null, string? agentName = null, CancellationToken ct = default)
+    {
+        var body = new Dictionary<string, object>();
+        if (messages is { Length: > 0 }) body["messages"] = messages;
+        if (!string.IsNullOrEmpty(agentName)) body["agent_name"] = agentName!;
+        return _transport.PostAsync<LinkResponse>("/api/v0/links/withdraw", body, ct);
+    }
 
     // ─── Contracts ─────────────────────────────────────────────────────────
 

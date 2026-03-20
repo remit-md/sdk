@@ -605,15 +605,27 @@ public final class RemitWallet: @unchecked Sendable {
 
     // MARK: - One-time operator links
 
-    public func createFundLink() async throws -> LinkResponse {
+    /// Generate a one-time URL for the operator to fund this wallet.
+    /// - Parameters:
+    ///   - messages: Optional chat-style messages shown on the funding page.
+    ///   - agentName: Optional agent display name shown on the funding page.
+    public func createFundLink(messages: [LinkMessageBody]? = nil, agentName: String? = nil) async throws -> LinkResponse {
+        let body = LinkBody(messages: messages, agent_name: agentName)
+        let hasContent = messages != nil || agentName != nil
         return try await transport.request(
-            method: "POST", path: "/api/v0/links/fund", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v0/links/fund", body: hasContent ? body : Optional<LinkBody>.none
         )
     }
 
-    public func createWithdrawLink() async throws -> LinkResponse {
+    /// Generate a one-time URL for the operator to withdraw funds.
+    /// - Parameters:
+    ///   - messages: Optional chat-style messages shown on the withdraw page.
+    ///   - agentName: Optional agent display name shown on the withdraw page.
+    public func createWithdrawLink(messages: [LinkMessageBody]? = nil, agentName: String? = nil) async throws -> LinkResponse {
+        let body = LinkBody(messages: messages, agent_name: agentName)
+        let hasContent = messages != nil || agentName != nil
         return try await transport.request(
-            method: "POST", path: "/api/v0/links/withdraw", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v0/links/withdraw", body: hasContent ? body : Optional<LinkBody>.none
         )
     }
 
@@ -641,6 +653,20 @@ public final class RemitWallet: @unchecked Sendable {
 
 private struct EmptyBody: Codable {}
 private struct EmptyObject: Codable {}
+
+/// Chat-style message shown on a fund/withdraw page.
+public struct LinkMessageBody: Codable, Sendable {
+    /// "agent" or "system"
+    public let role: String
+    /// Message text
+    public let text: String
+    public init(role: String, text: String) { self.role = role; self.text = text }
+}
+
+private struct LinkBody: Codable {
+    let messages: [LinkMessageBody]?
+    let agent_name: String?
+}
 private struct PayBody: Codable { let to: String; let amount: Double; let memo: String?; let permit: PermitSignature? }
 private struct InvoiceBody: Codable { let id: String; let chain: String; let from_agent: String; let to_agent: String; let amount: String; let type: String; let task: String; let nonce: String; let signature: String }
 private struct InvoiceResponse: Codable { let id: String? }

@@ -727,20 +727,34 @@ defmodule RemitMd.Wallet do
 
   @doc """
   Generate a one-time URL for the operator to fund this wallet.
+
+  ## Options
+
+  - `:messages` — list of maps with `:role` ("agent"/"system") and `:text`
+  - `:agent_name` — agent display name shown on the funding page
+
   Returns `{:ok, %RemitMd.Models.LinkResponse{}}` or `{:error, %RemitMd.Error{}}`.
   """
-  def create_fund_link(%__MODULE__{} = w) do
-    with {:ok, data} <- do_call(w, :post, "/links/fund", %{}) do
+  def create_fund_link(%__MODULE__{} = w, opts \\ []) do
+    body = build_link_body(opts)
+    with {:ok, data} <- do_call(w, :post, "/links/fund", body) do
       {:ok, RemitMd.Models.LinkResponse.from_map(data)}
     end
   end
 
   @doc """
   Generate a one-time URL for the operator to withdraw funds.
+
+  ## Options
+
+  - `:messages` — list of maps with `:role` ("agent"/"system") and `:text`
+  - `:agent_name` — agent display name shown on the withdraw page
+
   Returns `{:ok, %RemitMd.Models.LinkResponse{}}` or `{:error, %RemitMd.Error{}}`.
   """
-  def create_withdraw_link(%__MODULE__{} = w) do
-    with {:ok, data} <- do_call(w, :post, "/links/withdraw", %{}) do
+  def create_withdraw_link(%__MODULE__{} = w, opts \\ []) do
+    body = build_link_body(opts)
+    with {:ok, data} <- do_call(w, :post, "/links/withdraw", body) do
       {:ok, RemitMd.Models.LinkResponse.from_map(data)}
     end
   end
@@ -968,6 +982,19 @@ defmodule RemitMd.Wallet do
 
       {:error, reason} ->
         raise Error.new(Error.network_error(), "Network error fetching nonce: #{inspect(reason)}")
+    end
+  end
+
+  # Build a body map for create_fund_link / create_withdraw_link from keyword opts.
+  defp build_link_body(opts) do
+    body = %{}
+    body = case Keyword.get(opts, :messages) do
+      nil -> body
+      msgs -> Map.put(body, :messages, msgs)
+    end
+    case Keyword.get(opts, :agent_name) do
+      nil -> body
+      name -> Map.put(body, :agent_name, name)
     end
   end
 

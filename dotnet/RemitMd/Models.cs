@@ -41,6 +41,12 @@ public record Transaction(
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
 
+/// <summary>Chat-style message shown on a fund/withdraw page.</summary>
+public record LinkMessage(
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("text")] string Text
+);
+
 /// <summary>One-time operator link for funding or withdrawing a wallet.</summary>
 public record LinkResponse(
     [property: JsonPropertyName("url")]            string Url,

@@ -107,6 +107,15 @@ pub struct MintResponse {
     pub balance: Decimal,
 }
 
+/// Chat-style message shown on a fund/withdraw page.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkMessage {
+    /// "agent" or "system"
+    pub role: String,
+    /// Message text
+    pub text: String,
+}
+
 /// One-time operator link for funding or withdrawing a wallet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinkResponse {

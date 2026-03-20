@@ -551,14 +551,42 @@ class Wallet(RemitClient):
 
     # ─── One-time operator links ───────────────────────────────────────────────
 
-    async def create_fund_link(self) -> LinkResponse:
-        """Generate a one-time URL for the operator to fund this wallet."""
-        data = await self._http.post("/api/v0/links/fund", {})
+    async def create_fund_link(
+        self,
+        messages: list[dict[str, str]] | None = None,
+        agent_name: str | None = None,
+    ) -> LinkResponse:
+        """Generate a one-time URL for the operator to fund this wallet.
+
+        Args:
+            messages: Optional list of dicts with ``role`` ("agent"/"system") and ``text``.
+            agent_name: Optional agent display name shown on the funding page.
+        """
+        body: dict[str, Any] = {}
+        if messages is not None:
+            body["messages"] = messages
+        if agent_name is not None:
+            body["agent_name"] = agent_name
+        data = await self._http.post("/api/v0/links/fund", body)
         return LinkResponse.model_validate(data)
 
-    async def create_withdraw_link(self) -> LinkResponse:
-        """Generate a one-time URL for the operator to withdraw funds."""
-        data = await self._http.post("/api/v0/links/withdraw", {})
+    async def create_withdraw_link(
+        self,
+        messages: list[dict[str, str]] | None = None,
+        agent_name: str | None = None,
+    ) -> LinkResponse:
+        """Generate a one-time URL for the operator to withdraw funds.
+
+        Args:
+            messages: Optional list of dicts with ``role`` ("agent"/"system") and ``text``.
+            agent_name: Optional agent display name shown on the withdraw page.
+        """
+        body: dict[str, Any] = {}
+        if messages is not None:
+            body["messages"] = messages
+        if agent_name is not None:
+            body["agent_name"] = agent_name
+        data = await self._http.post("/api/v0/links/withdraw", body)
         return LinkResponse.model_validate(data)
 
     # ─── Webhooks ─────────────────────────────────────────────────────────────

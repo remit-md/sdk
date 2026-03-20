@@ -561,15 +561,25 @@ module Remitmd
     # ─── One-time operator links ───────────────────────────────────────────────
 
     # Generate a one-time URL for the operator to fund this wallet.
+    # @param messages [Array<Hash>, nil] chat-style messages (each with :role and :text)
+    # @param agent_name [String, nil] agent display name shown on the funding page
     # @return [LinkResponse]
-    def create_fund_link
-      LinkResponse.new(@transport.post("/links/fund", {}))
+    def create_fund_link(messages: nil, agent_name: nil)
+      body = {}
+      body[:messages] = messages if messages
+      body[:agent_name] = agent_name if agent_name
+      LinkResponse.new(@transport.post("/links/fund", body))
     end
 
     # Generate a one-time URL for the operator to withdraw funds.
+    # @param messages [Array<Hash>, nil] chat-style messages (each with :role and :text)
+    # @param agent_name [String, nil] agent display name shown on the withdraw page
     # @return [LinkResponse]
-    def create_withdraw_link
-      LinkResponse.new(@transport.post("/links/withdraw", {}))
+    def create_withdraw_link(messages: nil, agent_name: nil)
+      body = {}
+      body[:messages] = messages if messages
+      body[:agent_name] = agent_name if agent_name
+      LinkResponse.new(@transport.post("/links/withdraw", body))
     end
 
     # ─── Testnet ──────────────────────────────────────────────────────────────

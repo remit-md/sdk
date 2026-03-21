@@ -1,5 +1,10 @@
 name: Publish SDKs
 
+# CHECKLIST before running:
+# 1. Server deployed to production and healthy
+# 2. All acceptance tests pass against production
+# 3. VERSION bumped appropriately
+# 4. CHANGELOG updated
 on:
   workflow_dispatch:
     inputs:

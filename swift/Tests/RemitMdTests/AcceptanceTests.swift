@@ -41,7 +41,7 @@ final class AcceptanceTests: XCTestCase {
 
     func fetchContracts() async throws -> [String: Any] {
         if let cached = Self.contracts { return cached }
-        let url = URL(string: "\(Self.apiURL)/api/v0/contracts")!
+        let url = URL(string: "\(Self.apiURL)/api/v1/contracts")!
         let (data, resp) = try await URLSession.shared.data(from: url)
         let httpResp = resp as! HTTPURLResponse
         guard httpResp.statusCode == 200 else {
@@ -465,7 +465,7 @@ final class AcceptanceTests: XCTestCase {
             "maxAmountRequired": 100_000,
             "asset": "eip155:84532/erc20:\(Self.usdcAddress)",
             "network": "eip155:84532",
-            "facilitatorURL": Self.apiURL + "/api/v0/x402/verify",
+            "facilitatorURL": Self.apiURL + "/api/v1/x402/verify",
             "resource": "/v1/data",
             "description": "Test data endpoint",
             "mimeType": "application/json",
@@ -493,7 +493,7 @@ final class AcceptanceTests: XCTestCase {
                       "facilitatorURL should reference our API: got \(facilitatorURL)")
 
         // 4. Verify a GET to the x402/verify endpoint exists (OPTIONS or 4xx, not 404)
-        let verifyURL = URL(string: Self.apiURL + "/api/v0/x402/verify")!
+        let verifyURL = URL(string: Self.apiURL + "/api/v1/x402/verify")!
         let (_, verifyResp) = try await URLSession.shared.data(from: verifyURL)
         let httpResp = verifyResp as! HTTPURLResponse
         // 405 (Method Not Allowed) or 400 (Bad Request) means the endpoint exists

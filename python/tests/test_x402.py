@@ -229,7 +229,7 @@ async def test_v2_fields_available_via_last_payment() -> None:
     client = X402Client(wallet=wallet, max_auto_pay_usdc=1.0)
     header_402 = _make_payment_required(
         amount="1000",
-        resource="/api/v0/premium",
+        resource="/api/v1/premium",
         description="Access to premium data",
         mime_type="application/json",
     )
@@ -244,9 +244,9 @@ async def test_v2_fields_available_via_last_payment() -> None:
         return r402 if call_count == 1 else r200
 
     with patch.object(client._http, "request", new=mock_request):
-        await client.get("http://example.com/api/v0/premium")
+        await client.get("http://example.com/api/v1/premium")
 
     assert client.last_payment is not None
-    assert client.last_payment["resource"] == "/api/v0/premium"
+    assert client.last_payment["resource"] == "/api/v1/premium"
     assert client.last_payment["description"] == "Access to premium data"
     assert client.last_payment["mimeType"] == "application/json"

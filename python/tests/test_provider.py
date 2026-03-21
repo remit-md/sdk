@@ -169,7 +169,7 @@ async def test_check_calls_facilitator_and_returns_valid() -> None:
 
     # Verify the facilitator was called with correct body.
     call_kwargs = mock_client.post.call_args
-    assert "/api/v0/x402/verify" in call_kwargs.args[0]
+    assert "/api/v1/x402/verify" in call_kwargs.args[0]
     body = call_kwargs.kwargs["json"]
     assert body["paymentRequired"]["payTo"] == _WALLET
     assert body["paymentRequired"]["amount"] == "1000"

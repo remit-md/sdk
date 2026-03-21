@@ -8,7 +8,7 @@ public enum RemitChain: Int, Codable, Sendable {
 
     var baseURL: String {
         switch self {
-        case .base:        return "https://api.remit.md"
+        case .base:        return "https://remit.md"
         case .baseSepolia: return "https://testnet.remit.md"
         }
     }

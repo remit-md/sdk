@@ -64,7 +64,7 @@ public class ComplianceTests
 
     private static async Task FundWallet(string walletAddress)
     {
-        var resp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v0/mint", new
+        var resp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v1/mint", new
         {
             wallet = walletAddress,
             amount = 1000,
@@ -123,7 +123,7 @@ public class ComplianceTests
     {
         if (!await ServerAvailable.Value) return;
 
-        var resp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v0/payments/direct", new
+        var resp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v1/payments/direct", new
         {
             to     = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
             amount = "1.000000",

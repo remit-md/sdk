@@ -202,11 +202,11 @@ async def _async_sleep(seconds: float) -> None:
 _CHAIN_CONFIG: dict[str, dict[str, Any]] = {
     "base": {
         "chain_id": 8453,
-        "api_url": os.environ.get("REMITMD_API_URL", "https://api.remit.md"),
+        "api_url": os.environ.get("REMITMD_API_URL", "https://remit.md"),
     },
     "base-sepolia": {
         "chain_id": 84532,
-        "api_url": os.environ.get("REMITMD_API_URL", "https://api-testnet.remit.md"),
+        "api_url": os.environ.get("REMITMD_API_URL", "https://testnet.remit.md"),
     },
     "localhost": {
         "chain_id": 31337,

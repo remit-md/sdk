@@ -47,7 +47,7 @@ describe("TypeScript compliance: authentication", () => {
   it("unauthenticated POST /payments/direct returns 401", async (t) => {
     if (skip) return t.skip("server not available");
 
-    const resp = await fetch(`${SERVER_URL}/api/v0/payments/direct`, {
+    const resp = await fetch(`${SERVER_URL}/api/v1/payments/direct`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

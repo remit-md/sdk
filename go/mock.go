@@ -155,10 +155,10 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 
 	// Route to handler based on path + method
 	switch {
-	case method == "GET" && path == "/api/v0/wallet/balance":
+	case method == "GET" && path == "/api/v1/wallet/balance":
 		return t.respond(dst, m.mockBalance())
 
-	case method == "POST" && path == "/api/v0/payments/direct":
+	case method == "POST" && path == "/api/v1/payments/direct":
 		b := mustBody(body)
 		to := b["to"].(string)
 		amount := mustDecimal(b["amount"])
@@ -169,7 +169,7 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 		}
 		return t.respond(dst, tx)
 
-	case method == "POST" && path == "/api/v0/invoices":
+	case method == "POST" && path == "/api/v1/invoices":
 		b := mustBody(body)
 		id, _ := b["id"].(string)
 		payee, _ := b["to_agent"].(string)
@@ -180,7 +180,7 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 		m.mu.Unlock()
 		return nil
 
-	case method == "POST" && path == "/api/v0/escrows":
+	case method == "POST" && path == "/api/v1/escrows":
 		b := mustBody(body)
 		invoiceID, _ := b["invoice_id"].(string)
 		m.mu.Lock()
@@ -199,7 +199,7 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 		return t.respond(dst, escrow)
 
 	case method == "POST" && strings.HasSuffix(path, "/claim-start"):
-		escrowID := extractID(path, "/api/v0/escrows/", "/claim-start")
+		escrowID := extractID(path, "/api/v1/escrows/", "/claim-start")
 		escrow, err := m.mockClaimStart(escrowID)
 		if err != nil {
 			return err
@@ -207,7 +207,7 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 		return t.respond(dst, escrow)
 
 	case method == "POST" && strings.HasSuffix(path, "/release"):
-		escrowID := extractID(path, "/api/v0/escrows/", "/release")
+		escrowID := extractID(path, "/api/v1/escrows/", "/release")
 		escrow, err := m.mockReleaseEscrow(escrowID)
 		if err != nil {
 			return err
@@ -215,28 +215,28 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 		return t.respond(dst, escrow)
 
 	case method == "POST" && strings.HasSuffix(path, "/cancel"):
-		escrowID := extractID(path, "/api/v0/escrows/", "/cancel")
+		escrowID := extractID(path, "/api/v1/escrows/", "/cancel")
 		escrow, err := m.mockCancelEscrow(escrowID)
 		if err != nil {
 			return err
 		}
 		return t.respond(dst, escrow)
 
-	case method == "GET" && strings.HasPrefix(path, "/api/v0/escrows/"):
-		escrowID := strings.TrimPrefix(path, "/api/v0/escrows/")
+	case method == "GET" && strings.HasPrefix(path, "/api/v1/escrows/"):
+		escrowID := strings.TrimPrefix(path, "/api/v1/escrows/")
 		return t.respond(dst, m.mockGetEscrow(escrowID))
 
-	case method == "GET" && strings.HasPrefix(path, "/api/v0/reputation/"):
-		address := strings.TrimPrefix(path, "/api/v0/reputation/")
+	case method == "GET" && strings.HasPrefix(path, "/api/v1/reputation/"):
+		address := strings.TrimPrefix(path, "/api/v1/reputation/")
 		return t.respond(dst, m.mockReputation(address))
 
-	case method == "GET" && strings.HasPrefix(path, "/api/v0/wallet/spending"):
+	case method == "GET" && strings.HasPrefix(path, "/api/v1/wallet/spending"):
 		return t.respond(dst, m.mockSpendingSummary())
 
-	case method == "GET" && path == "/api/v0/wallet/budget":
+	case method == "GET" && path == "/api/v1/wallet/budget":
 		return t.respond(dst, m.mockBudget())
 
-	case method == "GET" && strings.HasPrefix(path, "/api/v0/wallet/history"):
+	case method == "GET" && strings.HasPrefix(path, "/api/v1/wallet/history"):
 		return t.respond(dst, m.mockHistory())
 
 	default:

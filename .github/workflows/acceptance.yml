@@ -47,7 +47,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md/api/v0
+          ACCEPTANCE_API_URL: https://remit.md/api/v1
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: npm run acceptance
 

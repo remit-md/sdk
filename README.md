@@ -239,7 +239,7 @@ except RemitError as e:
 | Environment Variable | Required | Default | Description |
 |---------------------|----------|---------|-------------|
 | `REMITMD_KEY` | Yes | — | Agent wallet private key (auto-generated or from registration) |
-| `REMITMD_API_URL` | No | `https://remit.md/api/v0` | API server URL |
+| `REMITMD_API_URL` | No | `https://remit.md/api/v1` | API server URL |
 | `REMITMD_CHAIN` | No | `base` | Chain name (`base` or `base-sepolia` for testnet) |
 | `REMITMD_TESTNET` | No | `false` | Set to `true` to use testnet |
 

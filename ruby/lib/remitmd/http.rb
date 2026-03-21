@@ -9,8 +9,8 @@ require "openssl"
 module Remitmd
   # Chain configuration: maps chain names to (api_url, chain_id) pairs.
   CHAIN_CONFIG = {
-    "base"          => { url: "https://api.remit.md/api/v0",          chain_id: 8453 },
-    "base_sepolia"  => { url: "https://testnet.remit.md/api/v0",      chain_id: 84532 },
+    "base"          => { url: "https://remit.md/api/v1",          chain_id: 8453 },
+    "base_sepolia"  => { url: "https://testnet.remit.md/api/v1",      chain_id: 84532 },
   }.freeze
 
   # HTTP transport layer. Signs each request with EIP-712 auth headers and

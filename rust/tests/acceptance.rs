@@ -42,7 +42,7 @@ struct Contracts {
 }
 
 async fn fetch_contracts() -> Contracts {
-    let url = format!("{}/api/v0/contracts", api_url());
+    let url = format!("{}/api/v1/contracts", api_url());
     let resp = reqwest::get(&url).await.expect("GET /contracts");
     resp.json::<Contracts>().await.expect("parse /contracts")
 }

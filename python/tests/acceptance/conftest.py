@@ -23,7 +23,7 @@ FEE_WALLET = "0xd3f721BDF92a2bB5Dd8d2FE2AFC03aFE5629B420"
 async def _get_router_address() -> str:
     """Fetch router address from /contracts."""
     async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{API_URL}/api/v0/contracts")
+        resp = await client.get(f"{API_URL}/api/v1/contracts")
         resp.raise_for_status()
         return resp.json()["router"]
 

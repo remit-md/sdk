@@ -7,8 +7,8 @@ defmodule RemitMd.Http do
   alias RemitMd.Error
 
   @chain_config %{
-    "base"         => %{url: "https://api.remit.md/api/v0",         chain_id: 8453},
-    "base_sepolia" => %{url: "https://testnet-api.remit.md/api/v0", chain_id: 84532}
+    "base"         => %{url: "https://remit.md/api/v1",         chain_id: 8453},
+    "base_sepolia" => %{url: "https://testnet.remit.md/api/v1", chain_id: 84532}
   }
 
   @max_retries 3
@@ -93,12 +93,12 @@ defmodule RemitMd.Http do
 
     body_json = if body, do: Jason.encode!(body), else: ""
 
-    # EIP-712 must sign the full URL path (including /api/v0 base path).
+    # EIP-712 must sign the full URL path (including /api/v1 base path).
     # Extract the path component from the full URL so the signature covers
     # the same string the server sees when it receives the request.
     full_path = URI.parse(url).path
 
-    # EIP-712 hash and signature — sign the full path (including /api/v0 prefix).
+    # EIP-712 hash and signature — sign the full path (including /api/v1 prefix).
     digest =
       eip712_hash(
         transport.chain_id,

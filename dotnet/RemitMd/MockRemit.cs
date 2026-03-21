@@ -101,22 +101,22 @@ public sealed class MockRemit
         {
             object result = path switch
             {
-                var p when p.StartsWith("/api/v0/status/") => (object)new Balance(
+                var p when p.StartsWith("/api/v1/status/") => (object)new Balance(
                     _mock._balance, MockAddress, ChainId.BaseSepolia, DateTimeOffset.UtcNow),
 
-                "/api/v0/invoices" =>
+                "/api/v1/invoices" =>
                     new TransactionList(_mock._transactions.ToList(), _mock._transactions.Count, 1, 20, false),
 
-                var p when p.StartsWith("/api/v0/reputation/") => new Reputation(
+                var p when p.StartsWith("/api/v1/reputation/") => new Reputation(
                     MockAddress, 750, _mock._transactions.Sum(t => t.Amount), 0m,
                     _mock._transactions.Count, DateTimeOffset.UtcNow.AddDays(-30)),
 
-                var p when p.StartsWith("/api/v0/escrows/") =>
+                var p when p.StartsWith("/api/v1/escrows/") =>
                     _mock._escrows.TryGetValue(PathId(p), out var e)
                         ? (object)e
                         : throw new RemitError(ErrorCodes.EscrowNotFound, $"Escrow not found: {PathId(p)}"),
 
-                "/api/v0/contracts" => new ContractAddresses(
+                "/api/v1/contracts" => new ContractAddresses(
                     84532,
                     "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
                     "0xb3E96ebE54138d1c0caea00Ae098309C7E0138eC",
@@ -142,32 +142,32 @@ public sealed class MockRemit
 
             object result = path switch
             {
-                "/api/v0/payments/direct"              => HandlePay(body, id, now),
+                "/api/v1/payments/direct"              => HandlePay(body, id, now),
 
-                "/api/v0/invoices"                     => HandleCreateInvoice(body),
-                "/api/v0/escrows"                      => HandleCreateEscrow(body, now),
+                "/api/v1/invoices"                     => HandleCreateInvoice(body),
+                "/api/v1/escrows"                      => HandleCreateEscrow(body, now),
                 var p when p.EndsWith("/claim-start")  => HandleClaimStart(p),
                 var p when p.EndsWith("/release")      => HandleEscrowAction(p, "released"),
                 var p when p.EndsWith("/cancel")       => HandleEscrowAction(p, "cancelled"),
 
-                "/api/v0/tabs"                         => HandleCreateTab(body, id, now),
-                var p when p.StartsWith("/api/v0/tabs/") && p.EndsWith("/charge")
+                "/api/v1/tabs"                         => HandleCreateTab(body, id, now),
+                var p when p.StartsWith("/api/v1/tabs/") && p.EndsWith("/charge")
                                                        => HandleTabCharge(p, body, id),
-                var p when p.StartsWith("/api/v0/tabs/") && p.EndsWith("/close")
+                var p when p.StartsWith("/api/v1/tabs/") && p.EndsWith("/close")
                                                        => HandleTabClose(p, body, id, now),
 
-                "/api/v0/streams"                      => HandleCreateStream(body, id, now),
-                var p when p.StartsWith("/api/v0/streams/") && p.EndsWith("/close")
+                "/api/v1/streams"                      => HandleCreateStream(body, id, now),
+                var p when p.StartsWith("/api/v1/streams/") && p.EndsWith("/close")
                                                        => HandleStreamClose(p, id, now),
 
-                "/api/v0/bounties"                     => HandleCreateBounty(body, id, now),
-                var p when p.StartsWith("/api/v0/bounties/") && p.EndsWith("/submit")
+                "/api/v1/bounties"                     => HandleCreateBounty(body, id, now),
+                var p when p.StartsWith("/api/v1/bounties/") && p.EndsWith("/submit")
                                                        => HandleBountySubmit(p, body, id),
-                var p when p.StartsWith("/api/v0/bounties/") && p.EndsWith("/award")
+                var p when p.StartsWith("/api/v1/bounties/") && p.EndsWith("/award")
                                                        => HandleBountyAward(p, body, id, now),
 
-                "/api/v0/deposits"                     => HandleCreateDeposit(body, id, now),
-                var p when p.StartsWith("/api/v0/deposits/") && p.EndsWith("/return")
+                "/api/v1/deposits"                     => HandleCreateDeposit(body, id, now),
+                var p when p.StartsWith("/api/v1/deposits/") && p.EndsWith("/return")
                                                        => HandleDepositReturn(p, id, now),
 
                 _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled POST {path}"),

@@ -30,7 +30,7 @@ public final class RemitMd {
 
     // API endpoints per chain
     private static final Map<String, String> API_URLS = Map.of(
-        "base",           "https://api.remit.md",
+        "base",           "https://remit.md",
         "base-sepolia",   "https://testnet.remit.md"
     );
 

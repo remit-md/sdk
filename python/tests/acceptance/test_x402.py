@@ -90,7 +90,7 @@ async def test_x402_auto_pay() -> None:
 
     # Fetch contract addresses for the paywall header
     async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{API_URL}/api/v0/contracts")
+        resp = await client.get(f"{API_URL}/api/v1/contracts")
         resp.raise_for_status()
         contracts = resp.json()
 
@@ -136,7 +136,7 @@ async def test_x402_rejects_above_limit() -> None:
 
     # Fetch contract addresses
     async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{API_URL}/api/v0/contracts")
+        resp = await client.get(f"{API_URL}/api/v1/contracts")
         resp.raise_for_status()
         contracts = resp.json()
 

@@ -37,7 +37,7 @@ export function generateWallet(): {
   const wallet = new Wallet({
     privateKey,
     chain: "base-sepolia",
-    apiUrl: `${SERVER_URL}/api/v0`,
+    apiUrl: `${SERVER_URL}/api/v1`,
     routerAddress: ROUTER_ADDRESS,
   });
   return { privateKey, walletAddress: wallet.address };
@@ -49,7 +49,7 @@ export function makeWallet(): Wallet {
   return new Wallet({
     privateKey,
     chain: "base-sepolia",
-    apiUrl: `${SERVER_URL}/api/v0`,
+    apiUrl: `${SERVER_URL}/api/v1`,
     routerAddress: ROUTER_ADDRESS,
   });
 }
@@ -65,7 +65,7 @@ export async function makeFundedPair(): Promise<{
 
   const walletOpts = {
     chain: "base-sepolia" as const,
-    apiUrl: `${SERVER_URL}/api/v0`,
+    apiUrl: `${SERVER_URL}/api/v1`,
     routerAddress: ROUTER_ADDRESS,
   };
 

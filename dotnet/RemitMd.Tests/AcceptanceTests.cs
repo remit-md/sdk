@@ -48,7 +48,7 @@ public class AcceptanceTests
     private async Task<Dictionary<string, JsonElement>> FetchContracts()
     {
         if (_contracts is not null) return _contracts;
-        var resp = await Http.GetStringAsync($"{ApiUrl}/api/v0/contracts");
+        var resp = await Http.GetStringAsync($"{ApiUrl}/api/v1/contracts");
         _contracts = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(resp)!;
         return _contracts;
     }

@@ -80,7 +80,7 @@ class AcceptanceTest {
     private static ContractAddresses fetchContracts() throws Exception {
         if (cachedContracts != null) return cachedContracts;
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(API_URL + "/api/v0/contracts"))
+                .uri(URI.create(API_URL + "/api/v1/contracts"))
                 .GET()
                 .timeout(Duration.ofSeconds(15))
                 .build();

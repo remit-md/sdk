@@ -24,7 +24,7 @@ defmodule RemitMd.AcceptanceTest do
   defp fetch_contracts do
     :inets.start()
     :ssl.start()
-    url = ~c"#{@api_url}/api/v0/contracts"
+    url = ~c"#{@api_url}/api/v1/contracts"
 
     {:ok, {{_, 200, _}, _, body}} =
       :httpc.request(:get, {url, []}, [{:timeout, 10_000}], [])
@@ -35,7 +35,7 @@ defmodule RemitMd.AcceptanceTest do
   defp create_test_wallet do
     key_hex = :crypto.strong_rand_bytes(32) |> Base.encode16(case: :lower)
     contracts = fetch_contracts()
-    base_url = if String.ends_with?(@api_url, "/api/v0"), do: @api_url, else: "#{@api_url}/api/v0"
+    base_url = if String.ends_with?(@api_url, "/api/v1"), do: @api_url, else: "#{@api_url}/api/v1"
 
     wallet = Wallet.new(
       private_key: "0x#{key_hex}",
@@ -421,7 +421,7 @@ defmodule RemitMd.AcceptanceTest do
     provider_wallet = create_test_wallet()
 
     # Build the PAYMENT-REQUIRED header payload
-    api_base = if String.ends_with?(@api_url, "/api/v0"), do: @api_url, else: "#{@api_url}/api/v0"
+    api_base = if String.ends_with?(@api_url, "/api/v1"), do: @api_url, else: "#{@api_url}/api/v1"
     payment_payload = %{
       "payTo"       => provider_wallet.wallet.address,
       "amount"      => "1000",

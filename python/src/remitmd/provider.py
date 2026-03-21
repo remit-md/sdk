@@ -60,7 +60,7 @@ class X402Paywall:
         network: CAIP-2 network string (e.g. ``"eip155:84532"`` for Base Sepolia).
         asset: USDC contract address on the target network.
         facilitator_url: Base URL of the remit.md facilitator.
-        facilitator_token: Bearer JWT for calling ``/api/v0/x402/verify``.
+        facilitator_token: Bearer JWT for calling ``/api/v1/x402/verify``.
         max_timeout_seconds: How long the payment authorization is valid.
         resource: V2 — URL or path of the resource being protected (e.g. ``"/v1/data"``).
         description: V2 — Human-readable description of what the payment is for.
@@ -151,7 +151,7 @@ class X402Paywall:
         async with httpx.AsyncClient() as client:
             try:
                 resp = await client.post(
-                    f"{self._facilitator_url}/api/v0/x402/verify",
+                    f"{self._facilitator_url}/api/v1/x402/verify",
                     json=body,
                     headers=headers,
                     timeout=10.0,

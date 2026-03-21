@@ -74,8 +74,8 @@ export class AuthenticatedClient {
   readonly #baseUrl: string;
   readonly #chainId: number;
   readonly #verifyingContract: string;
-  /** Path prefix extracted from baseUrl (e.g. "/api/v0") to prepend when signing.
-   *  The server verifies the full path (/api/v0/payments/direct) via OriginalUri,
+  /** Path prefix extracted from baseUrl (e.g. "/api/v1") to prepend when signing.
+   *  The server verifies the full path (/api/v1/payments/direct) via OriginalUri,
    *  not just the relative segment (/payments/direct). */
   readonly #signPathPrefix: string;
 
@@ -118,7 +118,7 @@ export class AuthenticatedClient {
 
     // Sign the full path (prefix + relative path only, no query string) so it matches
     // the path OriginalUri on the server. The server verifies only the path component.
-    // e.g. baseUrl "http://…/api/v0" + path "/events?wallet=0x…" → signed "/api/v0/events"
+    // e.g. baseUrl "http://…/api/v1" + path "/events?wallet=0x…" → signed "/api/v1/events"
     const pathOnly = path.split("?")[0];
     const signedPath = `${this.#signPathPrefix}${pathOnly}`;
 

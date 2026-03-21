@@ -34,7 +34,7 @@ var chainConfig = map[string]struct {
 	APIURL  string
 	Testnet bool
 }{
-	"base":         {ChainID: ChainBase, APIURL: "https://api.remit.md", Testnet: false},
+	"base":         {ChainID: ChainBase, APIURL: "https://remit.md", Testnet: false},
 	"base-sepolia": {ChainID: ChainBaseSep, APIURL: "https://testnet.remit.md", Testnet: true},
 }
 

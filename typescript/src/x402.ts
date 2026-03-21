@@ -71,7 +71,7 @@ export interface PaymentRequired {
   payTo: string;
   maxTimeoutSeconds?: number;
   // V2 optional fields — informational metadata about the resource being paid for.
-  /** URL or path of the resource being protected (e.g. "/api/v0/data"). */
+  /** URL or path of the resource being protected (e.g. "/api/v1/data"). */
   resource?: string;
   /** Human-readable description of what the payment is for. */
   description?: string;

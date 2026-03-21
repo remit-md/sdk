@@ -54,7 +54,7 @@ type PaywallOptions struct {
 	Asset string
 	// FacilitatorURL is the base URL of the remit.md facilitator (default: "https://remit.md").
 	FacilitatorURL string
-	// FacilitatorToken is the Bearer JWT for /api/v0/x402/verify calls.
+	// FacilitatorToken is the Bearer JWT for /api/v1/x402/verify calls.
 	FacilitatorToken string
 	// MaxTimeoutSeconds is how long the payment authorization is valid (default: 60).
 	MaxTimeoutSeconds int
@@ -173,7 +173,7 @@ func (p *X402Paywall) Check(ctx context.Context, sig string) (CheckResult, error
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		p.facilitatorURL+"/api/v0/x402/verify",
+		p.facilitatorURL+"/api/v1/x402/verify",
 		bytes.NewReader(bodyBytes),
 	)
 	if err != nil {

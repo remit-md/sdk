@@ -26,13 +26,13 @@ import RemitMd
 
 // Production
 let wallet = try RemitWallet(
-    privateKey: ProcessInfo.processInfo.environment["REMIT_PRIVATE_KEY"]!,
+    privateKey: ProcessInfo.processInfo.environment["REMITMD_PRIVATE_KEY"]!,
     chain: .base
 )
 let tx = try await wallet.pay(to: "0xAgent...", amount: 1.00)
 print(tx.id, tx.status) // "tx_...", "confirmed"
 
-// Environment-based (reads REMIT_PRIVATE_KEY + REMIT_CHAIN)
+// Environment-based (reads REMITMD_PRIVATE_KEY + REMIT_CHAIN)
 let wallet = try RemitWallet.fromEnvironment()
 ```
 
@@ -152,9 +152,9 @@ let contracts = try await wallet.getContracts()
 // Webhooks
 let wh = try await wallet.registerWebhook(url: "https://...", events: ["payment.received"])
 
-// Operator links
+// Operator links (optional: messages: [String]?, agentName: String?)
 let fundLink = try await wallet.createFundLink()
-let withdrawLink = try await wallet.createWithdrawLink()
+let withdrawLink = try await wallet.createWithdrawLink(messages: ["Withdraw profits"], agentName: "my-agent")
 
 // Testnet funding
 let result = try await wallet.mint(amount: 100.0)  // $100 testnet USDC

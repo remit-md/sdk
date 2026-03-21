@@ -146,9 +146,9 @@ sig = RemitMd.Wallet.sign_tab_charge(wallet, tab_contract, tab_id, total_charged
 # Webhooks
 {:ok, wh} = RemitMd.Wallet.register_webhook(wallet, "https://...", ["payment.received"])
 
-# Operator links
+# Operator links (optional: messages: [], agent_name: "")
 {:ok, link} = RemitMd.Wallet.create_fund_link(wallet)
-{:ok, link} = RemitMd.Wallet.create_withdraw_link(wallet)
+{:ok, link} = RemitMd.Wallet.create_withdraw_link(wallet, messages: ["Withdraw"], agent_name: "my-agent")
 
 # Testnet funding
 {:ok, result} = RemitMd.Wallet.mint(wallet, 100)  # $100 testnet USDC

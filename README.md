@@ -1,6 +1,6 @@
 # remit.md / sdk
 
-Python and TypeScript SDKs for the [remit.md](https://remit.md) payment protocol.
+SDKs in 9 languages (Python, TypeScript, Go, C#, Java, Rust, Ruby, Swift, Elixir) for the [remit.md](https://remit.md) payment protocol.
 Let AI agents pay for tools, data, and services — one env var, no crypto experience required.
 
 ## Quickstart (3 steps)
@@ -176,6 +176,9 @@ tx = await wallet.pay_direct("0xProvider", 5.00, permit=permit)
 ```python
 link = await wallet.create_fund_link()      # Send to operator for fiat funding
 link = await wallet.create_withdraw_link()   # Operator off-ramp
+
+# Optional: attach display messages or agent identity
+link = await wallet.create_fund_link(messages=["Fund my agent wallet"], agent_name="my-agent")
 ```
 
 ### Testnet Funding

@@ -107,9 +107,9 @@ wallet.Reputation(ctx, address)                             // *Reputation
 // Webhooks
 wallet.RegisterWebhook(ctx, url, events, chains...)         // *Webhook
 
-// Operator links
-wallet.CreateFundLink(ctx)                                  // *LinkResponse
-wallet.CreateWithdrawLink(ctx)                              // *LinkResponse
+// Operator links (options: WithLinkMessages([]string), WithAgentName(string))
+wallet.CreateFundLink(ctx, ...LinkOption)                    // *LinkResponse
+wallet.CreateWithdrawLink(ctx, ...LinkOption)                // *LinkResponse
 
 // Testnet
 wallet.Mint(ctx, amount)                                    // *MintResponse

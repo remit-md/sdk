@@ -154,12 +154,10 @@ wallet.balance()                                         // Promise<number>
 
 // Webhooks
 wallet.registerWebhook(url, events, chains?)             // Promise<Webhook>
-wallet.listWebhooks()                                    // Promise<Webhook[]>
-wallet.deleteWebhook(id)                                 // Promise<void>
 
-// Operator links
-wallet.createFundLink()                                  // Promise<LinkResponse>
-wallet.createWithdrawLink()                              // Promise<LinkResponse>
+// Operator links (optional: { messages?: string[], agentName?: string })
+wallet.createFundLink(opts?)                             // Promise<LinkResponse>
+wallet.createWithdrawLink(opts?)                         // Promise<LinkResponse>
 
 // Testnet
 wallet.mint(amount)                                      // Promise<{ tx_hash, balance }>

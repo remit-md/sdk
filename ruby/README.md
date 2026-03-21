@@ -194,9 +194,9 @@ wallet.return_deposit(deposit_id)                           # Transaction
 # Webhooks
 wallet.register_webhook(url, events, chains: nil)           # Webhook
 
-# Operator links
+# Operator links (optional: messages: [], agent_name: "")
 wallet.create_fund_link                                     # LinkResponse
-wallet.create_withdraw_link                                 # LinkResponse
+wallet.create_withdraw_link(messages: ["Withdraw"], agent_name: "my-agent")  # LinkResponse
 
 # Testnet
 wallet.mint(amount)                                         # Hash {tx_hash, balance}

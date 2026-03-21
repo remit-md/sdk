@@ -166,9 +166,9 @@ var contracts = await wallet.GetContractsAsync();
 // Webhooks
 var wh = await wallet.RegisterWebhookAsync("https://...", new[] { "payment.received" });
 
-// Operator links
+// Operator links (optional: messages, agentName)
 var fundLink = await wallet.CreateFundLinkAsync();
-var withdrawLink = await wallet.CreateWithdrawLinkAsync();
+var withdrawLink = await wallet.CreateWithdrawLinkAsync(messages: new[] { "Withdraw" }, agentName: "my-agent");
 
 // Testnet funding
 var result = await wallet.MintAsync(100m);  // $100 testnet USDC

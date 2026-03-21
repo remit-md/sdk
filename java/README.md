@@ -256,9 +256,9 @@ ContractAddresses contracts = wallet.getContracts();
 // Webhooks
 wallet.registerWebhook("https://...", List.of("payment.received"));
 
-// Operator links
+// Operator links (overloaded: optional messages, agentName)
 LinkResponse link = wallet.createFundLink();
-LinkResponse link = wallet.createWithdrawLink();
+LinkResponse link = wallet.createWithdrawLink(List.of("Withdraw"), "my-agent");
 
 // Testnet funding
 MintResponse result = wallet.mint(100.0);  // $100 testnet USDC

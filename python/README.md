@@ -158,9 +158,9 @@ await wallet.status()                                        # WalletStatus
 # Webhooks
 await wallet.register_webhook(url, events, chains=None)      # Webhook
 
-# Operator links
+# Operator links (optional: messages=[], agent_name="")
 await wallet.create_fund_link()                              # LinkResponse
-await wallet.create_withdraw_link()                          # LinkResponse
+await wallet.create_withdraw_link(messages=["Withdraw"], agent_name="my-agent")  # LinkResponse
 
 # Testnet
 await wallet.mint(amount)                                    # dict {tx_hash, balance}

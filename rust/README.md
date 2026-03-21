@@ -191,9 +191,9 @@ let contracts = wallet.get_contracts().await?;
 // Webhooks
 wallet.register_webhook("https://...", &["payment.received"], None).await?;
 
-// Operator links
+// Operator links (_with_options variant accepts messages + agent_name)
 let link = wallet.create_fund_link().await?;
-let link = wallet.create_withdraw_link().await?;
+let link = wallet.create_withdraw_link_with_options(&["Withdraw"], Some("my-agent")).await?;
 
 // Testnet funding
 let result = wallet.mint(100.0).await?;  // $100 testnet USDC

@@ -477,110 +477,110 @@ public class MockRemit {
         private <T> T dispatch(String method, String path, Object body, Class<T> responseType) {
             Map<String, Object> b = body instanceof Map ? (Map<String, Object>) body : Map.of();
 
-            if ("GET".equals(method) && "/api/v0/wallet/balance".equals(path)) {
+            if ("GET".equals(method) && "/api/v1/wallet/balance".equals(path)) {
                 return (T) mock.mockBalance();
             }
-            if ("GET".equals(method) && "/api/v0/wallet/history".equals(path)) {
+            if ("GET".equals(method) && "/api/v1/wallet/history".equals(path)) {
                 return (T) mock.mockHistory();
             }
-            if ("GET".equals(method) && path.startsWith("/api/v0/wallet/history")) {
+            if ("GET".equals(method) && path.startsWith("/api/v1/wallet/history")) {
                 return (T) mock.mockHistory();
             }
-            if ("GET".equals(method) && "/api/v0/wallet/budget".equals(path)) {
+            if ("GET".equals(method) && "/api/v1/wallet/budget".equals(path)) {
                 return (T) mock.mockBudget();
             }
-            if ("GET".equals(method) && path.startsWith("/api/v0/wallet/spending")) {
+            if ("GET".equals(method) && path.startsWith("/api/v1/wallet/spending")) {
                 String period = path.contains("period=") ? path.substring(path.indexOf("period=") + 7) : "month";
                 return (T) mock.mockSpendingSummary(period);
             }
-            if ("GET".equals(method) && path.startsWith("/api/v0/reputation/")) {
-                String address = path.substring("/api/v0/reputation/".length());
+            if ("GET".equals(method) && path.startsWith("/api/v1/reputation/")) {
+                String address = path.substring("/api/v1/reputation/".length());
                 return (T) mock.mockReputation(address);
             }
-            if ("GET".equals(method) && path.startsWith("/api/v0/escrows/")) {
-                String escrowId = path.substring("/api/v0/escrows/".length());
+            if ("GET".equals(method) && path.startsWith("/api/v1/escrows/")) {
+                String escrowId = path.substring("/api/v1/escrows/".length());
                 return (T) mock.mockGetEscrow(escrowId);
             }
-            if ("POST".equals(method) && "/api/v0/payments/direct".equals(path)) {
+            if ("POST".equals(method) && "/api/v1/payments/direct".equals(path)) {
                 String to = (String) b.get("to");
                 BigDecimal amount = new BigDecimal((String) b.get("amount"));
                 String memo = (String) b.getOrDefault("task", "");
                 return (T) mock.mockPay(to, amount, memo);
             }
-            if ("POST".equals(method) && "/api/v0/invoices".equals(path)) {
+            if ("POST".equals(method) && "/api/v1/invoices".equals(path)) {
                 mock.mockCreateInvoice(b);
                 return null;
             }
-            if ("POST".equals(method) && "/api/v0/escrows".equals(path)) {
+            if ("POST".equals(method) && "/api/v1/escrows".equals(path)) {
                 String invoiceId = (String) b.get("invoice_id");
                 return (T) mock.mockCreateEscrow(invoiceId);
             }
             if ("POST".equals(method) && path.endsWith("/claim-start")) {
-                String escrowId = path.replace("/api/v0/escrows/", "").replace("/claim-start", "");
+                String escrowId = path.replace("/api/v1/escrows/", "").replace("/claim-start", "");
                 return (T) mock.mockGetEscrow(escrowId);
             }
             if ("POST".equals(method) && path.endsWith("/release")) {
-                String escrowId = path.replace("/api/v0/escrows/", "").replace("/release", "");
+                String escrowId = path.replace("/api/v1/escrows/", "").replace("/release", "");
                 return (T) mock.mockReleaseEscrow(escrowId);
             }
             if ("POST".equals(method) && path.endsWith("/cancel")) {
-                String escrowId = path.replace("/api/v0/escrows/", "").replace("/cancel", "");
+                String escrowId = path.replace("/api/v1/escrows/", "").replace("/cancel", "");
                 return (T) mock.mockCancelEscrow(escrowId);
             }
-            if ("POST".equals(method) && "/api/v0/tabs".equals(path)) {
+            if ("POST".equals(method) && "/api/v1/tabs".equals(path)) {
                 String provider = (String) b.get("provider");
                 BigDecimal limitAmount = new BigDecimal((String) b.get("limit_amount"));
                 return (T) mock.mockCreateTab(provider, limitAmount);
             }
             if ("POST".equals(method) && path.contains("/tabs/") && path.endsWith("/charge")) {
-                String tabId = path.replace("/api/v0/tabs/", "").replace("/charge", "");
+                String tabId = path.replace("/api/v1/tabs/", "").replace("/charge", "");
                 BigDecimal amount = new BigDecimal((String) b.get("amount"));
                 BigDecimal cumulative = new BigDecimal((String) b.get("cumulative"));
                 int callCount = b.get("call_count") instanceof Number ? ((Number) b.get("call_count")).intValue() : 1;
                 return (T) mock.mockChargeTab(tabId, amount, cumulative, callCount);
             }
             if ("POST".equals(method) && path.contains("/tabs/") && path.endsWith("/close")) {
-                String tabId = path.replace("/api/v0/tabs/", "").replace("/close", "");
+                String tabId = path.replace("/api/v1/tabs/", "").replace("/close", "");
                 return (T) mock.mockCloseTab(tabId);
             }
-            if ("POST".equals(method) && "/api/v0/bounties".equals(path)) {
+            if ("POST".equals(method) && "/api/v1/bounties".equals(path)) {
                 BigDecimal amount = new BigDecimal((String) b.get("amount"));
                 String desc = (String) b.get("task_description");
                 return (T) mock.mockCreateBounty(amount, desc);
             }
             if ("POST".equals(method) && path.contains("/bounties/") && path.endsWith("/submit")) {
-                String bountyId = path.replace("/api/v0/bounties/", "").replace("/submit", "");
+                String bountyId = path.replace("/api/v1/bounties/", "").replace("/submit", "");
                 String evidenceHash = (String) b.get("evidence_hash");
                 return (T) mock.mockSubmitBounty(bountyId, evidenceHash);
             }
             if ("POST".equals(method) && path.contains("/bounties/") && path.endsWith("/award")) {
-                String bountyId = path.replace("/api/v0/bounties/", "").replace("/award", "");
+                String bountyId = path.replace("/api/v1/bounties/", "").replace("/award", "");
                 int submissionId = b.get("submission_id") instanceof Number ? ((Number) b.get("submission_id")).intValue() : 0;
                 return (T) mock.mockAwardBounty(bountyId, submissionId);
             }
-            if ("POST".equals(method) && "/api/v0/streams".equals(path)) {
+            if ("POST".equals(method) && "/api/v1/streams".equals(path)) {
                 String payee = (String) b.get("payee");
                 BigDecimal rate = new BigDecimal((String) b.get("rate_per_second"));
                 BigDecimal maxTotal = new BigDecimal((String) b.get("max_total"));
                 return (T) mock.mockCreateStream(payee, rate, maxTotal);
             }
             if ("POST".equals(method) && path.contains("/streams/") && path.endsWith("/close")) {
-                String streamId = path.replace("/api/v0/streams/", "").replace("/close", "");
+                String streamId = path.replace("/api/v1/streams/", "").replace("/close", "");
                 return (T) mock.mockCloseStream(streamId);
             }
-            if ("POST".equals(method) && "/api/v0/deposits".equals(path)) {
+            if ("POST".equals(method) && "/api/v1/deposits".equals(path)) {
                 String provider = (String) b.get("provider");
                 BigDecimal amount = new BigDecimal((String) b.get("amount"));
                 return (T) mock.mockLockDeposit(provider, amount);
             }
             if ("POST".equals(method) && path.contains("/deposits/") && path.endsWith("/return")) {
-                String depositId = path.replace("/api/v0/deposits/", "").replace("/return", "");
+                String depositId = path.replace("/api/v1/deposits/", "").replace("/return", "");
                 return (T) mock.mockReturnDeposit(depositId);
             }
-            if ("GET".equals(method) && "/api/v0/contracts".equals(path)) {
+            if ("GET".equals(method) && "/api/v1/contracts".equals(path)) {
                 return (T) mock.mockContracts();
             }
-            if ("POST".equals(method) && "/api/v0/mint".equals(path)) {
+            if ("POST".equals(method) && "/api/v1/mint".equals(path)) {
                 double amount = b.get("amount") instanceof Number ? ((Number) b.get("amount")).doubleValue() : 0.0;
                 return (T) mock.mockMint(amount);
             }

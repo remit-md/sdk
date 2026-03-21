@@ -78,7 +78,7 @@ public class Wallet {
 
     /** Returns the current USDC balance of this wallet. */
     public Balance balance() {
-        return client.get("/api/v0/wallet/balance", Balance.class);
+        return client.get("/api/v1/wallet/balance", Balance.class);
     }
 
     // ─── Direct Payment ───────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ public class Wallet {
         body.put("nonce", nonce);
         body.put("signature", "0x");
         if (p != null) body.put("permit", p);
-        return client.post("/api/v0/payments/direct", body, Transaction.class);
+        return client.post("/api/v1/payments/direct", body, Transaction.class);
     }
 
     // ─── Transaction History ──────────────────────────────────────────────────
@@ -134,12 +134,12 @@ public class Wallet {
      * @param perPage items per page (default 50, max 200)
      */
     public TransactionList history(int page, int perPage) {
-        return client.get("/api/v0/wallet/history?page=" + page + "&per_page=" + perPage, TransactionList.class);
+        return client.get("/api/v1/wallet/history?page=" + page + "&per_page=" + perPage, TransactionList.class);
     }
 
     /** Returns the first page of transaction history (50 items). */
     public TransactionList history() {
-        return client.get("/api/v0/wallet/history", TransactionList.class);
+        return client.get("/api/v1/wallet/history", TransactionList.class);
     }
 
     // ─── Reputation ───────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ public class Wallet {
     /** Returns the on-chain reputation for a given address. */
     public Reputation reputation(String address) {
         validateAddress(address);
-        return client.get("/api/v0/reputation/" + address, Reputation.class);
+        return client.get("/api/v1/reputation/" + address, Reputation.class);
     }
 
     // ─── Escrow ───────────────────────────────────────────────────────────────
@@ -204,41 +204,41 @@ public class Wallet {
         invoiceBody.put("signature", "0x");
         if (expiresIn != null) invoiceBody.put("escrow_timeout", (int) expiresIn.toSeconds());
 
-        client.post("/api/v0/invoices", invoiceBody, Map.class);
+        client.post("/api/v1/invoices", invoiceBody, Map.class);
 
         // Step 2: fund the escrow.
         Map<String, Object> escrowBody = new java.util.HashMap<>();
         escrowBody.put("invoice_id", invoiceId);
         if (p != null) escrowBody.put("permit", p);
 
-        return client.post("/api/v0/escrows", escrowBody, Escrow.class);
+        return client.post("/api/v1/escrows", escrowBody, Escrow.class);
     }
 
     /** Releases escrow funds to the payee. */
     public Transaction releaseEscrow(String escrowId) {
-        return client.post("/api/v0/escrows/" + escrowId + "/release",
+        return client.post("/api/v1/escrows/" + escrowId + "/release",
             Map.of("escrow_id", escrowId), Transaction.class);
     }
 
     /** Releases a specific milestone within an escrow. */
     public Transaction releaseEscrowMilestone(String escrowId, String milestoneId) {
-        return client.post("/api/v0/escrows/" + escrowId + "/release",
+        return client.post("/api/v1/escrows/" + escrowId + "/release",
             Map.of("escrow_id", escrowId, "milestone_id", milestoneId), Transaction.class);
     }
 
     /** Cancels an escrow and returns funds to the payer. */
     public Transaction cancelEscrow(String escrowId) {
-        return client.post("/api/v0/escrows/" + escrowId + "/cancel", null, Transaction.class);
+        return client.post("/api/v1/escrows/" + escrowId + "/cancel", null, Transaction.class);
     }
 
     /** Returns the current state of an escrow. */
     public Escrow getEscrow(String escrowId) {
-        return client.get("/api/v0/escrows/" + escrowId, Escrow.class);
+        return client.get("/api/v1/escrows/" + escrowId, Escrow.class);
     }
 
     /** Signals the provider has started work on an escrow. */
     public Escrow claimStart(String escrowId) {
-        return client.post("/api/v0/escrows/" + escrowId + "/claim-start", Map.of(), Escrow.class);
+        return client.post("/api/v1/escrows/" + escrowId + "/claim-start", Map.of(), Escrow.class);
     }
 
     // ─── Tab ──────────────────────────────────────────────────────────────────
@@ -276,7 +276,7 @@ public class Wallet {
         body.put("per_unit", perUnit.toPlainString());
         body.put("expiry", expiry);
         if (p != null) body.put("permit", p);
-        return client.post("/api/v0/tabs", body, Tab.class);
+        return client.post("/api/v1/tabs", body, Tab.class);
     }
 
     /**
@@ -294,7 +294,7 @@ public class Wallet {
         body.put("cumulative", cumulative.toPlainString());
         body.put("call_count", callCount);
         body.put("provider_sig", providerSig);
-        return client.post("/api/v0/tabs/" + tabId + "/charge", body, TabCharge.class);
+        return client.post("/api/v1/tabs/" + tabId + "/charge", body, TabCharge.class);
     }
 
     /**
@@ -308,7 +308,7 @@ public class Wallet {
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("final_amount", finalAmount.toPlainString());
         body.put("provider_sig", providerSig);
-        return client.post("/api/v0/tabs/" + tabId + "/close", body, Tab.class);
+        return client.post("/api/v1/tabs/" + tabId + "/close", body, Tab.class);
     }
 
     /**
@@ -389,17 +389,17 @@ public class Wallet {
         body.put("rate_per_second", ratePerSecond.toPlainString());
         body.put("max_total", maxTotal.toPlainString());
         if (p != null) body.put("permit", p);
-        return client.post("/api/v0/streams", body, Stream.class);
+        return client.post("/api/v1/streams", body, Stream.class);
     }
 
     /** Closes a stream and settles on-chain (payer only). */
     public Stream closeStream(String streamId) {
-        return client.post("/api/v0/streams/" + streamId + "/close", Map.of(), Stream.class);
+        return client.post("/api/v1/streams/" + streamId + "/close", Map.of(), Stream.class);
     }
 
     /** Claims all vested stream payments (callable by recipient). */
     public Transaction withdrawStream(String streamId) {
-        return client.post("/api/v0/streams/" + streamId + "/withdraw", null, Transaction.class);
+        return client.post("/api/v1/streams/" + streamId + "/withdraw", null, Transaction.class);
     }
 
     // ─── Bounty ───────────────────────────────────────────────────────────────
@@ -431,7 +431,7 @@ public class Wallet {
         body.put("deadline", deadline);
         body.put("max_attempts", maxAttempts);
         if (p != null) body.put("permit", p);
-        return client.post("/api/v0/bounties", body, Bounty.class);
+        return client.post("/api/v1/bounties", body, Bounty.class);
     }
 
     /**
@@ -444,7 +444,7 @@ public class Wallet {
     public BountySubmission submitBounty(String bountyId, String evidenceHash) {
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("evidence_hash", evidenceHash);
-        return client.post("/api/v0/bounties/" + bountyId + "/submit", body, BountySubmission.class);
+        return client.post("/api/v1/bounties/" + bountyId + "/submit", body, BountySubmission.class);
     }
 
     /**
@@ -454,7 +454,7 @@ public class Wallet {
      * @param submissionId submission ID returned by {@link #submitBounty}
      */
     public Bounty awardBounty(String bountyId, int submissionId) {
-        return client.post("/api/v0/bounties/" + bountyId + "/award",
+        return client.post("/api/v1/bounties/" + bountyId + "/award",
             Map.of("submission_id", submissionId), Bounty.class);
     }
 
@@ -467,7 +467,7 @@ public class Wallet {
      * @param limit     max results (default 20, max 100)
      */
     public java.util.List<Bounty> listBounties(String status, String poster, String submitter, int limit) {
-        StringBuilder sb = new StringBuilder("/api/v0/bounties?limit=").append(limit);
+        StringBuilder sb = new StringBuilder("/api/v1/bounties?limit=").append(limit);
         if (status != null && !status.isEmpty()) sb.append("&status=").append(status);
         if (poster != null && !poster.isEmpty()) sb.append("&poster=").append(poster);
         if (submitter != null && !submitter.isEmpty()) sb.append("&submitter=").append(submitter);
@@ -505,12 +505,12 @@ public class Wallet {
         body.put("amount", amount.toPlainString());
         body.put("expiry", expiry);
         if (p != null) body.put("permit", p);
-        return client.post("/api/v0/deposits", body, Deposit.class);
+        return client.post("/api/v1/deposits", body, Deposit.class);
     }
 
     /** Returns a deposit (provider-side, full refund to depositor). */
     public Deposit returnDeposit(String depositId) {
-        return client.post("/api/v0/deposits/" + depositId + "/return", Map.of(), Deposit.class);
+        return client.post("/api/v1/deposits/" + depositId + "/return", Map.of(), Deposit.class);
     }
 
     // ─── Analytics ────────────────────────────────────────────────────────────
@@ -521,12 +521,12 @@ public class Wallet {
      * @param period "day", "week", "month", or "all"
      */
     public SpendingSummary spendingSummary(String period) {
-        return client.get("/api/v0/wallet/spending?period=" + period, SpendingSummary.class);
+        return client.get("/api/v1/wallet/spending?period=" + period, SpendingSummary.class);
     }
 
     /** Returns how much the agent can still spend under operator-set limits. */
     public Budget remainingBudget() {
-        return client.get("/api/v0/wallet/budget", Budget.class);
+        return client.get("/api/v1/wallet/budget", Budget.class);
     }
 
     // ─── Contracts ─────────────────────────────────────────────────────────────
@@ -540,7 +540,7 @@ public class Wallet {
         if (cached != null) return cached;
         synchronized (this) {
             if (contractsCache != null) return contractsCache;
-            contractsCache = client.get("/api/v0/contracts", ContractAddresses.class);
+            contractsCache = client.get("/api/v1/contracts", ContractAddresses.class);
             return contractsCache;
         }
     }
@@ -554,7 +554,7 @@ public class Wallet {
      * @param amount USDC amount to mint
      */
     public MintResponse mint(double amount) {
-        return client.post("/api/v0/mint",
+        return client.post("/api/v1/mint",
             Map.of("wallet", address(), "amount", amount),
             MintResponse.class);
     }
@@ -586,7 +586,7 @@ public class Wallet {
         body.put("url", url);
         body.put("events", events);
         if (chains != null) body.put("chains", chains);
-        return client.post("/api/v0/webhooks", body, Webhook.class);
+        return client.post("/api/v1/webhooks", body, Webhook.class);
     }
 
     /** Registers a webhook for all chains. */
@@ -613,7 +613,7 @@ public class Wallet {
         Map<String, Object> body = new java.util.HashMap<>();
         if (messages != null && !messages.isEmpty()) body.put("messages", messages);
         if (agentName != null && !agentName.isEmpty()) body.put("agent_name", agentName);
-        return client.post("/api/v0/links/fund", body, LinkResponse.class);
+        return client.post("/api/v1/links/fund", body, LinkResponse.class);
     }
 
     /**
@@ -633,7 +633,7 @@ public class Wallet {
         Map<String, Object> body = new java.util.HashMap<>();
         if (messages != null && !messages.isEmpty()) body.put("messages", messages);
         if (agentName != null && !agentName.isEmpty()) body.put("agent_name", agentName);
-        return client.post("/api/v0/links/withdraw", body, LinkResponse.class);
+        return client.post("/api/v1/links/withdraw", body, LinkResponse.class);
     }
 
     // ─── Permit Signing ────────────────────────────────────────────────────

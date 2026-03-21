@@ -59,7 +59,7 @@ mod compliance_tests {
     /// Fund a wallet via mint (no auth required in testnet mode).
     async fn fund_wallet(client: &reqwest::Client, wallet_addr: &str) {
         let resp: serde_json::Value = client
-            .post(format!("{}/api/v0/mint", server_url()))
+            .post(format!("{}/api/v1/mint", server_url()))
             .json(&serde_json::json!({ "wallet": wallet_addr, "amount": 1000 }))
             .send()
             .await
@@ -114,7 +114,7 @@ mod compliance_tests {
         let client = reqwest::Client::new();
         let wallet = get_shared_payer(&client).await;
 
-        // reputation() makes an authenticated GET to /api/v0/reputation/{address} —
+        // reputation() makes an authenticated GET to /api/v1/reputation/{address} —
         // this endpoint exists for all registered addresses and fails with 401 if
         // auth headers are wrong.
         let rep = wallet
@@ -133,7 +133,7 @@ mod compliance_tests {
         }
         let client = reqwest::Client::new();
         let resp = client
-            .post(format!("{}/api/v0/payments/direct", server_url()))
+            .post(format!("{}/api/v1/payments/direct", server_url()))
             .json(&serde_json::json!({
                 "to": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
                 "amount": "1.000000"

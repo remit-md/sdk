@@ -53,7 +53,7 @@ pub(crate) fn chain_config(chain_key: &str) -> Option<ChainConfig> {
     match chain_key {
         "base" => Some(ChainConfig {
             chain_id: 8453,
-            api_url: "https://api.remit.md",
+            api_url: "https://remit.md",
             testnet: false,
         }),
         "base-sepolia" => Some(ChainConfig {

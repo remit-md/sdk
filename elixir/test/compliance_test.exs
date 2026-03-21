@@ -88,7 +88,7 @@ defmodule RemitMd.ComplianceTest do
   end
 
   defp fund_wallet(wallet_addr) do
-    {200, resp} = http_post("/api/v0/mint", %{wallet: wallet_addr, amount: 1000})
+    {200, resp} = http_post("/api/v1/mint", %{wallet: wallet_addr, amount: 1000})
     assert resp["tx_hash"] != nil, "mint response must contain tx_hash, got: #{inspect(resp)}"
   end
 
@@ -96,7 +96,7 @@ defmodule RemitMd.ComplianceTest do
     Wallet.new(
       private_key: private_key,
       chain: "base_sepolia",
-      api_url: @server_url <> "/api/v0",
+      api_url: @server_url <> "/api/v1",
       router_address: @router_address
     )
   end
@@ -123,7 +123,7 @@ defmodule RemitMd.ComplianceTest do
     else
       wallet = get_shared_payer()
 
-      # reputation/2 makes an authenticated GET to /api/v0/reputation/{address} —
+      # reputation/2 makes an authenticated GET to /api/v1/reputation/{address} —
       # this endpoint exists for all registered addresses and returns 401 if auth fails.
       {:ok, rep} = Wallet.reputation(wallet, wallet.address)
       assert rep != nil
@@ -135,7 +135,7 @@ defmodule RemitMd.ComplianceTest do
       :ok
     else
       {status, _body} =
-        http_post("/api/v0/payments/direct", %{
+        http_post("/api/v1/payments/direct", %{
           to: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
           amount: "1.000000"
         })

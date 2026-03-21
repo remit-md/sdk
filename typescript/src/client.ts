@@ -10,9 +10,9 @@ import type { Stream } from "./models/stream.js";
 import type { Bounty } from "./models/bounty.js";
 import type { Deposit } from "./models/deposit.js";
 const DEFAULT_API_URLS: Record<string, string> = {
-  base: "https://api.remit.md/api/v0",
-  "base-sepolia": "https://testnet.remit.md/api/v0",
-  localhost: "http://localhost:3000/api/v0",
+  base: "https://remit.md/api/v1",
+  "base-sepolia": "https://testnet.remit.md/api/v1",
+  localhost: "http://localhost:3000/api/v1",
 };
 
 export const CHAIN_IDS: Record<string, number> = {

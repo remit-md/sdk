@@ -69,7 +69,7 @@ func fetchContracts(t *testing.T) *testContracts {
 	if cachedContracts != nil {
 		return cachedContracts
 	}
-	resp, err := http.Get(acceptanceAPIURL + "/api/v0/contracts")
+	resp, err := http.Get(acceptanceAPIURL + "/api/v1/contracts")
 	if err != nil {
 		t.Fatalf("GET /contracts failed: %v", err)
 	}

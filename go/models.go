@@ -65,7 +65,7 @@ type PermitSignature struct {
 	S        string `json:"s"`
 }
 
-// ContractAddresses holds on-chain contract addresses returned by GET /api/v0/contracts.
+// ContractAddresses holds on-chain contract addresses returned by GET /api/v1/contracts.
 type ContractAddresses struct {
 	ChainID       int    `json:"chain_id"`
 	USDC          string `json:"usdc"`

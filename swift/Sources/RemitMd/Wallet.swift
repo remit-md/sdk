@@ -78,7 +78,7 @@ public final class RemitWallet: @unchecked Sendable {
         }
         cacheLock.unlock()
         let contracts: ContractAddresses = try await transport.request(
-            method: "GET", path: "/api/v0/contracts", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v1/contracts", body: Optional<EmptyBody>.none
         )
         cacheLock.lock()
         contractsCache = contracts
@@ -100,7 +100,7 @@ public final class RemitWallet: @unchecked Sendable {
             resolved = nil
         }
         return try await transport.request(
-            method: "POST", path: "/api/v0/payments/direct",
+            method: "POST", path: "/api/v1/payments/direct",
             body: PayBody(to: recipient, amount: amount, memo: memo, permit: resolved)
         )
     }
@@ -123,7 +123,7 @@ public final class RemitWallet: @unchecked Sendable {
         let invoiceId = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(32).lowercased()
         let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(32).lowercased()
         let _: InvoiceResponse = try await transport.request(
-            method: "POST", path: "/api/v0/invoices",
+            method: "POST", path: "/api/v1/invoices",
             body: InvoiceBody(
                 id: String(invoiceId), chain: chainName,
                 from_agent: signerAddress.lowercased(), to_agent: recipient.lowercased(),
@@ -134,32 +134,32 @@ public final class RemitWallet: @unchecked Sendable {
 
         // Step 2: fund the escrow.
         return try await transport.request(
-            method: "POST", path: "/api/v0/escrows",
+            method: "POST", path: "/api/v1/escrows",
             body: EscrowFundBody(invoice_id: String(invoiceId), permit: resolved)
         )
     }
 
     public func claimStart(id: String) async throws -> Escrow {
         return try await transport.request(
-            method: "POST", path: "/api/v0/escrows/\(id)/claim-start", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v1/escrows/\(id)/claim-start", body: Optional<EmptyBody>.none
         )
     }
 
     public func getEscrow(id: String) async throws -> Escrow {
         return try await transport.request(
-            method: "GET", path: "/api/v0/escrows/\(id)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v1/escrows/\(id)", body: Optional<EmptyBody>.none
         )
     }
 
     public func releaseEscrow(id: String) async throws -> Escrow {
         return try await transport.request(
-            method: "POST", path: "/api/v0/escrows/\(id)/release", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v1/escrows/\(id)/release", body: Optional<EmptyBody>.none
         )
     }
 
     public func cancelEscrow(id: String) async throws -> Escrow {
         return try await transport.request(
-            method: "POST", path: "/api/v0/escrows/\(id)/cancel", body: Optional<EmptyBody>.none
+            method: "POST", path: "/api/v1/escrows/\(id)/cancel", body: Optional<EmptyBody>.none
         )
     }
 
@@ -181,7 +181,7 @@ public final class RemitWallet: @unchecked Sendable {
         }
         let expiry = Int(Date().timeIntervalSince1970) + Int(expiresIn)
         return try await transport.request(
-            method: "POST", path: "/api/v0/tabs",
+            method: "POST", path: "/api/v1/tabs",
             body: TabBody(chain: chainName, provider: provider, limit_amount: limitAmount,
                           per_unit: perUnit, expiry: expiry, permit: resolved)
         )
@@ -192,7 +192,7 @@ public final class RemitWallet: @unchecked Sendable {
                           callCount: Int, providerSig: String) async throws -> TabCharge {
         try validateAmount(amount)
         return try await transport.request(
-            method: "POST", path: "/api/v0/tabs/\(id)/charge",
+            method: "POST", path: "/api/v1/tabs/\(id)/charge",
             body: ChargeTabBody(amount: amount, cumulative: cumulative,
                                 call_count: callCount, provider_sig: providerSig)
         )
@@ -201,7 +201,7 @@ public final class RemitWallet: @unchecked Sendable {
     /// Close a tab with optional final settlement amount and provider signature.
     public func closeTab(id: String, finalAmount: Double = 0, providerSig: String = "0x") async throws -> Tab {
         return try await transport.request(
-            method: "POST", path: "/api/v0/tabs/\(id)/close",
+            method: "POST", path: "/api/v1/tabs/\(id)/close",
             body: CloseTabBody(final_amount: finalAmount, provider_sig: providerSig)
         )
     }
@@ -225,7 +225,7 @@ public final class RemitWallet: @unchecked Sendable {
             resolved = nil
         }
         return try await transport.request(
-            method: "POST", path: "/api/v0/streams",
+            method: "POST", path: "/api/v1/streams",
             body: StreamBody(chain: chainName, payee: payee, rate_per_second: ratePerSecond,
                              max_total: maxTotal, permit: resolved)
         )
@@ -234,7 +234,7 @@ public final class RemitWallet: @unchecked Sendable {
     /// Close an active payment stream.
     public func closeStream(id: String) async throws -> Stream {
         return try await transport.request(
-            method: "POST", path: "/api/v0/streams/\(id)/close",
+            method: "POST", path: "/api/v1/streams/\(id)/close",
             body: EmptyObject()
         )
     }
@@ -257,7 +257,7 @@ public final class RemitWallet: @unchecked Sendable {
             resolved = nil
         }
         return try await transport.request(
-            method: "POST", path: "/api/v0/bounties",
+            method: "POST", path: "/api/v1/bounties",
             body: BountyBody(chain: chainName, amount: amount, task_description: taskDescription,
                              deadline: deadline, max_attempts: maxAttempts, permit: resolved)
         )
@@ -266,7 +266,7 @@ public final class RemitWallet: @unchecked Sendable {
     /// Submit evidence to claim a bounty.
     public func submitBounty(id: String, evidenceHash: String) async throws -> BountySubmission {
         return try await transport.request(
-            method: "POST", path: "/api/v0/bounties/\(id)/submit",
+            method: "POST", path: "/api/v1/bounties/\(id)/submit",
             body: SubmitBountyBody(evidence_hash: evidenceHash)
         )
     }
@@ -274,7 +274,7 @@ public final class RemitWallet: @unchecked Sendable {
     /// Award a bounty to a specific submission.
     public func awardBounty(id: String, submissionId: Int) async throws -> Bounty {
         return try await transport.request(
-            method: "POST", path: "/api/v0/bounties/\(id)/award",
+            method: "POST", path: "/api/v1/bounties/\(id)/award",
             body: AwardBody(submission_id: submissionId)
         )
     }
@@ -291,7 +291,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let s = submitter { params.append("submitter=\(s)") }
         let qs = params.joined(separator: "&")
         let resp: BountyListResponse = try await transport.request(
-            method: "GET", path: "/api/v0/bounties?\(qs)",
+            method: "GET", path: "/api/v1/bounties?\(qs)",
             body: Optional<EmptyBody>.none
         )
         return resp.data
@@ -314,7 +314,7 @@ public final class RemitWallet: @unchecked Sendable {
         }
         let expiry = Int(Date().timeIntervalSince1970) + Int(expiresIn)
         return try await transport.request(
-            method: "POST", path: "/api/v0/deposits",
+            method: "POST", path: "/api/v1/deposits",
             body: DepositBody(chain: chainName, provider: provider, amount: amount,
                               expiry: expiry, permit: resolved)
         )
@@ -323,7 +323,7 @@ public final class RemitWallet: @unchecked Sendable {
     /// Return a deposit to the payer (callable by provider).
     public func returnDeposit(id: String) async throws -> Transaction {
         return try await transport.request(
-            method: "POST", path: "/api/v0/deposits/\(id)/return",
+            method: "POST", path: "/api/v1/deposits/\(id)/return",
             body: EmptyObject()
         )
     }
@@ -334,7 +334,7 @@ public final class RemitWallet: @unchecked Sendable {
         try validateAddress(recipient)
         try validateAmount(amount)
         return try await transport.request(
-            method: "POST", path: "/api/v0/intent",
+            method: "POST", path: "/api/v1/intent",
             body: IntentBody(to: recipient, amount: amount, model: model)
         )
     }
@@ -344,35 +344,35 @@ public final class RemitWallet: @unchecked Sendable {
     public func balance(of address: String? = nil) async throws -> Balance {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/balance/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v1/balance/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
     public func reputation(of address: String? = nil) async throws -> Reputation {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/reputation/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v1/reputation/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
     public func spendingSummary(of address: String? = nil) async throws -> SpendingSummary {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/spending/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v1/spending/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
     public func history(of address: String? = nil) async throws -> TransactionList {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/history/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v1/history/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
     public func budget(of address: String? = nil) async throws -> Budget {
         let addr = address ?? signerAddress
         return try await transport.request(
-            method: "GET", path: "/api/v0/budget/\(addr)", body: Optional<EmptyBody>.none
+            method: "GET", path: "/api/v1/budget/\(addr)", body: Optional<EmptyBody>.none
         )
     }
 
@@ -598,7 +598,7 @@ public final class RemitWallet: @unchecked Sendable {
     ///   - chains: Optional chain names to filter by. Pass nil for all chains.
     public func registerWebhook(url: String, events: [String], chains: [String]? = nil) async throws -> Webhook {
         return try await transport.request(
-            method: "POST", path: "/api/v0/webhooks",
+            method: "POST", path: "/api/v1/webhooks",
             body: WebhookBody(url: url, events: events, chains: chains)
         )
     }
@@ -613,7 +613,7 @@ public final class RemitWallet: @unchecked Sendable {
         let body = LinkBody(messages: messages, agent_name: agentName)
         let hasContent = messages != nil || agentName != nil
         return try await transport.request(
-            method: "POST", path: "/api/v0/links/fund", body: hasContent ? body : Optional<LinkBody>.none
+            method: "POST", path: "/api/v1/links/fund", body: hasContent ? body : Optional<LinkBody>.none
         )
     }
 
@@ -625,7 +625,7 @@ public final class RemitWallet: @unchecked Sendable {
         let body = LinkBody(messages: messages, agent_name: agentName)
         let hasContent = messages != nil || agentName != nil
         return try await transport.request(
-            method: "POST", path: "/api/v0/links/withdraw", body: hasContent ? body : Optional<LinkBody>.none
+            method: "POST", path: "/api/v1/links/withdraw", body: hasContent ? body : Optional<LinkBody>.none
         )
     }
 
@@ -634,7 +634,7 @@ public final class RemitWallet: @unchecked Sendable {
     /// Mint testnet USDC via POST /mint. Max $2,500 per call, once per hour per wallet.
     public func mint(amount: Double) async throws -> MintResponse {
         return try await transport.request(
-            method: "POST", path: "/api/v0/mint",
+            method: "POST", path: "/api/v1/mint",
             body: MintBody(wallet: signerAddress, amount: amount)
         )
     }

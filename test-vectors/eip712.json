@@ -14,15 +14,15 @@
       },
       "message": {
         "method": "POST",
-        "path": "/api/v0/escrows",
+        "path": "/api/v1/escrows",
         "timestamp": 1741400000,
         "nonce": "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
       },
-      "signer": "0xf39Fd6e51aad88F6f4ce6aB8827279cffFb92266",
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       "expected_domain_separator": "0x12f2173a84c63b7869da5f77f24b1de4781ee21aa957a4593afdbed547986853",
-      "expected_struct_hash": "0x0ff72e6fd57d8a30d2f04934cb846a9b90b8d635ea6173c2bbbcf4663ebce987",
-      "expected_hash": "0x5128e1067782c3f878afeeeab079d90953cadb9e3289636a359cb60f7db60e1e",
-      "expected_signature": "0x212e1bd57500efed284d08bb7531ea752089f28aef4f8831d19814e6f03eabd354b038e4b679a59325ef4ef2d158b84f1197c699888d40508cdffad453998dbe1b"
+      "expected_struct_hash": "0xd1d739be5b7b5035be4e9cc41bddca1084b9bfc2ff136805b9373eb2fa708205",
+      "expected_hash": "0xf5a0d6dae638bc7974ebe98f0b0633746a39fb5ec338a7bc6c7695b7a476aa56",
+      "expected_signature": "0x8ea3f9c1036f0fd89807f0382cd083d5ea441bb72fe19d26373ef6bfde10fdfc76509dc4525bdb21b42e9e8bbd6c417e227d1cf6cbb3deabbaf8beaa1db5a9901c"
     },
     {
       "description": "GET request — method hash must differ from POST",
@@ -34,18 +34,18 @@
       },
       "message": {
         "method": "GET",
-        "path": "/api/v0/escrows",
+        "path": "/api/v1/escrows",
         "timestamp": 1741400000,
         "nonce": "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
       },
-      "signer": "0xf39Fd6e51aad88F6f4ce6aB8827279cffFb92266",
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       "expected_domain_separator": "0x12f2173a84c63b7869da5f77f24b1de4781ee21aa957a4593afdbed547986853",
-      "expected_struct_hash": "0x14b4d47370e653ef8eae618c55383b79cd4f86689b4572e1b5003c265e153895",
-      "expected_hash": "0x9562ff6f9a7db1df7482474fef4c10868fe37e123510cd33643bd231e296f1ff",
-      "expected_signature": "0x67ba480ae9a3f15090c00f4d03f6ff234c0ad7b177b2e17b04f4281252387fee730967761febfc8db13d3b857b850aa593a6f5f3bc5e024c1e1bf11b63a9fe2f1b"
+      "expected_struct_hash": "0xa28621defd34875c9f9e286afafdcfad45780a3f9180cf2aab233a5995307b40",
+      "expected_hash": "0xbdc05060d899f3c6a9396e2791fb6818bb8d69a6b2ab17909028bd1a793978dc",
+      "expected_signature": "0x17658ad135d9ebbc81781e3a59007eabca7061451ba5b62d2046b83fe7432c66724c02918798d0a3d1c11c5982bee8b844fdd6d9e5e95239e2a9ac9104c607a31b"
     },
     {
-      "description": "GET health — short path outside /api/v0/*",
+      "description": "GET health — short path outside /api/v1/*",
       "domain": {
         "name": "remit.md",
         "version": "0.1",
@@ -58,7 +58,7 @@
         "timestamp": 1741400000,
         "nonce": "0x0101010101010101010101010101010101010101010101010101010101010101"
       },
-      "signer": "0xf39Fd6e51aad88F6f4ce6aB8827279cffFb92266",
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       "expected_domain_separator": "0x12f2173a84c63b7869da5f77f24b1de4781ee21aa957a4593afdbed547986853",
       "expected_struct_hash": "0x7ff835c7db4b084bc3f8070d129c3a4b467e32a48b5253a43a6814fd27cad655",
       "expected_hash": "0x5ad90c2a79f6a7a7762f71e32bc88b7271c9ca9fe33dc7807755e6bd136755a5",
@@ -74,15 +74,15 @@
       },
       "message": {
         "method": "POST",
-        "path": "/api/v0/payments/direct",
+        "path": "/api/v1/payments/direct",
         "timestamp": 1741500000,
         "nonce": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
       },
-      "signer": "0xf39Fd6e51aad88F6f4ce6aB8827279cffFb92266",
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       "expected_domain_separator": "0x12f2173a84c63b7869da5f77f24b1de4781ee21aa957a4593afdbed547986853",
-      "expected_struct_hash": "0x4ccb6955176a09955979a09b9851dce2d65bba24abead77de3d5fc3335a2f868",
-      "expected_hash": "0xd1bd04d0aef8e2b50baa2eaec6e724353a44281a628cdb59f9c897f479c52dc2",
-      "expected_signature": "0xfdc9d61af67df3afc96178134fb4e5df056eca75d21dba7e778ef44eb615fe7827f3a2dd68b38894cb9557fd84b1c55f1890738bb4e0ffc8d365732d6a2837611c"
+      "expected_struct_hash": "0x05a1254fc92b6ab0cdee0216e44e22862aa50f20c1dd95949a0b53821119a8ca",
+      "expected_hash": "0xf23f0e09b8c3d919e8013380f9ca5504bbd94bbffe2efc7a911887f1cb04f86b",
+      "expected_signature": "0x6377676ebde0f3a58606d33380f7fc10917741accd2cdf19ae29764dc1bc0a656f618beb7a1a45567eb7b816d95964749a99ba01a2d30921469759f072477d1f1b"
     },
     {
       "description": "DELETE with UUID path segment — longer path",
@@ -94,15 +94,15 @@
       },
       "message": {
         "method": "DELETE",
-        "path": "/api/v0/escrows/550e8400-e29b-41d4-a716-446655440000",
+        "path": "/api/v1/escrows/550e8400-e29b-41d4-a716-446655440000",
         "timestamp": 1741600000,
         "nonce": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
       },
-      "signer": "0xf39Fd6e51aad88F6f4ce6aB8827279cffFb92266",
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       "expected_domain_separator": "0x12f2173a84c63b7869da5f77f24b1de4781ee21aa957a4593afdbed547986853",
-      "expected_struct_hash": "0xb6c09662671b9debef93645eab0b09d35483e9b3bb65e2ffae1c0101f19bea47",
-      "expected_hash": "0xd59e9a3f23781e7fab9d94371ff4fb1b8007316f46c198f373564416c8cf6847",
-      "expected_signature": "0x1ad3cf25b7145b81ca4f0d77201562c4172906ca777de554bd30ff6e99bebc12356a60a6938d2f443c9b7e196f3dc228759ee022ff3aafc9de5b08ab8c0db87d1b"
+      "expected_struct_hash": "0xbef81ba2d067df3777aeff4977e61e50a90c1548cb3873ac99276a49f3ce5416",
+      "expected_hash": "0x24d82f4790ac3ec969589181da810f02a06e4d72a6ee1e619b5be8bf288bc7fa",
+      "expected_signature": "0x069868e968c5f98cbc7241f26dee2f775badc18ca6e7a04425b904941a6a94dd221ef47b7732e9ec52ac27cc1b5fb7c145f9fe8128ef41d89d756378642957111b"
     },
     {
       "description": "Max timestamp (u64::MAX) — tests overflow safety in SDKs",
@@ -114,15 +114,15 @@
       },
       "message": {
         "method": "POST",
-        "path": "/api/v0/tabs",
+        "path": "/api/v1/tabs",
         "timestamp": 18446744073709551615,
         "nonce": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
       },
-      "signer": "0xf39Fd6e51aad88F6f4ce6aB8827279cffFb92266",
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       "expected_domain_separator": "0x12f2173a84c63b7869da5f77f24b1de4781ee21aa957a4593afdbed547986853",
-      "expected_struct_hash": "0xd07f78e564b7697431f90bca45df896a0e3ffeb3a83898d6c48de7cfe82be753",
-      "expected_hash": "0x989525cc121dfd10ff49487e8c4a3d17bb234a428e9c5870c43e1c2d8cd21e8f",
-      "expected_signature": "0x30b118a6712ee10c988f3943f1ffab6c2b03c19c574c4e92f6f7c5069faaaab62101f80653750cb10d82ec2e2088fcf594028e01e0a3803ad0a0f85fa91adc2b1b"
+      "expected_struct_hash": "0x317fbed59d38d2603e0d9890ab951af5e31654f540d4a47597ad289b77f15fbb",
+      "expected_hash": "0x4df321b3806e3b258738affca29e28ee910ed97c58f365760838665fd669a480",
+      "expected_signature": "0x6654df460d18c1c3a56e5fd090137b9980bcf7515483399090817c6bc97d849b7758106eff77b97da5d2a0e66907ceff27519b25d5e054621711cc3046d9ca791b"
     },
     {
       "description": "Nonce with leading zero bytes — must encode as full 32-byte value",
@@ -134,15 +134,15 @@
       },
       "message": {
         "method": "POST",
-        "path": "/api/v0/deposits",
+        "path": "/api/v1/deposits",
         "timestamp": 1741400000,
         "nonce": "0x0000000000000000cafebabe000000000000000000000000cafebabe00000001"
       },
-      "signer": "0xf39Fd6e51aad88F6f4ce6aB8827279cffFb92266",
+      "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       "expected_domain_separator": "0x12f2173a84c63b7869da5f77f24b1de4781ee21aa957a4593afdbed547986853",
-      "expected_struct_hash": "0xa3ee3fce693829e4c2f9faf732bea6ebcbe0758d3289bb2d726f1afd4dde4f2f",
-      "expected_hash": "0x3b9509d66b46052374f76a37a650c128ce62a350164914083dd4af86a70b4555",
-      "expected_signature": "0x42959b72e3f82d38511f54557b58ea7bcbf435e74c2b91f1abec7ae16a76188d16c45e6e95d90c07eeb601db7e4b5010183c24ca65973284b842f50893f6077b1b"
+      "expected_struct_hash": "0xfb11beed235e9d56d317061eec29405ef936f251b7a5078ad48e6ab3e1976873",
+      "expected_hash": "0x71ff64a1246c2485108adf4094492d1c7fb5f690f6deaa92336489fb9b8332a5",
+      "expected_signature": "0xe29dd05b4790b917295d2433c2ebd5075c19f22c82a7d1a252c6f72a5e490d022123ad12000544415589930d09d7e1f663d6621812ae69a5bad5740eacbfd8f51b"
     }
   ]
 }

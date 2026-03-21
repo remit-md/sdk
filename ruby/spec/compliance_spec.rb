@@ -51,7 +51,7 @@ module ComplianceHelpers
   end
 
   def fund_wallet(wallet_addr)
-    mint_resp = http_post("/api/v0/mint", { "wallet" => wallet_addr, "amount" => 1000 })
+    mint_resp = http_post("/api/v1/mint", { "wallet" => wallet_addr, "amount" => 1000 })
     data = JSON.parse(mint_resp.body)
     raise "mint failed: #{mint_resp.body}" unless data["tx_hash"]
   end
@@ -60,7 +60,7 @@ module ComplianceHelpers
     Remitmd::RemitWallet.new(
       private_key:    private_key,
       chain:          "base_sepolia",
-      api_url:        "#{COMPLIANCE_SERVER_URL}/api/v0",
+      api_url:        "#{COMPLIANCE_SERVER_URL}/api/v1",
       router_address: COMPLIANCE_ROUTER_ADDR
     )
   end
@@ -89,14 +89,14 @@ RSpec.describe "Ruby SDK compliance" do
     it "authenticated request returns balance, not 401" do
       pk, _addr = register_and_get_key
       wallet = make_wallet(pk)
-      # reputation() makes an authenticated GET to /api/v0/reputation/{address} —
+      # reputation() makes an authenticated GET to /api/v1/reputation/{address} —
       # this endpoint exists for all registered addresses and returns 401 if auth fails.
       rep = wallet.reputation(wallet.address)
       expect(rep).not_to be_nil
     end
 
     it "unauthenticated POST /payments/direct returns 401" do
-      resp = http_post("/api/v0/payments/direct",
+      resp = http_post("/api/v1/payments/direct",
         { "to" => "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "amount" => "1.000000" })
       expect(resp.code.to_i).to eq(401)
     end

@@ -83,7 +83,7 @@ final class ComplianceTests: XCTestCase {
     private static func fundWallet(_ walletAddr: String) async throws {
         let resp = try await httpJSON(
             method: "POST",
-            path: "/api/v0/mint",
+            path: "/api/v1/mint",
             body: ["wallet": walletAddr, "amount": 1000]
         )
         guard resp["tx_hash"] is String else {
@@ -128,7 +128,7 @@ final class ComplianceTests: XCTestCase {
     func testCompliance_UnauthenticatedRequest_Returns401() async throws {
         guard await Self.isServerAvailable() else { return }
 
-        let url = URL(string: Self.serverURL + "/api/v0/payments/direct")!
+        let url = URL(string: Self.serverURL + "/api/v1/payments/direct")!
         var req = URLRequest(url: url, timeoutInterval: 5)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")

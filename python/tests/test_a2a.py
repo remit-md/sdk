@@ -51,7 +51,7 @@ CARD_DATA: dict[str, Any] = {
         },
     ],
     "x402": {
-        "settleEndpoint": "https://remit.md/api/v0/x402/settle",
+        "settleEndpoint": "https://remit.md/api/v1/x402/settle",
         "assets": {"eip155:8453": "0xUSDC"},
         "fees": {"standardBps": 100, "preferredBps": 50, "cliffUsd": 10000},
     },

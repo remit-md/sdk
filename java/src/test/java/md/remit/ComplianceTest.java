@@ -123,7 +123,7 @@ class ComplianceTest {
     private static void fundWallet(String walletAddress) throws Exception {
         String body = MAPPER.writeValueAsString(
             java.util.Map.of("wallet", walletAddress, "amount", 1000));
-        JsonNode resp = MAPPER.readTree(post("/api/v0/mint", body, null));
+        JsonNode resp = MAPPER.readTree(post("/api/v1/mint", body, null));
         assertThat(resp.has("tx_hash"))
             .as("mint response must contain tx_hash, got: " + resp)
             .isTrue();
@@ -163,7 +163,7 @@ class ComplianceTest {
             .routerAddress(ROUTER_ADDRESS)
             .build();
 
-        // reputation() makes an authenticated GET to /api/v0/reputation/{address} —
+        // reputation() makes an authenticated GET to /api/v1/reputation/{address} —
         // this endpoint exists for all registered addresses and returns 401 if auth fails.
         var rep = wallet.reputation(wallet.address());
         assertThat(rep).as("reputation() must not throw 401").isNotNull();
@@ -174,7 +174,7 @@ class ComplianceTest {
         assumeTrue(serverAvailable, "Compliance server not reachable at " + SERVER_URL);
 
         HttpRequest req = HttpRequest.newBuilder()
-            .uri(URI.create(SERVER_URL + "/api/v0/payments/direct"))
+            .uri(URI.create(SERVER_URL + "/api/v1/payments/direct"))
             .timeout(Duration.ofSeconds(5))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(

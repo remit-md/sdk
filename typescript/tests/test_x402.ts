@@ -252,7 +252,7 @@ describe("X402Client.fetch — 402 handling", () => {
     const signer = new PrivateKeySigner(TEST_KEY);
     const header402 = makePaymentRequired({
       amount: "1000",
-      resource: "/api/v0/premium",
+      resource: "/api/v1/premium",
       description: "Access to premium data",
       mimeType: "application/json",
     });
@@ -265,13 +265,13 @@ describe("X402Client.fetch — 402 handling", () => {
     const orig = globalThis.fetch;
     try {
       (globalThis as Record<string, unknown>)["fetch"] = fetchFn;
-      await client.fetch("http://example.com/api/v0/premium");
+      await client.fetch("http://example.com/api/v1/premium");
     } finally {
       globalThis.fetch = orig;
     }
 
     assert.ok(client.lastPayment, "lastPayment must be set after payment");
-    assert.equal(client.lastPayment!.resource, "/api/v0/premium");
+    assert.equal(client.lastPayment!.resource, "/api/v1/premium");
     assert.equal(client.lastPayment!.description, "Access to premium data");
     assert.equal(client.lastPayment!.mimeType, "application/json");
   });

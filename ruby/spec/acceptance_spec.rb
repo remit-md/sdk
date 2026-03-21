@@ -28,7 +28,7 @@ CHAIN_ID = 84532
 
 def fetch_contracts
   @contracts_cache ||= begin
-    uri = URI("#{API_URL}/api/v0/contracts")
+    uri = URI("#{API_URL}/api/v1/contracts")
     resp = Net::HTTP.get_response(uri)
     raise "GET /contracts: #{resp.code} #{resp.body}" unless resp.code == "200"
     JSON.parse(resp.body)
@@ -38,8 +38,8 @@ end
 def create_test_wallet
   key_hex = SecureRandom.hex(32)
   contracts = fetch_contracts
-  # Ruby SDK paths don't include /api/v0, so base URL must include it.
-  base_url = API_URL.end_with?("/api/v0") ? API_URL : "#{API_URL}/api/v0"
+  # Ruby SDK paths don't include /api/v1, so base URL must include it.
+  base_url = API_URL.end_with?("/api/v1") ? API_URL : "#{API_URL}/api/v1"
   wallet = Remitmd::RemitWallet.new(
     private_key: "0x#{key_hex}",
     chain: "base_sepolia",
@@ -432,7 +432,7 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
         "amount"      => "1000",              # $0.001 USDC in base units
         "network"     => "eip155:84532",
         "asset"       => USDC_ADDRESS,
-        "facilitator" => "#{API_URL}/api/v0",
+        "facilitator" => "#{API_URL}/api/v1",
         "maxTimeout"  => 60,
         "resource"    => "/v1/data",
         "description" => "Test data endpoint",

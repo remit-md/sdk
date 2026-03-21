@@ -24,8 +24,8 @@ public sealed class Wallet
     // Chain → API base URL map
     private static readonly Dictionary<string, (long ChainId, string ApiUrl)> Chains = new()
     {
-        ["base"]               = (8453,  "https://api.remit.md"),
-        ["base-sepolia"]       = (84532, "https://api-sepolia.remit.md"),
+        ["base"]               = (8453,  "https://remit.md"),
+        ["base-sepolia"]       = (84532, "https://testnet.remit.md"),
     };
 
     // Chain → USDC contract address
@@ -155,25 +155,25 @@ public sealed class Wallet
             ["signature"] = "0x",
             ["permit"]    = permit,
         };
-        return await _transport.PostAsync<Transaction>("/api/v0/payments/direct", body, ct);
+        return await _transport.PostAsync<Transaction>("/api/v1/payments/direct", body, ct);
     }
 
     // ─── Balance & reputation ─────────────────────────────────────────────────
 
     /// <summary>Returns the current USDC balance for this wallet.</summary>
     public Task<Balance> BalanceAsync(CancellationToken ct = default) =>
-        _transport.GetAsync<Balance>($"/api/v0/status/{Address}", ct);
+        _transport.GetAsync<Balance>($"/api/v1/status/{Address}", ct);
 
     /// <summary>Returns the payment history for this wallet (newest first).</summary>
     /// <param name="page">Page number (1-based).</param>
     /// <param name="perPage">Results per page (max 100).</param>
     public Task<TransactionList> HistoryAsync(int page = 1, int perPage = 20, CancellationToken ct = default) =>
-        _transport.GetAsync<TransactionList>($"/api/v0/invoices?page={page}&per_page={perPage}", ct);
+        _transport.GetAsync<TransactionList>($"/api/v1/invoices?page={page}&per_page={perPage}", ct);
 
     /// <summary>Returns the reputation score for any Ethereum address.</summary>
     /// <param name="address">Address to look up (defaults to this wallet's address).</param>
     public Task<Reputation> ReputationAsync(string? address = null, CancellationToken ct = default) =>
-        _transport.GetAsync<Reputation>($"/api/v0/reputation/{address ?? Address}", ct);
+        _transport.GetAsync<Reputation>($"/api/v1/reputation/{address ?? Address}", ct);
 
     // ─── Escrow ───────────────────────────────────────────────────────────────
 
@@ -217,7 +217,7 @@ public sealed class Wallet
             var secs = (int)(expiresAt.Value - DateTimeOffset.UtcNow).TotalSeconds;
             invoiceBody["escrow_timeout"] = secs;
         }
-        await _transport.PostAsync<object>("/api/v0/invoices", invoiceBody, ct);
+        await _transport.PostAsync<object>("/api/v1/invoices", invoiceBody, ct);
 
         // Step 2: fund the escrow.
         permit ??= await AutoPermitAsync("escrow", amount);
@@ -226,24 +226,24 @@ public sealed class Wallet
             ["invoice_id"] = invoiceId,
             ["permit"]     = permit,
         };
-        return await _transport.PostAsync<Escrow>("/api/v0/escrows", escrowBody, ct);
+        return await _transport.PostAsync<Escrow>("/api/v1/escrows", escrowBody, ct);
     }
 
     /// <summary>Releases escrow funds to the payee after work is approved.</summary>
     public Task<Transaction> ReleaseEscrowAsync(string escrowId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/api/v0/escrows/{escrowId}/release", new { }, ct);
+        _transport.PostAsync<Transaction>($"/api/v1/escrows/{escrowId}/release", new { }, ct);
 
     /// <summary>Cancels an unfunded escrow and returns funds to the payer.</summary>
     public Task<Transaction> CancelEscrowAsync(string escrowId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/api/v0/escrows/{escrowId}/cancel", new { }, ct);
+        _transport.PostAsync<Transaction>($"/api/v1/escrows/{escrowId}/cancel", new { }, ct);
 
     /// <summary>Signals the provider has started work on an escrow.</summary>
     public Task<Escrow> ClaimStartAsync(string escrowId, CancellationToken ct = default) =>
-        _transport.PostAsync<Escrow>($"/api/v0/escrows/{escrowId}/claim-start", new { }, ct);
+        _transport.PostAsync<Escrow>($"/api/v1/escrows/{escrowId}/claim-start", new { }, ct);
 
     /// <summary>Retrieves the current state of an escrow.</summary>
     public Task<Escrow> GetEscrowAsync(string escrowId, CancellationToken ct = default) =>
-        _transport.GetAsync<Escrow>($"/api/v0/escrows/{escrowId}", ct);
+        _transport.GetAsync<Escrow>($"/api/v1/escrows/{escrowId}", ct);
 
     // ─── Tab (micro-payment channel) ──────────────────────────────────────────
 
@@ -275,7 +275,7 @@ public sealed class Wallet
             ["expiry"]       = expiry,
             ["permit"]       = permit,
         };
-        return await _transport.PostAsync<Tab>("/api/v0/tabs", body, ct);
+        return await _transport.PostAsync<Tab>("/api/v1/tabs", body, ct);
     }
 
     /// <summary>Charges an amount against an open Tab with a provider EIP-712 signature.</summary>
@@ -293,7 +293,7 @@ public sealed class Wallet
         CancellationToken ct = default)
     {
         ValidateAmount(amount);
-        return _transport.PostAsync<TabCharge>($"/api/v0/tabs/{tabId}/charge", new Dictionary<string, object?>
+        return _transport.PostAsync<TabCharge>($"/api/v1/tabs/{tabId}/charge", new Dictionary<string, object?>
         {
             ["amount"]       = amount.ToString("F6"),
             ["cumulative"]   = cumulative.ToString("F6"),
@@ -311,7 +311,7 @@ public sealed class Wallet
         decimal finalAmount = 0,
         string providerSig = "0x",
         CancellationToken ct = default) =>
-        _transport.PostAsync<Tab>($"/api/v0/tabs/{tabId}/close", new Dictionary<string, object?>
+        _transport.PostAsync<Tab>($"/api/v1/tabs/{tabId}/close", new Dictionary<string, object?>
         {
             ["final_amount"] = finalAmount.ToString("F6"),
             ["provider_sig"] = providerSig,
@@ -389,12 +389,12 @@ public sealed class Wallet
             ["max_total"]       = maxTotal.ToString("F6"),
             ["permit"]          = permit,
         };
-        return await _transport.PostAsync<Stream>("/api/v0/streams", body, ct);
+        return await _transport.PostAsync<Stream>("/api/v1/streams", body, ct);
     }
 
     /// <summary>Closes a stream, stopping further payments and settling on-chain.</summary>
     public Task<Transaction> CloseStreamAsync(string streamId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/api/v0/streams/{streamId}/close", new { }, ct);
+        _transport.PostAsync<Transaction>($"/api/v1/streams/{streamId}/close", new { }, ct);
 
     // ─── Bounty ───────────────────────────────────────────────────────────────
 
@@ -425,7 +425,7 @@ public sealed class Wallet
             ["max_attempts"]     = maxAttempts,
             ["permit"]           = permit,
         };
-        return await _transport.PostAsync<Bounty>("/api/v0/bounties", body, ct);
+        return await _transport.PostAsync<Bounty>("/api/v1/bounties", body, ct);
     }
 
     /// <summary>Submits evidence for a bounty.</summary>
@@ -436,14 +436,14 @@ public sealed class Wallet
         string bountyId,
         string evidenceHash,
         CancellationToken ct = default) =>
-        _transport.PostAsync<BountySubmission>($"/api/v0/bounties/{bountyId}/submit",
+        _transport.PostAsync<BountySubmission>($"/api/v1/bounties/{bountyId}/submit",
             new Dictionary<string, object?> { ["evidence_hash"] = evidenceHash }, ct);
 
     /// <summary>Awards a bounty to a specific submission (poster-only).</summary>
     /// <param name="bountyId">Bounty identifier.</param>
     /// <param name="submissionId">Integer ID of the winning submission.</param>
     public Task<Bounty> AwardBountyAsync(string bountyId, int submissionId, CancellationToken ct = default) =>
-        _transport.PostAsync<Bounty>($"/api/v0/bounties/{bountyId}/award",
+        _transport.PostAsync<Bounty>($"/api/v1/bounties/{bountyId}/award",
             new Dictionary<string, object?> { ["submission_id"] = submissionId }, ct);
 
     /// <summary>Lists bounties, optionally filtered by status, poster, or submitter.</summary>
@@ -458,7 +458,7 @@ public sealed class Wallet
         int limit = 20,
         CancellationToken ct = default)
     {
-        var sb = new System.Text.StringBuilder($"/api/v0/bounties?limit={limit}");
+        var sb = new System.Text.StringBuilder($"/api/v1/bounties?limit={limit}");
         if (!string.IsNullOrEmpty(status)) sb.Append($"&status={status}");
         if (!string.IsNullOrEmpty(poster)) sb.Append($"&poster={poster}");
         if (!string.IsNullOrEmpty(submitter)) sb.Append($"&submitter={submitter}");
@@ -499,23 +499,23 @@ public sealed class Wallet
             ["expiry"]   = expiry,
             ["permit"]   = permit,
         };
-        return await _transport.PostAsync<Deposit>("/api/v0/deposits", body, ct);
+        return await _transport.PostAsync<Deposit>("/api/v1/deposits", body, ct);
     }
 
     /// <summary>Returns a deposit to the depositor (provider-side, no fee).</summary>
     public Task<Transaction> ReturnDepositAsync(string depositId, CancellationToken ct = default) =>
-        _transport.PostAsync<Transaction>($"/api/v0/deposits/{depositId}/return", new { }, ct);
+        _transport.PostAsync<Transaction>($"/api/v1/deposits/{depositId}/return", new { }, ct);
 
     // ─── Analytics & budget ───────────────────────────────────────────────────
 
     /// <summary>Returns spending analytics for the given period.</summary>
     /// <param name="period">"day", "week", or "month".</param>
     public Task<SpendingSummary> SpendingSummaryAsync(string period = "day", CancellationToken ct = default) =>
-        _transport.GetAsync<SpendingSummary>($"/api/v0/invoices?period={period}", ct);
+        _transport.GetAsync<SpendingSummary>($"/api/v1/invoices?period={period}", ct);
 
     /// <summary>Returns remaining spending capacity under operator-set budget limits.</summary>
     public Task<Budget> RemainingBudgetAsync(CancellationToken ct = default) =>
-        _transport.GetAsync<Budget>($"/api/v0/status/{Address}", ct);
+        _transport.GetAsync<Budget>($"/api/v1/status/{Address}", ct);
 
     /// <summary>Proposes a payment intent for negotiation with a counterpart.</summary>
     public Task<Intent> ProposeIntentAsync(
@@ -526,7 +526,7 @@ public sealed class Wallet
     {
         ValidateAddress(to, nameof(to));
         ValidateAmount(amount);
-        return _transport.PostAsync<Intent>("/api/v0/invoices", new
+        return _transport.PostAsync<Intent>("/api/v1/invoices", new
         {
             to,
             amount = amount.ToString("F6"),
@@ -546,7 +546,7 @@ public sealed class Wallet
         IEnumerable<string> events,
         IEnumerable<string>? chains = null,
         CancellationToken ct = default)
-        => _transport.PostAsync<Webhook>("/api/v0/webhooks", new
+        => _transport.PostAsync<Webhook>("/api/v1/webhooks", new
         {
             url,
             events = events.ToList(),
@@ -563,7 +563,7 @@ public sealed class Wallet
         var body = new Dictionary<string, object>();
         if (messages is { Length: > 0 }) body["messages"] = messages;
         if (!string.IsNullOrEmpty(agentName)) body["agent_name"] = agentName!;
-        return _transport.PostAsync<LinkResponse>("/api/v0/links/fund", body, ct);
+        return _transport.PostAsync<LinkResponse>("/api/v1/links/fund", body, ct);
     }
 
     /// <summary>Generates a one-time URL for the operator to withdraw funds.</summary>
@@ -574,7 +574,7 @@ public sealed class Wallet
         var body = new Dictionary<string, object>();
         if (messages is { Length: > 0 }) body["messages"] = messages;
         if (!string.IsNullOrEmpty(agentName)) body["agent_name"] = agentName!;
-        return _transport.PostAsync<LinkResponse>("/api/v0/links/withdraw", body, ct);
+        return _transport.PostAsync<LinkResponse>("/api/v1/links/withdraw", body, ct);
     }
 
     // ─── Contracts ─────────────────────────────────────────────────────────
@@ -583,7 +583,7 @@ public sealed class Wallet
     public async Task<ContractAddresses> GetContractsAsync(CancellationToken ct = default)
     {
         if (_cachedContracts is not null) return _cachedContracts;
-        _cachedContracts = await _transport.GetAsync<ContractAddresses>("/api/v0/contracts", ct);
+        _cachedContracts = await _transport.GetAsync<ContractAddresses>("/api/v1/contracts", ct);
         return _cachedContracts;
     }
 
@@ -594,7 +594,7 @@ public sealed class Wallet
     public Task<MintResponse> MintAsync(decimal amount, CancellationToken ct = default)
     {
         ValidateAmount(amount);
-        return _transport.PostAsync<MintResponse>("/api/v0/mint", new
+        return _transport.PostAsync<MintResponse>("/api/v1/mint", new
         {
             wallet = Address,
             amount = amount.ToString("F6"),

@@ -150,7 +150,7 @@ func getSharedPayer(t *testing.T) *remitmd.Wallet {
 	oncePayer.Do(func() {
 		pk, addr := registerAndGetWalletC(t)
 		// Fund with 1000 USDC via direct HTTP — mint is public (no EIP-712 auth required).
-		resp := doJSONC(t, "POST", compServerURL+"/api/v0/mint", map[string]any{
+		resp := doJSONC(t, "POST", compServerURL+"/api/v1/mint", map[string]any{
 			"wallet": addr,
 			"amount": 1000,
 		}, "")

@@ -15,7 +15,7 @@ from remitmd.models.tab import Tab
 
 
 class ContractAddresses(TypedDict):
-    """On-chain contract addresses returned by GET /api/v0/contracts."""
+    """On-chain contract addresses returned by GET /api/v1/contracts."""
 
     chain_id: int
     usdc: str
@@ -60,38 +60,38 @@ class RemitClient:
         """Return on-chain contract addresses (cached after first call)."""
         if self._contracts_cache is not None:
             return self._contracts_cache
-        data = await self._http.get("/api/v0/contracts")
+        data = await self._http.get("/api/v1/contracts")
         self._contracts_cache = cast(ContractAddresses, data)
         return self._contracts_cache
 
     # ─── Invoices ─────────────────────────────────────────────────────────────
 
     async def get_invoice(self, invoice_id: str) -> Invoice:
-        data = await self._http.get(f"/api/v0/invoices/{invoice_id}")
+        data = await self._http.get(f"/api/v1/invoices/{invoice_id}")
         return Invoice.model_validate(data)
 
     # ─── Escrows ──────────────────────────────────────────────────────────────
 
     async def get_escrow(self, invoice_id: str) -> Escrow:
-        data = await self._http.get(f"/api/v0/escrows/{invoice_id}")
+        data = await self._http.get(f"/api/v1/escrows/{invoice_id}")
         return Escrow.model_validate(data)
 
     # ─── Tabs ─────────────────────────────────────────────────────────────────
 
     async def get_tab(self, tab_id: str) -> Tab:
-        data = await self._http.get(f"/api/v0/tabs/{tab_id}")
+        data = await self._http.get(f"/api/v1/tabs/{tab_id}")
         return Tab.model_validate(data)
 
     # ─── Streams ──────────────────────────────────────────────────────────────
 
     async def get_stream(self, stream_id: str) -> Stream:
-        data = await self._http.get(f"/api/v0/streams/{stream_id}")
+        data = await self._http.get(f"/api/v1/streams/{stream_id}")
         return Stream.model_validate(data)
 
     # ─── Bounties ─────────────────────────────────────────────────────────────
 
     async def get_bounty(self, bounty_id: str) -> Bounty:
-        data = await self._http.get(f"/api/v0/bounties/{bounty_id}")
+        data = await self._http.get(f"/api/v1/bounties/{bounty_id}")
         return Bounty.model_validate(data)
 
     async def list_bounties(
@@ -106,32 +106,32 @@ class RemitClient:
             kwargs["poster"] = poster
         if submitter is not None:
             kwargs["submitter"] = submitter
-        data = await self._http.get("/api/v0/bounties", **kwargs)
+        data = await self._http.get("/api/v1/bounties", **kwargs)
         items: list[dict[str, object]] = data.get("items", []) if isinstance(data, dict) else data
         return [Bounty.model_validate(d) for d in items]
 
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
     async def get_deposit(self, deposit_id: str) -> Deposit:
-        data = await self._http.get(f"/api/v0/deposits/{deposit_id}")
+        data = await self._http.get(f"/api/v1/deposits/{deposit_id}")
         return Deposit.model_validate(data)
 
     # ─── Wallet status ────────────────────────────────────────────────────────
 
     async def get_status(self, wallet: str) -> WalletStatus:
-        data = await self._http.get(f"/api/v0/status/{wallet}")
+        data = await self._http.get(f"/api/v1/status/{wallet}")
         return WalletStatus.model_validate(data)
 
     # ─── Reputation ───────────────────────────────────────────────────────────
 
     async def get_reputation(self, wallet: str) -> Reputation:
-        data = await self._http.get(f"/api/v0/reputation/{wallet}")
+        data = await self._http.get(f"/api/v1/reputation/{wallet}")
         return Reputation.model_validate(data)
 
     # ─── Webhooks (read-only) ─────────────────────────────────────────────────
 
     async def get_webhook(self, webhook_id: str) -> Webhook:
-        data = await self._http.get(f"/api/v0/webhooks/{webhook_id}")
+        data = await self._http.get(f"/api/v1/webhooks/{webhook_id}")
         return Webhook.model_validate(data)
 
     # ─── Lifecycle ────────────────────────────────────────────────────────────

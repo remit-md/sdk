@@ -265,7 +265,7 @@ class Wallet(RemitClient):
         }
         if resolved is not None:
             body["permit"] = resolved.to_dict()
-        data = await self._http.post("/api/v0/payments/direct", body)
+        data = await self._http.post("/api/v1/payments/direct", body)
         return Transaction.model_validate(data)
 
     # ─── Escrow ───────────────────────────────────────────────────────────────
@@ -295,19 +295,19 @@ class Wallet(RemitClient):
         }
         if invoice.timeout:
             inv_body["escrow_timeout"] = invoice.timeout
-        await self._http.post("/api/v0/invoices", inv_body)
+        await self._http.post("/api/v1/invoices", inv_body)
 
         # Step 2: fund the escrow.
         resolved = permit or await self._auto_permit("escrow", invoice.amount)
         escrow_body: dict[str, Any] = {"invoice_id": invoice_id}
         if resolved is not None:
             escrow_body["permit"] = resolved.to_dict()
-        data = await self._http.post("/api/v0/escrows", escrow_body)
+        data = await self._http.post("/api/v1/escrows", escrow_body)
         return Escrow.model_validate(data)
 
     async def claim_start(self, invoice_id: str) -> Escrow:
         """Payee calls this to start work and begin the escrow timer."""
-        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/claim-start", {})
+        data = await self._http.post(f"/api/v1/escrows/{invoice_id}/claim-start", {})
         return Escrow.model_validate(data)
 
     async def submit_evidence(
@@ -316,24 +316,24 @@ class Wallet(RemitClient):
         evidence_uri: str,
     ) -> Escrow:
         data = await self._http.post(
-            f"/api/v0/escrows/{invoice_id}/claim-start",
+            f"/api/v1/escrows/{invoice_id}/claim-start",
             {"evidence_uri": evidence_uri},
         )
         return Escrow.model_validate(data)
 
     async def release_escrow(self, invoice_id: str) -> Escrow:
-        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/release", {})
+        data = await self._http.post(f"/api/v1/escrows/{invoice_id}/release", {})
         return Escrow.model_validate(data)
 
     async def release_milestone(self, invoice_id: str, milestone_index: int) -> Escrow:
         data = await self._http.post(
-            f"/api/v0/escrows/{invoice_id}/release",
+            f"/api/v1/escrows/{invoice_id}/release",
             {"milestone_ids": [str(milestone_index)]},
         )
         return Escrow.model_validate(data)
 
     async def cancel_escrow(self, invoice_id: str) -> Escrow:
-        data = await self._http.post(f"/api/v0/escrows/{invoice_id}/cancel", {})
+        data = await self._http.post(f"/api/v1/escrows/{invoice_id}/cancel", {})
         return Escrow.model_validate(data)
 
     # ─── Metered tabs ─────────────────────────────────────────────────────────
@@ -357,7 +357,7 @@ class Wallet(RemitClient):
         }
         if resolved is not None:
             body["permit"] = resolved.to_dict()
-        data = await self._http.post("/api/v0/tabs", body)
+        data = await self._http.post("/api/v1/tabs", body)
         return Tab.model_validate(data)
 
     async def charge_tab(
@@ -370,7 +370,7 @@ class Wallet(RemitClient):
     ) -> TabCharge:
         """Provider-side: charge a tab with an EIP-712 TabCharge signature."""
         data = await self._http.post(
-            f"/api/v0/tabs/{tab_id}/charge",
+            f"/api/v1/tabs/{tab_id}/charge",
             {
                 "amount": amount,
                 "cumulative": cumulative,
@@ -387,7 +387,7 @@ class Wallet(RemitClient):
         provider_sig: str = "0x",
     ) -> Tab:
         data = await self._http.post(
-            f"/api/v0/tabs/{tab_id}/close",
+            f"/api/v1/tabs/{tab_id}/close",
             {"final_amount": final_amount, "provider_sig": provider_sig},
         )
         return Tab.model_validate(data)
@@ -453,11 +453,11 @@ class Wallet(RemitClient):
         }
         if resolved is not None:
             body["permit"] = resolved.to_dict()
-        data = await self._http.post("/api/v0/streams", body)
+        data = await self._http.post("/api/v1/streams", body)
         return Stream.model_validate(data)
 
     async def close_stream(self, stream_id: str) -> Transaction:
-        data = await self._http.post(f"/api/v0/streams/{stream_id}/close")
+        data = await self._http.post(f"/api/v1/streams/{stream_id}/close")
         return Transaction.model_validate(data)
 
     # ─── Bounties ─────────────────────────────────────────────────────────────
@@ -480,7 +480,7 @@ class Wallet(RemitClient):
         }
         if resolved is not None:
             body["permit"] = resolved.to_dict()
-        data = await self._http.post("/api/v0/bounties", body)
+        data = await self._http.post("/api/v1/bounties", body)
         return Bounty.model_validate(data)
 
     async def submit_bounty(
@@ -494,7 +494,7 @@ class Wallet(RemitClient):
         if evidence_uri is not None:
             body["evidence_uri"] = evidence_uri
         result: dict[str, Any] = await self._http.post(
-            f"/api/v0/bounties/{bounty_id}/submit",
+            f"/api/v1/bounties/{bounty_id}/submit",
             body,
         )
         return result
@@ -502,7 +502,7 @@ class Wallet(RemitClient):
     async def award_bounty(self, bounty_id: str, submission_id: int) -> Bounty:
         """Award a bounty to a specific submission (poster-only)."""
         data = await self._http.post(
-            f"/api/v0/bounties/{bounty_id}/award",
+            f"/api/v1/bounties/{bounty_id}/award",
             {"submission_id": submission_id},
         )
         return Bounty.model_validate(data)
@@ -526,12 +526,12 @@ class Wallet(RemitClient):
         }
         if resolved is not None:
             body["permit"] = resolved.to_dict()
-        data = await self._http.post("/api/v0/deposits", body)
+        data = await self._http.post("/api/v1/deposits", body)
         return Deposit.model_validate(data)
 
     async def return_deposit(self, deposit_id: str) -> Transaction:
         """Provider returns a deposit (full refund to depositor, no fee)."""
-        data = await self._http.post(f"/api/v0/deposits/{deposit_id}/return", {})
+        data = await self._http.post(f"/api/v1/deposits/{deposit_id}/return", {})
         return Transaction.model_validate(data)
 
     # ─── Events ───────────────────────────────────────────────────────────────
@@ -567,7 +567,7 @@ class Wallet(RemitClient):
             body["messages"] = messages
         if agent_name is not None:
             body["agent_name"] = agent_name
-        data = await self._http.post("/api/v0/links/fund", body)
+        data = await self._http.post("/api/v1/links/fund", body)
         return LinkResponse.model_validate(data)
 
     async def create_withdraw_link(
@@ -586,7 +586,7 @@ class Wallet(RemitClient):
             body["messages"] = messages
         if agent_name is not None:
             body["agent_name"] = agent_name
-        data = await self._http.post("/api/v0/links/withdraw", body)
+        data = await self._http.post("/api/v1/links/withdraw", body)
         return LinkResponse.model_validate(data)
 
     # ─── Webhooks ─────────────────────────────────────────────────────────────
@@ -600,7 +600,7 @@ class Wallet(RemitClient):
         body: dict[str, Any] = {"url": url, "events": events}
         if chains is not None:
             body["chains"] = chains
-        data = await self._http.post("/api/v0/webhooks", body)
+        data = await self._http.post("/api/v1/webhooks", body)
         return Webhook.model_validate(data)
 
     # ─── Testnet ──────────────────────────────────────────────────────────────
@@ -608,7 +608,7 @@ class Wallet(RemitClient):
     async def request_testnet_funds(self) -> Transaction:
         if not self.testnet:
             raise ValueError("request_testnet_funds() is only available on testnet")
-        data = await self._http.post("/api/v0/faucet", {"wallet": self.address})
+        data = await self._http.post("/api/v1/faucet", {"wallet": self.address})
         # Server returns FaucetResponse {tx_hash, amount, recipient} — not a full Transaction.
         return Transaction(
             tx_hash=data.get("tx_hash"),
@@ -623,7 +623,7 @@ class Wallet(RemitClient):
 
         # Mint is a public endpoint — use raw HTTP without auth.
         base = self._http._base_url.rstrip("/")
-        url = f"{base}/api/v0/mint" if "/api/v0" not in base else f"{base}/mint"
+        url = f"{base}/api/v1/mint" if "/api/v1" not in base else f"{base}/mint"
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(

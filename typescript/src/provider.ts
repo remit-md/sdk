@@ -51,7 +51,7 @@ export interface PaywallOptions {
   asset: string;
   /** Base URL of the remit.md facilitator (default: `"https://remit.md"`). */
   facilitatorUrl?: string;
-  /** Bearer JWT for authenticating calls to `/api/v0/x402/verify`. */
+  /** Bearer JWT for authenticating calls to `/api/v1/x402/verify`. */
   facilitatorToken?: string;
   /** How long the payment authorization remains valid in seconds (default: 60). */
   maxTimeoutSeconds?: number;
@@ -137,7 +137,7 @@ export class X402Paywall {
   /**
    * Check whether a `PAYMENT-SIGNATURE` header represents a valid payment.
    *
-   * Calls the remit.md facilitator's `/api/v0/x402/verify` endpoint.
+   * Calls the remit.md facilitator's `/api/v1/x402/verify` endpoint.
    *
    * @param paymentSig The raw header value (base64 JSON), or null if absent.
    * @returns `{ isValid: true }` or `{ isValid: false, invalidReason }`.
@@ -168,7 +168,7 @@ export class X402Paywall {
 
     let data: { isValid?: boolean; invalidReason?: string };
     try {
-      const resp = await globalThis.fetch(`${this.#facilitatorUrl}/api/v0/x402/verify`, {
+      const resp = await globalThis.fetch(`${this.#facilitatorUrl}/api/v1/x402/verify`, {
         method: "POST",
         headers,
         body: JSON.stringify(body),

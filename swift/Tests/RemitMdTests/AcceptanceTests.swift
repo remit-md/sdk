@@ -30,7 +30,13 @@ final class AcceptanceTests: XCTestCase {
 
     func createTestWallet() async throws -> TestWallet {
         var keyBytes = [UInt8](repeating: 0, count: 32)
+        #if canImport(Security)
         _ = SecRandomCopyBytes(kSecRandomDefault, 32, &keyBytes)
+        #else
+        // Linux: use SystemRandomNumberGenerator
+        var rng = SystemRandomNumberGenerator()
+        for i in 0..<32 { keyBytes[i] = UInt8.random(in: 0...255, using: &rng) }
+        #endif
         let hexKey = "0x" + keyBytes.map { String(format: "%02x", $0) }.joined()
 
         let contracts = try await fetchContracts()

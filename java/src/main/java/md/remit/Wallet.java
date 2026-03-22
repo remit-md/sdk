@@ -618,21 +618,36 @@ public class Wallet {
 
     /**
      * Generates a one-time URL for the operator to withdraw funds.
+     * Auto-signs a permit for the relayer to enable non-custodial withdrawals.
      */
     public LinkResponse createWithdrawLink() {
-        return createWithdrawLink(null, null);
+        return createWithdrawLink(null, null, null);
     }
 
     /**
      * Generates a one-time URL for the operator to withdraw funds.
+     * Auto-signs a permit for the relayer to enable non-custodial withdrawals.
      *
      * @param messages  optional chat-style messages shown on the withdraw page (each map has "role" and "text")
      * @param agentName optional agent display name shown on the withdraw page
      */
     public LinkResponse createWithdrawLink(List<Map<String, String>> messages, String agentName) {
+        return createWithdrawLink(messages, agentName, null);
+    }
+
+    /**
+     * Generates a one-time URL for the operator to withdraw funds with an explicit permit.
+     *
+     * @param messages  optional chat-style messages shown on the withdraw page (each map has "role" and "text")
+     * @param agentName optional agent display name shown on the withdraw page
+     * @param permit    optional pre-signed permit; auto-signs for the relayer if null
+     */
+    public LinkResponse createWithdrawLink(List<Map<String, String>> messages, String agentName, PermitSignature permit) {
+        PermitSignature p = permit != null ? permit : autoPermit("relayer", new BigDecimal("999999999"));
         Map<String, Object> body = new java.util.HashMap<>();
         if (messages != null && !messages.isEmpty()) body.put("messages", messages);
         if (agentName != null && !agentName.isEmpty()) body.put("agent_name", agentName);
+        if (p != null) body.put("permit", p);
         return client.post("/api/v1/links/withdraw", body, LinkResponse.class);
     }
 
@@ -766,6 +781,7 @@ public class Wallet {
                 case "stream":  spender = contracts.stream;  break;
                 case "bounty":  spender = contracts.bounty;  break;
                 case "deposit": spender = contracts.deposit;  break;
+                case "relayer": spender = contracts.relayer;  break;
                 default:        return null;
             }
             if (spender == null || spender.isBlank()) return null;

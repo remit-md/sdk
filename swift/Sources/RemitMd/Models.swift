@@ -76,9 +76,10 @@ public struct ContractAddresses: Codable, Sendable {
     public let feeCalculator: String
     public let keyRegistry: String
     public let arbitration: String
+    public let relayer: String?
 
     enum CodingKeys: String, CodingKey {
-        case usdc, router, escrow, tab, stream, bounty, deposit, arbitration
+        case usdc, router, escrow, tab, stream, bounty, deposit, arbitration, relayer
         case chainId = "chain_id"
         case feeCalculator = "fee_calculator"
         case keyRegistry = "key_registry"

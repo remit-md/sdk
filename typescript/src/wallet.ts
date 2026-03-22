@@ -268,7 +268,7 @@ export class Wallet extends RemitClient {
    * Used by payment methods when no explicit permit is provided.
    */
   async #autoPermit(
-    contract: "router" | "escrow" | "tab" | "stream" | "bounty" | "deposit",
+    contract: "router" | "escrow" | "tab" | "stream" | "bounty" | "deposit" | "relayer",
     amount: number,
   ): Promise<PermitSignature | undefined> {
     try {
@@ -534,11 +534,18 @@ export class Wallet extends RemitClient {
     });
   }
 
-  /** Generate a one-time URL for the operator to withdraw funds. */
-  createWithdrawLink(options?: { messages?: { role: "agent" | "system"; text: string }[]; agentName?: string }): Promise<LinkResponse> {
+  /** Generate a one-time URL for the operator to withdraw funds.
+   *  Auto-signs an EIP-2612 permit approving the server relayer to transferFrom the agent's wallet. */
+  async createWithdrawLink(options?: {
+    messages?: { role: "agent" | "system"; text: string }[];
+    agentName?: string;
+    permit?: PermitSignature;
+  }): Promise<LinkResponse> {
+    const permit = options?.permit ?? (await this.#autoPermit("relayer", 999_999_999));
     return this.#auth.post<LinkResponse>("/links/withdraw", {
       ...(options?.messages && { messages: options.messages }),
       ...(options?.agentName && { agent_name: options.agentName }),
+      ...(permit && { permit }),
     });
   }
 

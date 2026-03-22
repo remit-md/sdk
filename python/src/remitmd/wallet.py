@@ -574,18 +574,28 @@ class Wallet(RemitClient):
         self,
         messages: list[dict[str, str]] | None = None,
         agent_name: str | None = None,
+        permit: PermitSignature | None = None,
     ) -> LinkResponse:
         """Generate a one-time URL for the operator to withdraw funds.
+
+        Non-custodial: auto-signs an EIP-2612 permit approving the server
+        relayer to transfer USDC from the agent's wallet. If a permit is
+        provided it is used as-is; otherwise one is signed automatically.
 
         Args:
             messages: Optional list of dicts with ``role`` ("agent"/"system") and ``text``.
             agent_name: Optional agent display name shown on the withdraw page.
+            permit: Optional pre-signed permit. Auto-signed if omitted.
         """
+        if permit is None:
+            permit = await self._auto_permit("relayer", 999_999_999.0)
         body: dict[str, Any] = {}
         if messages is not None:
             body["messages"] = messages
         if agent_name is not None:
             body["agent_name"] = agent_name
+        if permit is not None:
+            body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v1/links/withdraw", body)
         return LinkResponse.model_validate(data)
 

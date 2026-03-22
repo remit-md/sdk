@@ -911,8 +911,9 @@ type LinkMessage struct {
 
 // LinkOptions configures optional fields for CreateFundLink / CreateWithdrawLink.
 type LinkOptions struct {
-	Messages  []LinkMessage // Chat-style messages displayed on the funding page.
-	AgentName string        // Agent display name shown on the page.
+	Messages  []LinkMessage    // Chat-style messages displayed on the funding page.
+	AgentName string           // Agent display name shown on the page.
+	Permit    *PermitSignature // Optional EIP-2612 permit for non-custodial withdraw.
 }
 
 // LinkOption configures CreateFundLink / CreateWithdrawLink.
@@ -926,6 +927,12 @@ func WithLinkMessages(msgs []LinkMessage) LinkOption {
 // WithAgentName sets the agent display name shown on the fund/withdraw page.
 func WithAgentName(name string) LinkOption {
 	return func(o *LinkOptions) { o.AgentName = name }
+}
+
+// WithLinkPermit attaches an EIP-2612 permit signature to a withdraw link,
+// enabling non-custodial withdrawals without a prior on-chain approval.
+func WithLinkPermit(permit *PermitSignature) LinkOption {
+	return func(o *LinkOptions) { o.Permit = permit }
 }
 
 // CreateFundLink generates a one-time URL for the operator to fund this wallet.
@@ -949,17 +956,33 @@ func (w *Wallet) CreateFundLink(ctx context.Context, opts ...LinkOption) (*LinkR
 }
 
 // CreateWithdrawLink generates a one-time URL for the operator to withdraw funds.
+// Automatically signs a permit for the relayer if no explicit permit is provided,
+// enabling non-custodial withdrawals.
 func (w *Wallet) CreateWithdrawLink(ctx context.Context, opts ...LinkOption) (*LinkResponse, error) {
 	cfg := &LinkOptions{}
 	for _, o := range opts {
 		o(cfg)
 	}
+
+	// Auto-sign permit if none provided
+	permit := cfg.Permit
+	if permit == nil {
+		p, err := w.autoPermit(ctx, "relayer", 999_999_999.0)
+		if err == nil {
+			permit = p
+		}
+		// graceful: if autoPermit fails, proceed without permit
+	}
+
 	body := map[string]any{}
 	if len(cfg.Messages) > 0 {
 		body["messages"] = cfg.Messages
 	}
 	if cfg.AgentName != "" {
 		body["agent_name"] = cfg.AgentName
+	}
+	if permit != nil {
+		body["permit"] = permit
 	}
 	var lr LinkResponse
 	if err := w.http.post(ctx, "/api/v1/links/withdraw", body, &lr); err != nil {
@@ -1116,6 +1139,8 @@ func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64
 		spender = contracts.Bounty
 	case "deposit":
 		spender = contracts.Deposit
+	case "relayer":
+		spender = contracts.Relayer
 	default:
 		return nil, nil
 	}

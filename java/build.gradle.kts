@@ -79,14 +79,14 @@ tasks.jacocoTestReport {
     }
 }
 
-// Target from MASTER.md: 50%. Initial gate: 35% (compliance tests skipped without server).
+// Target from MASTER.md: 50%. Gate: 40% (compliance tests skipped without server).
 tasks.jacocoTestCoverageVerification {
     violationRules {
         rule {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                minimum = "0.35".toBigDecimal()
+                minimum = "0.40".toBigDecimal()
             }
         }
     }

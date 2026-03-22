@@ -610,14 +610,27 @@ public final class RemitWallet: @unchecked Sendable {
     // MARK: - One-time operator links
 
     /// Generate a one-time URL for the operator to fund this wallet.
+    ///
+    /// Non-custodial: auto-signs an EIP-2612 permit approving the server
+    /// relayer to transfer USDC into the agent's wallet. If a permit is
+    /// provided it is used as-is; otherwise one is signed automatically.
+    ///
     /// - Parameters:
     ///   - messages: Optional chat-style messages shown on the funding page.
     ///   - agentName: Optional agent display name shown on the funding page.
-    public func createFundLink(messages: [LinkMessageBody]? = nil, agentName: String? = nil) async throws -> LinkResponse {
-        let body = LinkBody(messages: messages, agent_name: agentName)
-        let hasContent = messages != nil || agentName != nil
+    ///   - permit: Optional pre-signed permit. Auto-signed if omitted.
+    public func createFundLink(messages: [LinkMessageBody]? = nil, agentName: String? = nil, permit: PermitSignature? = nil) async throws -> LinkResponse {
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try? await autoPermit(contract: "relayer", amount: 999_999_999.0)
+        } else {
+            resolved = nil
+        }
+        let body = FundLinkBody(messages: messages, agent_name: agentName, permit: resolved)
         return try await transport.request(
-            method: "POST", path: "/api/v1/links/fund", body: hasContent ? body : Optional<LinkBody>.none
+            method: "POST", path: "/api/v1/links/fund", body: body
         )
     }
 
@@ -683,6 +696,11 @@ public struct LinkMessageBody: Codable, Sendable {
 private struct LinkBody: Codable {
     let messages: [LinkMessageBody]?
     let agent_name: String?
+}
+private struct FundLinkBody: Codable {
+    let messages: [LinkMessageBody]?
+    let agent_name: String?
+    let permit: PermitSignature?
 }
 private struct WithdrawLinkBody: Codable {
     let messages: [LinkMessageBody]?

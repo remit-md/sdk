@@ -563,11 +563,18 @@ module Remitmd
     # Generate a one-time URL for the operator to fund this wallet.
     # @param messages [Array<Hash>, nil] chat-style messages (each with :role and :text)
     # @param agent_name [String, nil] agent display name shown on the funding page
+    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
     # @return [LinkResponse]
-    def create_fund_link(messages: nil, agent_name: nil)
+    def create_fund_link(messages: nil, agent_name: nil, permit: nil)
       body = {}
       body[:messages] = messages if messages
       body[:agent_name] = agent_name if agent_name
+      begin
+        resolved = permit || auto_permit("relayer", 999_999_999.0)
+        body[:permit] = resolved.to_h
+      rescue StandardError
+        # permit signing failed — proceed without permit (custodial fallback)
+      end
       LinkResponse.new(@transport.post("/links/fund", body))
     end
 
@@ -705,6 +712,7 @@ module Remitmd
       create_stream:        :stream,
       create_bounty:        :bounty,
       place_deposit:        :deposit,
+      create_fund_link:     :relayer,
       create_withdraw_link: :relayer,
     }.freeze
   end

@@ -1,5 +1,8 @@
 import XCTest
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 @testable import RemitMd
 
 /// Compliance tests: Swift SDK against a real running server.

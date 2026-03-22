@@ -57,7 +57,7 @@ defmodule RemitMd.A2A do
     :inets.start()
     :ssl.start()
 
-    case :httpc.request(:get, {uri, [{'accept', 'application/json'}]}, [], []) do
+    case :httpc.request(:get, {uri, [{~c"accept", ~c"application/json"}]}, [], []) do
       {:ok, {{_, 200, _}, _headers, body}} ->
         json = IO.iodata_to_binary(body)
 

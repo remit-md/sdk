@@ -9,6 +9,9 @@
 import XCTest
 @testable import RemitMd
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 final class AcceptanceTests: XCTestCase {
 

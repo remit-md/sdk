@@ -999,7 +999,7 @@ impl Wallet {
             body["agent_name"] = json!(name);
         }
         // Auto-sign a permit for the relayer (best-effort)
-        if let Some(permit) = self.auto_permit("relayer", 999_999_999.0).await.ok() {
+        if let Ok(permit) = self.auto_permit("relayer", 999_999_999.0).await {
             body["permit"] = serde_json::to_value(&permit).unwrap();
         }
         self.post("/api/v1/links/withdraw", body).await

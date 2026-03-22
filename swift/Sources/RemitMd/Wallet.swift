@@ -535,6 +535,7 @@ public final class RemitWallet: @unchecked Sendable {
         case "stream":  spender = contracts.stream
         case "bounty":  spender = contracts.bounty
         case "deposit": spender = contracts.deposit
+        case "relayer": spender = contracts.relayer ?? ""
         default:
             throw RemitError(RemitError.serverError, "No \(contract) contract address available")
         }
@@ -621,14 +622,27 @@ public final class RemitWallet: @unchecked Sendable {
     }
 
     /// Generate a one-time URL for the operator to withdraw funds.
+    ///
+    /// Non-custodial: auto-signs an EIP-2612 permit approving the server
+    /// relayer to transfer USDC from the agent's wallet. If a permit is
+    /// provided it is used as-is; otherwise one is signed automatically.
+    ///
     /// - Parameters:
     ///   - messages: Optional chat-style messages shown on the withdraw page.
     ///   - agentName: Optional agent display name shown on the withdraw page.
-    public func createWithdrawLink(messages: [LinkMessageBody]? = nil, agentName: String? = nil) async throws -> LinkResponse {
-        let body = LinkBody(messages: messages, agent_name: agentName)
-        let hasContent = messages != nil || agentName != nil
+    ///   - permit: Optional pre-signed permit. Auto-signed if omitted.
+    public func createWithdrawLink(messages: [LinkMessageBody]? = nil, agentName: String? = nil, permit: PermitSignature? = nil) async throws -> LinkResponse {
+        let resolved: PermitSignature?
+        if let p = permit {
+            resolved = p
+        } else if signer != nil {
+            resolved = try? await autoPermit(contract: "relayer", amount: 999_999_999.0)
+        } else {
+            resolved = nil
+        }
+        let body = WithdrawLinkBody(messages: messages, agent_name: agentName, permit: resolved)
         return try await transport.request(
-            method: "POST", path: "/api/v1/links/withdraw", body: hasContent ? body : Optional<LinkBody>.none
+            method: "POST", path: "/api/v1/links/withdraw", body: body
         )
     }
 
@@ -669,6 +683,11 @@ public struct LinkMessageBody: Codable, Sendable {
 private struct LinkBody: Codable {
     let messages: [LinkMessageBody]?
     let agent_name: String?
+}
+private struct WithdrawLinkBody: Codable {
+    let messages: [LinkMessageBody]?
+    let agent_name: String?
+    let permit: PermitSignature?
 }
 private struct PayBody: Codable { let to: String; let amount: Double; let memo: String?; let permit: PermitSignature? }
 private struct InvoiceBody: Codable { let id: String; let chain: String; let from_agent: String; let to_agent: String; let amount: String; let type: String; let task: String; let nonce: String; let signature: String }

@@ -97,6 +97,8 @@ pub struct ContractAddresses {
     pub fee_calculator: String,
     pub key_registry: String,
     pub arbitration: String,
+    #[serde(default)]
+    pub relayer: Option<String>,
 }
 
 /// Result of a testnet mint operation.

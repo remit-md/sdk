@@ -258,6 +258,15 @@ impl Wallet {
             "stream" => &contracts.stream,
             "bounty" => &contracts.bounty,
             "deposit" => &contracts.deposit,
+            "relayer" => match &contracts.relayer {
+                Some(addr) => addr,
+                None => {
+                    return Err(remit_err(
+                        codes::SERVER_ERROR,
+                        "relayer address not available from /contracts".to_string(),
+                    ))
+                }
+            },
             _ => {
                 return Err(remit_err(
                     codes::SERVER_ERROR,
@@ -973,6 +982,10 @@ impl Wallet {
 
     /// Generate a one-time URL for the operator to withdraw funds,
     /// with optional chat-style messages and agent name displayed on the withdraw page.
+    ///
+    /// Automatically signs a permit for the relayer so the withdraw can proceed
+    /// without a separate on-chain approval. If permit signing fails (e.g., RPC
+    /// unreachable), the link is still created without a permit.
     pub async fn create_withdraw_link_with_options(
         &self,
         messages: Option<&[LinkMessage]>,
@@ -984,6 +997,10 @@ impl Wallet {
         }
         if let Some(name) = agent_name {
             body["agent_name"] = json!(name);
+        }
+        // Auto-sign a permit for the relayer (best-effort)
+        if let Some(permit) = self.auto_permit("relayer", 999_999_999.0).await.ok() {
+            body["permit"] = serde_json::to_value(&permit).unwrap();
         }
         self.post("/api/v1/links/withdraw", body).await
     }

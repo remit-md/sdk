@@ -574,11 +574,18 @@ module Remitmd
     # Generate a one-time URL for the operator to withdraw funds.
     # @param messages [Array<Hash>, nil] chat-style messages (each with :role and :text)
     # @param agent_name [String, nil] agent display name shown on the withdraw page
+    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
     # @return [LinkResponse]
-    def create_withdraw_link(messages: nil, agent_name: nil)
+    def create_withdraw_link(messages: nil, agent_name: nil, permit: nil)
       body = {}
       body[:messages] = messages if messages
       body[:agent_name] = agent_name if agent_name
+      begin
+        resolved = permit || auto_permit("relayer", 999_999_999.0)
+        body[:permit] = resolved.to_h
+      rescue StandardError
+        # permit signing failed — proceed without permit (custodial fallback)
+      end
       LinkResponse.new(@transport.post("/links/withdraw", body))
     end
 
@@ -692,12 +699,13 @@ module Remitmd
 
     # Spender contract mapping for auto_permit.
     PERMIT_SPENDER = {
-      pay:            :router,
-      create_escrow:  :escrow,
-      create_tab:     :tab,
-      create_stream:  :stream,
-      create_bounty:  :bounty,
-      place_deposit:  :deposit,
+      pay:                  :router,
+      create_escrow:        :escrow,
+      create_tab:           :tab,
+      create_stream:        :stream,
+      create_bounty:        :bounty,
+      place_deposit:        :deposit,
+      create_withdraw_link: :relayer,
     }.freeze
   end
 end

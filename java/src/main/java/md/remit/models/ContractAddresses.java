@@ -39,4 +39,7 @@ public class ContractAddresses {
 
     @JsonProperty("arbitration")
     public String arbitration;
+
+    @JsonProperty("relayer")
+    public String relayer;
 }

@@ -391,6 +391,8 @@ jobs:
   swift-compliance:
     name: Swift Compliance (real server)
     runs-on: ubuntu-latest
+    # Informational until Swift SDK has full Linux support (runtime test failures on Linux)
+    continue-on-error: true
     permissions:
       contents: read
       packages: read

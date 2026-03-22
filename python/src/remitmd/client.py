@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NotRequired, TypedDict, cast
+from typing import TypedDict, cast
 
 from remitmd._http import AuthenticatedClient, get_chain_config
 from remitmd.models.bounty import Bounty
@@ -28,7 +28,7 @@ class ContractAddresses(TypedDict):
     fee_calculator: str
     key_registry: str
     arbitration: str
-    relayer: NotRequired[str]
+    # relayer: str — optional, accessed via .get() in _auto_permit
 
 
 class RemitClient:

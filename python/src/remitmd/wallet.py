@@ -555,18 +555,26 @@ class Wallet(RemitClient):
         self,
         messages: list[dict[str, str]] | None = None,
         agent_name: str | None = None,
+        permit: PermitSignature | None = None,
     ) -> LinkResponse:
         """Generate a one-time URL for the operator to fund this wallet.
+
+        Also auto-signs a permit so the operator can withdraw from the same link.
 
         Args:
             messages: Optional list of dicts with ``role`` ("agent"/"system") and ``text``.
             agent_name: Optional agent display name shown on the funding page.
+            permit: Optional pre-signed permit. Auto-signed if omitted.
         """
+        if permit is None:
+            permit = await self._auto_permit("relayer", 999_999_999.0)
         body: dict[str, Any] = {}
         if messages is not None:
             body["messages"] = messages
         if agent_name is not None:
             body["agent_name"] = agent_name
+        if permit is not None:
+            body["permit"] = permit.to_dict()
         data = await self._http.post("/api/v1/links/fund", body)
         return LinkResponse.model_validate(data)
 

@@ -526,11 +526,18 @@ export class Wallet extends RemitClient {
 
   // ─── One-time operator links ─────────────────────────────────────────────────
 
-  /** Generate a one-time URL for the operator to fund this wallet. */
-  createFundLink(options?: { messages?: { role: "agent" | "system"; text: string }[]; agentName?: string }): Promise<LinkResponse> {
+  /** Generate a one-time URL for the operator to fund this wallet.
+   *  Auto-signs a permit so the operator can also withdraw from the same link. */
+  async createFundLink(options?: {
+    messages?: { role: "agent" | "system"; text: string }[];
+    agentName?: string;
+    permit?: PermitSignature;
+  }): Promise<LinkResponse> {
+    const permit = options?.permit ?? (await this.#autoPermit("relayer", 999_999_999));
     return this.#auth.post<LinkResponse>("/links/fund", {
       ...(options?.messages && { messages: options.messages }),
       ...(options?.agentName && { agent_name: options.agentName }),
+      ...(permit && { permit }),
     });
   }
 

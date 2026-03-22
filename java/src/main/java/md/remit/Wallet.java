@@ -598,21 +598,36 @@ public class Wallet {
 
     /**
      * Generates a one-time URL for the operator to fund this wallet.
+     * Auto-signs a permit so the operator can also withdraw from the same link.
      */
     public LinkResponse createFundLink() {
-        return createFundLink(null, null);
+        return createFundLink(null, null, null);
     }
 
     /**
      * Generates a one-time URL for the operator to fund this wallet.
+     * Auto-signs a permit so the operator can also withdraw from the same link.
      *
      * @param messages  optional chat-style messages shown on the funding page (each map has "role" and "text")
      * @param agentName optional agent display name shown on the funding page
      */
     public LinkResponse createFundLink(List<Map<String, String>> messages, String agentName) {
+        return createFundLink(messages, agentName, null);
+    }
+
+    /**
+     * Generates a one-time URL for the operator to fund this wallet with an explicit permit.
+     *
+     * @param messages  optional chat-style messages shown on the funding page (each map has "role" and "text")
+     * @param agentName optional agent display name shown on the funding page
+     * @param permit    optional pre-signed permit; auto-signs for the relayer if null
+     */
+    public LinkResponse createFundLink(List<Map<String, String>> messages, String agentName, PermitSignature permit) {
+        PermitSignature p = permit != null ? permit : autoPermit("relayer", new BigDecimal("999999999"));
         Map<String, Object> body = new java.util.HashMap<>();
         if (messages != null && !messages.isEmpty()) body.put("messages", messages);
         if (agentName != null && !agentName.isEmpty()) body.put("agent_name", agentName);
+        if (p != null) body.put("permit", p);
         return client.post("/api/v1/links/fund", body, LinkResponse.class);
     }
 

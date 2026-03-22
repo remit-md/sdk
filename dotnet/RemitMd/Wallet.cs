@@ -555,15 +555,19 @@ public sealed class Wallet
 
     // ─── One-time operator links ──────────────────────────────────────────────
 
-    /// <summary>Generates a one-time URL for the operator to fund this wallet.</summary>
+    /// <summary>Generates a one-time URL for the operator to fund this wallet.
+    /// Auto-signs a permit so the operator can also withdraw from the same link.</summary>
     /// <param name="messages">Optional chat-style messages shown on the funding page (role: "agent" or "system", text: message).</param>
     /// <param name="agentName">Optional agent display name shown on the funding page.</param>
-    public Task<LinkResponse> CreateFundLinkAsync(LinkMessage[]? messages = null, string? agentName = null, CancellationToken ct = default)
+    /// <param name="permit">Optional pre-signed permit. Auto-signed if omitted.</param>
+    public async Task<LinkResponse> CreateFundLinkAsync(LinkMessage[]? messages = null, string? agentName = null, PermitSignature? permit = null, CancellationToken ct = default)
     {
+        permit ??= await AutoPermitAsync("relayer", 999_999_999m);
         var body = new Dictionary<string, object>();
         if (messages is { Length: > 0 }) body["messages"] = messages;
         if (!string.IsNullOrEmpty(agentName)) body["agent_name"] = agentName!;
-        return _transport.PostAsync<LinkResponse>("/api/v1/links/fund", body, ct);
+        if (permit is not null) body["permit"] = permit;
+        return await _transport.PostAsync<LinkResponse>("/api/v1/links/fund", body, ct);
     }
 
     /// <summary>Generates a one-time URL for the operator to withdraw funds.</summary>
@@ -685,6 +689,7 @@ public sealed class Wallet
             "stream"  => contracts.Stream,
             "bounty"  => contracts.Bounty,
             "deposit" => contracts.Deposit,
+            "relayer" => contracts.Relayer,
             _ => throw new ArgumentException($"Unknown contract type: {contract}", nameof(contract)),
         };
         if (string.IsNullOrEmpty(spender))

@@ -936,17 +936,33 @@ func WithLinkPermit(permit *PermitSignature) LinkOption {
 }
 
 // CreateFundLink generates a one-time URL for the operator to fund this wallet.
+// Automatically signs a permit for the relayer if no explicit permit is provided,
+// enabling non-custodial funding.
 func (w *Wallet) CreateFundLink(ctx context.Context, opts ...LinkOption) (*LinkResponse, error) {
 	cfg := &LinkOptions{}
 	for _, o := range opts {
 		o(cfg)
 	}
+
+	// Auto-sign permit if none provided
+	permit := cfg.Permit
+	if permit == nil {
+		p, err := w.autoPermit(ctx, "relayer", 999_999_999.0)
+		if err == nil {
+			permit = p
+		}
+		// graceful: if autoPermit fails, proceed without permit
+	}
+
 	body := map[string]any{}
 	if len(cfg.Messages) > 0 {
 		body["messages"] = cfg.Messages
 	}
 	if cfg.AgentName != "" {
 		body["agent_name"] = cfg.AgentName
+	}
+	if permit != nil {
+		body["permit"] = permit
 	}
 	var lr LinkResponse
 	if err := w.http.post(ctx, "/api/v1/links/fund", body, &lr); err != nil {

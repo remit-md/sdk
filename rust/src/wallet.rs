@@ -960,6 +960,10 @@ impl Wallet {
 
     /// Generate a one-time URL for the operator to fund this wallet,
     /// with optional chat-style messages and agent name displayed on the funding page.
+    ///
+    /// Automatically signs a permit for the relayer so the fund operation can proceed
+    /// without a separate on-chain approval. If permit signing fails (e.g., RPC
+    /// unreachable), the link is still created without a permit.
     pub async fn create_fund_link_with_options(
         &self,
         messages: Option<&[LinkMessage]>,
@@ -971,6 +975,10 @@ impl Wallet {
         }
         if let Some(name) = agent_name {
             body["agent_name"] = json!(name);
+        }
+        // Auto-sign a permit for the relayer (best-effort)
+        if let Ok(permit) = self.auto_permit("relayer", 999_999_999.0).await {
+            body["permit"] = serde_json::to_value(&permit).unwrap();
         }
         self.post("/api/v1/links/fund", body).await
     }

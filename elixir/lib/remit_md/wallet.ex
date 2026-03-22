@@ -732,11 +732,14 @@ defmodule RemitMd.Wallet do
 
   - `:messages` — list of maps with `:role` ("agent"/"system") and `:text`
   - `:agent_name` — agent display name shown on the funding page
+  - `:permit` — `%PermitSignature{}` for gasless approval (auto-signed if omitted)
 
   Returns `{:ok, %RemitMd.Models.LinkResponse{}}` or `{:error, %RemitMd.Error{}}`.
   """
   def create_fund_link(%__MODULE__{} = w, opts \\ []) do
+    permit = resolve_permit(w, "relayer", "999999999.0", opts)
     body = build_link_body(opts)
+    body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
     with {:ok, data} <- do_call(w, :post, "/links/fund", body) do
       {:ok, RemitMd.Models.LinkResponse.from_map(data)}
     end

@@ -22,6 +22,9 @@ on:
           - elixir
         default: all
 
+permissions:
+  contents: read
+
 jobs:
   typescript:
     name: TS SDK Acceptance

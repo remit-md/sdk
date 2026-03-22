@@ -17,6 +17,9 @@ concurrency:
   group: publish
   cancel-in-progress: false  # Never cancel a publish in progress
 
+permissions:
+  contents: read
+
 jobs:
   bump-and-tag:
     name: Bump version & tag

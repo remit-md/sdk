@@ -31,10 +31,10 @@ jobs:
         run: cd python && ruff format --check .
       - name: Type check
         run: cd python && mypy src/
-      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
       # Exclude acceptance tests (live Base Sepolia) — they have their own manual workflow.
       - name: Test with coverage gate
-        run: cd python && pytest -v --cov=remitmd --cov-fail-under=35 --cov-report=term-missing --ignore=tests/acceptance --ignore=tests/compliance
+        run: cd python && pytest -v --cov=remitmd --cov-fail-under=40 --cov-report=term-missing --ignore=tests/acceptance --ignore=tests/compliance
 
   typescript:
     name: SDK TypeScript
@@ -55,9 +55,9 @@ jobs:
         run: cd typescript && pnpm tsc --noEmit
       - name: Build
         run: cd typescript && pnpm tsc
-      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
       - name: Test with coverage gate
-        run: cd typescript && pnpm dlx c8@10 --reporter=text --lines 35 --branches 35 --functions 35 node --import ./node_modules/tsx/dist/esm/index.cjs --test tests/*.ts
+        run: cd typescript && pnpm dlx c8@10 --reporter=text --lines 40 --branches 40 --functions 40 node --import ./node_modules/tsx/dist/esm/index.cjs --test tests/*.ts
 
   go:
     name: SDK Go
@@ -72,12 +72,12 @@ jobs:
         run: cd go && go mod tidy
       - name: Vet
         run: cd go && go vet ./...
-      # Coverage gate: target 50% (MASTER.md); measured baseline: 33%. Gate: 30%.
+      # Coverage gate: target 50% (MASTER.md); gate: 40%.
       - name: Test with coverage gate
         working-directory: go
         run: |
           go test -coverprofile=coverage.out ./... -v -count=1
-          go tool cover -func=coverage.out | awk '/^total:/{gsub(/%/,"",$3); pct=$3+0; printf "Total coverage: %.1f%%\n", pct; if (pct < 30) {print "ERROR: coverage " pct "% below 30% threshold"; exit 1}}'
+          go tool cover -func=coverage.out | awk '/^total:/{gsub(/%/,"",$3); pct=$3+0; printf "Total coverage: %.1f%%\n", pct; if (pct < 40) {print "ERROR: coverage " pct "% below 40% threshold"; exit 1}}'
 
   rust:
     name: SDK Rust
@@ -97,9 +97,9 @@ jobs:
         run: cd rust && cargo fmt --check
       - name: Clippy
         run: cd rust && cargo clippy -- -D warnings
-      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
+      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
       - name: Test with coverage gate
-        run: cd rust && cargo llvm-cov --fail-under-lines 35
+        run: cd rust && cargo llvm-cov --fail-under-lines 40
 
   dotnet:
     name: SDK .NET
@@ -113,10 +113,10 @@ jobs:
         run: cd dotnet && dotnet restore
       - name: Build
         run: cd dotnet && dotnet build --no-restore -c Release
-      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
-      # /p:Threshold=35 fails the test run if line coverage drops below 35%.
+      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
+      # /p:Threshold=40 fails the test run if line coverage drops below 40%.
       - name: Test with coverage gate
-        run: cd dotnet && dotnet test --no-build -c Release --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:Threshold=35 /p:ThresholdType=Line
+        run: cd dotnet && dotnet test --no-build -c Release --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:Threshold=40 /p:ThresholdType=Line
 
   java:
     name: SDK Java/Kotlin
@@ -130,8 +130,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance tests server-gated).
-      # jacocoTestCoverageVerification fails the build if line coverage < 35%.
+      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
+      # jacocoTestCoverageVerification fails the build if line coverage < 40%.
       # Single build+test step avoids double compilation.
       - name: Build + Test with coverage gate
         run: cd java && gradle build test jacocoTestReport jacocoTestCoverageVerification --no-daemon
@@ -143,12 +143,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.2'
+          ruby-version: '3.3'
           bundler-cache: true
           working-directory: ruby
       - name: RuboCop
         run: cd ruby && bundle exec rubocop -A --no-color && bundle exec rubocop --no-color
-      # Coverage gate: target 50% (MASTER.md); initial gate 35% via SimpleCov in spec_helper.rb.
+      # Coverage gate: target 50% (MASTER.md); gate 40% via SimpleCov in spec_helper.rb.
       # SimpleCov minimum_coverage is enforced only when CI=true (set by GitHub Actions).
       # Exclude acceptance tests (live Base Sepolia) — they have their own manual workflow.
       - name: Test with coverage gate
@@ -161,7 +161,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: cd swift && swift build
-      # Coverage gate: target 50% (MASTER.md); initial gate 35%.
+      # Coverage gate: target 50% (MASTER.md); gate 40%.
       - name: Test with coverage gate
         run: |
           cd swift && swift test --enable-code-coverage
@@ -172,7 +172,7 @@ jobs:
             PROFDATA=".build/debug/codecov/default.profdata"
             TOTAL=$(xcrun llvm-cov report "$BINARY" -instr-profile="$PROFDATA" --sources Sources/ 2>/dev/null | grep "^TOTAL" | awk '{gsub(/%/,""); print $4}')
             echo "Total coverage: ${TOTAL:-0}%"
-            awk "BEGIN { pct=${TOTAL:-0}+0; if (pct < 35) { printf \"ERROR: coverage %.1f%% below 35%%\n\", pct; exit 1 } }"
+            awk "BEGIN { pct=${TOTAL:-0}+0; if (pct < 40) { printf \"ERROR: coverage %.1f%% below 40%%\n\", pct; exit 1 } }"
           else
             echo "WARNING: xctest binary not found, skipping coverage check"
           fi
@@ -184,13 +184,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
-          elixir-version: '1.16'
-          otp-version: '26'
+          elixir-version: '1.17'
+          otp-version: '27'
       - name: Install dependencies
         run: cd elixir && mix deps.get
       - name: Compile
         run: cd elixir && mix compile --warnings-as-errors
-      # Coverage gate: target 50% (MASTER.md); initial gate 35% via .coveralls.json minimum_coverage.
+      # Coverage gate: target 50% (MASTER.md); gate 40% via .coveralls.json minimum_coverage.
       # mix coveralls exits non-zero if coverage < minimum_coverage in .coveralls.json.
       - name: Test with coverage gate
         run: cd elixir && mix coveralls

@@ -47,12 +47,7 @@ jobs:
             VERSION="$CURRENT"
           else
             IFS='.' read -r major minor patch <<< "$CURRENT"
-            if [ "$patch" -ge 9 ]; then
-              minor=$((minor + 1))
-              patch=0
-            else
-              patch=$((patch + 1))
-            fi
+            patch=$((patch + 1))
             VERSION="${major}.${minor}.${patch}"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -265,8 +260,8 @@ jobs:
           ref: ${{ needs.bump-and-tag.outputs.tag }}
       - uses: erlef/setup-beam@v1
         with:
-          elixir-version: '1.16'
-          otp-version: '26'
+          elixir-version: '1.17'
+          otp-version: '27'
       - name: Publish to Hex.pm
         working-directory: elixir
         run: |

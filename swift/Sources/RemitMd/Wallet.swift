@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Main entry point for remit.md payments.
 public final class RemitWallet: @unchecked Sendable {

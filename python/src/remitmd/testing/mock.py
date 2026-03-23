@@ -215,23 +215,25 @@ class MockWallet:
         self._mock._state.escrows[invoice_id] = escrow
         return escrow
 
-    async def release_escrow(self, invoice_id: str) -> Transaction:
+    async def release_escrow(self, invoice_id: str) -> Escrow:
         self._mock._check_forced_error(self.address)
         escrow = self._find_escrow_by_invoice(invoice_id)
         if escrow.status not in (EscrowStatus.funded, EscrowStatus.active):
             raise InvalidState(f"Escrow is {escrow.status}, expected funded or active")
         self._mock._credit(escrow.payee, escrow.amount)
         escrow.status = EscrowStatus.completed
-        return self._mock._make_tx(invoice_id=invoice_id)
+        escrow.updated_at = _iso(self._mock.now())
+        return escrow
 
-    async def cancel_escrow(self, invoice_id: str) -> Transaction:
+    async def cancel_escrow(self, invoice_id: str) -> Escrow:
         self._mock._check_forced_error(self.address)
         escrow = self._find_escrow_by_invoice(invoice_id)
         if escrow.status != EscrowStatus.funded:
             raise InvalidState(f"Escrow is {escrow.status}, expected funded")
         self._mock._credit(self.address, escrow.amount)
         escrow.status = EscrowStatus.cancelled
-        return self._mock._make_tx(invoice_id=invoice_id)
+        escrow.updated_at = _iso(self._mock.now())
+        return escrow
 
     async def claim_start(self, invoice_id: str) -> Transaction:
         self._mock._check_forced_error(self.address)
@@ -321,14 +323,13 @@ class MockWallet:
         self,
         to: str,
         rate: float,
-        max_duration: int = 3600,
-        max_total: float | None = None,
+        max_total: float,
     ) -> Stream:
         self._mock._check_forced_error(self.address)
-        total = max_total or (rate * max_duration)
-        self._mock._debit(self.address, total)
+        self._mock._debit(self.address, max_total)
 
         sid = _id("stm")
+        max_duration = int(max_total / rate) if rate > 0 else 3600
         stream = Stream(
             id=sid,
             payer=self.address,

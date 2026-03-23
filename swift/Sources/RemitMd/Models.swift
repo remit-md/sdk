@@ -25,19 +25,19 @@ public enum RemitChain: Int, Codable, Sendable {
 // MARK: - Status enums
 
 public enum EscrowStatus: String, Codable, Sendable {
-    case pending, funded, released, cancelled, expired
+    case pending, funded, active, completed, cancelled, failed
 }
 
 public enum TabStatus: String, Codable, Sendable {
-    case open, closed, settled
+    case open, closed, expired
 }
 
 public enum StreamStatus: String, Codable, Sendable {
-    case active, paused, ended, cancelled
+    case active, closed, completed
 }
 
 public enum BountyStatus: String, Codable, Sendable {
-    case open, awarded, expired, reclaimed
+    case open, claimed, awarded, expired, cancelled
 }
 
 public enum DepositStatus: String, Codable, Sendable {

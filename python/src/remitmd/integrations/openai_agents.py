@@ -42,8 +42,8 @@ def remit_tools(wallet: Wallet) -> list[Any]:
     @function_tool
     async def remit_check_balance() -> str:
         """Check the current USDC wallet balance."""
-        bal = await wallet.balance()
-        return f"Current USDC balance: ${bal:.2f}"
+        info = await wallet.status()
+        return f"Current USDC balance: ${info.balance:.2f}"
 
     @function_tool
     async def remit_open_tab(to: str, limit: float, per_unit: float) -> str:

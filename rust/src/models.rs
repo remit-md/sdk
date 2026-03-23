@@ -30,9 +30,8 @@ pub enum EscrowStatus {
     Funded,
     Active,
     Completed,
-    Released,
     Cancelled,
-    Expired,
+    Failed,
 }
 
 /// Status of a payment channel (tab).
@@ -41,7 +40,7 @@ pub enum EscrowStatus {
 pub enum TabStatus {
     Open,
     Closed,
-    Settled,
+    Expired,
 }
 
 /// Status of a payment stream.
@@ -49,9 +48,8 @@ pub enum TabStatus {
 #[serde(rename_all = "lowercase")]
 pub enum StreamStatus {
     Active,
-    Paused,
-    Ended,
-    Cancelled,
+    Closed,
+    Completed,
 }
 
 /// Status of a bounty.
@@ -59,9 +57,10 @@ pub enum StreamStatus {
 #[serde(rename_all = "lowercase")]
 pub enum BountyStatus {
     Open,
+    Claimed,
     Awarded,
     Expired,
-    Reclaimed,
+    Cancelled,
 }
 
 /// Status of a security deposit.

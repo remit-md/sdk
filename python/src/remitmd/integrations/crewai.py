@@ -19,6 +19,7 @@ Requires: pip install remitmd[crewai]
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -30,6 +31,26 @@ except ImportError as exc:  # pragma: no cover
 
 if TYPE_CHECKING:
     pass
+
+
+def _run_async(coro: Any) -> Any:
+    """Run an async coroutine from a sync context.
+
+    Uses ``asyncio.run()`` when no event loop is running. Falls back to
+    running in a separate thread when called from within an existing
+    async context (e.g. Jupyter notebooks, async frameworks).
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is None:
+        return asyncio.run(coro)
+
+    # Already inside a running loop — cannot use asyncio.run().
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
 
 
 class RemitPayDirectTool(BaseTool):
@@ -44,7 +65,7 @@ class RemitPayDirectTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, to: str, amount: float, memo: str = "") -> str:
-        result = asyncio.run(self.wallet.pay_direct(to, amount, memo))
+        result = _run_async(self.wallet.pay_direct(to, amount, memo))
         return f"Payment of ${amount:.2f} sent to {to}. tx_hash={result.tx_hash}"
 
 
@@ -60,7 +81,7 @@ class RemitOpenTabTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, to: str, limit: float, per_unit: float, expires: int = 86400) -> str:
-        tab = asyncio.run(self.wallet.open_tab(to, limit, per_unit, expires))
+        tab = _run_async(self.wallet.open_tab(to, limit, per_unit, expires))
         return f"Tab {tab.id} opened. Limit: ${limit:.2f}, per_unit: ${per_unit:.4f}"
 
 
@@ -73,7 +94,7 @@ class RemitCloseTabTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, tab_id: str) -> str:
-        asyncio.run(self.wallet.close_tab(tab_id))
+        _run_async(self.wallet.close_tab(tab_id))
         return f"Tab {tab_id} closed and settled."
 
 
@@ -86,8 +107,8 @@ class RemitCheckBalanceTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self) -> str:
-        bal = asyncio.run(self.wallet.balance())
-        return f"Current USDC balance: ${bal:.2f}"
+        info = _run_async(self.wallet.status())
+        return f"Current USDC balance: ${info.balance:.2f}"
 
 
 class RemitCreateEscrowTool(BaseTool):
@@ -105,7 +126,7 @@ class RemitCreateEscrowTool(BaseTool):
         from remitmd.models.invoice import Invoice
 
         invoice = Invoice(to=to, amount=amount, memo=task, timeout=timeout)
-        result = asyncio.run(self.wallet.pay(invoice))
+        result = _run_async(self.wallet.pay(invoice))
         return f"Escrow created. invoice_id={result.invoice_id}"
 
 
@@ -118,5 +139,5 @@ class RemitReleaseEscrowTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, invoice_id: str) -> str:
-        asyncio.run(self.wallet.release_escrow(invoice_id))
+        _run_async(self.wallet.release_escrow(invoice_id))
         return f"Escrow {invoice_id} released to payee."

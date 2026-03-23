@@ -232,9 +232,9 @@ public final class MockRemit: @unchecked Sendable {
             guard let e = _escrows[id] else {
                 throw RemitError.notFound(RemitError.escrowNotFound, id)
             }
-            if e.status == .released { throw RemitError(RemitError.escrowAlreadyReleased, "escrow \(id) already released") }
+            if e.status == .completed { throw RemitError(RemitError.escrowAlreadyCompleted, "escrow \(id) already completed") }
             let updated = Escrow(id: e.id, payer: e.payer, recipient: e.recipient,
-                                 amount: e.amount, currency: e.currency, status: .released,
+                                 amount: e.amount, currency: e.currency, status: .completed,
                                  conditions: e.conditions, expiresAt: e.expiresAt, createdAt: e.createdAt)
             _escrows[id] = updated
             return updated
@@ -318,7 +318,7 @@ public final class MockRemit: @unchecked Sendable {
             guard let s = _streams[id] else { throw RemitError.notFound(RemitError.streamNotFound, id) }
             let updated = Stream(id: s.id, payer: s.payer, recipient: s.recipient,
                                  ratePerSecond: s.ratePerSecond, currency: s.currency,
-                                 status: .ended, totalStreamed: s.totalStreamed,
+                                 status: .closed, totalStreamed: s.totalStreamed,
                                  startedAt: s.startedAt, endedAt: Date())
             _streams[id] = updated
             return updated

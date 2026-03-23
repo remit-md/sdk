@@ -199,7 +199,7 @@ module Remitmd
       in ["POST", path] if path.end_with?("/release") && path.include?("/escrows/")
         id  = extract_id(path, "/escrows/", "/release")
         esc = @state[:escrows].fetch(id) { raise not_found(RemitError::ESCROW_NOT_FOUND, id) }
-        new_esc = update_escrow(esc, status: EscrowStatus::RELEASED)
+        new_esc = update_escrow(esc, status: EscrowStatus::COMPLETED)
         @state[:escrows][id] = new_esc
         tx = make_tx(from: esc.payer, to: esc.payee, amount: esc.amount)
         @state[:transactions] << tx
@@ -268,7 +268,7 @@ module Remitmd
       in ["POST", path] if path.end_with?("/close") && path.include?("/tabs/")
         id  = extract_id(path, "/tabs/", "/close")
         tab = @state[:tabs].fetch(id) { raise not_found(RemitError::TAB_NOT_FOUND, id) }
-        new_tab = update_tab(tab, status: TabStatus::SETTLED)
+        new_tab = update_tab(tab, status: TabStatus::CLOSED)
         @state[:tabs][id] = new_tab
         tab_hash(new_tab)
 

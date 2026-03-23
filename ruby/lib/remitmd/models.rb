@@ -16,29 +16,30 @@ module Remitmd
   module EscrowStatus
     PENDING   = "pending"
     FUNDED    = "funded"
-    RELEASED  = "released"
+    ACTIVE    = "active"
+    COMPLETED = "completed"
     CANCELLED = "cancelled"
-    EXPIRED   = "expired"
+    FAILED    = "failed"
   end
 
   module TabStatus
     OPEN    = "open"
     CLOSED  = "closed"
-    SETTLED = "settled"
+    EXPIRED = "expired"
   end
 
   module StreamStatus
     ACTIVE    = "active"
-    PAUSED    = "paused"
-    ENDED     = "ended"
-    CANCELLED = "cancelled"
+    CLOSED    = "closed"
+    COMPLETED = "completed"
   end
 
   module BountyStatus
     OPEN      = "open"
+    CLAIMED   = "claimed"
     AWARDED   = "awarded"
     EXPIRED   = "expired"
-    RECLAIMED = "reclaimed"
+    CANCELLED = "cancelled"
   end
 
   module DepositStatus

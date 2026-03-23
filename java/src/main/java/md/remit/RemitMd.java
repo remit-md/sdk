@@ -139,7 +139,8 @@ public final class RemitMd {
                     Map.of("chain", chain)
                 );
             }
-            String apiUrl = baseUrl != null ? baseUrl : API_URLS.get(chainKey);
+            String envUrl = System.getenv("REMITMD_API_URL");
+            String apiUrl = baseUrl != null ? baseUrl : (envUrl != null && !envUrl.isBlank() ? envUrl : API_URLS.get(chainKey));
             long chainId = CHAIN_IDS.get(chainKey);
             ApiClient client = new ApiClient(apiUrl, chainId, routerAddress, signer);
             return new Wallet(client, signer, chainId, chainKey, rpcUrl);

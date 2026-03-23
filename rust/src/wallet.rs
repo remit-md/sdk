@@ -1156,7 +1156,9 @@ fn build_wallet(
         )
     })?;
 
-    let api_url = base_url_override.unwrap_or_else(|| cfg.api_url.to_string());
+    let api_url = base_url_override
+        .or_else(|| env::var("REMITMD_API_URL").ok())
+        .unwrap_or_else(|| cfg.api_url.to_string());
     let router_addr = router_address.unwrap_or_default();
     let address = signer.address().to_string();
 

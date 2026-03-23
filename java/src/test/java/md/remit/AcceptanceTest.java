@@ -40,8 +40,8 @@ class AcceptanceTest {
 
     private static final String API_URL = envOr("ACCEPTANCE_API_URL", "https://remit.md");
     private static final String RPC_URL = envOr("ACCEPTANCE_RPC_URL", "https://sepolia.base.org");
-    private static final String USDC_ADDRESS = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317";
-    private static final String FEE_WALLET = "0xd3f721BDF92a2bB5Dd8d2FE2AFC03aFE5629B420";
+    private static final String USDC_ADDRESS = "0x2d846325766921935f37d5b4478196d3ef93707c";
+    private static final String FEE_WALLET = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
     private static final long CHAIN_ID = 84532L;
 
     private static final HttpClient HTTP = HttpClient.newBuilder()

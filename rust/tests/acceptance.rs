@@ -24,8 +24,8 @@ fn rpc_url() -> String {
     env::var("ACCEPTANCE_RPC_URL").unwrap_or_else(|_| "https://sepolia.base.org".to_string())
 }
 
-const USDC_ADDRESS: &str = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317";
-const FEE_WALLET: &str = "0xd3f721BDF92a2bB5Dd8d2FE2AFC03aFE5629B420";
+const USDC_ADDRESS: &str = "0x2d846325766921935f37d5b4478196d3ef93707c";
+const FEE_WALLET: &str = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
 const CHAIN_ID: u64 = 84532;
 
 // ─── Contract discovery (unauthenticated) ────────────────────────────────────

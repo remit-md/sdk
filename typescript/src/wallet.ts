@@ -188,7 +188,7 @@ export class Wallet extends RemitClient {
 
   /** Default USDC addresses per chain. */
   static readonly USDC_ADDRESSES: Record<string, string> = {
-    "base-sepolia": "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+    "base-sepolia": "0x2d846325766921935f37d5b4478196d3ef93707c",
     base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     localhost: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   };

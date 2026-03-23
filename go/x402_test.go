@@ -15,7 +15,7 @@ import (
 const (
 	_testWallet  = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 	_testNetwork = "eip155:84532"
-	_testAsset   = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317"
+	_testAsset   = "0x2d846325766921935f37d5b4478196d3ef93707c"
 )
 
 func makePaywall(t *testing.T, opts ...func(*remitmd.PaywallOptions)) *remitmd.X402Paywall {

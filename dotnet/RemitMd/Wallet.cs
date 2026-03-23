@@ -31,7 +31,7 @@ public sealed class Wallet
     // Chain → USDC contract address
     private static readonly Dictionary<string, string> UsdcAddresses = new()
     {
-        ["base-sepolia"] = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+        ["base-sepolia"] = "0x2d846325766921935f37d5b4478196d3ef93707c",
         ["base"]         = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
         ["localhost"]    = "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     };

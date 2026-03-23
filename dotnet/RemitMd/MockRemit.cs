@@ -118,16 +118,16 @@ public sealed class MockRemit
 
                 "/api/v1/contracts" => new ContractAddresses(
                     84532,
-                    "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
-                    "0xb3E96ebE54138d1c0caea00Ae098309C7E0138eC",
-                    "0x9AC531dd432d5dcF637D288290E5A23F2eE36594",
-                    "0xE6D1Bc6dE70Dbc432d5fFbE8Bcd2C578C49Eb23b",
-                    "0x9e54bFB3Dcd1dB1235655a4D22b1c1d74b62C883",
-                    "0x2D08DD3093De3F22f85300330671122300F1e01b",
-                    "0x5DC44bd61729Dc06187D0F2B1612ea21e69B6a52",
-                    "0x853CFc2387C184E4492892475adfc19A23FF2e4F",
-                    "0x97ff63c9E24Fc074023F5d1251E544dCDaC93886",
-                    "0x3b2C97AafCdFBD5F6C9cF86dDa684Faa248008B1"),
+                    "0x2d846325766921935f37d5b4478196d3ef93707c",
+                    "0x3120f396ff6a9afc5a9d92e28796082f1429e024",
+                    "0x47de7cdd757e3765d36c083dab59b2c5a9d249f2",
+                    "0x9415f510d8c6199e0f66bde927d7d88de391f5e8",
+                    "0x20d413e0eac0f5da3c8630667fd16a94fcd7231a",
+                    "0xb3868471c3034280cce3a56dd37c6154c3bb0b32",
+                    "0x7e0ae37df62e93c1c16a5661a7998bd174331554",
+                    "0xcce1b8cee59f860578bed3c05fe2a80eea04aafb",
+                    "0xf5ba0baa124885eb88ad225e81a60864d5e43074",
+                    "0x4b88c779c970314216b97ca94cb6d380db57ce91"),
 
                 _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled GET {path}"),
             };

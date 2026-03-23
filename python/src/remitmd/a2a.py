@@ -269,7 +269,7 @@ class A2AClient:
 
     async def get(self, task_id: str) -> A2ATask:
         """Fetch the current state of an A2A task by ID."""
-        call_id = task_id.lstrip("task_")[:16] or secrets.token_hex(8)
+        call_id = task_id.removeprefix("task_")[:16] or secrets.token_hex(8)
         result = await self._auth.post(
             self._path,
             {
@@ -283,7 +283,7 @@ class A2AClient:
 
     async def cancel(self, task_id: str) -> A2ATask:
         """Cancel an in-progress A2A task."""
-        call_id = task_id.lstrip("task_")[:16] or secrets.token_hex(8)
+        call_id = task_id.removeprefix("task_")[:16] or secrets.token_hex(8)
         result = await self._auth.post(
             self._path,
             {

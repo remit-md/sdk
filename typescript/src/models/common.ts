@@ -43,12 +43,12 @@ export interface Transaction {
 export interface WalletStatus {
   wallet: string;
   balance: string;
-  monthly_volume: string;
+  monthlyVolume: string;
   tier: string;
-  fee_rate_bps: number; // basis points
-  active_escrows: number;
-  active_tabs: number;
-  active_streams: number;
+  feeRateBps: number; // basis points
+  activeEscrows: number;
+  activeTabs: number;
+  activeStreams: number;
 }
 
 /** On-chain reputation profile. */

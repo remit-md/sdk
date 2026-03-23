@@ -348,9 +348,9 @@ export class Wallet extends RemitClient {
   }
 
   submitEvidence(invoiceId: string, evidenceUri: string, milestoneIndex = 0): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/evidence`, {
-      evidenceUri,
-      milestoneIndex,
+    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/claim-start`, {
+      evidence_uri: evidenceUri,
+      milestone_index: milestoneIndex,
     });
   }
 
@@ -359,7 +359,9 @@ export class Wallet extends RemitClient {
   }
 
   releaseMilestone(invoiceId: string, milestoneIndex: number): Promise<Transaction> {
-    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/milestones/${milestoneIndex}/release`, {});
+    return this.#auth.post<Transaction>(`/escrows/${invoiceId}/release`, {
+      milestone_ids: [milestoneIndex],
+    });
   }
 
   cancelEscrow(invoiceId: string): Promise<Transaction> {

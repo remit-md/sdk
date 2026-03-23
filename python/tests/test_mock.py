@@ -138,7 +138,7 @@ async def test_tab_double_close_raises(mock, payer, payee):
 
 @pytest.mark.asyncio
 async def test_stream_open_and_close(mock, payer, payee):
-    stream = await payer.open_stream(payee.address, rate=1.0, max_duration=60)
+    stream = await payer.open_stream(payee.address, rate=1.0, max_total=60.0)
     assert stream.status == StreamStatus.active
 
     mock.advance_time(30)  # 30 seconds pass

@@ -92,7 +92,7 @@ export interface LinkResponse {
 
 /** Contract addresses returned by GET /contracts. */
 export interface ContractAddresses {
-  chain_id: number;
+  chainId: number;
   usdc: string;
   router: string;
   escrow: string;
@@ -100,7 +100,7 @@ export interface ContractAddresses {
   stream: string;
   bounty: string;
   deposit: string;
-  fee_calculator: string;
-  key_registry: string;
+  feeCalculator: string;
+  keyRegistry: string;
   relayer?: string;
 }

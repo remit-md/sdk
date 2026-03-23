@@ -35,7 +35,7 @@ class InvalidSignature(RemitError):
 
 
 class SignatureExpired(RemitError):
-    code = "SIGNATURE_EXPIRED"
+    code = "TIMESTAMP_EXPIRED"
     http_status = 401
 
 
@@ -147,7 +147,7 @@ class InvalidChain(RemitError):
 
 
 class RateLimitExceeded(RemitError):
-    code = "RATE_LIMIT_EXCEEDED"
+    code = "RATE_LIMITED"
     http_status = 429
 
 
@@ -173,7 +173,8 @@ class ServerError(RemitError):
 
 _CODE_MAP: dict[str, type[RemitError]] = {
     "INVALID_SIGNATURE": InvalidSignature,
-    "SIGNATURE_EXPIRED": SignatureExpired,
+    "TIMESTAMP_EXPIRED": SignatureExpired,
+    "SIGNATURE_EXPIRED": SignatureExpired,  # backwards-compat alias
     "NONCE_REUSED": NonceReused,
     "UNAUTHORIZED": Unauthorized,
     "INSUFFICIENT_BALANCE": InsufficientBalance,
@@ -193,7 +194,8 @@ _CODE_MAP: dict[str, type[RemitError]] = {
     "INVALID_AMOUNT": InvalidAmount,
     "INVALID_ADDRESS": InvalidAddress,
     "INVALID_CHAIN": InvalidChain,
-    "RATE_LIMIT_EXCEEDED": RateLimitExceeded,
+    "RATE_LIMITED": RateLimitExceeded,
+    "RATE_LIMIT_EXCEEDED": RateLimitExceeded,  # backwards-compat alias
     "CHAIN_UNAVAILABLE": ChainUnavailable,
     "TRANSACTION_FAILED": TransactionFailed,
     "SERVER_ERROR": ServerError,

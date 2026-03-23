@@ -25,7 +25,7 @@ jobs:
     name: Vectors · Python
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -39,7 +39,7 @@ jobs:
     name: Vectors · TypeScript
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: pnpm/action-setup@v4
         with:
           version: 'latest'
@@ -57,7 +57,7 @@ jobs:
     name: Vectors · Go
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
@@ -71,7 +71,7 @@ jobs:
     name: Vectors · Rust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -83,7 +83,7 @@ jobs:
     name: Vectors · .NET
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
@@ -98,7 +98,7 @@ jobs:
     name: Vectors · Java
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -113,7 +113,7 @@ jobs:
     name: Vectors · Ruby
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
@@ -126,7 +126,7 @@ jobs:
     name: Vectors · Swift
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build
         run: cd swift && swift build
       - name: Golden vectors
@@ -136,7 +136,7 @@ jobs:
     name: Vectors · Elixir
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: '1.16'

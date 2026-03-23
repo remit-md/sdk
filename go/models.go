@@ -31,25 +31,27 @@ const (
 	InvoiceStatusCancelled InvoiceStatus = "cancelled"
 	InvoiceStatusExpired   InvoiceStatus = "expired"
 
-	EscrowStatusPending   EscrowStatus = "pending"
 	EscrowStatusFunded    EscrowStatus = "funded"
-	EscrowStatusReleased  EscrowStatus = "released"
+	EscrowStatusActive    EscrowStatus = "active"
+	EscrowStatusCompleted EscrowStatus = "completed"
+	EscrowStatusDisputed  EscrowStatus = "disputed"
 	EscrowStatusCancelled EscrowStatus = "cancelled"
-	EscrowStatusExpired   EscrowStatus = "expired"
+	EscrowStatusTimedOut  EscrowStatus = "timed_out"
 
-	TabStatusOpen   TabStatus = "open"
-	TabStatusClosed TabStatus = "closed"
-	TabStatusSettled TabStatus = "settled"
+	TabStatusOpen     TabStatus = "open"
+	TabStatusDepleted TabStatus = "depleted"
+	TabStatusClosed   TabStatus = "closed"
+	TabStatusExpired  TabStatus = "expired"
 
-	StreamStatusActive   StreamStatus = "active"
-	StreamStatusPaused   StreamStatus = "paused"
-	StreamStatusEnded    StreamStatus = "ended"
-	StreamStatusCancelled StreamStatus = "cancelled"
+	StreamStatusActive     StreamStatus = "active"
+	StreamStatusClosed     StreamStatus = "closed"
+	StreamStatusTerminated StreamStatus = "terminated"
 
-	BountyStatusOpen       BountyStatus = "open"
-	BountyStatusAwarded    BountyStatus = "awarded"
-	BountyStatusExpired    BountyStatus = "expired"
-	BountyStatusReclaimed  BountyStatus = "reclaimed"
+	BountyStatusOpen      BountyStatus = "open"
+	BountyStatusClaimed   BountyStatus = "claimed"
+	BountyStatusAwarded   BountyStatus = "awarded"
+	BountyStatusExpired   BountyStatus = "expired"
+	BountyStatusReclaimed BountyStatus = "reclaimed"
 
 	DepositStatusLocked    DepositStatus = "locked"
 	DepositStatusReturned  DepositStatus = "returned"
@@ -58,8 +60,8 @@ const (
 
 // PermitSignature holds an EIP-2612 permit signature for gasless USDC approval.
 type PermitSignature struct {
-	Value    int    `json:"value"`
-	Deadline int    `json:"deadline"`
+	Value    int64  `json:"value"`
+	Deadline int64  `json:"deadline"`
 	V        int    `json:"v"`
 	R        string `json:"r"`
 	S        string `json:"s"`

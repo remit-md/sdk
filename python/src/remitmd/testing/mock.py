@@ -192,7 +192,7 @@ class MockWallet:
 
     # ─── Escrow ───────────────────────────────────────────────────────────────
 
-    async def pay(self, invoice: Invoice) -> Transaction:
+    async def pay(self, invoice: Invoice) -> Escrow:
         self._mock._check_forced_error(self.address)
         self._mock._debit(self.address, invoice.amount)
 
@@ -213,7 +213,7 @@ class MockWallet:
             updated_at=now,
         )
         self._mock._state.escrows[invoice_id] = escrow
-        return self._mock._make_tx(invoice_id=invoice_id)
+        return escrow
 
     async def release_escrow(self, invoice_id: str) -> Transaction:
         self._mock._check_forced_error(self.address)

@@ -42,15 +42,18 @@ internal sealed class ApiClient : IDisposable
     internal async Task<T> GetAsync<T>(string path, CancellationToken ct)
     {
         var response = await ExecuteWithRetryAsync(
-            () => SendSignedAsync(HttpMethod.Get, path, body: null, ct), ct);
+            () => SendSignedAsync(HttpMethod.Get, path, body: null, idempotencyKey: null, ct), ct);
         return await DeserializeAsync<T>(response);
     }
 
     /// <summary>Makes a POST request with a JSON body and deserializes the response.</summary>
     internal async Task<T> PostAsync<T>(string path, object body, CancellationToken ct)
     {
+        // Generate idempotency key once per request (stable across retries).
+        var keyBytes = RandomNumberGenerator.GetBytes(16);
+        var idempotencyKey = Convert.ToHexString(keyBytes).ToLowerInvariant();
         var response = await ExecuteWithRetryAsync(
-            () => SendSignedAsync(HttpMethod.Post, path, body, ct), ct);
+            () => SendSignedAsync(HttpMethod.Post, path, body, idempotencyKey, ct), ct);
         return await DeserializeAsync<T>(response);
     }
 
@@ -58,6 +61,7 @@ internal sealed class ApiClient : IDisposable
         HttpMethod method,
         string path,
         object? body,
+        string? idempotencyKey,
         CancellationToken ct)
     {
         // Generate fresh nonce and timestamp for each attempt (replay protection).
@@ -74,6 +78,9 @@ internal sealed class ApiClient : IDisposable
         req.Headers.Add("X-Remit-Nonce",     nonceHex);
         req.Headers.Add("X-Remit-Timestamp", timestamp.ToString());
         req.Headers.Add("X-Remit-Signature", signature);
+
+        if (idempotencyKey is not null)
+            req.Headers.Add("X-Idempotency-Key", idempotencyKey);
 
         if (body is not null)
             req.Content = JsonContent.Create(body, options: JsonOptions);

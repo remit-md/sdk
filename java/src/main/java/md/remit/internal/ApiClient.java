@@ -54,7 +54,11 @@ public class ApiClient {
     }
 
     public <T> T post(String path, Object body, Class<T> responseType) {
-        return executeWithRetry(() -> doPost(path, body, responseType));
+        // Generate idempotency key once per request (stable across retries).
+        byte[] keyBytes = new byte[16];
+        new SecureRandom().nextBytes(keyBytes);
+        String idempotencyKey = HexFormat.of().formatHex(keyBytes);
+        return executeWithRetry(() -> doPost(path, body, responseType, idempotencyKey));
     }
 
     private <T> T doGet(String path, Class<T> responseType) throws Exception {
@@ -78,14 +82,14 @@ public class ApiClient {
         return handleResponse(resp, responseType);
     }
 
-    private <T> T doPost(String path, Object body, Class<T> responseType) throws Exception {
+    private <T> T doPost(String path, Object body, Class<T> responseType, String idempotencyKey) throws Exception {
         String bodyJson = body != null ? MAPPER.writeValueAsString(body) : "{}";
         byte[] nonce = generateNonce();
         String nonceHex = "0x" + HexFormat.of().formatHex(nonce);
         long timestamp = Instant.now().getEpochSecond();
         String signature = signEip712("POST", path, timestamp, nonce);
 
-        HttpRequest req = HttpRequest.newBuilder()
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + path))
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
@@ -93,7 +97,13 @@ public class ApiClient {
             .header("X-Remit-Nonce", nonceHex)
             .header("X-Remit-Timestamp", String.valueOf(timestamp))
             .header("X-Remit-Signature", signature)
-            .timeout(Duration.ofSeconds(30))
+            .timeout(Duration.ofSeconds(30));
+
+        if (idempotencyKey != null) {
+            builder.header("X-Idempotency-Key", idempotencyKey);
+        }
+
+        HttpRequest req = builder
             .POST(HttpRequest.BodyPublishers.ofString(bodyJson))
             .build();
 

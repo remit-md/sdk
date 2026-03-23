@@ -155,12 +155,12 @@ export class MockRemit {
     return {
       wallet: address,
       balance: String(state.balance),
-      monthly_volume: "0",
+      monthlyVolume: "0",
       tier: "trusted",
-      fee_rate_bps: 50,
-      active_escrows: 0,
-      active_tabs: 0,
-      active_streams: 0,
+      feeRateBps: 50,
+      activeEscrows: 0,
+      activeTabs: 0,
+      activeStreams: 0,
     };
   }
 

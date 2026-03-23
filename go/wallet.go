@@ -487,6 +487,8 @@ func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.D
 	return &tab, nil
 }
 
+// Deprecated: Use ChargeTab instead. DebitTab will be removed in a future release.
+//
 // DebitTab charges the given amount from an open tab (off-chain, signed).
 func (w *Wallet) DebitTab(ctx context.Context, tabID string, amount decimal.Decimal, memo string) (*TabDebit, error) {
 	body := map[string]any{
@@ -1033,8 +1035,9 @@ func (w *Wallet) SignPermit(ctx context.Context, spender string, amount float64,
 		dl = deadline[0]
 	}
 
-	// Convert USDC amount to base units (6 decimals)
-	rawAmount := new(big.Int).SetUint64(uint64(amount * 1e6))
+	// Convert USDC amount to base units (6 decimals) using integer math
+	amountDec := decimal.NewFromFloat(amount)
+	rawAmount := amountDec.Mul(decimal.NewFromInt(1_000_000)).BigInt()
 	chainID := new(big.Int).SetUint64(uint64(w.chainID))
 
 	digest := computePermitDigest(
@@ -1058,8 +1061,8 @@ func (w *Wallet) SignPermit(ctx context.Context, spender string, amount float64,
 	v := int(sig[64])
 
 	return &PermitSignature{
-		Value:    int(rawAmount.Int64()),
-		Deadline: int(dl),
+		Value:    rawAmount.Int64(),
+		Deadline: dl,
 		V:        v,
 		R:        r,
 		S:        s,

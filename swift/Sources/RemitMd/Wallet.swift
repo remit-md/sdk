@@ -28,7 +28,7 @@ public final class RemitWallet: @unchecked Sendable {
         "localhost": "http://127.0.0.1:8545",
     ]
 
-    public init(privateKey: String, chain: RemitChain = .baseSepolia, baseURL: String? = nil, routerAddress: String? = nil, rpcUrl: String? = nil) throws {
+    public init(privateKey: String, chain: RemitChain = .base, baseURL: String? = nil, routerAddress: String? = nil, rpcUrl: String? = nil) throws {
         let signer = try PrivateKeySigner(privateKey: privateKey)
         self.transport = HttpTransport(
             baseURL: baseURL ?? chain.baseURL,
@@ -57,10 +57,16 @@ public final class RemitWallet: @unchecked Sendable {
 
     public static func fromEnvironment() throws -> RemitWallet {
         let env = ProcessInfo.processInfo.environment
-        guard let key = env["REMITMD_PRIVATE_KEY"] else {
-            throw RemitError(RemitError.unauthorized, "REMITMD_PRIVATE_KEY environment variable not set")
+        let key: String
+        if let k = env["REMITMD_KEY"] {
+            key = k
+        } else if let k = env["REMITMD_PRIVATE_KEY"] {
+            print("[remitmd] Warning: REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead")
+            key = k
+        } else {
+            throw RemitError(RemitError.unauthorized, "REMITMD_KEY environment variable not set")
         }
-        let chainStr = env["REMITMD_CHAIN"] ?? "base-sepolia"
+        let chainStr = env["REMITMD_CHAIN"] ?? "base"
         let chain: RemitChain = chainStr == "base" ? .base : .baseSepolia
         let routerAddress = env["REMITMD_ROUTER_ADDRESS"]
         let rpcUrl = env["REMITMD_RPC_URL"]

@@ -32,7 +32,7 @@ describe("TypeScript compliance: authentication", () => {
 
     const wallet = makeWallet();
     // status() uses #auth.get — if EIP-712 is wrong this returns 401 not 200.
-    // Server returns { wallet, tier, monthly_volume, fee_rate_bps, ... }.
+    // Server returns { wallet, tier, monthlyVolume, feeRateBps, ... } (camelized by SDK).
     const status = await wallet.status();
     // Server uses "wallet" key (not "address"), cast to access it.
     const raw = status as unknown as Record<string, unknown>;

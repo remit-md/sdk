@@ -105,7 +105,7 @@ export class AuthenticatedClient {
     return this.#request<T>("DELETE", path);
   }
 
-  async #request<T>(method: string, path: string, body?: unknown, attempt = 0): Promise<T> {
+  async #request<T>(method: string, path: string, body?: unknown, attempt = 0, idempotencyKey?: string): Promise<T> {
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = newNonce();
 
@@ -130,6 +130,11 @@ export class AuthenticatedClient {
       { method, path: signedPath, timestamp: BigInt(timestamp), nonce },
     );
 
+    // Generate idempotency key ONCE on the first attempt, reuse across retries.
+    const idemKey = idempotencyKey ?? (
+      (method === "POST" || method === "PUT" || method === "PATCH") ? newIdempotencyKey() : undefined
+    );
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "X-Remit-Agent": this.#signer.getAddress(),
@@ -138,8 +143,8 @@ export class AuthenticatedClient {
       "X-Remit-Nonce": nonce,
     };
 
-    if (method === "POST" || method === "PUT" || method === "PATCH") {
-      headers["X-Idempotency-Key"] = newIdempotencyKey();
+    if (idemKey) {
+      headers["X-Idempotency-Key"] = idemKey;
     }
 
     let response: Response;
@@ -168,7 +173,7 @@ export class AuthenticatedClient {
       } else {
         await sleep(DELAY_MS[attempt]);
       }
-      return this.#request<T>(method, path, body, attempt + 1);
+      return this.#request<T>(method, path, body, attempt + 1, idemKey);
     }
 
     // Parse error body

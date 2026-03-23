@@ -80,6 +80,11 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
         req.setValue(String(timestamp), forHTTPHeaderField: "X-Remit-Timestamp")
         req.setValue(sig, forHTTPHeaderField: "X-Remit-Signature")
 
+        // Add idempotency key for mutating requests (generated once, stable across retries).
+        if method == "POST" || method == "PUT" || method == "PATCH" {
+            req.setValue(UUID().uuidString.lowercased(), forHTTPHeaderField: "X-Idempotency-Key")
+        }
+
         return try await withRetry(maxRetries: maxRetries) {
             let (data, response) = try await self.session.data(for: req)
             let http = response as! HTTPURLResponse

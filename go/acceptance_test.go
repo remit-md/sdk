@@ -272,8 +272,8 @@ func signUSDCPermit(
 	sig[64] += 27 // Ethereum v adjustment
 
 	return &remitmd.PermitSignature{
-		Value:    int(value.Int64()),
-		Deadline: int(deadline.Int64()),
+		Value:    value.Int64(),
+		Deadline: deadline.Int64(),
 		V:        int(sig[64]),
 		R:        "0x" + hex.EncodeToString(sig[:32]),
 		S:        "0x" + hex.EncodeToString(sig[32:64]),

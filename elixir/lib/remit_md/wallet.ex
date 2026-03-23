@@ -115,9 +115,13 @@ defmodule RemitMd.Wallet do
   Optional: `REMITMD_CHAIN`, `REMITMD_API_URL`, `REMITMD_ROUTER_ADDRESS`
   """
   def from_env do
-    key =
-      System.get_env("REMITMD_PRIVATE_KEY") ||
-        raise Error.new(Error.unauthorized(), "REMITMD_PRIVATE_KEY not set")
+    key = System.get_env("REMITMD_KEY") || System.get_env("REMITMD_PRIVATE_KEY")
+
+    if System.get_env("REMITMD_PRIVATE_KEY") && !System.get_env("REMITMD_KEY") do
+      IO.warn("REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead")
+    end
+
+    key || raise Error.new(Error.unauthorized(), "REMITMD_KEY not set")
 
     chain          = System.get_env("REMITMD_CHAIN", "base")
     api_url        = System.get_env("REMITMD_API_URL")

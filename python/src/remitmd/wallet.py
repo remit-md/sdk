@@ -233,14 +233,22 @@ class Wallet(RemitClient):
         return await self.sign_usdc_permit(spender, raw, dl, nonce, usdc_addr)
 
     async def _auto_permit(self, contract: str, amount: float) -> PermitSignature | None:
-        """Internal: auto-sign a permit for the given contract type and amount."""
+        """Internal: auto-sign a permit for the given contract type and amount.
+
+        Catches permit-specific errors (missing contract, signing failures)
+        and returns None. Re-raises all other errors.
+        """
+        import logging
+
+        logger = logging.getLogger("remitmd")
         try:
             contracts = await self.get_contracts()
             spender = str(contracts.get(contract, ""))
             if not spender:
                 return None
             return await self.sign_permit(spender, amount)
-        except Exception:
+        except (ValueError, KeyError, TypeError, RuntimeError) as exc:
+            logger.warning("auto-permit failed for %s (amount=%s): %s", contract, amount, exc)
             return None
 
     # ─── Direct payment ───────────────────────────────────────────────────────
@@ -314,10 +322,21 @@ class Wallet(RemitClient):
         self,
         invoice_id: str,
         evidence_uri: str,
+        evidence_hash: str = "",
     ) -> Escrow:
+        """Submit evidence for an escrow via the claim-start endpoint.
+
+        Args:
+            invoice_id: The invoice/escrow ID.
+            evidence_uri: URI pointing to the evidence (e.g. IPFS hash).
+            evidence_hash: Optional hash of the evidence content.
+        """
+        body: dict[str, Any] = {"evidence_uri": evidence_uri}
+        if evidence_hash:
+            body["evidence_hash"] = evidence_hash
         data = await self._http.post(
             f"/api/v1/escrows/{invoice_id}/claim-start",
-            {"evidence_uri": evidence_uri},
+            body,
         )
         return Escrow.model_validate(data)
 

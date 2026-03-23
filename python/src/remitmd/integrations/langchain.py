@@ -32,6 +32,28 @@ if TYPE_CHECKING:
     pass
 
 
+def _run_async(coro: Any) -> Any:
+    """Run an async coroutine from a sync context.
+
+    Uses ``asyncio.run()`` when no event loop is running. Falls back to
+    ``loop.run_until_complete()`` when called from within an existing
+    async context (e.g. Jupyter notebooks, async frameworks).
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is None:
+        return asyncio.run(coro)
+
+    # Already inside a running loop — cannot use asyncio.run().
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
+
+
 class RemitToolkit(BaseToolkit):
     """LangChain toolkit providing remit.md payment tools."""
 
@@ -103,7 +125,7 @@ class RemitPayDirectTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, to: str, amount: float, memo: str = "") -> str:
-        result = asyncio.run(self.wallet.pay_direct(to, amount, memo))
+        result = _run_async(self.wallet.pay_direct(to, amount, memo))
         return f"Payment sent. tx_hash={result.tx_hash}"
 
     async def _arun(self, to: str, amount: float, memo: str = "") -> str:
@@ -126,7 +148,7 @@ class RemitCreateEscrowTool(BaseTool):
         from remitmd.models.invoice import Invoice
 
         invoice = Invoice(to=to, amount=amount, memo=task, timeout=timeout)
-        result = asyncio.run(self.wallet.pay(invoice))
+        result = _run_async(self.wallet.pay(invoice))
         return f"Escrow created. invoice_id={result.invoice_id}"
 
     async def _arun(self, to: str, amount: float, task: str, timeout: int = 86400) -> str:
@@ -147,7 +169,7 @@ class RemitReleaseEscrowTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, invoice_id: str) -> str:
-        asyncio.run(self.wallet.release_escrow(invoice_id))
+        _run_async(self.wallet.release_escrow(invoice_id))
         return f"Escrow {invoice_id} released."
 
     async def _arun(self, invoice_id: str) -> str:
@@ -165,12 +187,12 @@ class RemitOpenTabTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, to: str, limit: float, per_unit: float, expires: int = 86400) -> str:
-        tab = asyncio.run(self.wallet.open_tab(to, limit, per_unit, expires))
-        return f"Tab opened. tab_id={tab.id}, limit={tab.limit}"
+        tab = _run_async(self.wallet.open_tab(to, limit, per_unit, expires))
+        return f"Tab opened. tab_id={tab.id}, limit={tab.limit_amount}"
 
     async def _arun(self, to: str, limit: float, per_unit: float, expires: int = 86400) -> str:
         tab = await self.wallet.open_tab(to, limit, per_unit, expires)
-        return f"Tab opened. tab_id={tab.id}, limit={tab.limit}"
+        return f"Tab opened. tab_id={tab.id}, limit={tab.limit_amount}"
 
 
 class RemitCloseTabTool(BaseTool):
@@ -183,7 +205,7 @@ class RemitCloseTabTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, tab_id: str) -> str:
-        asyncio.run(self.wallet.close_tab(tab_id))
+        _run_async(self.wallet.close_tab(tab_id))
         return f"Tab {tab_id} closed."
 
     async def _arun(self, tab_id: str) -> str:
@@ -201,29 +223,31 @@ class RemitOpenStreamTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, to: str, rate: float, max_duration: int = 3600) -> str:
-        stream = asyncio.run(self.wallet.open_stream(to, rate, max_duration))
-        return f"Stream opened. stream_id={stream.id}, rate={stream.rate_per_second}/s"
+        max_total = rate * max_duration
+        result = _run_async(self.wallet.open_stream(to, rate, max_total))
+        return f"Stream opened. stream_id={result.id}, rate={result.rate_per_second}/s"
 
     async def _arun(self, to: str, rate: float, max_duration: int = 3600) -> str:
-        stream = await self.wallet.open_stream(to, rate, max_duration)
+        max_total = rate * max_duration
+        stream = await self.wallet.open_stream(to, rate, max_total)
         return f"Stream opened. stream_id={stream.id}, rate={stream.rate_per_second}/s"
 
 
 class RemitCheckBalanceTool(BaseTool):
     name: str = "remit_check_balance"
-    description: str = "Check your current USDC balance."
+    description: str = "Check your current USDC balance and wallet status."
     wallet: Any
 
     class Config:
         arbitrary_types_allowed = True
 
     def _run(self) -> str:
-        bal = asyncio.run(self.wallet.balance())
-        return f"Balance: ${bal:.2f} USDC"
+        ws = _run_async(self.wallet.status())
+        return f"Balance: ${ws.balance} USDC (tier={ws.tier}, fee={ws.fee_rate_bps}bps)"
 
     async def _arun(self) -> str:
-        bal = await self.wallet.balance()
-        return f"Balance: ${bal:.2f} USDC"
+        ws = await self.wallet.status()
+        return f"Balance: ${ws.balance} USDC (tier={ws.tier}, fee={ws.fee_rate_bps}bps)"
 
 
 class RemitGetReputationTool(BaseTool):
@@ -235,7 +259,7 @@ class RemitGetReputationTool(BaseTool):
         arbitrary_types_allowed = True
 
     def _run(self, wallet: str) -> str:
-        rep = asyncio.run(self.wallet.get_reputation(wallet))
+        rep = _run_async(self.wallet.get_reputation(wallet))
         return f"Reputation for {wallet[:10]}...: score={rep.score:.2f}"
 
     async def _arun(self, wallet: str) -> str:

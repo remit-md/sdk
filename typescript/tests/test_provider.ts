@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { X402Paywall } from "../src/provider.js";
 
 const WALLET = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
-const USDC = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317";
+const USDC = "0x2d846325766921935f37d5b4478196d3ef93707c";
 const NETWORK = "eip155:31337";
 
 function makePaywall(overrides: Partial<ConstructorParameters<typeof X402Paywall>[0]> = {}): X402Paywall {

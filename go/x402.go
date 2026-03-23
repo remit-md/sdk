@@ -23,7 +23,7 @@ import (
 //	    WalletAddress:    "0xYourProviderWallet",
 //	    AmountUsdc:       0.001,
 //	    Network:          "eip155:84532",
-//	    Asset:            "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+//	    Asset:            "0x2d846325766921935f37d5b4478196d3ef93707c",
 //	    FacilitatorToken: os.Getenv("REMITMD_TOKEN"),
 //	})
 //

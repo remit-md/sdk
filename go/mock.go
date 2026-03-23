@@ -71,13 +71,13 @@ func (m *MockRemit) Wallet() *Wallet {
 		rpcURL:   "", // empty = skip RPC calls in mock mode
 		contractsCache: &ContractAddresses{
 			ChainID: int(ChainBaseSep),
-			USDC:    "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
-			Router:  "0xb3E96ebE54138d1c0caea00Ae098309C7E0138eC",
-			Escrow:  "0x9AC531dd432d5dcF637D288290E5A23F2eE36594",
-			Tab:     "0xE6D1Bc6dE70Dbc432d5fFbE8Bcd2C578C49Eb23b",
-			Stream:  "0x9e54bFB3Dcd1dB1235655a4D22b1c1d74b62C883",
-			Bounty:  "0x2D08DD3093De3F22f85300330671122300F1e01b",
-			Deposit: "0x5DC44bd61729Dc06187D0F2B1612ea21e69B6a52",
+			USDC:    "0x2d846325766921935f37d5b4478196d3ef93707c",
+			Router:  "0x3120f396ff6a9afc5a9d92e28796082f1429e024",
+			Escrow:  "0x47de7cdd757e3765d36c083dab59b2c5a9d249f2",
+			Tab:     "0x9415f510d8c6199e0f66bde927d7d88de391f5e8",
+			Stream:  "0x20d413e0eac0f5da3c8630667fd16a94fcd7231a",
+			Bounty:  "0xb3868471c3034280cce3a56dd37c6154c3bb0b32",
+			Deposit: "0x7e0ae37df62e93c1c16a5661a7998bd174331554",
 		},
 	}
 }

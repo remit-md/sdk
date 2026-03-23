@@ -38,8 +38,8 @@ import (
 var (
 	acceptanceAPIURL = envOr("ACCEPTANCE_API_URL", "https://remit.md")
 	acceptanceRPCURL = envOr("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
-	usdcAddress      = common.HexToAddress("0x142aD61B8d2edD6b3807D9266866D97C35Ee0317")
-	feeWalletAddr    = "0xd3f721BDF92a2bB5Dd8d2FE2AFC03aFE5629B420"
+	usdcAddress      = common.HexToAddress("0x2d846325766921935f37d5b4478196d3ef93707c")
+	feeWalletAddr    = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
 	baseSepoliaID    = big.NewInt(84532)
 )
 

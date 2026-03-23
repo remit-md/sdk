@@ -12,7 +12,7 @@ import { generatePrivateKey } from "viem/accounts";
 
 export const API_URL = process.env["ACCEPTANCE_API_URL"] ?? "https://remit.md/api/v1";
 export const RPC_URL = process.env["ACCEPTANCE_RPC_URL"] ?? "https://sepolia.base.org";
-export const FEE_WALLET = "0xd3f721BDF92a2bB5Dd8d2FE2AFC03aFE5629B420";
+export const FEE_WALLET = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
 
 // ─── Router address (fetched once from /contracts) ──────────────────────────
 
@@ -56,7 +56,7 @@ export async function fundWallet(wallet: Wallet, amount = 100): Promise<void> {
 export async function getUsdcBalance(address: string): Promise<number> {
   const paddedAddr = address.toLowerCase().replace("0x", "").padStart(64, "0");
   const data = `0x70a08231${paddedAddr}`;
-  const usdcAddress = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317";
+  const usdcAddress = "0x2d846325766921935f37d5b4478196d3ef93707c";
 
   const res = await fetch(RPC_URL, {
     method: "POST",

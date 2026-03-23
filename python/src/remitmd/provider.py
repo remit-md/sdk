@@ -12,7 +12,7 @@ Usage (FastAPI)::
         wallet_address="0xYourProviderWallet",
         amount_usdc=0.001,
         network="eip155:84532",
-        asset="0x142aD61B8d2edD6b3807D9266866D97C35Ee0317",
+        asset="0x2d846325766921935f37d5b4478196d3ef93707c",
         facilitator_token="your-bearer-jwt",
         resource="/v1/data",
         description="Realtime market data feed",

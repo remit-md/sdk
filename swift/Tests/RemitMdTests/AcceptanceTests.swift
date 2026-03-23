@@ -17,8 +17,8 @@ final class AcceptanceTests: XCTestCase {
 
     static let apiURL = ProcessInfo.processInfo.environment["ACCEPTANCE_API_URL"] ?? "https://remit.md"
     static let rpcURL = ProcessInfo.processInfo.environment["ACCEPTANCE_RPC_URL"] ?? "https://sepolia.base.org"
-    static let usdcAddress = "0x142aD61B8d2edD6b3807D9266866D97C35Ee0317"
-    static let feeWallet = "0xd3f721BDF92a2bB5Dd8d2FE2AFC03aFE5629B420"
+    static let usdcAddress = "0x2d846325766921935f37d5b4478196d3ef93707c"
+    static let feeWallet = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
     static let chainIdVal: UInt64 = 84532
 
     static var contracts: [String: Any]?

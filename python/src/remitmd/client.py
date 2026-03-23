@@ -27,7 +27,6 @@ class ContractAddresses(TypedDict):
     deposit: str
     fee_calculator: str
     key_registry: str
-    arbitration: str
     # relayer: str — optional, accessed via .get() in _auto_permit
 
 

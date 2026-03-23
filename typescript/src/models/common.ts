@@ -102,6 +102,5 @@ export interface ContractAddresses {
   deposit: string;
   fee_calculator: string;
   key_registry: string;
-  arbitration: string;
   relayer?: string;
 }

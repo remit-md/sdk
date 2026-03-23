@@ -239,7 +239,6 @@ public record ContractAddresses(
     [property: JsonPropertyName("deposit")] string Deposit,
     [property: JsonPropertyName("fee_calculator")] string FeeCalculator,
     [property: JsonPropertyName("key_registry")] string KeyRegistry,
-    [property: JsonPropertyName("arbitration")] string Arbitration,
     [property: JsonPropertyName("relayer")] string? Relayer = null
 );
 

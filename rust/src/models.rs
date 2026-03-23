@@ -96,7 +96,6 @@ pub struct ContractAddresses {
     pub deposit: String,
     pub fee_calculator: String,
     pub key_registry: String,
-    pub arbitration: String,
     #[serde(default)]
     pub relayer: Option<String>,
 }

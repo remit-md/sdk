@@ -30,8 +30,9 @@ defmodule RemitMd do
 
   Environment variables:
 
-  - `REMITMD_PRIVATE_KEY` — secp256k1 private key (required for production)
-  - `REMITMD_CHAIN` — chain name, default `"base"`. Options: `"base_sepolia"`
+  - `REMITMD_KEY` — secp256k1 private key (required for production)
+  - `REMITMD_PRIVATE_KEY` — deprecated alias for `REMITMD_KEY`
+  - `REMITMD_CHAIN` — chain name, default `"base"`. Options: `"base-sepolia"`
   - `REMITMD_API_URL` — override the API base URL (useful for self-hosted instances)
 
   ## Installation

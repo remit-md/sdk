@@ -129,13 +129,24 @@ impl HttpTransport {
         let url = format!("{}{}", self.base_url, path);
         let mut last_err: Option<RemitError> = None;
 
+        // Generate idempotency key once per request (stable across retries).
+        let idempotency_key = if method == "POST" || method == "PUT" || method == "PATCH" {
+            let key_bytes: [u8; 16] = rand_bytes();
+            Some(hex::encode(key_bytes))
+        } else {
+            None
+        };
+
         for attempt in 0..MAX_RETRIES {
             if attempt > 0 {
                 let delay_ms = 500u64 * (1 << (attempt - 1));
                 tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
             }
 
-            match self.attempt(method, &url, path, body.clone()).await {
+            match self
+                .attempt(method, &url, path, body.clone(), idempotency_key.as_deref())
+                .await
+            {
                 Ok(v) => return Ok(v),
                 Err(e) => {
                     // Only retry on rate limit and server errors.
@@ -157,6 +168,7 @@ impl HttpTransport {
         url: &str,
         path: &str,
         body: Option<Value>,
+        idempotency_key: Option<&str>,
     ) -> Result<Value, RemitError> {
         // Generate a random 32-byte nonce for replay protection.
         let nonce_bytes: [u8; 32] = rand_bytes();
@@ -194,6 +206,10 @@ impl HttpTransport {
             .header("X-Remit-Nonce", &nonce_hex)
             .header("X-Remit-Timestamp", timestamp.to_string())
             .header("X-Remit-Signature", &sig_hex);
+
+        if let Some(key) = idempotency_key {
+            req = req.header("X-Idempotency-Key", key);
+        }
 
         if let Some(body) = body {
             req = req.json(&body);

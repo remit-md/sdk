@@ -79,6 +79,16 @@ func (c *httpClient) do(ctx context.Context, method, path string, body any, dst 
 		}
 	}
 
+	// Generate idempotency key once per request (stable across retries).
+	var idempotencyKey string
+	if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch {
+		var keyBytes [16]byte
+		if _, err := rand.Read(keyBytes[:]); err != nil {
+			return fmt.Errorf("generate idempotency key: %w", err)
+		}
+		idempotencyKey = hex.EncodeToString(keyBytes[:])
+	}
+
 	var lastErr error
 	for attempt := range maxRetries {
 		if attempt > 0 {
@@ -90,7 +100,7 @@ func (c *httpClient) do(ctx context.Context, method, path string, body any, dst 
 			}
 		}
 
-		lastErr = c.attempt(ctx, method, path, bodyBytes, dst)
+		lastErr = c.attempt(ctx, method, path, bodyBytes, idempotencyKey, dst)
 		if lastErr == nil {
 			return nil
 		}
@@ -107,7 +117,7 @@ func (c *httpClient) do(ctx context.Context, method, path string, body any, dst 
 	return lastErr
 }
 
-func (c *httpClient) attempt(ctx context.Context, method, path string, bodyBytes []byte, dst any) error {
+func (c *httpClient) attempt(ctx context.Context, method, path string, bodyBytes []byte, idempotencyKey string, dst any) error {
 	url := c.baseURL + path
 
 	var bodyReader io.Reader
@@ -122,6 +132,9 @@ func (c *httpClient) attempt(ctx context.Context, method, path string, bodyBytes
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if idempotencyKey != "" {
+		req.Header.Set("X-Idempotency-Key", idempotencyKey)
+	}
 
 	if err := c.sign(req, bodyBytes); err != nil {
 		return err

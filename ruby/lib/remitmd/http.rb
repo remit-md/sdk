@@ -8,9 +8,11 @@ require "openssl"
 
 module Remitmd
   # Chain configuration: maps chain names to (api_url, chain_id) pairs.
+  # Canonical keys use hyphens; underscored variants are accepted as aliases.
   CHAIN_CONFIG = {
-    "base"          => { url: "https://remit.md/api/v1",          chain_id: 8453 },
-    "base_sepolia"  => { url: "https://testnet.remit.md/api/v1",      chain_id: 84532 },
+    "base"          => { url: "https://remit.md/api/v1",             chain_id: 8453 },
+    "base-sepolia"  => { url: "https://testnet.remit.md/api/v1",    chain_id: 84532 },
+    "base_sepolia"  => { url: "https://testnet.remit.md/api/v1",    chain_id: 84532 },
   }.freeze
 
   # HTTP transport layer. Signs each request with EIP-712 auth headers and
@@ -40,9 +42,11 @@ module Remitmd
 
     def request(method, path, body)
       attempt = 0
+      # Generate idempotency key once per request (stable across retries).
+      idempotency_key = (method == :post || method == :put || method == :patch) ? SecureRandom.uuid : nil
       begin
         attempt += 1
-        req  = build_request(method, path, body)
+        req  = build_request(method, path, body, idempotency_key)
         resp = @http.request(req)
         handle_response(resp, path)
       rescue RemitError => e
@@ -58,7 +62,7 @@ module Remitmd
       end
     end
 
-    def build_request(method, path, body)
+    def build_request(method, path, body, idempotency_key = nil)
       full_path = "#{@uri.path}#{path}"
       req = case method
             when :get  then Net::HTTP::Get.new(full_path)
@@ -81,6 +85,7 @@ module Remitmd
       req["X-Remit-Nonce"]     = nonce_hex
       req["X-Remit-Timestamp"] = timestamp.to_s
       req["X-Remit-Signature"] = signature
+      req["X-Idempotency-Key"] = idempotency_key if idempotency_key
 
       if body
         req.body = body.to_json

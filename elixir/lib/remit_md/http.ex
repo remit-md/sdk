@@ -6,9 +6,11 @@ defmodule RemitMd.Http do
 
   alias RemitMd.Error
 
+  # Canonical keys use hyphens; underscored variants are accepted as aliases.
   @chain_config %{
-    "base"         => %{url: "https://remit.md/api/v1",         chain_id: 8453},
-    "base_sepolia" => %{url: "https://testnet.remit.md/api/v1", chain_id: 84532}
+    "base"          => %{url: "https://remit.md/api/v1",         chain_id: 8453},
+    "base-sepolia"  => %{url: "https://testnet.remit.md/api/v1", chain_id: 84532},
+    "base_sepolia"  => %{url: "https://testnet.remit.md/api/v1", chain_id: 84532}
   }
 
   @max_retries 3
@@ -38,11 +40,13 @@ defmodule RemitMd.Http do
   end
 
   def get(%__MODULE__{} = t, path) do
-    request(t, :get, path, nil, 1)
+    request(t, :get, path, nil, 1, nil)
   end
 
   def post(%__MODULE__{} = t, path, body) do
-    request(t, :post, path, body, 1)
+    # Generate idempotency key once per request (stable across retries).
+    idempotency_key = Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
+    request(t, :post, path, body, 1, idempotency_key)
   end
 
   # ─── EIP-712 hash (exposed for golden-vector testing) ──────────────────
@@ -81,7 +85,7 @@ defmodule RemitMd.Http do
 
   # ─── Private ──────────────────────────────────────────────────────────────
 
-  defp request(transport, method, path, body, attempt) do
+  defp request(transport, method, path, body, attempt, idempotency_key) do
     url = transport.base_url <> path
 
     # 32-byte random nonce
@@ -120,6 +124,13 @@ defmodule RemitMd.Http do
       {~c"x-remit-signature", String.to_charlist(signature)}
     ]
 
+    headers =
+      if idempotency_key do
+        headers ++ [{~c"x-idempotency-key", String.to_charlist(idempotency_key)}]
+      else
+        headers
+      end
+
     url_charlist = String.to_charlist(url)
 
     result =
@@ -148,20 +159,21 @@ defmodule RemitMd.Http do
           method,
           path,
           body,
-          attempt
+          attempt,
+          idempotency_key
         )
 
       {:error, reason} ->
         if attempt < @max_retries do
           Process.sleep(@base_delay_ms * trunc(:math.pow(2, attempt - 1)))
-          request(transport, method, path, body, attempt + 1)
+          request(transport, method, path, body, attempt + 1, idempotency_key)
         else
           raise Error.new(Error.network_error(), "Network error: #{inspect(reason)}")
         end
     end
   end
 
-  defp handle_response(status, resp_body, _url, transport, method, path, req_body, attempt) do
+  defp handle_response(status, resp_body, _url, transport, method, path, req_body, attempt, idempotency_key) do
     parsed =
       if resp_body == "" do
         %{}
@@ -178,7 +190,7 @@ defmodule RemitMd.Http do
 
       status in @retry_codes and attempt < @max_retries ->
         Process.sleep(@base_delay_ms * trunc(:math.pow(2, attempt - 1)))
-        request(transport, method, path, req_body, attempt + 1)
+        request(transport, method, path, req_body, attempt + 1, idempotency_key)
 
       status == 400 ->
         code = Map.get(parsed, "code", Error.server_error())

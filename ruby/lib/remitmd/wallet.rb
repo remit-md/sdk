@@ -82,9 +82,15 @@ module Remitmd
     end
 
     # Build a RemitWallet from environment variables.
-    # Reads: REMITMD_PRIVATE_KEY, REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS, REMITMD_RPC_URL.
+    # Reads: REMITMD_KEY (primary) or REMITMD_PRIVATE_KEY (deprecated fallback),
+    # REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS, REMITMD_RPC_URL.
     def self.from_env
-      key            = ENV.fetch("REMITMD_PRIVATE_KEY") { raise ArgumentError, "REMITMD_PRIVATE_KEY not set" }
+      key = ENV["REMITMD_KEY"] || ENV["REMITMD_PRIVATE_KEY"]
+      if ENV["REMITMD_PRIVATE_KEY"] && !ENV["REMITMD_KEY"]
+        warn "[remitmd] REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead"
+      end
+      raise ArgumentError, "REMITMD_KEY not set" unless key
+
       chain          = ENV.fetch("REMITMD_CHAIN", "base")
       api_url        = ENV["REMITMD_API_URL"]
       router_address = ENV["REMITMD_ROUTER_ADDRESS"]

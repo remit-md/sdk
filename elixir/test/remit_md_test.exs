@@ -23,9 +23,10 @@ defmodule RemitMdTest do
     assert wallet.mock_pid != nil
   end
 
-  test "from_env/0 raises when REMITMD_PRIVATE_KEY not set" do
+  test "from_env/0 raises when REMITMD_KEY not set" do
+    System.delete_env("REMITMD_KEY")
     System.delete_env("REMITMD_PRIVATE_KEY")
-    assert_raise RemitMd.Error, ~r/REMITMD_PRIVATE_KEY/, fn ->
+    assert_raise RemitMd.Error, ~r/REMITMD_KEY/, fn ->
       Wallet.from_env()
     end
   end

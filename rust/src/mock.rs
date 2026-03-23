@@ -307,7 +307,7 @@ impl MockTransport {
                         format!("escrow {escrow_id:?} not found"),
                     )
                 })?;
-                escrow.status = EscrowStatus::Released;
+                escrow.status = EscrowStatus::Completed;
                 Ok(serde_json::to_value(&*escrow).unwrap())
             }
 
@@ -635,7 +635,7 @@ impl MockTransport {
                         format!("stream {stream_id:?} not found"),
                     )
                 })?;
-                stream.status = StreamStatus::Ended;
+                stream.status = StreamStatus::Closed;
                 Ok(serde_json::to_value(&*stream).unwrap())
             }
 
@@ -819,7 +819,7 @@ mod tests {
         let released = wallet.release_escrow(&escrow.id, None).await.unwrap();
         assert_eq!(released.payee, PAYEE);
         assert_eq!(released.amount, dec!(100.00));
-        assert_eq!(released.status, EscrowStatus::Released);
+        assert_eq!(released.status, EscrowStatus::Completed);
     }
 
     #[tokio::test]

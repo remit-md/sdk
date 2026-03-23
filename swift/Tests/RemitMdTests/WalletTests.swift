@@ -96,13 +96,13 @@ final class WalletTests: XCTestCase {
         XCTAssertEqual(escrow.amount, 100.0, accuracy: 0.001)
 
         let released = try await wallet.releaseEscrow(id: escrow.id)
-        XCTAssertEqual(released.status, .released)
+        XCTAssertEqual(released.status, .completed)
 
         do {
             _ = try await wallet.releaseEscrow(id: escrow.id)
             XCTFail("expected double-release error")
         } catch let e as RemitError {
-            XCTAssertEqual(e.code, RemitError.escrowAlreadyReleased)
+            XCTAssertEqual(e.code, RemitError.escrowAlreadyCompleted)
         }
     }
 
@@ -160,7 +160,7 @@ final class WalletTests: XCTestCase {
         XCTAssertEqual(stream.ratePerSecond, 0.001, accuracy: 0.0001)
 
         let stopped = try await wallet.closeStream(id: stream.id)
-        XCTAssertEqual(stopped.status, .ended)
+        XCTAssertEqual(stopped.status, .closed)
         XCTAssertNotNil(stopped.endedAt)
     }
 

@@ -36,8 +36,9 @@ export class RemitClient {
   constructor(options: RemitClientOptions = {}) {
     const { chain = "base", testnet = false, apiUrl } = options;
     this._chain = testnet && !chain.includes("sepolia") ? `${chain}-sepolia` : chain;
+    const envUrl = typeof process !== "undefined" ? process.env.REMITMD_API_URL : undefined;
     this._apiUrl =
-      apiUrl ?? DEFAULT_API_URLS[this._chain] ?? DEFAULT_API_URLS["base"]!;
+      apiUrl ?? envUrl ?? DEFAULT_API_URLS[this._chain] ?? DEFAULT_API_URLS["base"]!;
     this._chainId = CHAIN_IDS[this._chain] ?? CHAIN_IDS["base"]!;
   }
 

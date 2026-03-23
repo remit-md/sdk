@@ -42,8 +42,8 @@ def remit_tools(wallet: Wallet) -> list[Any]:
     @function_tool
     async def remit_check_balance() -> str:
         """Check the current USDC wallet balance."""
-        bal = await wallet.balance()
-        return f"Current USDC balance: ${bal:.2f}"
+        info = await wallet.status()
+        return f"Current USDC balance: ${info.balance:.2f}"
 
     @function_tool
     async def remit_open_tab(to: str, limit: float, per_unit: float) -> str:
@@ -75,7 +75,8 @@ def remit_tools(wallet: Wallet) -> list[Any]:
     @function_tool
     async def remit_open_stream(to: str, rate_per_second: float, max_duration: int = 3600) -> str:
         """Start a continuous streaming payment at rate USD/second."""
-        stream = await wallet.open_stream(to, rate_per_second, max_duration)
+        max_total = rate_per_second * max_duration
+        stream = await wallet.open_stream(to, rate_per_second, max_total)
         return f"Stream {stream.id} started at ${rate_per_second:.6f}/s"
 
     @function_tool

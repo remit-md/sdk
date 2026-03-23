@@ -83,7 +83,8 @@ public sealed class Wallet
         _rpcUrl = rpcUrl
             ?? Environment.GetEnvironmentVariable("REMITMD_RPC_URL")
             ?? (DefaultRpcUrls.TryGetValue(key, out var defaultRpc) ? defaultRpc : DefaultRpcUrls["base-sepolia"]);
-        _transport = new HttpTransport(signer, cc.ChainId, routerAddress ?? string.Empty, baseUrl ?? cc.ApiUrl);
+        var envUrl = Environment.GetEnvironmentVariable("REMITMD_API_URL");
+        _transport = new HttpTransport(signer, cc.ChainId, routerAddress ?? string.Empty, baseUrl ?? envUrl ?? cc.ApiUrl);
     }
 
     /// <summary>

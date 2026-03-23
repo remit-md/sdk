@@ -360,7 +360,7 @@ export class Wallet extends RemitClient {
 
   releaseMilestone(invoiceId: string, milestoneIndex: number): Promise<Transaction> {
     return this.#auth.post<Transaction>(`/escrows/${invoiceId}/release`, {
-      milestone_ids: [milestoneIndex],
+      milestone_ids: [String(milestoneIndex)],
     });
   }
 

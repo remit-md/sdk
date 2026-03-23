@@ -122,7 +122,7 @@ RSpec.describe "Remitmd MockRemit" do
 
       closed = wallet.close_tab(tab.id, final_amount: 0.10, provider_sig: "0xfakesig")
       expect(closed).to be_a(Remitmd::Tab)
-      expect(closed.status).to eq(Remitmd::TabStatus::SETTLED)
+      expect(closed.status).to eq(Remitmd::TabStatus::CLOSED)
     end
   end
 

@@ -16,7 +16,7 @@ pub mod codes {
     pub const TAB_CLOSED: &str = "TAB_CLOSED";
     pub const TAB_LIMIT_EXCEEDED: &str = "TAB_LIMIT_EXCEEDED";
     pub const STREAM_NOT_FOUND: &str = "STREAM_NOT_FOUND";
-    pub const STREAM_ENDED: &str = "STREAM_ENDED";
+    pub const STREAM_CLOSED: &str = "STREAM_CLOSED";
     pub const BOUNTY_NOT_FOUND: &str = "BOUNTY_NOT_FOUND";
     pub const BOUNTY_EXPIRED: &str = "BOUNTY_EXPIRED";
     pub const DEPOSIT_NOT_FOUND: &str = "DEPOSIT_NOT_FOUND";

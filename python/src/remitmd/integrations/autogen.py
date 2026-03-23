@@ -44,8 +44,8 @@ def register_remit_tools(
     @executor.register_for_execution()  # type: ignore[misc]
     @assistant.register_for_llm(description="Check current USDC balance.")  # type: ignore[misc]
     async def remit_check_balance() -> str:
-        bal = await wallet.balance()
-        return f"Balance: ${bal:.2f} USDC"
+        info = await wallet.status()
+        return f"Balance: ${info.balance:.2f} USDC"
 
     @executor.register_for_execution()  # type: ignore[misc]
     @assistant.register_for_llm(description="Open a metered payment tab.")  # type: ignore[misc]

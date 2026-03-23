@@ -30,8 +30,9 @@ public final class RemitWallet: @unchecked Sendable {
 
     public init(privateKey: String, chain: RemitChain = .base, baseURL: String? = nil, routerAddress: String? = nil, rpcUrl: String? = nil) throws {
         let signer = try PrivateKeySigner(privateKey: privateKey)
+        let envURL = ProcessInfo.processInfo.environment["REMITMD_API_URL"]
         self.transport = HttpTransport(
-            baseURL: baseURL ?? chain.baseURL,
+            baseURL: baseURL ?? envURL ?? chain.baseURL,
             chainId: UInt64(chain.rawValue),
             routerAddress: routerAddress ?? "",
             signer: signer

@@ -124,6 +124,9 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 	}
 
 	apiURL := cc.APIURL
+	if envURL := os.Getenv("REMITMD_API_URL"); envURL != "" {
+		apiURL = envURL
+	}
 	if cfg.baseURL != "" {
 		apiURL = cfg.baseURL
 	}

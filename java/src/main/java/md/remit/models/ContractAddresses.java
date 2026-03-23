@@ -37,9 +37,6 @@ public class ContractAddresses {
     @JsonProperty("key_registry")
     public String keyRegistry;
 
-    @JsonProperty("arbitration")
-    public String arbitration;
-
     @JsonProperty("relayer")
     public String relayer;
 }

@@ -148,7 +148,6 @@ module Remitmd
           "deposit"        => "0xMockDeposit00000000000000000000000001",
           "fee_calculator" => "0xMockFeeCalc0000000000000000000000001",
           "key_registry"   => "0xMockKeyReg000000000000000000000000001",
-          "arbitration"    => "0xMockArbitr000000000000000000000000001",
         }
 
       # Balance

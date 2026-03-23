@@ -69,7 +69,6 @@ describe("Error classes", () => {
       "TAB_NOT_FOUND",
       "RATE_LIMITED",
       "CHAIN_MISMATCH",
-      "DISPUTE_ALREADY_FILED",
       "VERSION_MISMATCH",
     ];
     for (const code of codes) {

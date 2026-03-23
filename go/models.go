@@ -77,7 +77,6 @@ type ContractAddresses struct {
 	Deposit       string `json:"deposit"`
 	FeeCalculator string `json:"fee_calculator"`
 	KeyRegistry   string `json:"key_registry"`
-	Arbitration   string `json:"arbitration"`
 	Relayer       string `json:"relayer,omitempty"`
 }
 

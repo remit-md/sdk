@@ -310,7 +310,7 @@ defmodule RemitMd.Models do
     @moduledoc "On-chain contract addresses for the current chain."
     @enforce_keys [:chain_id, :usdc, :router]
     defstruct [:chain_id, :usdc, :router, :escrow, :tab, :stream,
-               :bounty, :deposit, :fee_calculator, :key_registry, :arbitration,
+               :bounty, :deposit, :fee_calculator, :key_registry,
                :relayer]
 
     @doc false
@@ -326,7 +326,6 @@ defmodule RemitMd.Models do
         deposit:        Map.get(m, "deposit"),
         fee_calculator: Map.get(m, "fee_calculator"),
         key_registry:   Map.get(m, "key_registry"),
-        arbitration:    Map.get(m, "arbitration"),
         relayer:        Map.get(m, "relayer")
       }
     end

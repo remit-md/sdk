@@ -116,12 +116,11 @@ module Remitmd
       @deposit        = h["deposit"]
       @fee_calculator = h["fee_calculator"]
       @key_registry   = h["key_registry"]
-      @arbitration    = h["arbitration"]
       @relayer        = h["relayer"]
     end
 
     attr_reader :chain_id, :usdc, :router, :escrow, :tab, :stream,
-                :bounty, :deposit, :fee_calculator, :key_registry, :arbitration,
+                :bounty, :deposit, :fee_calculator, :key_registry,
                 :relayer
   end
 

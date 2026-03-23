@@ -217,10 +217,3 @@ func (c *httpClient) parseAPIError(statusCode int, body []byte) *RemitError {
 	}
 	return remitErr(apiErr.Code, apiErr.Message, apiErr.Context)
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

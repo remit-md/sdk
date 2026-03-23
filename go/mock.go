@@ -343,7 +343,7 @@ func (m *MockRemit) mockReleaseEscrow(escrowID string) (*Escrow, error) {
 			map[string]any{"escrow_id": escrowID},
 		)
 	}
-	escrow.Status = EscrowStatusReleased
+	escrow.Status = EscrowStatusCompleted
 	return escrow, nil
 }
 

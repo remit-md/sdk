@@ -148,4 +148,63 @@ describe("A2AClient", () => {
     const client = A2AClient.fromCard(CARD_DATA, signer, { chain: "base-sepolia" });
     assert.ok(client instanceof A2AClient);
   });
+
+  it("throws when A2A response has no result field", async () => {
+    // Mock fetch to return a JSON-RPC envelope without 'result'
+    const fetchMock = mock.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ jsonrpc: "2.0", id: "abc123" }),
+      headers: new Headers(),
+    }));
+    (globalThis as unknown as { fetch: unknown }).fetch = fetchMock;
+
+    const signer = new PrivateKeySigner(TEST_KEY);
+    const client = A2AClient.fromCard(CARD_DATA, signer);
+    await assert.rejects(
+      () => client.getTask("task_123"),
+      /A2A response missing 'result' field/,
+    );
+    mock.restoreAll();
+  });
+
+  it("throws when A2A response has null result", async () => {
+    const fetchMock = mock.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ jsonrpc: "2.0", id: "abc123", result: null }),
+      headers: new Headers(),
+    }));
+    (globalThis as unknown as { fetch: unknown }).fetch = fetchMock;
+
+    const signer = new PrivateKeySigner(TEST_KEY);
+    const client = A2AClient.fromCard(CARD_DATA, signer);
+    await assert.rejects(
+      () => client.getTask("task_123"),
+      /A2A response missing 'result' field/,
+    );
+    mock.restoreAll();
+  });
+
+  it("returns result when present in A2A response", async () => {
+    const taskData: A2ATask = {
+      id: "task_ok",
+      status: { state: "completed" },
+      artifacts: [],
+    };
+    const fetchMock = mock.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ jsonrpc: "2.0", id: "abc123", result: taskData }),
+      headers: new Headers(),
+    }));
+    (globalThis as unknown as { fetch: unknown }).fetch = fetchMock;
+
+    const signer = new PrivateKeySigner(TEST_KEY);
+    const client = A2AClient.fromCard(CARD_DATA, signer);
+    const task = await client.getTask("task_ok");
+    assert.equal(task.id, "task_ok");
+    assert.equal(task.status.state, "completed");
+    mock.restoreAll();
+  });
 });

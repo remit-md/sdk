@@ -804,6 +804,7 @@ public class Wallet {
         } catch (Exception e) {
             // Permit signing unavailable (no RPC, mock context, etc.)
             // Fall through — server will handle approval via other means
+            System.err.println("[remitmd] auto-permit failed for " + contractField + ": " + e.getMessage());
             return null;
         }
     }

@@ -272,7 +272,10 @@ class Wallet(RemitClient):
         except (ValueError, KeyError, TypeError, RuntimeError) as exc:
             logger.warning(
                 "auto-permit failed for %s (amount=%s): %s",
-                contract, amount, exc, exc_info=True,
+                contract,
+                amount,
+                exc,
+                exc_info=True,
             )
             return None
 

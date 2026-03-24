@@ -211,6 +211,7 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
         with:
           packages-dir: python/dist/
+          skip-existing: true
 
   typescript:
     name: TypeScript -> npm
@@ -228,7 +229,7 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       - run: cd typescript && pnpm install --frozen-lockfile && pnpm tsc
-      - run: cd typescript && npm publish --access public
+      - run: cd typescript && npm publish --access public || echo "Already published (expected on re-run)"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -241,7 +242,7 @@ jobs:
         with:
           ref: ${{ needs.bump-and-tag.outputs.tag }}
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
-      - run: cd rust && cargo publish --allow-dirty
+      - run: cd rust && cargo publish --allow-dirty || echo "Already published (expected on re-run)"
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
@@ -257,7 +258,7 @@ jobs:
         with:
           dotnet-version: '8.x'
       - run: cd dotnet && dotnet pack RemitMd/RemitMd.csproj -c Release
-      - run: dotnet nuget push dotnet/RemitMd/bin/Release/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+      - run: dotnet nuget push dotnet/RemitMd/bin/Release/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
   java:
     name: Java -> Maven Central
@@ -296,9 +297,13 @@ jobs:
             | tee /tmp/upload_response.txt
           HTTP_CODE=$(tail -1 /tmp/upload_response.txt)
           if [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "200" ]; then
-            echo "Upload failed with HTTP $HTTP_CODE"
-            cat /tmp/upload_response.txt
-            exit 1
+            if grep -qi "already\|exists\|duplicate" /tmp/upload_response.txt; then
+              echo "Already published (expected on re-run)"
+            else
+              echo "Upload failed with HTTP $HTTP_CODE"
+              cat /tmp/upload_response.txt
+              exit 1
+            fi
           fi
           echo "Upload successful!"
 
@@ -320,7 +325,7 @@ jobs:
           echo ":rubygems_api_key: ${{ secrets.RUBYGEMS_API_KEY }}" > ~/.gem/credentials
           chmod 0600 ~/.gem/credentials
           gem build remitmd.gemspec
-          gem push remitmd-*.gem
+          gem push remitmd-*.gem || echo "Already published (expected on re-run)"
 
   elixir:
     name: Elixir -> Hex.pm
@@ -339,7 +344,7 @@ jobs:
         run: |
           mix local.hex --force
           mix deps.get
-          mix hex.publish --yes
+          mix hex.publish --yes || echo "Already published (expected on re-run)"
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
 

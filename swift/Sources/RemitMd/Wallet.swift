@@ -10,7 +10,7 @@ public final class RemitWallet: @unchecked Sendable {
     private let signerAddress: String
     private let chain: RemitChain
     private let chainName: String
-    private let rpcUrl: String
+    private let isMock: Bool
     private var contractsCache: ContractAddresses?
     private let cacheLock = NSLock()
 
@@ -21,14 +21,7 @@ public final class RemitWallet: @unchecked Sendable {
         "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     ]
 
-    /// Default JSON-RPC URLs per chain (for nonce fetching).
-    public static let defaultRpcUrls: [String: String] = [
-        "base-sepolia": "https://sepolia.base.org",
-        "base": "https://mainnet.base.org",
-        "localhost": "http://127.0.0.1:8545",
-    ]
-
-    public init(privateKey: String, chain: RemitChain = .base, baseURL: String? = nil, routerAddress: String? = nil, rpcUrl: String? = nil) throws {
+    public init(privateKey: String, chain: RemitChain = .base, baseURL: String? = nil, routerAddress: String? = nil) throws {
         let signer = try PrivateKeySigner(privateKey: privateKey)
         let envURL = ProcessInfo.processInfo.environment["REMITMD_API_URL"]
         self.transport = HttpTransport(
@@ -41,10 +34,7 @@ public final class RemitWallet: @unchecked Sendable {
         self.signerAddress = signer.address
         self.chain = chain
         self.chainName = chain.chainName
-        self.rpcUrl = rpcUrl
-            ?? ProcessInfo.processInfo.environment["REMITMD_RPC_URL"]
-            ?? RemitWallet.defaultRpcUrls[chain.chainName]
-            ?? RemitWallet.defaultRpcUrls["base-sepolia"]!
+        self.isMock = false
     }
 
     public init(mock: MockRemit) {
@@ -53,7 +43,7 @@ public final class RemitWallet: @unchecked Sendable {
         self.signerAddress = mock.walletAddress
         self.chain = .baseSepolia
         self.chainName = "base"
-        self.rpcUrl = RemitWallet.defaultRpcUrls["base-sepolia"]!
+        self.isMock = true
     }
 
     public static func fromEnvironment() throws -> RemitWallet {
@@ -70,8 +60,7 @@ public final class RemitWallet: @unchecked Sendable {
         let chainStr = env["REMITMD_CHAIN"] ?? "base"
         let chain: RemitChain = chainStr == "base" ? .base : .baseSepolia
         let routerAddress = env["REMITMD_ROUTER_ADDRESS"]
-        let rpcUrl = env["REMITMD_RPC_URL"]
-        return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress, rpcUrl: rpcUrl)
+        return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress)
     }
 
     /// The Ethereum address (0x-prefixed) of this wallet.
@@ -557,67 +546,17 @@ public final class RemitWallet: @unchecked Sendable {
         return try await signPermit(spender: spender, amount: amount)
     }
 
-    /// Fetch the EIP-2612 permit nonce, trying the API first then falling back to direct RPC.
-    ///
-    /// The `/status/{address}` endpoint returns `permit_nonce` when available, which avoids
-    /// a direct JSON-RPC call. If the API is unreachable or the field is missing, we fall
-    /// back to `fetchUsdcNonceRpc()`.
+    /// Fetch the EIP-2612 permit nonce from the API.
     private func fetchPermitNonce(usdcAddress: String) async throws -> Int {
-        // Try the status API first — it's cheaper than a direct RPC call.
-        do {
-            let status: StatusResponse = try await transport.request(
-                method: "GET", path: "/api/v1/status/\(signerAddress)",
-                body: Optional<EmptyBody>.none
-            )
-            if let nonce = status.permitNonce {
-                return nonce
-            }
-        } catch {
-            // API unavailable or field missing — fall through to RPC.
-        }
-        return try await fetchUsdcNonceRpc(usdcAddress: usdcAddress)
-    }
+        // Mock mode: return 0 directly
+        if isMock { return 0 }
 
-    /// Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
-    private func fetchUsdcNonceRpc(usdcAddress: String) async throws -> Int {
-        // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
-        let paddedAddress = signerAddress.lowercased()
-            .replacingOccurrences(of: "0x", with: "")
-            .leftPad(toLength: 64, withPad: "0")
-        let data = "0x7ecebe00\(paddedAddress)"
-
-        let payload: [String: Any] = [
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "eth_call",
-            "params": [["to": usdcAddress, "data": data], "latest"]
-        ]
-
-        guard let url = URL(string: rpcUrl) else {
-            throw RemitError(RemitError.serverError, "Invalid RPC URL: \(rpcUrl)")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-
-        let (responseData, _) = try await URLSession.shared.data(for: request)
-
-        guard let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any] else {
-            throw RemitError(RemitError.serverError, "Invalid JSON-RPC response")
-        }
-
-        if let error = json["error"] as? [String: Any], let message = error["message"] as? String {
-            throw RemitError(RemitError.serverError, "RPC error fetching nonce: \(message)")
-        }
-
-        guard let resultHex = json["result"] as? String else {
-            throw RemitError(RemitError.serverError, "RPC returned null result for nonce query — is the USDC address correct?")
-        }
-        let hexStr = resultHex.hasPrefix("0x") ? String(resultHex.dropFirst(2)) : resultHex
-        guard let nonce = Int(hexStr, radix: 16) else {
-            throw RemitError(RemitError.serverError, "Failed to parse nonce hex '\(resultHex)' as integer")
+        let status: StatusResponse = try await transport.request(
+            method: "GET", path: "/api/v1/status/\(signerAddress)",
+            body: Optional<EmptyBody>.none
+        )
+        guard let nonce = status.permitNonce else {
+            throw RemitError(RemitError.serverError, "permit_nonce not available from /status API for \(signerAddress)")
         }
         return nonce
     }
@@ -840,13 +779,3 @@ private func permitEncodeAddress(_ address: String) -> Data {
     return result
 }
 
-// MARK: - String helpers
-
-extension String {
-    /// Left-pad a string to a specified length.
-    func leftPad(toLength: Int, withPad pad: Character) -> String {
-        let deficit = toLength - count
-        guard deficit > 0 else { return self }
-        return String(repeating: pad, count: deficit) + self
-    }
-}

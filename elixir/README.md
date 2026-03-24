@@ -114,7 +114,6 @@ wallet = RemitMd.Wallet.from_env()
 | `REMITMD_PRIVATE_KEY` | — | secp256k1 private key (required for production) |
 | `REMITMD_CHAIN` | `"base"` | Chain: `base`, `base_sepolia` |
 | `REMITMD_API_URL` | _(chain default)_ | Override API base URL |
-| `REMITMD_RPC_URL` | _(chain default)_ | JSON-RPC URL for on-chain reads (nonce fetching) |
 
 ## Custom Signer
 

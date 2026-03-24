@@ -58,7 +58,7 @@ public class MockRemit {
     public Wallet wallet() {
         MockApiClient mockClient = new MockApiClient(this);
         Signer mockSigner = new MockSigner();
-        return new Wallet(mockClient, mockSigner, MOCK_CHAIN_ID, "base", null);
+        return new Wallet(mockClient, mockSigner, MOCK_CHAIN_ID, "base");
     }
 
     /** Overrides the mock's simulated USDC balance. */

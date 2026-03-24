@@ -40,7 +40,7 @@ Or from environment variables:
 ```ruby
 wallet = Remitmd::RemitWallet.from_env
 # Requires: REMITMD_PRIVATE_KEY
-# Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL, REMITMD_RPC_URL
+# Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL
 ```
 
 Permits are auto-signed. Every payment method fetches the on-chain USDC nonce, signs an EIP-2612 permit, and includes it automatically.
@@ -267,19 +267,6 @@ permit = wallet.sign_usdc_permit(
   usdc_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 )
 tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
-```
-
-### Custom RPC URL
-
-Override the JSON-RPC endpoint used for nonce fetching:
-
-```ruby
-wallet = Remitmd::RemitWallet.new(
-  private_key: key,
-  chain: "base_sepolia",
-  rpc_url: "https://your-rpc-provider.com/v1/base-sepolia"
-)
-# Or via environment: REMITMD_RPC_URL
 ```
 
 ## License

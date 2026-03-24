@@ -8,8 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
 use crate::http::{
-    chain_config, compute_permit_digest, default_rpc_url, fetch_permit_nonce, usdc_address,
-    HttpTransport, Transport,
+    chain_config, compute_permit_digest, fetch_permit_nonce, usdc_address, HttpTransport, Transport,
 };
 use crate::models::*;
 use crate::signer::{PrivateKeySigner, Signer};
@@ -58,8 +57,6 @@ pub struct Wallet {
     /// Full chain key (e.g. "base-sepolia") for USDC/RPC lookups.
     pub(crate) chain_key: String,
     pub(crate) contracts_cache: Mutex<Option<ContractAddresses>>,
-    /// JSON-RPC URL for on-chain reads (nonce fetching).
-    pub(crate) rpc_url: String,
     /// Retained signer reference for permit signing.
     pub(crate) signer: Arc<dyn Signer>,
 }
@@ -81,7 +78,6 @@ impl Wallet {
             testnet: false,
             base_url: None,
             router_address: None,
-            rpc_url: None,
         }
     }
 
@@ -93,7 +89,6 @@ impl Wallet {
             testnet: false,
             base_url: None,
             router_address: None,
-            rpc_url: None,
         }
     }
 
@@ -102,7 +97,6 @@ impl Wallet {
     /// - `REMITMD_CHAIN` — chain name (default: `"base"`)
     /// - `REMITMD_TESTNET` — `"1"`, `"true"`, or `"yes"` for testnet
     /// - `REMITMD_ROUTER_ADDRESS` — EIP-712 verifying contract address
-    /// - `REMITMD_RPC_URL` — JSON-RPC URL for on-chain reads (optional, defaults per chain)
     pub fn from_env() -> Result<Self, RemitError> {
         let key = env::var("REMITMD_KEY").map_err(|_| {
             remit_err_ctx(
@@ -119,7 +113,6 @@ impl Wallet {
             Ok("1") | Ok("true") | Ok("yes")
         );
         let router_address = env::var("REMITMD_ROUTER_ADDRESS").unwrap_or_default();
-        let rpc_url = env::var("REMITMD_RPC_URL").ok();
 
         let mut builder = Self::new(&key).chain(&chain);
         if testnet {
@@ -127,9 +120,6 @@ impl Wallet {
         }
         if !router_address.is_empty() {
             builder = builder.router_address(&router_address);
-        }
-        if let Some(url) = rpc_url {
-            builder = builder.rpc_url(&url);
         }
         builder.build()
     }
@@ -197,13 +187,7 @@ impl Wallet {
             )
         })?;
 
-        let nonce = fetch_permit_nonce(
-            self.transport.as_ref(),
-            &self.rpc_url,
-            usdc_addr,
-            &self.address,
-        )
-        .await?;
+        let nonce = fetch_permit_nonce(self.transport.as_ref(), &self.address).await?;
 
         let dl = deadline.unwrap_or_else(|| {
             SystemTime::now()
@@ -1098,7 +1082,6 @@ pub struct WalletBuilder<S> {
     pub(crate) testnet: bool,
     pub(crate) base_url: Option<String>,
     pub(crate) router_address: Option<String>,
-    pub(crate) rpc_url: Option<String>,
 }
 
 impl<S> WalletBuilder<S> {
@@ -1126,13 +1109,6 @@ impl<S> WalletBuilder<S> {
         self.router_address = Some(addr.to_string());
         self
     }
-
-    /// Set the JSON-RPC URL for on-chain reads (permit nonce fetching).
-    /// Falls back to `REMITMD_RPC_URL` env var, then chain defaults.
-    pub fn rpc_url(mut self, url: &str) -> Self {
-        self.rpc_url = Some(url.to_string());
-        self
-    }
 }
 
 impl WalletBuilder<WithKey> {
@@ -1145,7 +1121,6 @@ impl WalletBuilder<WithKey> {
             self.testnet,
             self.base_url,
             self.router_address,
-            self.rpc_url,
         )
     }
 }
@@ -1159,7 +1134,6 @@ impl WalletBuilder<WithSigner> {
             self.testnet,
             self.base_url,
             self.router_address,
-            self.rpc_url,
         )
     }
 }
@@ -1170,7 +1144,6 @@ fn build_wallet(
     testnet: bool,
     base_url_override: Option<String>,
     router_address: Option<String>,
-    rpc_url_override: Option<String>,
 ) -> Result<Wallet, RemitError> {
     let chain_key = if testnet {
         format!("{chain}-sepolia")
@@ -1193,15 +1166,6 @@ fn build_wallet(
     let router_addr = router_address.unwrap_or_default();
     let address = signer.address().to_string();
 
-    // Resolve RPC URL: explicit override > env var > chain default.
-    let resolved_rpc_url = rpc_url_override
-        .or_else(|| env::var("REMITMD_RPC_URL").ok())
-        .unwrap_or_else(|| {
-            default_rpc_url(&chain_key)
-                .unwrap_or("https://sepolia.base.org")
-                .to_string()
-        });
-
     let transport = Arc::new(HttpTransport::new(
         api_url,
         cfg.chain_id,
@@ -1216,7 +1180,6 @@ fn build_wallet(
         chain: chain.to_string(),
         chain_key,
         contracts_cache: Mutex::new(None),
-        rpc_url: resolved_rpc_url,
         signer,
     })
 }

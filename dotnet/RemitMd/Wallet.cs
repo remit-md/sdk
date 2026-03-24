@@ -17,9 +17,8 @@ public sealed class Wallet
     private readonly long _chainId;
     private readonly string _chain;
     private readonly string _chainKey;
-    private readonly string _rpcUrl;
+    private readonly bool _isMock;
     private ContractAddresses? _cachedContracts;
-    private static readonly HttpClient RpcClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 
     // Chain → API base URL map
     private static readonly Dictionary<string, (long ChainId, string ApiUrl)> Chains = new()
@@ -36,14 +35,6 @@ public sealed class Wallet
         ["localhost"]    = "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     };
 
-    // Chain → default public RPC URL
-    private static readonly Dictionary<string, string> DefaultRpcUrls = new()
-    {
-        ["base-sepolia"] = "https://sepolia.base.org",
-        ["base"]         = "https://mainnet.base.org",
-        ["localhost"]    = "http://127.0.0.1:8545",
-    };
-
     // ─── Constructors ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -53,17 +44,15 @@ public sealed class Wallet
     /// <param name="chain">Target chain name: "base". Default: "base".</param>
     /// <param name="testnet">When true, targets the testnet variant of <paramref name="chain"/>.</param>
     /// <param name="baseUrl">Override the API base URL (useful for local or self-hosted setups).</param>
-    /// <param name="rpcUrl">JSON-RPC URL for on-chain reads (nonce fetching). Falls back to REMITMD_RPC_URL env var, then public defaults.</param>
-    public Wallet(string privateKeyHex, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null, string? rpcUrl = null)
-        : this(new PrivateKeySigner(privateKeyHex), chain, testnet, baseUrl, routerAddress, rpcUrl)
+    public Wallet(string privateKeyHex, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null)
+        : this(new PrivateKeySigner(privateKeyHex), chain, testnet, baseUrl, routerAddress)
     { }
 
     /// <summary>
     /// Creates a Wallet with a custom <see cref="IRemitSigner"/> (KMS, HSM, etc.).
     /// </summary>
     /// <param name="routerAddress">EIP-712 verifying contract address. Required for production use.</param>
-    /// <param name="rpcUrl">JSON-RPC URL for on-chain reads (nonce fetching). Falls back to REMITMD_RPC_URL env var, then public defaults.</param>
-    public Wallet(IRemitSigner signer, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null, string? rpcUrl = null)
+    public Wallet(IRemitSigner signer, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null)
     {
         var key = testnet ? $"{chain}-sepolia" : chain;
 
@@ -80,9 +69,7 @@ public sealed class Wallet
         _chainId = cc.ChainId;
         _chain = chain;
         _chainKey = key;
-        _rpcUrl = rpcUrl
-            ?? Environment.GetEnvironmentVariable("REMITMD_RPC_URL")
-            ?? (DefaultRpcUrls.TryGetValue(key, out var defaultRpc) ? defaultRpc : DefaultRpcUrls["base-sepolia"]);
+        _isMock = false;
         var envUrl = Environment.GetEnvironmentVariable("REMITMD_API_URL");
         _transport = new HttpTransport(signer, cc.ChainId, routerAddress ?? string.Empty, baseUrl ?? envUrl ?? cc.ApiUrl);
     }
@@ -102,9 +89,8 @@ public sealed class Wallet
         var chain         = Environment.GetEnvironmentVariable("REMITMD_CHAIN") ?? "base";
         var testnet       = Environment.GetEnvironmentVariable("REMITMD_TESTNET") is "1" or "true";
         var routerAddress = Environment.GetEnvironmentVariable("REMITMD_ROUTER_ADDRESS");
-        var rpcUrl        = Environment.GetEnvironmentVariable("REMITMD_RPC_URL");
 
-        return new Wallet(new PrivateKeySigner(key), chain, testnet, null, routerAddress, rpcUrl);
+        return new Wallet(new PrivateKeySigner(key), chain, testnet, null, routerAddress);
     }
 
     /// <summary>The agent's Ethereum address (derived from the private key).</summary>
@@ -119,7 +105,7 @@ public sealed class Wallet
         _chainId = chainId;
         _chain = "base";
         _chainKey = "base";
-        _rpcUrl = "";  // empty = mock mode, FetchUsdcNonceRpcAsync returns 0
+        _isMock = true;
     }
 
     // ─── Direct payments ──────────────────────────────────────────────────────
@@ -704,70 +690,29 @@ public sealed class Wallet
     }
 
     /// <summary>
-    /// Fetches the EIP-2612 permit nonce, trying the API first then falling back to direct RPC.
-    /// The API path is cheaper (no RPC round-trip) and works even when no RPC URL is configured.
+    /// Fetches the EIP-2612 permit nonce from the API.
     /// </summary>
     private async Task<long> FetchPermitNonceAsync(string usdcAddress)
     {
-        // Mock mode: no RPC URL means return 0 (used by MockRemit)
-        if (string.IsNullOrEmpty(_rpcUrl))
+        // Mock mode: return 0 directly (used by MockRemit)
+        if (_isMock)
             return 0;
 
-        // Try the status API first — it's cheaper than a direct RPC call.
-        try
+        var status = await _transport.GetAsync<System.Text.Json.JsonElement>(
+            $"/api/v1/status/{Address}", CancellationToken.None);
+        if (status.TryGetProperty("permit_nonce", out var nonceElem))
         {
-            var status = await _transport.GetAsync<System.Text.Json.JsonElement>(
-                $"/api/v1/status/{Address}", CancellationToken.None);
-            if (status.TryGetProperty("permit_nonce", out var nonceElem))
+            if (nonceElem.ValueKind == System.Text.Json.JsonValueKind.Number)
+                return nonceElem.GetInt64();
+            if (nonceElem.ValueKind == System.Text.Json.JsonValueKind.String)
             {
-                if (nonceElem.ValueKind == System.Text.Json.JsonValueKind.Number)
-                    return nonceElem.GetInt64();
-                if (nonceElem.ValueKind == System.Text.Json.JsonValueKind.String)
-                {
-                    var s = nonceElem.GetString();
-                    if (s is not null && long.TryParse(s, out var parsed))
-                        return parsed;
-                }
+                var s = nonceElem.GetString();
+                if (s is not null && long.TryParse(s, out var parsed))
+                    return parsed;
             }
         }
-        catch
-        {
-            // Fall through to RPC fallback.
-        }
-
-        // Fall back to direct RPC call.
-        return await FetchUsdcNonceRpcAsync(usdcAddress);
-    }
-
-    /// <summary>Fetches the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.</summary>
-    private async Task<long> FetchUsdcNonceRpcAsync(string usdcAddress)
-    {
-        // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
-        var paddedAddress = Address.ToLowerInvariant().Replace("0x", "").PadLeft(64, '0');
-        var data = $"0x7ecebe00{paddedAddress}";
-
-        var requestBody = new
-        {
-            jsonrpc = "2.0",
-            id = 1,
-            method = "eth_call",
-            @params = new object[]
-            {
-                new { to = usdcAddress, data },
-                "latest"
-            }
-        };
-
-        var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-        var response = await RpcClient.PostAsync(_rpcUrl, content);
-        var responseBody = await response.Content.ReadAsStringAsync();
-
-        using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
-        var result = doc.RootElement.GetProperty("result").GetString()
-            ?? throw new RemitError(ErrorCodes.ServerError, "RPC returned null for nonces() call.");
-
-        return Convert.ToInt64(result, 16);
+        throw new RemitError(ErrorCodes.ServerError,
+            $"permit_nonce not available from /status API for {Address}");
     }
 
     // ─── Validation helpers ───────────────────────────────────────────────────

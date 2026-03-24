@@ -216,13 +216,6 @@ var permit = wallet.SignUsdcPermit(
 );
 ```
 
-You can also override the JSON-RPC URL used for nonce fetching:
-
-```csharp
-var wallet = new Wallet(key, chain: "base", testnet: true, rpcUrl: "https://my-rpc.example.com");
-// or via environment variable: REMITMD_RPC_URL
-```
-
 ## License
 
 MIT — see [LICENSE](../../LICENSE)

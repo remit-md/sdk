@@ -1,15 +1,12 @@
 package remitmd
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"math/big"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -23,13 +20,6 @@ var usdcAddresses = map[string]string{
 	"base-sepolia": "0x2d846325766921935f37d5b4478196d3ef93707c",
 	"base":         "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
 	"localhost":    "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-}
-
-// defaultRPCURLs maps chain keys to public JSON-RPC endpoints.
-var defaultRPCURLs = map[string]string{
-	"base-sepolia": "https://sepolia.base.org",
-	"base":         "https://mainnet.base.org",
-	"localhost":    "http://127.0.0.1:8545",
 }
 
 // Wallet is the primary remit.md client for agents that send payments.
@@ -49,7 +39,6 @@ type Wallet struct {
 	chain          string
 	chainKey       string
 	testnet        bool
-	rpcURL         string
 	contractsCache *ContractAddresses
 }
 
@@ -61,7 +50,6 @@ type walletConfig struct {
 	testnet       bool
 	baseURL       string
 	routerAddress common.Address
-	rpcURL        string
 }
 
 // WithChain sets the target chain. Currently only "base" is supported. Default: "base".
@@ -83,12 +71,6 @@ func WithBaseURL(url string) Option {
 // This must match the ROUTER_ADDRESS configured on the server.
 func WithRouterAddress(addr string) Option {
 	return func(c *walletConfig) { c.routerAddress = common.HexToAddress(addr) }
-}
-
-// WithRPCURL overrides the JSON-RPC endpoint used for on-chain reads (e.g., permit nonces).
-// If not set, defaults to the public RPC for the selected chain.
-func WithRPCURL(url string) Option {
-	return func(c *walletConfig) { c.rpcURL = url }
 }
 
 // NewWallet creates a Wallet from a hex-encoded private key.
@@ -132,11 +114,6 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 		apiURL = cfg.baseURL
 	}
 
-	rpcURL := cfg.rpcURL
-	if rpcURL == "" {
-		rpcURL = defaultRPCURLs[chainKey]
-	}
-
 	return &Wallet{
 		http:    newHTTPClient(apiURL, cc.ChainID, cfg.routerAddress, signer),
 		signer:  signer,
@@ -144,7 +121,6 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 		chain:   chainKey,
 		chainKey: chainKey,
 		testnet: cfg.testnet,
-		rpcURL:  rpcURL,
 	}, nil
 }
 
@@ -172,9 +148,6 @@ func FromEnv(opts ...Option) (*Wallet, error) {
 	}
 	if routerAddr := os.Getenv("REMITMD_ROUTER_ADDRESS"); routerAddr != "" {
 		envOpts = append(envOpts, WithRouterAddress(routerAddr))
-	}
-	if rpcURL := os.Getenv("REMITMD_RPC_URL"); rpcURL != "" {
-		envOpts = append(envOpts, WithRPCURL(rpcURL))
 	}
 
 	// Caller opts take precedence over env opts
@@ -1085,86 +1058,17 @@ func (w *Wallet) SignPermit(ctx context.Context, spender string, amount float64,
 	}, nil
 }
 
-// fetchUsdcNonceRpc fetches the current EIP-2612 nonce for this wallet from the USDC contract via direct RPC.
-// Returns 0 if no RPC URL is configured (mock/test mode).
-func (w *Wallet) fetchUsdcNonceRpc(ctx context.Context, usdcAddr string) (uint64, error) {
-	if w.rpcURL == "" {
-		return 0, nil
-	}
-	// Encode: nonces(address) selector = 0x7ecebe00 + padded address
-	addrHex := strings.ToLower(strings.TrimPrefix(w.signer.Address().Hex(), "0x"))
-	padded := fmt.Sprintf("%064s", addrHex)
-	data := "0x7ecebe00" + padded
-
-	payload := map[string]any{
-		"jsonrpc": "2.0",
-		"id":      1,
-		"method":  "eth_call",
-		"params": []any{
-			map[string]string{"to": usdcAddr, "data": data},
-			"latest",
-		},
-	}
-
-	bodyBytes, err := json.Marshal(payload)
-	if err != nil {
-		return 0, fmt.Errorf("marshal RPC request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, w.rpcURL, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return 0, fmt.Errorf("create RPC request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, remitErr(ErrCodeNetworkError,
-			fmt.Sprintf("RPC call to %s failed: %s", w.rpcURL, err),
-			map[string]any{"rpc_url": w.rpcURL},
-		)
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, fmt.Errorf("read RPC response: %w", err)
-	}
-
-	var rpcResp struct {
-		Result string         `json:"result"`
-		Error  map[string]any `json:"error"`
-	}
-	if err := json.Unmarshal(respBytes, &rpcResp); err != nil {
-		return 0, fmt.Errorf("parse RPC response: %w", err)
-	}
-	if rpcResp.Error != nil {
-		msg, _ := rpcResp.Error["message"].(string)
-		return 0, fmt.Errorf("RPC error fetching nonce: %s", msg)
-	}
-
-	result := rpcResp.Result
-	if result == "" || result == "0x" {
-		return 0, nil
-	}
-	nonce := new(big.Int)
-	nonce.SetString(strings.TrimPrefix(result, "0x"), 16)
-	return nonce.Uint64(), nil
-}
-
-// fetchPermitNonce fetches the current EIP-2612 permit nonce for this wallet.
-// Prefers the API (GET /api/v1/status/{address} → permit_nonce), falls back to direct RPC.
+// fetchPermitNonce fetches the current EIP-2612 permit nonce for this wallet from the API.
 func (w *Wallet) fetchPermitNonce(ctx context.Context, usdcAddr string) (uint64, error) {
-	// Try the status API first — it's cheaper than a direct RPC call.
 	var status WalletStatus
 	err := w.http.get(ctx, "/api/v1/status/"+strings.ToLower(w.Address()), &status)
-	if err == nil && status.PermitNonce != nil {
+	if err != nil {
+		return 0, fmt.Errorf("permit nonce API lookup failed: %w", err)
+	}
+	if status.PermitNonce != nil {
 		return uint64(*status.PermitNonce), nil
 	}
-	if err != nil {
-		log.Printf("[remitmd] permit nonce API lookup failed, falling back to RPC: %v", err)
-	}
-	return w.fetchUsdcNonceRpc(ctx, usdcAddr)
+	return 0, fmt.Errorf("permit_nonce not available from API for %s", w.Address())
 }
 
 // autoPermit signs a permit for the given contract type and amount.

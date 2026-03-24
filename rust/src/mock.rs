@@ -100,7 +100,6 @@ impl MockRemit {
             chain: "base".to_string(),
             chain_key: "base-sepolia".to_string(),
             contracts_cache: Mutex::new(None),
-            rpc_url: "http://127.0.0.1:8545".to_string(),
             signer,
         }
     }

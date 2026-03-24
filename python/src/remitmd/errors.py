@@ -174,7 +174,6 @@ class ServerError(RemitError):
 _CODE_MAP: dict[str, type[RemitError]] = {
     "INVALID_SIGNATURE": InvalidSignature,
     "TIMESTAMP_EXPIRED": SignatureExpired,
-    "SIGNATURE_EXPIRED": SignatureExpired,  # backwards-compat alias
     "NONCE_REUSED": NonceReused,
     "UNAUTHORIZED": Unauthorized,
     "INSUFFICIENT_BALANCE": InsufficientBalance,

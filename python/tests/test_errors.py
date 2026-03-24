@@ -29,7 +29,7 @@ from remitmd.errors import (
     ("code", "expected_cls"),
     [
         ("INVALID_SIGNATURE", InvalidSignature),
-        ("SIGNATURE_EXPIRED", SignatureExpired),
+        ("TIMESTAMP_EXPIRED", SignatureExpired),
         ("NONCE_REUSED", NonceReused),
         ("UNAUTHORIZED", Unauthorized),
         ("INSUFFICIENT_BALANCE", InsufficientBalance),

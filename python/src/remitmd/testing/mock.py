@@ -47,7 +47,7 @@ from remitmd.models.deposit import Deposit
 from remitmd.models.escrow import Escrow
 from remitmd.models.invoice import Invoice
 from remitmd.models.stream import Stream
-from remitmd.models.tab import Tab
+from remitmd.models.tab import Tab, TabCharge
 
 
 def _id(prefix: str) -> str:
@@ -169,7 +169,7 @@ class MockWallet:
             wallet=self.address,
             tier="free",
             monthly_volume=0.0,
-            fee_rate_bps=30,
+            fee_rate_bps=100,
         )
 
     async def get_reputation(self, wallet: str) -> Reputation:
@@ -235,25 +235,28 @@ class MockWallet:
         escrow.updated_at = _iso(self._mock.now())
         return escrow
 
-    async def claim_start(self, invoice_id: str) -> Transaction:
+    async def claim_start(self, invoice_id: str) -> Escrow:
         self._mock._check_forced_error(self.address)
         escrow = self._find_escrow_by_invoice(invoice_id)
         if escrow.status != EscrowStatus.funded:
             raise InvalidState(f"Escrow is {escrow.status}")
         escrow.status = EscrowStatus.active
-        return self._mock._make_tx(invoice_id=invoice_id)
+        escrow.updated_at = _iso(self._mock.now())
+        return escrow
 
     async def submit_evidence(
-        self, invoice_id: str, evidence_uri: str, milestone_index: int = 0
-    ) -> Transaction:
+        self, invoice_id: str, evidence_uri: str, evidence_hash: str = "", milestone_index: int = 0
+    ) -> Escrow:
         self._mock._check_forced_error(self.address)
-        self._find_escrow_by_invoice(invoice_id)  # validates existence
-        return self._mock._make_tx(invoice_id=invoice_id)
+        escrow = self._find_escrow_by_invoice(invoice_id)
+        escrow.updated_at = _iso(self._mock.now())
+        return escrow
 
-    async def release_milestone(self, invoice_id: str, milestone_index: int) -> Transaction:
+    async def release_milestone(self, invoice_id: str, milestone_index: int) -> Escrow:
         self._mock._check_forced_error(self.address)
-        self._find_escrow_by_invoice(invoice_id)
-        return self._mock._make_tx(invoice_id=invoice_id)
+        escrow = self._find_escrow_by_invoice(invoice_id)
+        escrow.updated_at = _iso(self._mock.now())
+        return escrow
 
     def _find_escrow_by_invoice(self, invoice_id: str) -> Escrow:
         for escrow in self._mock._state.escrows.values():
@@ -289,7 +292,9 @@ class MockWallet:
         self._mock._state.tabs[tid] = tab
         return tab
 
-    async def close_tab(self, tab_id: str) -> Transaction:
+    async def close_tab(
+        self, tab_id: str, final_amount: float = 0, provider_sig: str = "0x"
+    ) -> Tab:
         self._mock._check_forced_error(self.address)
         tab = self._mock._state.tabs.get(tab_id)
         if tab is None:
@@ -302,20 +307,35 @@ class MockWallet:
         self._mock._credit(tab.provider, tab.total_charged)
         self._mock._credit(self.address, remaining)
         tab.status = TabStatus.closed
-        return self._mock._make_tx()
+        tab.updated_at = _iso(self._mock.now())
+        return tab
 
-    async def charge_tab(self, tab_id: str, units: float) -> Transaction:
-        """Payee charges units against an open tab (not in Wallet API but useful in tests)."""
+    async def charge_tab(
+        self,
+        tab_id: str,
+        amount: float,
+        cumulative: float,
+        call_count: int,
+        provider_sig: str = "0x",
+    ) -> TabCharge:
+        """Charge an amount against an open tab."""
         tab = self._mock._state.tabs.get(tab_id)
         if tab is None:
             raise TabNotFound(f"Tab {tab_id!r} not found")
-        amount = units * tab.per_unit
         remaining = tab.limit_amount - tab.total_charged
         if amount > remaining:
             raise TabLimitExceeded(f"Charge {amount:.2f} exceeds remaining {remaining:.2f}")
         tab.total_charged += amount
         tab.call_count += 1
-        return self._mock._make_tx()
+        return TabCharge(
+            id=tab.call_count,
+            tab_id=tab_id,
+            amount=amount,
+            cumulative=tab.total_charged,
+            call_count=tab.call_count,
+            provider_sig=provider_sig,
+            charged_at=_iso(self._mock.now()),
+        )
 
     # ─── Streams ──────────────────────────────────────────────────────────────
 
@@ -402,16 +422,19 @@ class MockWallet:
         self._mock._state.bounties[bid] = bounty
         return bounty
 
-    async def submit_bounty(self, bounty_id: str, evidence_uri: str) -> Transaction:
+    async def submit_bounty(
+        self, bounty_id: str, evidence_hash: str, evidence_uri: str | None = None
+    ) -> dict[str, Any]:
         self._mock._check_forced_error(self.address)
         bounty = self._mock._state.bounties.get(bounty_id)
         if bounty is None:
             raise BountyNotFound(f"Bounty {bounty_id!r} not found")
+        sub_id = bounty.attempts  # integer ID, matching real API
         sub = BountySubmission(
-            id=_id("sub"),
+            id=str(sub_id),
             bounty_id=bounty_id,
             submitter=self.address,
-            evidence_uri=evidence_uri,
+            evidence_uri=evidence_uri or "",
             status="pending",
             submitted_at=self._mock.now(),
         )
@@ -419,19 +442,27 @@ class MockWallet:
             bounty.submissions = []
         bounty.submissions.append(sub)
         bounty.attempts += 1
-        return self._mock._make_tx()
+        return {"submission_id": sub_id, "bounty_id": bounty_id}
 
-    async def award_bounty(self, bounty_id: str, winner: str) -> Transaction:
+    async def award_bounty(self, bounty_id: str, submission_id: int) -> Bounty:
         self._mock._check_forced_error(self.address)
         bounty = self._mock._state.bounties.get(bounty_id)
         if bounty is None:
             raise BountyNotFound(f"Bounty {bounty_id!r} not found")
         if bounty.status != BountyStatus.open:
             raise InvalidState(f"Bounty is {bounty.status}")
+        # Find winner from submissions
+        winner = self.address  # default
+        if bounty.submissions:
+            for sub in bounty.submissions:
+                if str(sub.id) == str(submission_id):
+                    winner = sub.submitter
+                    break
         self._mock._credit(winner, bounty.amount)
         bounty.winner = winner
         bounty.status = BountyStatus.awarded
-        return self._mock._make_tx()
+        bounty.updated_at = self._mock.now()
+        return bounty
 
     # ─── Deposits ─────────────────────────────────────────────────────────────
 

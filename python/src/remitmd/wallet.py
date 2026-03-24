@@ -49,6 +49,7 @@ USDC_ADDRESSES: dict[str, str] = {
     "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
 }
 
+
 class Wallet(RemitClient):
     """
     Full remit.md wallet with signing capability.

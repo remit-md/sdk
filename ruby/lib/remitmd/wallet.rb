@@ -356,7 +356,15 @@ module Remitmd
     # @param usdc_address [String, nil] override the USDC contract address
     # @return [PermitSignature]
     def sign_usdc_permit(spender, value, deadline, nonce = 0, usdc_address: nil)
-      usdc_addr = usdc_address || USDC_ADDRESSES[@chain_key] || ""
+      usdc_addr = usdc_address || USDC_ADDRESSES[@chain_key]
+      if usdc_addr.nil? || usdc_addr.empty?
+        raise RemitError.new(
+          RemitError::INVALID_ADDRESS,
+          "No USDC address configured for chain #{@chain_key.inspect}. " \
+          "Valid chains: #{USDC_ADDRESSES.keys.join(", ")}",
+          context: { chain: @chain_key }
+        )
+      end
       chain_id = @chain_id || ChainId::BASE_SEPOLIA
 
       # Domain separator for USDC (EIP-2612)
@@ -403,7 +411,15 @@ module Remitmd
     # @param deadline [Integer, nil] optional Unix timestamp; defaults to 1 hour from now
     # @return [PermitSignature]
     def sign_permit(spender, amount, deadline: nil)
-      usdc_addr = USDC_ADDRESSES[@chain_key] || ""
+      usdc_addr = USDC_ADDRESSES[@chain_key]
+      if usdc_addr.nil? || usdc_addr.empty?
+        raise RemitError.new(
+          RemitError::INVALID_ADDRESS,
+          "No USDC address configured for chain #{@chain_key.inspect}. " \
+          "Valid chains: #{USDC_ADDRESSES.keys.join(", ")}",
+          context: { chain: @chain_key }
+        )
+      end
       nonce = fetch_usdc_nonce(usdc_addr)
       dl = deadline || (Time.now.to_i + 3600)
       raw = (amount * 1_000_000).round.to_i
@@ -578,8 +594,8 @@ module Remitmd
       begin
         resolved = permit || auto_permit("relayer", 999_999_999.0)
         body[:permit] = resolved.to_h
-      rescue StandardError
-        # permit signing failed — proceed without permit (custodial fallback)
+      rescue StandardError => e
+        warn "[remitmd] create_fund_link: auto-permit failed: #{e.message}"
       end
       LinkResponse.new(@transport.post("/links/fund", body))
     end
@@ -596,8 +612,8 @@ module Remitmd
       begin
         resolved = permit || auto_permit("relayer", 999_999_999.0)
         body[:permit] = resolved.to_h
-      rescue StandardError
-        # permit signing failed — proceed without permit (custodial fallback)
+      rescue StandardError => e
+        warn "[remitmd] create_withdraw_link: auto-permit failed: #{e.message}"
       end
       LinkResponse.new(@transport.post("/links/withdraw", body))
     end
@@ -692,7 +708,15 @@ module Remitmd
         raise RemitError.new(RemitError::NETWORK_ERROR, "RPC error fetching nonce: #{msg}")
       end
 
-      (result["result"] || "0x0").to_i(16)
+      raw = result["result"]
+      if raw.nil?
+        raise RemitError.new(
+          RemitError::NETWORK_ERROR,
+          "RPC returned nil result when fetching USDC nonce (address=#{usdc_address})",
+          context: { rpc_url: @rpc_url, usdc_address: usdc_address }
+        )
+      end
+      raw.to_i(16)
     end
 
     # Auto-sign a permit for the given contract type and amount.

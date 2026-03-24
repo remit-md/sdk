@@ -236,6 +236,9 @@ export class A2AClient {
     if (data.error) {
       throw new Error(`A2A error: ${data.error.message ?? JSON.stringify(data.error)}`);
     }
-    return (data.result ?? (data as unknown as T)) as T;
+    if (data.result == null) {
+      throw new Error("A2A response missing 'result' field");
+    }
+    return data.result;
   }
 }

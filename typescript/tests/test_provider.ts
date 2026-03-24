@@ -161,24 +161,39 @@ describe("X402Paywall.check", () => {
     }
   });
 
-  it("returns FACILITATOR_ERROR when fetch throws", async () => {
+  it("returns FACILITATOR_UNREACHABLE when fetch throws", async () => {
     const pw = makePaywall();
     const orig = globalThis.fetch;
     try {
       (globalThis as Record<string, unknown>)["fetch"] = async () => { throw new Error("network error"); };
       const result = await pw.check(makeDummyPaymentSig());
       assert.equal(result.isValid, false);
-      assert.equal(result.invalidReason, "FACILITATOR_ERROR");
+      assert.equal(result.invalidReason, "FACILITATOR_UNREACHABLE");
     } finally {
       globalThis.fetch = orig;
     }
   });
 
-  it("returns FACILITATOR_ERROR when facilitator returns non-ok status", async () => {
+  it("returns FACILITATOR_UNREACHABLE on 5xx status", async () => {
     const pw = makePaywall();
     const orig = globalThis.fetch;
     try {
-      (globalThis as Record<string, unknown>)["fetch"] = mockFetch({ ok: false, json: () => ({}) });
+      (globalThis as Record<string, unknown>)["fetch"] = async () =>
+        ({ ok: false, status: 503, json: async () => ({}) }) as Response;
+      const result = await pw.check(makeDummyPaymentSig());
+      assert.equal(result.isValid, false);
+      assert.equal(result.invalidReason, "FACILITATOR_UNREACHABLE");
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  it("returns FACILITATOR_ERROR on 4xx status", async () => {
+    const pw = makePaywall();
+    const orig = globalThis.fetch;
+    try {
+      (globalThis as Record<string, unknown>)["fetch"] = async () =>
+        ({ ok: false, status: 400, json: async () => ({}) }) as Response;
       const result = await pw.check(makeDummyPaymentSig());
       assert.equal(result.isValid, false);
       assert.equal(result.invalidReason, "FACILITATOR_ERROR");

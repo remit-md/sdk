@@ -35,14 +35,12 @@ let wallet = Wallet::from_env()?;
 // REMITMD_KEY=0x...         (required)
 // REMITMD_CHAIN=base        (optional, default: "base")
 // REMITMD_TESTNET=true      (optional)
-// REMITMD_RPC_URL=https://… (optional, for permit nonce fetching)
 
 // Builder pattern
 let wallet = Wallet::new("0x<private-key>")
     .chain("base")          // "base" (only supported chain)
     .testnet()              // use testnet
     .base_url("http://localhost:3000")  // self-hosted
-    .rpc_url("https://sepolia.base.org") // custom RPC
     .build()?;
 
 // Custom signer (KMS, hardware wallet, etc.)

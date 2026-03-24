@@ -49,12 +49,6 @@ USDC_ADDRESSES: dict[str, str] = {
     "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
 }
 
-DEFAULT_RPC_URLS: dict[str, str] = {
-    "base-sepolia": "https://sepolia.base.org",
-    "base": "https://mainnet.base.org",
-    "localhost": "http://127.0.0.1:8545",
-}
-
 
 class Wallet(RemitClient):
     """
@@ -76,7 +70,6 @@ class Wallet(RemitClient):
         api_url: str | None = None,
         signer: Signer | None = None,
         router_address: str | None = None,
-        rpc_url: str | None = None,
     ) -> None:
         if private_key is None and signer is None:
             private_key = os.environ.get("REMITMD_KEY")
@@ -100,17 +93,6 @@ class Wallet(RemitClient):
             url, signer=self._signer, chain_id=chain_id, verifying_contract=verifying_contract
         )
         self._contracts_cache = None
-
-        # RPC URL for on-chain queries (nonce fetching for auto-permit).
-        resolved_rpc = rpc_url or os.environ.get("REMITMD_RPC_URL")
-        if not resolved_rpc:
-            if chain not in DEFAULT_RPC_URLS:
-                raise ValueError(
-                    f"Unknown chain '{chain}'. Supported chains: {', '.join(DEFAULT_RPC_URLS)}. "
-                    "Pass rpc_url explicitly or set REMITMD_RPC_URL."
-                )
-            resolved_rpc = DEFAULT_RPC_URLS[chain]
-        self._rpc_url = resolved_rpc
 
         # Event callbacks: event_type → list of callables
         self._callbacks: dict[str, list[Callable[..., Any]]] = {}
@@ -203,49 +185,16 @@ class Wallet(RemitClient):
 
         return PermitSignature(value=value, deadline=deadline, v=v, r=r, s=s)
 
-    async def _fetch_usdc_nonce_rpc(self, usdc_address: str) -> int:
-        """Fetch the current EIP-2612 nonce for this wallet via direct RPC call."""
-        import httpx
-
-        padded = self.address.lower().replace("0x", "").zfill(64)
-        data = f"0x7ecebe00{padded}"
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "eth_call",
-            "params": [{"to": usdc_address, "data": data}, "latest"],
-        }
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(self._rpc_url, json=payload)
-            result = resp.json()
-        if "error" in result:
-            msg = result["error"].get("message", result["error"])
-            raise RuntimeError(f"RPC error fetching nonce: {msg}")
-        raw_result = result.get("result")
-        if raw_result is None:
-            raise RuntimeError(
-                "RPC returned null result for nonce query — "
-                "USDC contract may not exist at the given address"
-            )
-        return int(raw_result, 16)
-
     async def _fetch_permit_nonce(self, usdc_address: str) -> int:
-        """Fetch the EIP-2612 permit nonce, trying the API first then falling back to RPC."""
-        import logging
-
-        logger = logging.getLogger("remitmd")
-
-        # Try the status API first — it's cheaper than a direct RPC call.
-        try:
-            data = await self._http.get(f"/api/v1/status/{self.address}")
-            nonce = data.get("permit_nonce") if isinstance(data, dict) else None
-            if nonce is not None:
-                return int(nonce)
-        except Exception as exc:
-            logger.debug("permit nonce API lookup failed, falling back to RPC: %s", exc)
-
-        # Fall back to direct RPC call.
-        return await self._fetch_usdc_nonce_rpc(usdc_address)
+        """Fetch the EIP-2612 permit nonce from the API."""
+        data = await self._http.get(f"/api/v1/status/{self.address}")
+        nonce = data.get("permit_nonce") if isinstance(data, dict) else None
+        if nonce is not None:
+            return int(nonce)
+        raise RuntimeError(
+            f"permit_nonce not available from API for {self.address}. "
+            "Ensure the server supports the permit_nonce field in GET /api/v1/status."
+        )
 
     async def sign_permit(
         self,

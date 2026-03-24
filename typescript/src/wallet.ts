@@ -20,20 +20,11 @@ import type { Tab, TabCharge } from "./models/tab.js";
 import type { Stream } from "./models/stream.js";
 import type { Bounty } from "./models/bounty.js";
 import type { Deposit } from "./models/deposit.js";
-/** Default public RPC URLs per chain. */
-const DEFAULT_RPC_URLS: Record<string, string> = {
-  "base-sepolia": "https://sepolia.base.org",
-  base: "https://mainnet.base.org",
-  localhost: "http://127.0.0.1:8545",
-};
-
 export interface WalletOptions extends RemitClientOptions {
   privateKey?: string;
   signer?: Signer;
   /** Router contract address for EIP-712 domain — must match server's ROUTER_ADDRESS. */
   routerAddress?: string;
-  /** JSON-RPC URL for on-chain reads (nonce fetching). Falls back to REMITMD_RPC_URL env var, then public defaults. */
-  rpcUrl?: string;
 }
 
 export interface OpenTabOptions {
@@ -125,10 +116,9 @@ function uuidToBytes32(uuid: string): `0x${string}` {
 export class Wallet extends RemitClient {
   readonly #signer: Signer;
   readonly #auth: AuthenticatedClient;
-  readonly #rpcUrl: string;
 
   constructor(options: WalletOptions = {}) {
-    const { privateKey: explicitKey, signer, routerAddress, rpcUrl, ...clientOptions } = options;
+    const { privateKey: explicitKey, signer, routerAddress, ...clientOptions } = options;
 
     const privateKey =
       explicitKey ?? (!signer ? process.env["REMITMD_KEY"] : undefined);
@@ -140,16 +130,6 @@ export class Wallet extends RemitClient {
     }
 
     super(clientOptions);
-
-    const resolvedRpc = rpcUrl ?? process.env["REMITMD_RPC_URL"] ?? DEFAULT_RPC_URLS[this._chain];
-    if (!resolvedRpc) {
-      throw new Error(
-        `Unknown chain '${this._chain}'. No RPC URL available. ` +
-        `Supported chains: ${Object.keys(DEFAULT_RPC_URLS).join(", ")}. ` +
-        "Pass rpcUrl explicitly or set REMITMD_RPC_URL.",
-      );
-    }
-    this.#rpcUrl = resolvedRpc;
 
     // Router contract address for EIP-712 domain — falls back to env var.
     const verifyingContract =
@@ -305,45 +285,18 @@ export class Wallet extends RemitClient {
   }
 
   /**
-   * Fetch the current EIP-2612 permit nonce for this wallet.
-   * Prefers the API (GET /status/{address} → permitNonce), falls back to direct RPC.
+   * Fetch the current EIP-2612 permit nonce for this wallet from the API.
+   * The server reads the on-chain nonce via its own RPC connection.
    */
-  async #fetchPermitNonce(usdcAddress: string): Promise<number> {
-    try {
-      const s = await this.status();
-      if (s.permitNonce !== null && s.permitNonce !== undefined) {
-        return s.permitNonce;
-      }
-    } catch {
-      // API unavailable — fall through to RPC.
+  async #fetchPermitNonce(_usdcAddress: string): Promise<number> {
+    const s = await this.status();
+    if (s.permitNonce !== null && s.permitNonce !== undefined) {
+      return s.permitNonce;
     }
-    return this.#fetchUsdcNonceRpc(usdcAddress);
-  }
-
-  /** Fallback: fetch nonce directly from USDC contract via JSON-RPC eth_call. */
-  async #fetchUsdcNonceRpc(usdcAddress: string): Promise<number> {
-    const paddedAddress = this.address.toLowerCase().replace("0x", "").padStart(64, "0");
-    const data = `0x7ecebe00${paddedAddress}`;
-
-    const response = await fetch(this.#rpcUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "eth_call",
-        params: [{ to: usdcAddress, data }, "latest"],
-      }),
-    });
-
-    const json = await response.json() as { result?: string; error?: { message: string } };
-    if (json.error) throw new Error(`RPC error fetching nonce: ${json.error.message}`);
-    if (json.result === undefined || json.result === null) {
-      throw new Error(
-        "RPC returned null result for nonce query — USDC contract may not exist at the given address",
-      );
-    }
-    return parseInt(json.result, 16);
+    throw new Error(
+      "Server returned null permit_nonce — RPC may be unavailable server-side. " +
+      "Cannot sign permit without a valid nonce.",
+    );
   }
 
   // ─── Direct Payment ─────────────────────────────────────────────────────────

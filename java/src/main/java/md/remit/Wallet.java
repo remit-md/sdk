@@ -5,11 +5,6 @@ import md.remit.models.*;
 import md.remit.signer.Signer;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,25 +33,17 @@ public class Wallet {
         "localhost", "0x5FbDB2315678afecb367f032d93F642f64180aa3"
     );
 
-    private static final Map<String, String> DEFAULT_RPC_URLS = Map.of(
-        "base-sepolia", "https://sepolia.base.org",
-        "base", "https://mainnet.base.org",
-        "localhost", "http://127.0.0.1:8545"
-    );
-
     private final ApiClient client;
     private final Signer signer;
     private final long chainId;
     private final String chain;
-    private final String rpcUrl;
     private volatile ContractAddresses contractsCache;
 
-    Wallet(ApiClient client, Signer signer, long chainId, String chain, String rpcUrl) {
+    Wallet(ApiClient client, Signer signer, long chainId, String chain) {
         this.client = client;
         this.signer = signer;
         this.chainId = chainId;
         this.chain = chain;
-        this.rpcUrl = rpcUrl;
     }
 
     /** The Ethereum address (0x-prefixed) of this wallet. */
@@ -783,7 +770,7 @@ public class Wallet {
     /**
      * Auto-signs a permit for the given contract type and amount.
      * Used internally by payment methods when no explicit permit is provided.
-     * Returns null if permit signing is unavailable (e.g. mock context, no RPC).
+     * Returns null if permit signing is unavailable (e.g. mock context, API error).
      */
     private PermitSignature autoPermit(String contractField, BigDecimal amount) {
         try {
@@ -802,7 +789,7 @@ public class Wallet {
             if (spender == null || spender.isBlank()) return null;
             return signPermit(spender, amount);
         } catch (Exception e) {
-            // Permit signing unavailable (no RPC, mock context, etc.)
+            // Permit signing unavailable (mock context, API error, etc.)
             // Fall through — server will handle approval via other means
             System.err.println("[remitmd] auto-permit failed for " + contractField + ": " + e.getMessage());
             return null;
@@ -810,83 +797,19 @@ public class Wallet {
     }
 
     /**
-     * Fetches the EIP-2612 permit nonce, trying the API first then falling back to RPC.
+     * Fetches the EIP-2612 permit nonce from the API.
      */
     @SuppressWarnings("unchecked")
     private long fetchPermitNonce(String usdcAddress) {
-        // Try the status API first — it's cheaper than a direct RPC call.
-        try {
-            Map<String, Object> data = client.get(
-                "/api/v1/status/" + signer.address(), Map.class);
-            Object nonce = data != null ? data.get("permit_nonce") : null;
-            if (nonce != null) {
-                return ((Number) nonce).longValue();
-            }
-        } catch (Exception e) {
-            System.err.println("[remitmd] permit nonce API lookup failed, falling back to RPC: " + e.getMessage());
+        Map<String, Object> data = client.get(
+            "/api/v1/status/" + signer.address(), Map.class);
+        Object nonce = data != null ? data.get("permit_nonce") : null;
+        if (nonce != null) {
+            return ((Number) nonce).longValue();
         }
-
-        // Fall back to direct RPC call.
-        return fetchUsdcNonceRpc(usdcAddress);
-    }
-
-    /**
-     * Fetches the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
-     */
-    private long fetchUsdcNonceRpc(String usdcAddress) {
-        // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
-        String addr = signer.address().toLowerCase().replace("0x", "");
-        String paddedAddress = String.format("%64s", addr).replace(' ', '0');
-        String data = "0x7ecebe00" + paddedAddress;
-
-        String rpc = this.rpcUrl;
-        if (rpc == null || rpc.isBlank()) {
-            rpc = DEFAULT_RPC_URLS.getOrDefault(chain, "");
-        }
-        if (rpc.isEmpty()) {
-            throw new RemitError(ErrorCodes.INVALID_CHAIN,
-                "No RPC URL available for chain \"" + chain + "\". " +
-                "Set REMITMD_RPC_URL or pass rpcUrl in the builder.",
-                Map.of("chain", chain));
-        }
-
-        String jsonBody = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_call\"," +
-            "\"params\":[{\"to\":\"" + usdcAddress + "\",\"data\":\"" + data + "\"},\"latest\"]}";
-
-        try {
-            HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-            HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(rpc))
-                .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(15))
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                .build();
-            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-
-            // Parse "result" field from JSON-RPC response
-            String body = resp.body();
-            int resultIdx = body.indexOf("\"result\"");
-            if (resultIdx == -1) {
-                throw new RemitError(ErrorCodes.CHAIN_ERROR,
-                    "RPC call to nonces() failed: no result in response.",
-                    Map.of("response", body.length() > 200 ? body.substring(0, 200) : body));
-            }
-            // Extract hex value between quotes after "result":
-            int colonIdx = body.indexOf(':', resultIdx);
-            int startQuote = body.indexOf('"', colonIdx);
-            int endQuote = body.indexOf('"', startQuote + 1);
-            String hex = body.substring(startQuote + 1, endQuote);
-            if (hex.startsWith("0x") || hex.startsWith("0X")) hex = hex.substring(2);
-            return new BigInteger(hex, 16).longValueExact();
-        } catch (RemitError e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RemitError(ErrorCodes.CHAIN_ERROR,
-                "Failed to fetch USDC nonce via RPC: " + e.getMessage(),
-                Map.of("rpc_url", rpc));
-        }
+        throw new RemitError(ErrorCodes.CHAIN_ERROR,
+            "permit_nonce not available from /status API for " + signer.address(),
+            Map.of("address", signer.address()));
     }
 
     // ─── Private crypto helpers ──────────────────────────────────────────────

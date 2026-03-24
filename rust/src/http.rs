@@ -16,24 +16,9 @@ pub(crate) const USDC_ADDRESSES: &[(&str, &str)] = &[
     ("localhost", "0x5FbDB2315678afecb367f032d93F642f64180aa3"),
 ];
 
-/// Default public RPC URLs per chain key.
-pub(crate) const DEFAULT_RPC_URLS: &[(&str, &str)] = &[
-    ("base-sepolia", "https://sepolia.base.org"),
-    ("base", "https://mainnet.base.org"),
-    ("localhost", "http://127.0.0.1:8545"),
-];
-
 /// Look up a USDC address by chain key (e.g. "base-sepolia").
 pub(crate) fn usdc_address(chain_key: &str) -> Option<&'static str> {
     USDC_ADDRESSES
-        .iter()
-        .find(|(k, _)| *k == chain_key)
-        .map(|(_, v)| *v)
-}
-
-/// Look up a default RPC URL by chain key.
-pub(crate) fn default_rpc_url(chain_key: &str) -> Option<&'static str> {
-    DEFAULT_RPC_URLS
         .iter()
         .find(|(k, _)| *k == chain_key)
         .map(|(_, v)| *v)
@@ -426,100 +411,25 @@ pub(crate) fn compute_permit_digest(
     Ok(keccak256_hash(&final_data))
 }
 
-/// Fetch the ERC-2612 nonce for `owner` from the USDC contract via JSON-RPC `eth_call`.
-///
-/// Calls `nonces(address)` (selector `0x7ecebe00`) on the USDC contract.
-pub(crate) async fn fetch_usdc_nonce_rpc(
-    rpc_url: &str,
-    usdc_addr: &str,
-    owner: &str,
-) -> Result<u64, RemitError> {
-    let padded_owner = format!("{:0>64}", owner.trim_start_matches("0x").to_lowercase());
-    let data = format!("0x7ecebe00{padded_owner}");
-
-    let body = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "eth_call",
-        "params": [
-            { "to": usdc_addr, "data": data },
-            "latest"
-        ]
-    });
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| {
-            remit_err(
-                codes::NETWORK_ERROR,
-                format!("HTTP client build failed: {e}"),
-            )
-        })?;
-
-    let resp = client
-        .post(rpc_url)
-        .header("Content-Type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| {
-            remit_err(
-                codes::NETWORK_ERROR,
-                format!("RPC request to {rpc_url} failed: {e}"),
-            )
-        })?;
-
-    let json: Value = resp.json().await.map_err(|e| {
-        remit_err(
-            codes::NETWORK_ERROR,
-            format!("failed to parse RPC response: {e}"),
-        )
-    })?;
-
-    if let Some(err) = json.get("error") {
-        return Err(remit_err(codes::SERVER_ERROR, format!("RPC error: {err}")));
-    }
-
-    let result_hex = json["result"]
-        .as_str()
-        .ok_or_else(|| remit_err(codes::SERVER_ERROR, "RPC response missing result field"))?;
-
-    // Parse the hex result (0x-prefixed, 32-byte big-endian uint256) into u64.
-    let hex_str = result_hex.trim_start_matches("0x");
-    u64::from_str_radix(hex_str, 16).map_err(|e| {
-        remit_err(
-            codes::SERVER_ERROR,
-            format!("failed to parse nonce from RPC result {result_hex}: {e}"),
-        )
-    })
-}
-
-/// Fetch the EIP-2612 permit nonce, trying the API first then falling back to direct RPC.
+/// Fetch the EIP-2612 permit nonce from the API.
 ///
 /// Calls `GET /api/v1/status/{owner}` and reads the `permit_nonce` field.
-/// If the API is unreachable or doesn't return the field, falls back to
-/// `fetch_usdc_nonce_rpc()`.
 pub(crate) async fn fetch_permit_nonce(
     transport: &dyn Transport,
-    rpc_url: &str,
-    usdc_addr: &str,
     owner: &str,
 ) -> Result<u64, RemitError> {
-    // Try the status API first — cheaper than a direct RPC call.
-    match transport.get(&format!("/api/v1/status/{owner}")).await {
-        Ok(data) => {
-            if let Some(nonce) = data.get("permit_nonce").and_then(|v| v.as_u64()) {
-                return Ok(nonce);
-            }
-            // Field missing or null — fall through to RPC.
-        }
-        Err(_) => {
-            // API unavailable — fall through to RPC.
-        }
-    }
-
-    fetch_usdc_nonce_rpc(rpc_url, usdc_addr, owner).await
+    let data = transport.get(&format!("/api/v1/status/{owner}")).await?;
+    data.get("permit_nonce")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| {
+            remit_err(
+                codes::SERVER_ERROR,
+                format!(
+                    "permit_nonce not available from API for {owner}. \
+                     Ensure the server supports the permit_nonce field in GET /api/v1/status."
+                ),
+            )
+        })
 }
 
 // ─── Error parsing ────────────────────────────────────────────────────────────

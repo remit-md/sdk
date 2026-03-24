@@ -87,6 +87,7 @@ class WalletStatus(BaseModel):
     active_escrows: int = 0
     active_tabs: int = 0
     active_streams: int = 0
+    permit_nonce: int | None = None
 
 
 class LinkResponse(BaseModel):

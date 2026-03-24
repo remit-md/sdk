@@ -1,5 +1,7 @@
 # remit.md Java/Kotlin SDK
 
+> [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
+
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 
 Java and Kotlin SDK for [remit.md](https://remit.md) — the universal USDC payment protocol for AI agents.

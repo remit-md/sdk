@@ -1,5 +1,7 @@
 # remitmd — Rust SDK
 
+> [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
+
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 
 Rust SDK for the [remit.md](https://remit.md) universal AI payment protocol. Send and receive USDC payments from AI agents on Base using Tokio async.

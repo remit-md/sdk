@@ -495,7 +495,8 @@ defmodule RemitMd.Wallet do
     keccak = &RemitMd.Keccak.hash/1
 
     nonce = Keyword.get(opts, :nonce, 0)
-    usdc_addr = Keyword.get(opts, :usdc_address) || @usdc_addresses[w.chain_key] || ""
+    usdc_addr = Keyword.get(opts, :usdc_address) || @usdc_addresses[w.chain_key] ||
+      raise Error.new(Error.chain_unsupported(), "No USDC address for chain #{w.chain_key}")
 
     # Domain separator for USDC (EIP-2612)
     domain_type_hash =
@@ -552,7 +553,8 @@ defmodule RemitMd.Wallet do
   Returns `%PermitSignature{}`.
   """
   def sign_permit(%__MODULE__{} = w, spender, amount, opts \\ []) do
-    usdc_addr = @usdc_addresses[w.chain_key] || ""
+    usdc_addr = @usdc_addresses[w.chain_key] ||
+      raise Error.new(Error.chain_unsupported(), "No USDC address for chain #{w.chain_key}")
     nonce = fetch_usdc_nonce(w, usdc_addr)
     deadline = Keyword.get(opts, :deadline) || (:os.system_time(:second) + 3600)
     raw = amount |> to_string() |> Decimal.new() |> Decimal.mult(1_000_000) |> Decimal.round(0) |> Decimal.to_integer()
@@ -1019,17 +1021,24 @@ defmodule RemitMd.Wallet do
   defp chain_id(%__MODULE__{transport: %Http{chain_id: id}}), do: id
   defp chain_id(%__MODULE__{chain: "base"}), do: 8453
   defp chain_id(%__MODULE__{chain: "base_sepolia"}), do: 84532
-  defp chain_id(_), do: 84532
+  defp chain_id(%__MODULE__{chain: chain}) do
+    raise Error.new(Error.chain_unsupported(), "Unknown chain: #{inspect(chain)}")
+  end
 
-  defp address_to_bytes32(nil), do: <<0::256>>
-  defp address_to_bytes32(""), do: <<0::256>>
+  defp address_to_bytes32(nil) do
+    raise Error.new(Error.invalid_address(), "address_to_bytes32 received nil")
+  end
+  defp address_to_bytes32("") do
+    raise Error.new(Error.invalid_address(), "address_to_bytes32 received empty string")
+  end
   defp address_to_bytes32(address) do
     hex = String.trim_leading(address, "0x")
     if String.length(hex) == 40 do
       addr_bytes = Base.decode16!(hex, case: :mixed)
       :binary.copy(<<0>>, 12) <> addr_bytes
     else
-      <<0::256>>
+      raise Error.new(Error.invalid_address(),
+        "address_to_bytes32: expected 40 hex chars, got #{String.length(hex)} in #{inspect(address)}")
     end
   end
 

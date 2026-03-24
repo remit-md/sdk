@@ -13,16 +13,16 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        tx_id:       Map.get(m, "tx_id"),
-        from:        Map.get(m, "from"),
-        to:          Map.get(m, "to"),
-        amount_usdc: Map.get(m, "amount_usdc"),
+        tx_id:       Map.fetch!(m, "tx_id"),
+        from:        Map.fetch!(m, "from"),
+        to:          Map.fetch!(m, "to"),
+        amount_usdc: Map.fetch!(m, "amount_usdc"),
         fee_usdc:    Map.get(m, "fee_usdc"),
         model:       Map.get(m, "model"),
-        status:      Map.get(m, "status"),
+        status:      Map.fetch!(m, "status"),
         tx_hash:     Map.get(m, "tx_hash"),
         chain_id:    Map.get(m, "chain_id"),
-        created_at:  Map.get(m, "created_at"),
+        created_at:  Map.fetch!(m, "created_at"),
         metadata:    Map.get(m, "metadata")
       }
     end
@@ -36,8 +36,8 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        address:  Map.get(m, "address"),
-        usdc:     Map.get(m, "usdc"),
+        address:  Map.fetch!(m, "address"),
+        usdc:     Map.fetch!(m, "usdc"),
         chain_id: Map.get(m, "chain_id")
       }
     end
@@ -52,8 +52,8 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        address:              Map.get(m, "address"),
-        score:                Map.get(m, "score"),
+        address:              Map.fetch!(m, "address"),
+        score:                Map.fetch!(m, "score"),
         total_volume_usdc:    Map.get(m, "total_volume_usdc"),
         successful_txns:      Map.get(m, "successful_txns"),
         avg_settlement_secs:  Map.get(m, "avg_settlement_secs"),
@@ -71,12 +71,12 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        escrow_id:   Map.get(m, "escrow_id"),
-        from:        Map.get(m, "from"),
-        to:          Map.get(m, "to"),
-        amount_usdc: Map.get(m, "amount_usdc"),
+        escrow_id:   Map.fetch!(m, "escrow_id"),
+        from:        Map.fetch!(m, "from"),
+        to:          Map.fetch!(m, "to"),
+        amount_usdc: Map.fetch!(m, "amount_usdc"),
         fee_usdc:    Map.get(m, "fee_usdc"),
-        status:      Map.get(m, "status"),
+        status:      Map.fetch!(m, "status"),
         milestones:  Map.get(m, "milestones"),
         created_at:  Map.get(m, "created_at"),
         expires_at:  Map.get(m, "expires_at")
@@ -93,12 +93,12 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        tab_id:               Map.get(m, "tab_id"),
-        from:                 Map.get(m, "from"),
-        to:                   Map.get(m, "to"),
+        tab_id:               Map.fetch!(m, "tab_id"),
+        from:                 Map.fetch!(m, "from"),
+        to:                   Map.fetch!(m, "to"),
         credit_limit_usdc:    Map.get(m, "credit_limit_usdc"),
         current_balance_usdc: Map.get(m, "current_balance_usdc"),
-        status:               Map.get(m, "status"),
+        status:               Map.fetch!(m, "status"),
         created_at:           Map.get(m, "created_at"),
         expires_at:           Map.get(m, "expires_at")
       }
@@ -114,13 +114,13 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        stream_id:            Map.get(m, "stream_id"),
-        from:                 Map.get(m, "from"),
-        to:                   Map.get(m, "to"),
-        rate_per_second_usdc: Map.get(m, "rate_per_second_usdc"),
+        stream_id:            Map.fetch!(m, "stream_id"),
+        from:                 Map.fetch!(m, "from"),
+        to:                   Map.fetch!(m, "to"),
+        rate_per_second_usdc: Map.fetch!(m, "rate_per_second_usdc"),
         total_amount_usdc:    Map.get(m, "total_amount_usdc"),
         streamed_usdc:        Map.get(m, "streamed_usdc"),
-        status:               Map.get(m, "status"),
+        status:               Map.fetch!(m, "status"),
         started_at:           Map.get(m, "started_at"),
         ends_at:              Map.get(m, "ends_at")
       }
@@ -136,12 +136,12 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        bounty_id:   Map.get(m, "bounty_id"),
-        poster:      Map.get(m, "poster"),
-        amount_usdc: Map.get(m, "amount_usdc"),
+        bounty_id:   Map.fetch!(m, "bounty_id"),
+        poster:      Map.fetch!(m, "poster"),
+        amount_usdc: Map.fetch!(m, "amount_usdc"),
         fee_usdc:    Map.get(m, "fee_usdc"),
         description: Map.get(m, "description"),
-        status:      Map.get(m, "status"),
+        status:      Map.fetch!(m, "status"),
         winner:      Map.get(m, "winner"),
         created_at:  Map.get(m, "created_at"),
         expires_at:  Map.get(m, "expires_at")
@@ -157,12 +157,15 @@ defmodule RemitMd.Models do
 
     @doc false
     def from_map(m) do
+      deposit_id = Map.get(m, "deposit_id") || Map.get(m, "id") ||
+        raise KeyError, key: "deposit_id", term: m
+      status = Map.fetch!(m, "status")
       %__MODULE__{
-        deposit_id:  Map.get(m, "deposit_id") || Map.get(m, "id"),
+        deposit_id:  deposit_id,
         payer:       Map.get(m, "payer") || Map.get(m, "from"),
         provider:    Map.get(m, "provider") || Map.get(m, "to"),
         amount_usdc: Map.get(m, "amount_usdc") || Map.get(m, "amount"),
-        status:      Map.get(m, "status"),
+        status:      status,
         created_at:  Map.get(m, "created_at"),
         expires_at:  Map.get(m, "expires_at"),
         tx_hash:     Map.get(m, "tx_hash")
@@ -178,7 +181,7 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        tab_id:     Map.get(m, "tab_id"),
+        tab_id:     Map.fetch!(m, "tab_id"),
         amount:     Map.get(m, "amount"),
         cumulative: Map.get(m, "cumulative"),
         call_count: Map.get(m, "call_count"),
@@ -195,8 +198,8 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        id:            Map.get(m, "id"),
-        bounty_id:     Map.get(m, "bounty_id"),
+        id:            Map.fetch!(m, "id"),
+        bounty_id:     Map.fetch!(m, "bounty_id"),
         submitter:     Map.get(m, "submitter"),
         evidence_hash: Map.get(m, "evidence_hash"),
         status:        Map.get(m, "status"),
@@ -213,11 +216,11 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        address:        Map.get(m, "address"),
-        limit_usdc:     Map.get(m, "limit_usdc"),
-        spent_usdc:     Map.get(m, "spent_usdc"),
-        remaining_usdc: Map.get(m, "remaining_usdc"),
-        period:         Map.get(m, "period"),
+        address:        Map.fetch!(m, "address"),
+        limit_usdc:     Map.fetch!(m, "limit_usdc"),
+        spent_usdc:     Map.fetch!(m, "spent_usdc"),
+        remaining_usdc: Map.fetch!(m, "remaining_usdc"),
+        period:         Map.fetch!(m, "period"),
         resets_at:      Map.get(m, "resets_at")
       }
     end
@@ -232,9 +235,9 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        address:           Map.get(m, "address"),
-        total_spent_usdc:  Map.get(m, "total_spent_usdc"),
-        transaction_count: Map.get(m, "transaction_count"),
+        address:           Map.fetch!(m, "address"),
+        total_spent_usdc:  Map.fetch!(m, "total_spent_usdc"),
+        transaction_count: Map.fetch!(m, "transaction_count"),
         top_recipients:    Map.get(m, "top_recipients"),
         period_start:      Map.get(m, "period_start"),
         period_end:        Map.get(m, "period_end")
@@ -250,8 +253,8 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        url:            Map.get(m, "url"),
-        token:          Map.get(m, "token"),
+        url:            Map.fetch!(m, "url"),
+        token:          Map.fetch!(m, "token"),
         expires_at:     Map.get(m, "expires_at"),
         wallet_address: Map.get(m, "wallet_address")
       }
@@ -266,9 +269,9 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        id:         Map.get(m, "id"),
-        wallet:     Map.get(m, "wallet"),
-        url:        Map.get(m, "url"),
+        id:         Map.fetch!(m, "id"),
+        wallet:     Map.fetch!(m, "wallet"),
+        url:        Map.fetch!(m, "url"),
         events:     Map.get(m, "events") || [],
         chains:     Map.get(m, "chains") || [],
         active:     Map.get(m, "active") == true,
@@ -288,9 +291,9 @@ defmodule RemitMd.Models do
       items = (Map.get(m, "items") || []) |> Enum.map(&Transaction.from_map/1)
       %__MODULE__{
         items:  items,
-        total:  Map.get(m, "total"),
-        limit:  Map.get(m, "limit"),
-        offset: Map.get(m, "offset")
+        total:  Map.fetch!(m, "total"),
+        limit:  Map.fetch!(m, "limit"),
+        offset: Map.fetch!(m, "offset")
       }
     end
   end
@@ -316,9 +319,9 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        chain_id:       Map.get(m, "chain_id"),
-        usdc:           Map.get(m, "usdc"),
-        router:         Map.get(m, "router"),
+        chain_id:       Map.fetch!(m, "chain_id"),
+        usdc:           Map.fetch!(m, "usdc"),
+        router:         Map.fetch!(m, "router"),
         escrow:         Map.get(m, "escrow"),
         tab:            Map.get(m, "tab"),
         stream:         Map.get(m, "stream"),
@@ -339,8 +342,8 @@ defmodule RemitMd.Models do
     @doc false
     def from_map(m) do
       %__MODULE__{
-        tx_hash: Map.get(m, "tx_hash"),
-        balance: Map.get(m, "balance")
+        tx_hash: Map.fetch!(m, "tx_hash"),
+        balance: Map.fetch!(m, "balance")
       }
     end
   end

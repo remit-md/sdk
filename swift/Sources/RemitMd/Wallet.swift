@@ -466,7 +466,10 @@ public final class RemitWallet: @unchecked Sendable {
             throw RemitError(RemitError.signatureInvalid, "Cannot sign permits in mock mode — no signer available")
         }
 
-        let usdcAddr = usdcAddress ?? RemitWallet.usdcAddresses[chain.chainName] ?? ""
+        let usdcAddr = usdcAddress ?? RemitWallet.usdcAddresses[chain.chainName]
+        guard let usdcAddr, !usdcAddr.isEmpty else {
+            throw RemitError(RemitError.chainUnavailable, "No USDC address known for chain '\(chain.chainName)' — provide usdcAddress explicitly")
+        }
 
         // Domain separator for USDC (EIP-2612)
         let domainTypeHash = keccak256(Data("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".utf8))
@@ -520,7 +523,9 @@ public final class RemitWallet: @unchecked Sendable {
     ///   - deadline: Optional Unix timestamp. Defaults to 1 hour from now.
     /// - Returns: A `PermitSignature`.
     public func signPermit(spender: String, amount: Double, deadline: Int? = nil) async throws -> PermitSignature {
-        let usdcAddr = RemitWallet.usdcAddresses[chain.chainName] ?? ""
+        guard let usdcAddr = RemitWallet.usdcAddresses[chain.chainName], !usdcAddr.isEmpty else {
+            throw RemitError(RemitError.chainUnavailable, "No USDC address known for chain '\(chain.chainName)'")
+        }
         let nonce = try await fetchUsdcNonce(usdcAddress: usdcAddr)
         let dl = deadline ?? (Int(Date().timeIntervalSince1970) + 3600)
         let rawAmount = UInt64(round(amount * 1_000_000))
@@ -586,9 +591,14 @@ public final class RemitWallet: @unchecked Sendable {
             throw RemitError(RemitError.serverError, "RPC error fetching nonce: \(message)")
         }
 
-        let resultHex = (json["result"] as? String) ?? "0x0"
+        guard let resultHex = json["result"] as? String else {
+            throw RemitError(RemitError.serverError, "RPC returned null result for nonce query — is the USDC address correct?")
+        }
         let hexStr = resultHex.hasPrefix("0x") ? String(resultHex.dropFirst(2)) : resultHex
-        return Int(hexStr, radix: 16) ?? 0
+        guard let nonce = Int(hexStr, radix: 16) else {
+            throw RemitError(RemitError.serverError, "Failed to parse nonce hex '\(resultHex)' as integer")
+        }
+        return nonce
     }
 
     // MARK: - Validation

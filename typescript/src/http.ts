@@ -159,7 +159,9 @@ export class AuthenticatedClient {
     }
 
     if (response.ok) {
-      if (response.status === 204) return undefined as T;
+      if (response.status === 204) {
+        throw new Error("Unexpected 204 No Content response");
+      }
       return camelizeKeys(await response.json()) as T;
     }
 
@@ -168,7 +170,8 @@ export class AuthenticatedClient {
       if (response.status === 429) {
         // Respect Retry-After header if present
         const retryAfter = response.headers.get("Retry-After");
-        const delay = retryAfter ? parseInt(retryAfter) * 1000 : DELAY_MS[attempt];
+        const parsed = retryAfter ? parseInt(retryAfter, 10) : NaN;
+        const delay = Number.isNaN(parsed) ? DELAY_MS[attempt] : parsed * 1000;
         await sleep(delay);
       } else {
         await sleep(DELAY_MS[attempt]);

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"net/http"
 	"os"
@@ -253,7 +254,9 @@ func (w *Wallet) Pay(ctx context.Context, to string, amount decimal.Decimal, opt
 		"chain":     w.chain,
 		"nonce":     randomHex(16),
 		"signature": "0x",
-		"permit":    permit,
+	}
+	if permit != nil {
+		body["permit"] = permit
 	}
 	var tx Transaction
 	if err := w.http.post(ctx, "/api/v1/payments/direct", body, &tx); err != nil {
@@ -385,7 +388,9 @@ func (w *Wallet) CreateEscrow(ctx context.Context, payee string, amount decimal.
 
 	escrowBody := map[string]any{
 		"invoice_id": invoiceID,
-		"permit":     permit,
+	}
+	if permit != nil {
+		escrowBody["permit"] = permit
 	}
 	var escrow Escrow
 	if err := w.http.post(ctx, "/api/v1/escrows", escrowBody, &escrow); err != nil {
@@ -481,7 +486,9 @@ func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.D
 		"limit_amount": limit.InexactFloat64(),
 		"per_unit":     perUnit.InexactFloat64(),
 		"expiry":       int(time.Now().Unix()) + int(cfg.ExpiresIn.Seconds()),
-		"permit":       permit,
+	}
+	if permit != nil {
+		body["permit"] = permit
 	}
 	var tab Tab
 	if err := w.http.post(ctx, "/api/v1/tabs", body, &tab); err != nil {
@@ -607,7 +614,9 @@ func (w *Wallet) CreateStream(ctx context.Context, payee string, ratePerSecond d
 		"payee":           payee,
 		"rate_per_second": ratePerSecond.String(),
 		"max_total":       maxTotal.String(),
-		"permit":          permit,
+	}
+	if permit != nil {
+		body["permit"] = permit
 	}
 	var stream Stream
 	if err := w.http.post(ctx, "/api/v1/streams", body, &stream); err != nil {
@@ -679,7 +688,9 @@ func (w *Wallet) CreateBounty(ctx context.Context, amount decimal.Decimal, task 
 		"task_description": task,
 		"deadline":         deadline,
 		"max_attempts":     cfg.MaxAttempts,
-		"permit":           permit,
+	}
+	if permit != nil {
+		body["permit"] = permit
 	}
 	var bounty Bounty
 	if err := w.http.post(ctx, "/api/v1/bounties", body, &bounty); err != nil {
@@ -794,7 +805,9 @@ func (w *Wallet) PlaceDeposit(ctx context.Context, provider string, amount decim
 		"provider": provider,
 		"amount":   amount.InexactFloat64(),
 		"expiry":   int(time.Now().Unix()) + int(expires.Seconds()),
-		"permit":   permit,
+	}
+	if permit != nil {
+		body["permit"] = permit
 	}
 	var deposit Deposit
 	if err := w.http.post(ctx, "/api/v1/deposits", body, &deposit); err != nil {
@@ -1144,6 +1157,7 @@ func (w *Wallet) fetchUsdcNonce(ctx context.Context, usdcAddr string) (uint64, e
 func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64) (*PermitSignature, error) {
 	contracts, err := w.GetContracts(ctx)
 	if err != nil {
+		log.Printf("[remitmd] auto-permit: GetContracts failed for %s (amount=%.2f): %v", contract, amount, err)
 		return nil, nil // graceful: proceed without permit
 	}
 
@@ -1164,13 +1178,16 @@ func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64
 	case "relayer":
 		spender = contracts.Relayer
 	default:
+		log.Printf("[remitmd] auto-permit: unknown contract type %q", contract)
 		return nil, nil
 	}
 	if spender == "" {
+		log.Printf("[remitmd] auto-permit: empty spender for contract %q", contract)
 		return nil, nil // graceful: contract not available
 	}
 	p, err := w.SignPermit(ctx, spender, amount)
 	if err != nil {
+		log.Printf("[remitmd] auto-permit: SignPermit failed for %s (amount=%.2f): %v", contract, amount, err)
 		return nil, nil // graceful: RPC unreachable
 	}
 	return p, nil

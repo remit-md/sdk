@@ -618,7 +618,9 @@ public sealed class Wallet
     /// <param name="usdcAddress">Optional USDC contract address override.</param>
     public PermitSignature SignUsdcPermit(string spender, long value, long nonce, long deadline, string? usdcAddress = null)
     {
-        var usdc = usdcAddress ?? (UsdcAddresses.TryGetValue(_chainKey, out var addr) ? addr : "");
+        var usdc = usdcAddress ?? (UsdcAddresses.TryGetValue(_chainKey, out var addr) ? addr : null)
+            ?? throw new RemitError(ErrorCodes.InvalidChain,
+                $"No USDC address for chain '{_chainKey}'. Supported: {string.Join(", ", UsdcAddresses.Keys)}. Pass usdcAddress explicitly.");
 
         // EIP-712 domain: name="USD Coin", version="2", chainId, verifyingContract=USDC
         var domainTypeHash = Eip712.Keccak256(
@@ -668,7 +670,10 @@ public sealed class Wallet
     /// <param name="deadline">Optional Unix timestamp. Defaults to 1 hour from now.</param>
     public async Task<PermitSignature> SignPermitAsync(string spender, decimal amount, long? deadline = null)
     {
-        var usdcAddr = UsdcAddresses.TryGetValue(_chainKey, out var addr) ? addr : "";
+        var usdcAddr = UsdcAddresses.TryGetValue(_chainKey, out var a) ? a : null;
+        if (string.IsNullOrEmpty(usdcAddr))
+            throw new RemitError(ErrorCodes.InvalidChain,
+                $"No USDC address for chain '{_chainKey}'. Supported: {string.Join(", ", UsdcAddresses.Keys)}. Use SignUsdcPermit() with explicit address.");
         var nonce = await FetchUsdcNonceAsync(usdcAddr);
         var dl = deadline ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
         var rawAmount = (long)(amount * 1_000_000m);

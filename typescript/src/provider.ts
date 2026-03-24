@@ -174,11 +174,12 @@ export class X402Paywall {
         body: JSON.stringify(body),
       });
       if (!resp.ok) {
-        return { isValid: false, invalidReason: "FACILITATOR_ERROR" };
+        const reason = resp.status >= 500 ? "FACILITATOR_UNREACHABLE" : "FACILITATOR_ERROR";
+        return { isValid: false, invalidReason: reason };
       }
       data = (await resp.json()) as { isValid?: boolean; invalidReason?: string };
     } catch {
-      return { isValid: false, invalidReason: "FACILITATOR_ERROR" };
+      return { isValid: false, invalidReason: "FACILITATOR_UNREACHABLE" };
     }
 
     return {
@@ -199,6 +200,12 @@ export class X402Paywall {
     const paymentSig = request.headers.get("payment-signature");
     const result = await this.check(paymentSig);
     if (!result.isValid) {
+      if (result.invalidReason === "FACILITATOR_UNREACHABLE") {
+        return new Response(JSON.stringify({ error: "Payment verification unavailable", invalidReason: result.invalidReason }), {
+          status: 503,
+          headers: { "Content-Type": "application/json", "Retry-After": "30" },
+        });
+      }
       return new Response(JSON.stringify({ error: "Payment required", invalidReason: result.invalidReason }), {
         status: 402,
         headers: {
@@ -232,6 +239,13 @@ export class X402Paywall {
       const paymentSig = Array.isArray(raw) ? raw[0] ?? null : (raw ?? null);
       const result = await this.check(paymentSig);
       if (!result.isValid) {
+        if (result.invalidReason === "FACILITATOR_UNREACHABLE") {
+          res
+            .status(503)
+            .set({ "Retry-After": "30", "Content-Type": "application/json" })
+            .json({ error: "Payment verification unavailable", invalidReason: result.invalidReason });
+          return;
+        }
         res
           .status(402)
           .set({ "PAYMENT-REQUIRED": this.paymentRequiredHeader(), "Content-Type": "application/json" })
@@ -266,6 +280,11 @@ export class X402Paywall {
       const paymentSig = c.req.raw.headers.get("payment-signature");
       const result = await this.check(paymentSig);
       if (!result.isValid) {
+        if (result.invalidReason === "FACILITATOR_UNREACHABLE") {
+          c.header("Retry-After", "30");
+          c.header("Content-Type", "application/json");
+          return c.body(JSON.stringify({ error: "Payment verification unavailable", invalidReason: result.invalidReason }), 503);
+        }
         c.header("PAYMENT-REQUIRED", this.paymentRequiredHeader());
         c.header("Content-Type", "application/json");
         return c.body(JSON.stringify({ error: "Payment required", invalidReason: result.invalidReason }), 402);

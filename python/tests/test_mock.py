@@ -104,7 +104,7 @@ async def test_tab_open_and_close(mock, payer, payee):
     assert tab.status == TabStatus.open
     assert await payer.balance() == 990.0  # limit reserved
 
-    await payer.charge_tab(tab.id, units=100)  # 100 * $0.01 = $1.00
+    await payer.charge_tab(tab.id, amount=1.0, cumulative=1.0, call_count=1)
 
     await payer.close_tab(tab.id)
     # payee gets $1.00, payer gets back $9.00
@@ -116,7 +116,9 @@ async def test_tab_open_and_close(mock, payer, payee):
 async def test_tab_charge_exceeds_limit(mock, payer, payee):
     tab = await payer.open_tab(payee.address, limit=1.0, per_unit=0.01)
     with pytest.raises(TabLimitExceeded):
-        await payer.charge_tab(tab.id, units=200)  # 200 * $0.01 = $2.00 > $1.00 limit
+        await payer.charge_tab(
+            tab.id, amount=2.0, cumulative=2.0, call_count=1,
+        )  # $2.00 > $1.00 limit
 
 
 @pytest.mark.asyncio
@@ -160,8 +162,8 @@ async def test_bounty_post_and_award(mock, payer, payee):
     assert bounty.status == BountyStatus.open
     assert await payer.balance() == 950.0
 
-    await payee.submit_bounty(bounty.id, evidence_uri="ipfs://Qm...")
-    await payer.award_bounty(bounty.id, winner=payee.address)
+    result = await payee.submit_bounty(bounty.id, evidence_hash="0xabc", evidence_uri="ipfs://Qm...")
+    await payer.award_bounty(bounty.id, submission_id=result["submission_id"])
 
     assert await payee.balance() == 50.0
     assert mock._state.bounties[bounty.id].status == BountyStatus.awarded
@@ -170,15 +172,15 @@ async def test_bounty_post_and_award(mock, payer, payee):
 @pytest.mark.asyncio
 async def test_bounty_award_unknown(mock, payer, payee):
     with pytest.raises(BountyNotFound):
-        await payer.award_bounty("nonexistent", winner=payee.address)
+        await payer.award_bounty("nonexistent", submission_id=0)
 
 
 @pytest.mark.asyncio
 async def test_bounty_double_award_raises(mock, payer, payee):
     bounty = await payer.post_bounty(25.0, "task", deadline=mock.now() + 3600)
-    await payer.award_bounty(bounty.id, winner=payee.address)
+    await payer.award_bounty(bounty.id, submission_id=0)
     with pytest.raises(InvalidState):
-        await payer.award_bounty(bounty.id, winner=payee.address)
+        await payer.award_bounty(bounty.id, submission_id=0)
 
 
 # ─── Deposits ─────────────────────────────────────────────────────────────────

@@ -28,7 +28,7 @@ from typing import Any
 
 import httpx
 
-from remitmd.errors import RemitError, RateLimitExceeded, from_error_code
+from remitmd.errors import RateLimitExceeded, RemitError, from_error_code
 
 # EIP-712 typed struct definition — must match server's auth.rs exactly.
 _AUTH_TYPES = {
@@ -139,9 +139,9 @@ class AuthenticatedClient:
 
         try:
             data = resp.json()
-        except ValueError:
+        except ValueError as exc:
             if resp.is_success:
-                raise RemitError(f"Non-JSON response body (status {resp.status_code})")
+                raise RemitError(f"Non-JSON response body (status {resp.status_code})") from exc
             resp.raise_for_status()
             return None  # unreachable
 

@@ -169,7 +169,7 @@ func (p *X402Paywall) Check(ctx context.Context, sig string) (CheckResult, error
 	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
-		return CheckResult{IsValid: false, InvalidReason: "FACILITATOR_ERROR"}, nil
+		return CheckResult{}, fmt.Errorf("remitmd: failed to marshal verify request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
@@ -177,7 +177,7 @@ func (p *X402Paywall) Check(ctx context.Context, sig string) (CheckResult, error
 		bytes.NewReader(bodyBytes),
 	)
 	if err != nil {
-		return CheckResult{IsValid: false, InvalidReason: "FACILITATOR_ERROR"}, nil
+		return CheckResult{}, fmt.Errorf("remitmd: failed to create verify request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if p.facilitatorToken != "" {
@@ -186,17 +186,20 @@ func (p *X402Paywall) Check(ctx context.Context, sig string) (CheckResult, error
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		return CheckResult{IsValid: false, InvalidReason: "FACILITATOR_ERROR"}, nil
+		return CheckResult{}, fmt.Errorf("remitmd: facilitator unreachable: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode >= 500 {
+		return CheckResult{}, fmt.Errorf("remitmd: facilitator returned %d", resp.StatusCode)
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return CheckResult{IsValid: false, InvalidReason: "FACILITATOR_ERROR"}, nil
 	}
 
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return CheckResult{IsValid: false, InvalidReason: "FACILITATOR_ERROR"}, nil
+		return CheckResult{}, fmt.Errorf("remitmd: failed to read verify response: %w", err)
 	}
 
 	var data struct {
@@ -204,7 +207,7 @@ func (p *X402Paywall) Check(ctx context.Context, sig string) (CheckResult, error
 		InvalidReason string `json:"invalidReason"`
 	}
 	if err := json.Unmarshal(respBytes, &data); err != nil {
-		return CheckResult{IsValid: false, InvalidReason: "FACILITATOR_ERROR"}, nil
+		return CheckResult{}, fmt.Errorf("remitmd: failed to parse verify response: %w", err)
 	}
 
 	return CheckResult{IsValid: data.IsValid, InvalidReason: data.InvalidReason}, nil
@@ -225,7 +228,14 @@ func (p *X402Paywall) Middleware() func(http.Handler) http.Handler {
 			if sig == "" {
 				sig = r.Header.Get("PAYMENT-SIGNATURE")
 			}
-			result, _ := p.Check(r.Context(), sig)
+			result, err := p.Check(r.Context(), sig)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("Retry-After", "30")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(`{"error":"Payment verification unavailable"}`))
+				return
+			}
 			if !result.IsValid {
 				w.Header().Set("PAYMENT-REQUIRED", p.PaymentRequiredHeader())
 				w.Header().Set("Content-Type", "application/json")

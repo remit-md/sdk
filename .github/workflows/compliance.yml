@@ -391,8 +391,6 @@ jobs:
   swift-compliance:
     name: Swift Compliance (real server)
     runs-on: ubuntu-latest
-    # Informational until Swift SDK has full Linux support (runtime test failures on Linux)
-    continue-on-error: true
     permissions:
       contents: read
       packages: read
@@ -425,6 +423,8 @@ jobs:
           curl -sf http://localhost:3000/health | python3 -m json.tool
 
       - name: Run Swift compliance tests
+        # Informational until Swift SDK has full Linux support (runtime test failures on Linux)
+        continue-on-error: true
         env:
           REMIT_TEST_SERVER_URL: http://localhost:3000
           REMIT_ROUTER_ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"

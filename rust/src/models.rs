@@ -447,4 +447,3 @@ pub struct TransactionList {
     pub per_page: u32,
     pub has_more: bool,
 }
-

@@ -555,7 +555,7 @@ defmodule RemitMd.Wallet do
   def sign_permit(%__MODULE__{} = w, spender, amount, opts \\ []) do
     usdc_addr = @usdc_addresses[w.chain_key] ||
       raise Error.new(Error.chain_unsupported(), "No USDC address for chain #{w.chain_key}")
-    nonce = fetch_usdc_nonce(w, usdc_addr)
+    nonce = fetch_permit_nonce(w, usdc_addr)
     deadline = Keyword.get(opts, :deadline) || (:os.system_time(:second) + 3600)
     raw = amount |> to_string() |> Decimal.new() |> Decimal.mult(1_000_000) |> Decimal.round(0) |> Decimal.to_integer()
     sign_usdc_permit(w, spender, raw, deadline, nonce: nonce, usdc_address: usdc_addr)
@@ -959,11 +959,33 @@ defmodule RemitMd.Wallet do
     sign_permit(w, spender, amount)
   end
 
+  # Fetch the EIP-2612 permit nonce, trying the API first then falling back to RPC.
+  defp fetch_permit_nonce(%__MODULE__{mock_pid: pid}, _usdc_address) when pid != nil, do: 0
+
+  defp fetch_permit_nonce(%__MODULE__{} = w, usdc_address) do
+    # Try the status API first — it's cheaper than a direct RPC call.
+    try do
+      data = do_http_get(w, "/status/#{w.address}")
+
+      nonce =
+        case data do
+          %{"permit_nonce" => n} when not is_nil(n) -> n
+          _ -> nil
+        end
+
+      if nonce != nil do
+        if is_integer(nonce), do: nonce, else: nonce |> to_string() |> String.to_integer()
+      else
+        fetch_usdc_nonce_rpc(w, usdc_address)
+      end
+    rescue
+      _ -> fetch_usdc_nonce_rpc(w, usdc_address)
+    end
+  end
+
   # Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
   # Uses eth_call with selector 0x7ecebe00 (nonces(address)).
-  defp fetch_usdc_nonce(%__MODULE__{mock_pid: pid}, _usdc_address) when pid != nil, do: 0
-
-  defp fetch_usdc_nonce(%__MODULE__{} = w, usdc_address) do
+  defp fetch_usdc_nonce_rpc(%__MODULE__{} = w, usdc_address) do
     padded = w.address |> String.downcase() |> String.trim_leading("0x") |> String.pad_leading(64, "0")
     data = "0x7ecebe00#{padded}"
 

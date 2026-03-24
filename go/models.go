@@ -304,6 +304,19 @@ type TransactionList struct {
 	HasMore    bool          `json:"has_more"`
 }
 
+// WalletStatus is returned by GET /api/v1/status/{address}.
+type WalletStatus struct {
+	Wallet        string `json:"wallet"`
+	Balance       string `json:"balance"`
+	MonthlyVolume string `json:"monthly_volume"`
+	Tier          string `json:"tier"`
+	FeeRateBps    int    `json:"fee_rate_bps"`
+	ActiveEscrows int    `json:"active_escrows"`
+	ActiveTabs    int    `json:"active_tabs"`
+	ActiveStreams  int    `json:"active_streams"`
+	PermitNonce   *int   `json:"permit_nonce"`
+}
+
 // Webhook is a registered webhook endpoint.
 type Webhook struct {
 	ID        string    `json:"id"`

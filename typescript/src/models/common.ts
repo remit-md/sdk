@@ -49,6 +49,8 @@ export interface WalletStatus {
   activeEscrows: number;
   activeTabs: number;
   activeStreams: number;
+  /** Current EIP-2612 permit nonce for this wallet. Null if RPC unavailable server-side. */
+  permitNonce: number | null;
 }
 
 /** On-chain reputation profile. */

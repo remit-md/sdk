@@ -119,7 +119,7 @@ public sealed class Wallet
         _chainId = chainId;
         _chain = "base";
         _chainKey = "base";
-        _rpcUrl = "";  // empty = mock mode, FetchUsdcNonceAsync returns 0
+        _rpcUrl = "";  // empty = mock mode, FetchUsdcNonceRpcAsync returns 0
     }
 
     // ─── Direct payments ──────────────────────────────────────────────────────
@@ -674,7 +674,7 @@ public sealed class Wallet
         if (string.IsNullOrEmpty(usdcAddr))
             throw new RemitError(ErrorCodes.InvalidChain,
                 $"No USDC address for chain '{_chainKey}'. Supported: {string.Join(", ", UsdcAddresses.Keys)}. Use SignUsdcPermit() with explicit address.");
-        var nonce = await FetchUsdcNonceAsync(usdcAddr);
+        var nonce = await FetchPermitNonceAsync(usdcAddr);
         var dl = deadline ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
         var rawAmount = (long)(amount * 1_000_000m);
         return SignUsdcPermit(spender, rawAmount, nonce, dl, usdcAddr);
@@ -703,13 +703,45 @@ public sealed class Wallet
         return await SignPermitAsync(spender, amount);
     }
 
-    /// <summary>Fetches the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.</summary>
-    private async Task<long> FetchUsdcNonceAsync(string usdcAddress)
+    /// <summary>
+    /// Fetches the EIP-2612 permit nonce, trying the API first then falling back to direct RPC.
+    /// The API path is cheaper (no RPC round-trip) and works even when no RPC URL is configured.
+    /// </summary>
+    private async Task<long> FetchPermitNonceAsync(string usdcAddress)
     {
         // Mock mode: no RPC URL means return 0 (used by MockRemit)
         if (string.IsNullOrEmpty(_rpcUrl))
             return 0;
 
+        // Try the status API first — it's cheaper than a direct RPC call.
+        try
+        {
+            var status = await _transport.GetAsync<System.Text.Json.JsonElement>(
+                $"/api/v1/status/{Address}", CancellationToken.None);
+            if (status.TryGetProperty("permit_nonce", out var nonceElem))
+            {
+                if (nonceElem.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    return nonceElem.GetInt64();
+                if (nonceElem.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var s = nonceElem.GetString();
+                    if (s is not null && long.TryParse(s, out var parsed))
+                        return parsed;
+                }
+            }
+        }
+        catch
+        {
+            // Fall through to RPC fallback.
+        }
+
+        // Fall back to direct RPC call.
+        return await FetchUsdcNonceRpcAsync(usdcAddress);
+    }
+
+    /// <summary>Fetches the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.</summary>
+    private async Task<long> FetchUsdcNonceRpcAsync(string usdcAddress)
+    {
         // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
         var paddedAddress = Address.ToLowerInvariant().Replace("0x", "").PadLeft(64, '0');
         var data = $"0x7ecebe00{paddedAddress}";

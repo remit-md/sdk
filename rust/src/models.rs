@@ -447,3 +447,15 @@ pub struct TransactionList {
     pub per_page: u32,
     pub has_more: bool,
 }
+
+/// Wallet status from `GET /api/v1/status/{address}`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletStatus {
+    pub address: String,
+    #[serde(default, with = "rust_decimal::serde::float")]
+    pub balance: Decimal,
+    #[serde(default)]
+    pub chain_id: ChainId,
+    #[serde(default)]
+    pub permit_nonce: Option<u64>,
+}

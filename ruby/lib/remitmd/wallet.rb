@@ -420,7 +420,7 @@ module Remitmd
           context: { chain: @chain_key }
         )
       end
-      nonce = fetch_usdc_nonce(usdc_addr)
+      nonce = fetch_permit_nonce(usdc_addr)
       dl = deadline || (Time.now.to_i + 3600)
       raw = (amount * 1_000_000).round.to_i
       sign_usdc_permit(spender, raw, dl, nonce, usdc_address: usdc_addr)
@@ -674,11 +674,30 @@ module Remitmd
 
     # ─── Permit helpers ──────────────────────────────────────────────────
 
-    # Fetch the current EIP-2612 nonce for this wallet from the USDC contract.
+    # Fetch the EIP-2612 permit nonce, trying the API first then falling back to RPC.
+    # @param usdc_address [String] the USDC contract address
+    # @return [Integer] current nonce
+    def fetch_permit_nonce(usdc_address)
+      return 0 if @mock_mode
+
+      # Try the status API first — it's cheaper than a direct RPC call.
+      begin
+        data = @transport.get("/status/#{address}")
+        nonce = data.is_a?(Hash) ? data["permit_nonce"] : nil
+        return nonce.to_i unless nonce.nil?
+      rescue StandardError => e
+        warn "[remitmd] permit nonce API lookup failed, falling back to RPC: #{e.message}"
+      end
+
+      # Fall back to direct RPC call.
+      fetch_usdc_nonce_rpc(usdc_address)
+    end
+
+    # Fetch the current EIP-2612 nonce for this wallet directly from the USDC contract via RPC.
     # Uses JSON-RPC eth_call with selector 0x7ecebe00 (nonces(address)).
     # @param usdc_address [String] the USDC contract address
     # @return [Integer] current nonce
-    def fetch_usdc_nonce(usdc_address)
+    def fetch_usdc_nonce_rpc(usdc_address)
       return 0 if @mock_mode
 
       padded = address.downcase.delete_prefix("0x").rjust(64, "0")

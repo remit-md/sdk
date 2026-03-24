@@ -47,6 +47,7 @@ function mkTx(invoiceId?: string): Transaction {
 /** State machine for a mock wallet. */
 class MockWalletState {
   balance: number;
+  permitNonce: number = 0;
   forcedError: string | null = null;
 
   constructor(balance: number) {
@@ -161,6 +162,7 @@ export class MockRemit {
       activeEscrows: 0,
       activeTabs: 0,
       activeStreams: 0,
+      permitNonce: state.permitNonce ?? 0,
     };
   }
 

@@ -203,8 +203,8 @@ class Wallet(RemitClient):
 
         return PermitSignature(value=value, deadline=deadline, v=v, r=r, s=s)
 
-    async def _fetch_usdc_nonce(self, usdc_address: str) -> int:
-        """Fetch the current EIP-2612 nonce for this wallet from the USDC contract."""
+    async def _fetch_usdc_nonce_rpc(self, usdc_address: str) -> int:
+        """Fetch the current EIP-2612 nonce for this wallet via direct RPC call."""
         import httpx
 
         padded = self.address.lower().replace("0x", "").zfill(64)
@@ -229,6 +229,24 @@ class Wallet(RemitClient):
             )
         return int(raw_result, 16)
 
+    async def _fetch_permit_nonce(self, usdc_address: str) -> int:
+        """Fetch the EIP-2612 permit nonce, trying the API first then falling back to RPC."""
+        import logging
+
+        logger = logging.getLogger("remitmd")
+
+        # Try the status API first — it's cheaper than a direct RPC call.
+        try:
+            data = await self._http.get(f"/api/v1/status/{self.address}")
+            nonce = data.get("permit_nonce") if isinstance(data, dict) else None
+            if nonce is not None:
+                return int(nonce)
+        except Exception as exc:
+            logger.debug("permit nonce API lookup failed, falling back to RPC: %s", exc)
+
+        # Fall back to direct RPC call.
+        return await self._fetch_usdc_nonce_rpc(usdc_address)
+
     async def sign_permit(
         self,
         spender: str,
@@ -249,7 +267,7 @@ class Wallet(RemitClient):
                 f"Supported chains: {', '.join(USDC_ADDRESSES)}. "
                 "Pass usdc_address to sign_usdc_permit() instead."
             )
-        nonce = await self._fetch_usdc_nonce(usdc_addr)
+        nonce = await self._fetch_permit_nonce(usdc_addr)
         dl = deadline or (int(time.time()) + 3600)
         raw = int(round(amount * 1_000_000))
         return await self.sign_usdc_permit(spender, raw, dl, nonce, usdc_addr)

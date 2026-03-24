@@ -1041,7 +1041,7 @@ func (w *Wallet) SignPermit(ctx context.Context, spender string, amount float64,
 		)
 	}
 
-	nonce, err := w.fetchUsdcNonce(ctx, usdcAddr)
+	nonce, err := w.fetchPermitNonce(ctx, usdcAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -1085,9 +1085,9 @@ func (w *Wallet) SignPermit(ctx context.Context, spender string, amount float64,
 	}, nil
 }
 
-// fetchUsdcNonce fetches the current EIP-2612 nonce for this wallet from the USDC contract.
+// fetchUsdcNonceRpc fetches the current EIP-2612 nonce for this wallet from the USDC contract via direct RPC.
 // Returns 0 if no RPC URL is configured (mock/test mode).
-func (w *Wallet) fetchUsdcNonce(ctx context.Context, usdcAddr string) (uint64, error) {
+func (w *Wallet) fetchUsdcNonceRpc(ctx context.Context, usdcAddr string) (uint64, error) {
 	if w.rpcURL == "" {
 		return 0, nil
 	}
@@ -1150,6 +1150,21 @@ func (w *Wallet) fetchUsdcNonce(ctx context.Context, usdcAddr string) (uint64, e
 	nonce := new(big.Int)
 	nonce.SetString(strings.TrimPrefix(result, "0x"), 16)
 	return nonce.Uint64(), nil
+}
+
+// fetchPermitNonce fetches the current EIP-2612 permit nonce for this wallet.
+// Prefers the API (GET /api/v1/status/{address} → permit_nonce), falls back to direct RPC.
+func (w *Wallet) fetchPermitNonce(ctx context.Context, usdcAddr string) (uint64, error) {
+	// Try the status API first — it's cheaper than a direct RPC call.
+	var status WalletStatus
+	err := w.http.get(ctx, "/api/v1/status/"+strings.ToLower(w.Address()), &status)
+	if err == nil && status.PermitNonce != nil {
+		return uint64(*status.PermitNonce), nil
+	}
+	if err != nil {
+		log.Printf("[remitmd] permit nonce API lookup failed, falling back to RPC: %v", err)
+	}
+	return w.fetchUsdcNonceRpc(ctx, usdcAddr)
 }
 
 // autoPermit signs a permit for the given contract type and amount.

@@ -273,7 +273,7 @@ export class Wallet extends RemitClient {
         "Pass usdcAddress to signUsdcPermit() instead.",
       );
     }
-    const nonce = await this.#fetchUsdcNonce(usdcAddress);
+    const nonce = await this.#fetchPermitNonce(usdcAddress);
     const dl = deadline ?? Math.floor(Date.now() / 1000) + 3600;
     const rawAmount = BigInt(Math.round(amount * 1e6));
     return this.signUsdcPermit({
@@ -304,9 +304,24 @@ export class Wallet extends RemitClient {
     }
   }
 
-  /** Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC. */
-  async #fetchUsdcNonce(usdcAddress: string): Promise<number> {
-    // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
+  /**
+   * Fetch the current EIP-2612 permit nonce for this wallet.
+   * Prefers the API (GET /status/{address} → permitNonce), falls back to direct RPC.
+   */
+  async #fetchPermitNonce(usdcAddress: string): Promise<number> {
+    try {
+      const s = await this.status();
+      if (s.permitNonce !== null && s.permitNonce !== undefined) {
+        return s.permitNonce;
+      }
+    } catch {
+      // API unavailable — fall through to RPC.
+    }
+    return this.#fetchUsdcNonceRpc(usdcAddress);
+  }
+
+  /** Fallback: fetch nonce directly from USDC contract via JSON-RPC eth_call. */
+  async #fetchUsdcNonceRpc(usdcAddress: string): Promise<number> {
     const paddedAddress = this.address.toLowerCase().replace("0x", "").padStart(64, "0");
     const data = `0x7ecebe00${paddedAddress}`;
 

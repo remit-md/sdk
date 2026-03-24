@@ -2,8 +2,6 @@
 
 require "bigdecimal"
 require "bigdecimal/util"
-require "net/http"
-require "uri"
 require "json"
 
 module Remitmd
@@ -12,13 +10,6 @@ module Remitmd
     "base-sepolia" => "0x2d846325766921935f37d5b4478196d3ef93707c",
     "base" => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     "localhost" => "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-  }.freeze
-
-  # Default JSON-RPC endpoints per chain (for nonce fetching).
-  DEFAULT_RPC_URLS = {
-    "base-sepolia" => "https://sepolia.base.org",
-    "base" => "https://mainnet.base.org",
-    "localhost" => "http://127.0.0.1:8545",
   }.freeze
 
   # Primary remit.md client. All payment operations are methods on RemitWallet.
@@ -39,16 +30,14 @@ module Remitmd
     # @param signer [Signer, nil]      custom signer (pass instead of private_key)
     # @param chain [String]            chain name — "base", "base_sepolia"
     # @param api_url [String, nil]     override API base URL
-    # @param rpc_url [String, nil]     override JSON-RPC URL for on-chain queries
     # @param transport [Object, nil]   inject mock transport (used by MockRemit)
-    def initialize(private_key: nil, signer: nil, chain: "base", api_url: nil, router_address: nil, rpc_url: nil, transport: nil)
+    def initialize(private_key: nil, signer: nil, chain: "base", api_url: nil, router_address: nil, transport: nil)
       if transport
         # MockRemit path: transport + signer injected directly
         @signer    = signer
         @transport = transport
         @chain_key = "base-sepolia"
         @chain_id  = ChainId::BASE_SEPOLIA
-        @rpc_url   = DEFAULT_RPC_URLS["base-sepolia"]
         @mock_mode = true
         return
       end
@@ -61,7 +50,7 @@ module Remitmd
       end
 
       @signer = signer || PrivateKeySigner.new(private_key)
-      # Normalize chain key for USDC/RPC lookups (underscore → hyphen).
+      # Normalize chain key for USDC lookups (underscore → hyphen).
       @chain_key = chain.tr("_", "-")
       # Normalize to the base chain name (strip testnet suffix) for use in pay body.
       # The server accepts "base" — not "base_sepolia" etc.
@@ -72,7 +61,6 @@ module Remitmd
       base_url       = api_url || cfg[:url]
       @chain_id      = cfg[:chain_id]
       router_address ||= ""
-      @rpc_url = rpc_url || ENV["REMITMD_RPC_URL"] || DEFAULT_RPC_URLS[@chain_key] || DEFAULT_RPC_URLS["base-sepolia"]
       @transport = HttpTransport.new(
         base_url:       base_url,
         signer:         @signer,
@@ -83,7 +71,7 @@ module Remitmd
 
     # Build a RemitWallet from environment variables.
     # Reads: REMITMD_KEY (primary) or REMITMD_PRIVATE_KEY (deprecated fallback),
-    # REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS, REMITMD_RPC_URL.
+    # REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS.
     def self.from_env
       key = ENV["REMITMD_KEY"] || ENV["REMITMD_PRIVATE_KEY"]
       if ENV["REMITMD_PRIVATE_KEY"] && !ENV["REMITMD_KEY"]
@@ -94,8 +82,7 @@ module Remitmd
       chain          = ENV.fetch("REMITMD_CHAIN", "base")
       api_url        = ENV["REMITMD_API_URL"]
       router_address = ENV["REMITMD_ROUTER_ADDRESS"]
-      rpc_url        = ENV["REMITMD_RPC_URL"]
-      new(private_key: key, chain: chain, api_url: api_url, router_address: router_address, rpc_url: rpc_url)
+      new(private_key: key, chain: chain, api_url: api_url, router_address: router_address)
     end
 
     # The Ethereum address associated with this wallet.
@@ -674,68 +661,23 @@ module Remitmd
 
     # ─── Permit helpers ──────────────────────────────────────────────────
 
-    # Fetch the EIP-2612 permit nonce, trying the API first then falling back to RPC.
+    # Fetch the EIP-2612 permit nonce from the API.
     # @param usdc_address [String] the USDC contract address
     # @return [Integer] current nonce
     def fetch_permit_nonce(usdc_address)
       return 0 if @mock_mode
 
-      # Try the status API first — it's cheaper than a direct RPC call.
-      begin
-        data = @transport.get("/status/#{address}")
-        nonce = data.is_a?(Hash) ? data["permit_nonce"] : nil
-        return nonce.to_i unless nonce.nil?
-      rescue StandardError => e
-        warn "[remitmd] permit nonce API lookup failed, falling back to RPC: #{e.message}"
-      end
-
-      # Fall back to direct RPC call.
-      fetch_usdc_nonce_rpc(usdc_address)
-    end
-
-    # Fetch the current EIP-2612 nonce for this wallet directly from the USDC contract via RPC.
-    # Uses JSON-RPC eth_call with selector 0x7ecebe00 (nonces(address)).
-    # @param usdc_address [String] the USDC contract address
-    # @return [Integer] current nonce
-    def fetch_usdc_nonce_rpc(usdc_address)
-      return 0 if @mock_mode
-
-      padded = address.downcase.delete_prefix("0x").rjust(64, "0")
-      data = "0x7ecebe00#{padded}"
-      payload = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "eth_call",
-        params: [{ to: usdc_address, data: data }, "latest"]
-      }
-
-      uri = URI.parse(@rpc_url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = (uri.scheme == "https")
-      http.read_timeout = 10
-      http.open_timeout = 5
-
-      req = Net::HTTP::Post.new(uri.request_uri)
-      req["Content-Type"] = "application/json"
-      req.body = payload.to_json
-
-      resp = http.request(req)
-      result = JSON.parse(resp.body)
-
-      if result["error"]
-        msg = result["error"].is_a?(Hash) ? result["error"]["message"] : result["error"].to_s
-        raise RemitError.new(RemitError::NETWORK_ERROR, "RPC error fetching nonce: #{msg}")
-      end
-
-      raw = result["result"]
-      if raw.nil?
+      data = @transport.get("/status/#{address}")
+      nonce = data.is_a?(Hash) ? data["permit_nonce"] : nil
+      if nonce.nil?
         raise RemitError.new(
           RemitError::NETWORK_ERROR,
-          "RPC returned nil result when fetching USDC nonce (address=#{usdc_address})",
-          context: { rpc_url: @rpc_url, usdc_address: usdc_address }
+          "permit_nonce not available from API for #{address}. " \
+          "Ensure the server supports the permit_nonce field in GET /api/v1/status.",
+          context: { address: address }
         )
       end
-      raw.to_i(16)
+      nonce.to_i
     end
 
     # Auto-sign a permit for the given contract type and amount.

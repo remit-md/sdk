@@ -34,14 +34,7 @@ defmodule RemitMd.Wallet do
     "localhost"    => "0x5FbDB2315678afecb367f032d93F642f64180aa3"
   }
 
-  # Default JSON-RPC URLs per chain (for nonce fetching).
-  @default_rpc_urls %{
-    "base-sepolia" => "https://sepolia.base.org",
-    "base"         => "https://mainnet.base.org",
-    "localhost"    => "http://127.0.0.1:8545"
-  }
-
-  defstruct [:signer, :transport, :mock_pid, :address, :chain, :chain_key, :rpc_url]
+  defstruct [:signer, :transport, :mock_pid, :address, :chain, :chain_key]
 
   @type t :: %__MODULE__{
     signer:    term(),
@@ -49,8 +42,7 @@ defmodule RemitMd.Wallet do
     mock_pid:  pid() | nil,
     address:   String.t(),
     chain:     String.t() | nil,
-    chain_key: String.t() | nil,
-    rpc_url:   String.t() | nil
+    chain_key: String.t() | nil
   }
 
   # ─── Constructors ─────────────────────────────────────────────────────────
@@ -74,7 +66,7 @@ defmodule RemitMd.Wallet do
       signer = MockSigner.new(Keyword.get(opts, :address, MockSigner.new().address))
       %__MODULE__{
         signer: signer, transport: nil, mock_pid: mock_pid, address: signer.address,
-        chain: "base", chain_key: "base-sepolia", rpc_url: @default_rpc_urls["base-sepolia"]
+        chain: "base", chain_key: "base-sepolia"
       }
     else
       signer =
@@ -92,18 +84,14 @@ defmodule RemitMd.Wallet do
       transport = Http.new(opts |> Keyword.put(:signer, signer))
       address = get_address(signer)
       raw_chain = opts |> Keyword.get(:chain, "base")
-      # chain_key preserves the full name for USDC/RPC lookups (e.g. "base_sepolia" → "base-sepolia")
+      # chain_key preserves the full name for USDC lookups (e.g. "base_sepolia" → "base-sepolia")
       chain_key = raw_chain |> String.replace("_", "-")
       # Normalize to base chain name (strip testnet suffix) for use in pay body.
       # The server accepts "base" — not "base_sepolia" etc.
       chain = base_chain_name(raw_chain)
-      rpc_url = Keyword.get(opts, :rpc_url)
-        || System.get_env("REMITMD_RPC_URL")
-        || @default_rpc_urls[chain_key]
-        || @default_rpc_urls["base-sepolia"]
       %__MODULE__{
         signer: signer, transport: transport, mock_pid: nil, address: address,
-        chain: chain, chain_key: chain_key, rpc_url: rpc_url
+        chain: chain, chain_key: chain_key
       }
     end
   end
@@ -126,12 +114,9 @@ defmodule RemitMd.Wallet do
     chain          = System.get_env("REMITMD_CHAIN", "base")
     api_url        = System.get_env("REMITMD_API_URL")
     router_address = System.get_env("REMITMD_ROUTER_ADDRESS")
-    rpc_url        = System.get_env("REMITMD_RPC_URL")
-
     opts = [private_key: key, chain: chain]
     opts = if api_url, do: Keyword.put(opts, :api_url, api_url), else: opts
     opts = if router_address, do: Keyword.put(opts, :router_address, router_address), else: opts
-    opts = if rpc_url, do: Keyword.put(opts, :rpc_url, rpc_url), else: opts
 
     new(opts)
   end
@@ -959,63 +944,22 @@ defmodule RemitMd.Wallet do
     sign_permit(w, spender, amount)
   end
 
-  # Fetch the EIP-2612 permit nonce, trying the API first then falling back to RPC.
+  # Fetch the EIP-2612 permit nonce. Mock mode returns 0 directly.
   defp fetch_permit_nonce(%__MODULE__{mock_pid: pid}, _usdc_address) when pid != nil, do: 0
 
-  defp fetch_permit_nonce(%__MODULE__{} = w, usdc_address) do
-    # Try the status API first — it's cheaper than a direct RPC call.
-    try do
-      data = do_http_get(w, "/status/#{w.address}")
+  defp fetch_permit_nonce(%__MODULE__{} = w, _usdc_address) do
+    data = do_http_get(w, "/status/#{w.address}")
 
-      nonce =
-        case data do
-          %{"permit_nonce" => n} when not is_nil(n) -> n
-          _ -> nil
-        end
-
-      if nonce != nil do
-        if is_integer(nonce), do: nonce, else: nonce |> to_string() |> String.to_integer()
-      else
-        fetch_usdc_nonce_rpc(w, usdc_address)
+    nonce =
+      case data do
+        %{"permit_nonce" => n} when not is_nil(n) -> n
+        _ -> nil
       end
-    rescue
-      _ -> fetch_usdc_nonce_rpc(w, usdc_address)
-    end
-  end
 
-  # Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
-  # Uses eth_call with selector 0x7ecebe00 (nonces(address)).
-  defp fetch_usdc_nonce_rpc(%__MODULE__{} = w, usdc_address) do
-    padded = w.address |> String.downcase() |> String.trim_leading("0x") |> String.pad_leading(64, "0")
-    data = "0x7ecebe00#{padded}"
-
-    payload = Jason.encode!(%{
-      jsonrpc: "2.0",
-      id: 1,
-      method: "eth_call",
-      params: [%{to: usdc_address, data: data}, "latest"]
-    })
-
-    url = w.rpc_url |> String.to_charlist()
-    headers = [{~c"content-type", ~c"application/json"}]
-    body_charlist = String.to_charlist(payload)
-
-    case :httpc.request(:post, {url, headers, ~c"application/json", body_charlist},
-           [timeout: 10_000, connect_timeout: 5_000], []) do
-      {:ok, {{_version, _status, _reason}, _resp_headers, resp_body}} ->
-        result = Jason.decode!(to_string(resp_body))
-
-        if result["error"] do
-          msg = if is_map(result["error"]), do: result["error"]["message"], else: inspect(result["error"])
-          raise Error.new(Error.network_error(), "RPC error fetching nonce: #{msg}")
-        end
-
-        (result["result"] || "0x0")
-        |> String.trim_leading("0x")
-        |> String.to_integer(16)
-
-      {:error, reason} ->
-        raise Error.new(Error.network_error(), "Network error fetching nonce: #{inspect(reason)}")
+    if nonce != nil do
+      if is_integer(nonce), do: nonce, else: nonce |> to_string() |> String.to_integer()
+    else
+      raise Error.new(Error.server_error(), "permit_nonce not available from /status API for #{w.address}")
     end
   end
 

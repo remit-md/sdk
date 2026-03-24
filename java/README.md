@@ -67,12 +67,6 @@ Wallet wallet = RemitMd.withKey("0x...")
     .testnet(true)
     .build();
 
-// Custom RPC URL
-Wallet wallet = RemitMd.withKey("0x...")
-    .testnet(true)
-    .rpcUrl("https://my-rpc.example.com")
-    .build();
-
 // Custom signer (KMS, HSM, etc.)
 Wallet wallet = RemitMd.withSigner(hash -> myKmsClient.sign(hash))
     .build();

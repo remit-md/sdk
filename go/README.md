@@ -154,13 +154,4 @@ tx, err := wallet.Pay(ctx, "0xRecipient...", decimal.NewFromFloat(5.0),
     remitmd.WithPayPermit(permit))
 ```
 
-You can also override the RPC URL used for nonce fetching:
-
-```go
-wallet, err := remitmd.NewWallet(key,
-    remitmd.WithTestnet(),
-    remitmd.WithRPCURL("https://my-rpc.example.com"),
-)
-```
-
-Or via environment variable: `REMITMD_RPC_URL`.
+Permit nonces are fetched from the API automatically. No RPC configuration needed.

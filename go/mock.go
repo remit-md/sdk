@@ -68,7 +68,6 @@ func (m *MockRemit) Wallet() *Wallet {
 		chain:    "base",
 		chainKey: "base-sepolia",
 		testnet:  true,
-		rpcURL:   "", // empty = skip RPC calls in mock mode
 		contractsCache: &ContractAddresses{
 			ChainID: int(ChainBaseSep),
 			USDC:    "0x2d846325766921935f37d5b4478196d3ef93707c",

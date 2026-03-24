@@ -1,5 +1,7 @@
 # remit.md / sdk
 
+> [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
+
 SDKs in 9 languages (Python, TypeScript, Go, C#, Java, Rust, Ruby, Swift, Elixir) for the [remit.md](https://remit.md) payment protocol.
 Let AI agents pay for tools, data, and services — one env var, no crypto experience required.
 

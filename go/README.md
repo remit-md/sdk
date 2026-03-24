@@ -1,5 +1,7 @@
 # remitmd-go — Go SDK for remit.md
 
+> [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
+
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 
 Universal AI payment protocol for agents on EVM L2 chains.

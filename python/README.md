@@ -1,5 +1,7 @@
 # remit.md Python SDK
 
+> [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
+
 Universal payment protocol for AI agents — Python client library.
 
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)

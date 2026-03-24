@@ -197,9 +197,13 @@ impl Wallet {
             )
         })?;
 
-        let nonce =
-            fetch_permit_nonce(self.transport.as_ref(), &self.rpc_url, usdc_addr, &self.address)
-                .await?;
+        let nonce = fetch_permit_nonce(
+            self.transport.as_ref(),
+            &self.rpc_url,
+            usdc_addr,
+            &self.address,
+        )
+        .await?;
 
         let dl = deadline.unwrap_or_else(|| {
             SystemTime::now()

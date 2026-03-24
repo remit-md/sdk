@@ -890,8 +890,12 @@ defmodule RemitMd.Wallet do
     end
   end
 
-  defp do_call(%__MODULE__{mock_pid: _pid}, _method, _path, _body) do
-    {:ok, %{}}  # Unimplemented mock endpoint — return empty map
+  defp do_call(%__MODULE__{mock_pid: _pid}, method, path, _body) do
+    {:error,
+     RemitMd.Error.new(
+       RemitMd.Error.server_error(),
+       "Mock endpoint not implemented: #{method} #{path}"
+     )}
   end
 
   defp do_http_get(%__MODULE__{transport: t}, path) do

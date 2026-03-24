@@ -141,7 +141,15 @@ export class Wallet extends RemitClient {
 
     super(clientOptions);
 
-    this.#rpcUrl = rpcUrl ?? process.env["REMITMD_RPC_URL"] ?? DEFAULT_RPC_URLS[this._chain] ?? DEFAULT_RPC_URLS["base-sepolia"]!;
+    const resolvedRpc = rpcUrl ?? process.env["REMITMD_RPC_URL"] ?? DEFAULT_RPC_URLS[this._chain];
+    if (!resolvedRpc) {
+      throw new Error(
+        `Unknown chain '${this._chain}'. No RPC URL available. ` +
+        `Supported chains: ${Object.keys(DEFAULT_RPC_URLS).join(", ")}. ` +
+        "Pass rpcUrl explicitly or set REMITMD_RPC_URL.",
+      );
+    }
+    this.#rpcUrl = resolvedRpc;
 
     // Router contract address for EIP-712 domain — falls back to env var.
     const verifyingContract =
@@ -198,7 +206,14 @@ export class Wallet extends RemitClient {
    * Returns a PermitSignature object that can be passed to postBounty() or placeDeposit().
    */
   async signUsdcPermit(options: SignPermitOptions): Promise<PermitSignature> {
-    const usdcAddress = options.usdcAddress ?? Wallet.USDC_ADDRESSES[this._chain] ?? "";
+    const usdcAddress = options.usdcAddress ?? Wallet.USDC_ADDRESSES[this._chain];
+    if (!usdcAddress) {
+      throw new Error(
+        `No USDC address for chain '${this._chain}'. ` +
+        `Supported chains: ${Object.keys(Wallet.USDC_ADDRESSES).join(", ")}. ` +
+        "Pass usdcAddress explicitly.",
+      );
+    }
 
     const domain = {
       name: "USD Coin",
@@ -250,7 +265,14 @@ export class Wallet extends RemitClient {
    * @param deadline Optional Unix timestamp. Defaults to 1 hour from now.
    */
   async signPermit(spender: string, amount: number, deadline?: number): Promise<PermitSignature> {
-    const usdcAddress = Wallet.USDC_ADDRESSES[this._chain] ?? "";
+    const usdcAddress = Wallet.USDC_ADDRESSES[this._chain];
+    if (!usdcAddress) {
+      throw new Error(
+        `No USDC address for chain '${this._chain}'. ` +
+        `Supported chains: ${Object.keys(Wallet.USDC_ADDRESSES).join(", ")}. ` +
+        "Pass usdcAddress to signUsdcPermit() instead.",
+      );
+    }
     const nonce = await this.#fetchUsdcNonce(usdcAddress);
     const dl = deadline ?? Math.floor(Date.now() / 1000) + 3600;
     const rawAmount = BigInt(Math.round(amount * 1e6));
@@ -276,7 +298,8 @@ export class Wallet extends RemitClient {
       const spender = contracts[contract];
       if (!spender) return undefined;
       return await this.signPermit(spender, amount);
-    } catch {
+    } catch (err) {
+      console.warn(`[remitmd] auto-permit failed for ${contract} (amount=${amount}):`, err);
       return undefined;
     }
   }
@@ -300,7 +323,12 @@ export class Wallet extends RemitClient {
 
     const json = await response.json() as { result?: string; error?: { message: string } };
     if (json.error) throw new Error(`RPC error fetching nonce: ${json.error.message}`);
-    return parseInt(json.result ?? "0x0", 16);
+    if (json.result === undefined || json.result === null) {
+      throw new Error(
+        "RPC returned null result for nonce query — USDC contract may not exist at the given address",
+      );
+    }
+    return parseInt(json.result, 16);
   }
 
   // ─── Direct Payment ─────────────────────────────────────────────────────────

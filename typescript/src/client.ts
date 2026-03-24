@@ -37,9 +37,21 @@ export class RemitClient {
     const { chain = "base", testnet = false, apiUrl } = options;
     this._chain = testnet && !chain.includes("sepolia") ? `${chain}-sepolia` : chain;
     const envUrl = typeof process !== "undefined" ? process.env.REMITMD_API_URL : undefined;
-    this._apiUrl =
-      apiUrl ?? envUrl ?? DEFAULT_API_URLS[this._chain] ?? DEFAULT_API_URLS["base"]!;
-    this._chainId = CHAIN_IDS[this._chain] ?? CHAIN_IDS["base"]!;
+    const resolvedUrl = apiUrl ?? envUrl ?? DEFAULT_API_URLS[this._chain];
+    if (!resolvedUrl) {
+      throw new Error(
+        `Unknown chain '${this._chain}'. Supported chains: ${Object.keys(DEFAULT_API_URLS).join(", ")}. ` +
+        "Pass apiUrl explicitly or set REMITMD_API_URL.",
+      );
+    }
+    this._apiUrl = resolvedUrl;
+    const resolvedChainId = CHAIN_IDS[this._chain];
+    if (resolvedChainId === undefined) {
+      throw new Error(
+        `Unknown chain '${this._chain}'. Supported chains: ${Object.keys(CHAIN_IDS).join(", ")}.`,
+      );
+    }
+    this._chainId = resolvedChainId;
   }
 
   protected async _fetch<T>(path: string): Promise<T> {

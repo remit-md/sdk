@@ -526,7 +526,7 @@ public final class RemitWallet: @unchecked Sendable {
         guard let usdcAddr = RemitWallet.usdcAddresses[chain.chainName], !usdcAddr.isEmpty else {
             throw RemitError(RemitError.chainUnavailable, "No USDC address known for chain '\(chain.chainName)'")
         }
-        let nonce = try await fetchUsdcNonce(usdcAddress: usdcAddr)
+        let nonce = try await fetchPermitNonce(usdcAddress: usdcAddr)
         let dl = deadline ?? (Int(Date().timeIntervalSince1970) + 3600)
         let rawAmount = UInt64(round(amount * 1_000_000))
         return try signUsdcPermit(spender: spender, value: rawAmount, deadline: dl, nonce: nonce, usdcAddress: usdcAddr)
@@ -557,8 +557,29 @@ public final class RemitWallet: @unchecked Sendable {
         return try await signPermit(spender: spender, amount: amount)
     }
 
+    /// Fetch the EIP-2612 permit nonce, trying the API first then falling back to direct RPC.
+    ///
+    /// The `/status/{address}` endpoint returns `permit_nonce` when available, which avoids
+    /// a direct JSON-RPC call. If the API is unreachable or the field is missing, we fall
+    /// back to `fetchUsdcNonceRpc()`.
+    private func fetchPermitNonce(usdcAddress: String) async throws -> Int {
+        // Try the status API first — it's cheaper than a direct RPC call.
+        do {
+            let status: StatusResponse = try await transport.request(
+                method: "GET", path: "/api/v1/status/\(signerAddress)",
+                body: Optional<EmptyBody>.none
+            )
+            if let nonce = status.permitNonce {
+                return nonce
+            }
+        } catch {
+            // API unavailable or field missing — fall through to RPC.
+        }
+        return try await fetchUsdcNonceRpc(usdcAddress: usdcAddress)
+    }
+
     /// Fetch the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
-    private func fetchUsdcNonce(usdcAddress: String) async throws -> Int {
+    private func fetchUsdcNonceRpc(usdcAddress: String) async throws -> Int {
         // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
         let paddedAddress = signerAddress.lowercased()
             .replacingOccurrences(of: "0x", with: "")
@@ -700,6 +721,15 @@ public final class RemitWallet: @unchecked Sendable {
 
 private struct EmptyBody: Codable {}
 private struct EmptyObject: Codable {}
+
+/// Response from GET /status/{address}. Only the fields we need for permit nonce.
+private struct StatusResponse: Codable {
+    let permitNonce: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case permitNonce = "permit_nonce"
+    }
+}
 
 /// Chat-style message shown on a fund/withdraw page.
 public struct LinkMessageBody: Codable, Sendable {

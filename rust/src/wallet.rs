@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
 use crate::http::{
-    chain_config, compute_permit_digest, default_rpc_url, fetch_usdc_nonce, usdc_address,
+    chain_config, compute_permit_digest, default_rpc_url, fetch_permit_nonce, usdc_address,
     HttpTransport, Transport,
 };
 use crate::models::*;
@@ -197,7 +197,13 @@ impl Wallet {
             )
         })?;
 
-        let nonce = fetch_usdc_nonce(&self.rpc_url, usdc_addr, &self.address).await?;
+        let nonce = fetch_permit_nonce(
+            self.transport.as_ref(),
+            &self.rpc_url,
+            usdc_addr,
+            &self.address,
+        )
+        .await?;
 
         let dl = deadline.unwrap_or_else(|| {
             SystemTime::now()

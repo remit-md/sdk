@@ -429,7 +429,7 @@ pub(crate) fn compute_permit_digest(
 /// Fetch the ERC-2612 nonce for `owner` from the USDC contract via JSON-RPC `eth_call`.
 ///
 /// Calls `nonces(address)` (selector `0x7ecebe00`) on the USDC contract.
-pub(crate) async fn fetch_usdc_nonce(
+pub(crate) async fn fetch_usdc_nonce_rpc(
     rpc_url: &str,
     usdc_addr: &str,
     owner: &str,
@@ -493,6 +493,33 @@ pub(crate) async fn fetch_usdc_nonce(
             format!("failed to parse nonce from RPC result {result_hex}: {e}"),
         )
     })
+}
+
+/// Fetch the EIP-2612 permit nonce, trying the API first then falling back to direct RPC.
+///
+/// Calls `GET /api/v1/status/{owner}` and reads the `permit_nonce` field.
+/// If the API is unreachable or doesn't return the field, falls back to
+/// `fetch_usdc_nonce_rpc()`.
+pub(crate) async fn fetch_permit_nonce(
+    transport: &dyn Transport,
+    rpc_url: &str,
+    usdc_addr: &str,
+    owner: &str,
+) -> Result<u64, RemitError> {
+    // Try the status API first — cheaper than a direct RPC call.
+    match transport.get(&format!("/api/v1/status/{owner}")).await {
+        Ok(data) => {
+            if let Some(nonce) = data.get("permit_nonce").and_then(|v| v.as_u64()) {
+                return Ok(nonce);
+            }
+            // Field missing or null — fall through to RPC.
+        }
+        Err(_) => {
+            // API unavailable — fall through to RPC.
+        }
+    }
+
+    fetch_usdc_nonce_rpc(rpc_url, usdc_addr, owner).await
 }
 
 // ─── Error parsing ────────────────────────────────────────────────────────────

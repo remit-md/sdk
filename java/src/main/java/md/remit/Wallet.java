@@ -774,7 +774,7 @@ public class Wallet {
                 "No USDC address known for chain \"" + chain + "\". Cannot auto-sign permit.",
                 Map.of("chain", chain));
         }
-        long nonce = fetchUsdcNonce(usdc);
+        long nonce = fetchPermitNonce(usdc);
         long dl = deadline.orElse(Instant.now().getEpochSecond() + 3600);
         long rawAmount = amount.movePointRight(6).longValueExact();
         return signUsdcPermit(spender, rawAmount, dl, nonce);
@@ -810,9 +810,30 @@ public class Wallet {
     }
 
     /**
+     * Fetches the EIP-2612 permit nonce, trying the API first then falling back to RPC.
+     */
+    @SuppressWarnings("unchecked")
+    private long fetchPermitNonce(String usdcAddress) {
+        // Try the status API first — it's cheaper than a direct RPC call.
+        try {
+            Map<String, Object> data = client.get(
+                "/api/v1/status/" + signer.address(), Map.class);
+            Object nonce = data != null ? data.get("permit_nonce") : null;
+            if (nonce != null) {
+                return ((Number) nonce).longValue();
+            }
+        } catch (Exception e) {
+            System.err.println("[remitmd] permit nonce API lookup failed, falling back to RPC: " + e.getMessage());
+        }
+
+        // Fall back to direct RPC call.
+        return fetchUsdcNonceRpc(usdcAddress);
+    }
+
+    /**
      * Fetches the current EIP-2612 nonce for this wallet from the USDC contract via JSON-RPC.
      */
-    private long fetchUsdcNonce(String usdcAddress) {
+    private long fetchUsdcNonceRpc(String usdcAddress) {
         // nonces(address) selector = 0x7ecebe00 + address padded to 32 bytes
         String addr = signer.address().toLowerCase().replace("0x", "");
         String paddedAddress = String.format("%64s", addr).replace(' ', '0');

@@ -171,9 +171,9 @@ public struct Escrow: Codable, Sendable {
         } else {
             self.id = try c.decode(String.self, forKey: .id)
         }
-        self.payer = (try? c.decode(String.self, forKey: .payer)) ?? ""
-        self.recipient = (try? c.decode(String.self, forKey: .recipient)) ?? ""
-        self.amount = (try? c.decode(Double.self, forKey: .amount)) ?? 0
+        self.payer = try c.decode(String.self, forKey: .payer)
+        self.recipient = try c.decode(String.self, forKey: .recipient)
+        self.amount = try c.decode(Double.self, forKey: .amount)
         self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USDC"
         self.status = (try? c.decode(EscrowStatus.self, forKey: .status)) ?? .pending
         self.conditions = try? c.decode(String.self, forKey: .conditions)

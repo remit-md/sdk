@@ -102,11 +102,15 @@ class Wallet(RemitClient):
         self._contracts_cache = None
 
         # RPC URL for on-chain queries (nonce fetching for auto-permit).
-        self._rpc_url = (
-            rpc_url
-            or os.environ.get("REMITMD_RPC_URL")
-            or DEFAULT_RPC_URLS.get(chain, DEFAULT_RPC_URLS["base-sepolia"])
-        )
+        resolved_rpc = rpc_url or os.environ.get("REMITMD_RPC_URL")
+        if not resolved_rpc:
+            if chain not in DEFAULT_RPC_URLS:
+                raise ValueError(
+                    f"Unknown chain '{chain}'. Supported chains: {', '.join(DEFAULT_RPC_URLS)}. "
+                    "Pass rpc_url explicitly or set REMITMD_RPC_URL."
+                )
+            resolved_rpc = DEFAULT_RPC_URLS[chain]
+        self._rpc_url = resolved_rpc
 
         # Event callbacks: event_type → list of callables
         self._callbacks: dict[str, list[Callable[..., Any]]] = {}
@@ -160,6 +164,12 @@ class Wallet(RemitClient):
             open_tab(), open_stream(), post_bounty(), or place_deposit().
         """
         usdc_addr = usdc_address or USDC_ADDRESSES.get(self.chain, "")
+        if not usdc_addr:
+            raise ValueError(
+                f"No USDC address for chain '{self.chain}'. "
+                f"Supported chains: {', '.join(USDC_ADDRESSES)}. "
+                "Pass usdc_address explicitly."
+            )
 
         domain = {
             "name": "USD Coin",
@@ -211,7 +221,13 @@ class Wallet(RemitClient):
         if "error" in result:
             msg = result["error"].get("message", result["error"])
             raise RuntimeError(f"RPC error fetching nonce: {msg}")
-        return int(result.get("result", "0x0"), 16)
+        raw_result = result.get("result")
+        if raw_result is None:
+            raise RuntimeError(
+                "RPC returned null result for nonce query — "
+                "USDC contract may not exist at the given address"
+            )
+        return int(raw_result, 16)
 
     async def sign_permit(
         self,
@@ -227,6 +243,12 @@ class Wallet(RemitClient):
             deadline: Optional Unix timestamp. Defaults to 1 hour from now.
         """
         usdc_addr = USDC_ADDRESSES.get(self.chain, "")
+        if not usdc_addr:
+            raise ValueError(
+                f"No USDC address for chain '{self.chain}'. "
+                f"Supported chains: {', '.join(USDC_ADDRESSES)}. "
+                "Pass usdc_address to sign_usdc_permit() instead."
+            )
         nonce = await self._fetch_usdc_nonce(usdc_addr)
         dl = deadline or (int(time.time()) + 3600)
         raw = int(round(amount * 1_000_000))
@@ -248,7 +270,10 @@ class Wallet(RemitClient):
                 return None
             return await self.sign_permit(spender, amount)
         except (ValueError, KeyError, TypeError, RuntimeError) as exc:
-            logger.warning("auto-permit failed for %s (amount=%s): %s", contract, amount, exc)
+            logger.warning(
+                "auto-permit failed for %s (amount=%s): %s",
+                contract, amount, exc, exc_info=True,
+            )
             return None
 
     # ─── Direct payment ───────────────────────────────────────────────────────

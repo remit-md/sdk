@@ -218,7 +218,7 @@ impl Wallet {
             raw_amount,
             nonce,
             dl,
-        );
+        )?;
 
         let sig_bytes = self.signer.sign(&digest)?;
 
@@ -281,9 +281,24 @@ impl Wallet {
     ///
     /// This is used by the convenience payment methods so they gracefully fall back
     /// to server-side approval when the RPC is unreachable (e.g., in mock tests).
+    /// Failures are logged to stderr so they are visible for debugging.
     async fn try_auto_permit(&self, contract: &str, amount: Decimal) -> Option<PermitSignature> {
-        let amount_f64 = decimal_to_f64(amount);
-        self.auto_permit(contract, amount_f64).await.ok()
+        let amount_f64 = match decimal_to_f64(amount) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[remitmd] auto_permit skipped: amount conversion failed: {e}");
+                return None;
+            }
+        };
+        match self.auto_permit(contract, amount_f64).await {
+            Ok(permit) => Some(permit),
+            Err(e) => {
+                eprintln!(
+                    "[remitmd] auto_permit for {contract} failed (falling back to server-side approval): {e}"
+                );
+                None
+            }
+        }
     }
 }
 
@@ -450,7 +465,7 @@ impl Wallet {
             "chain": &self.chain,
             "from_agent": self.address().to_lowercase(),
             "to_agent": payee.to_lowercase(),
-            "amount": amount.to_string().parse::<f64>().unwrap_or(0.0),
+            "amount": decimal_to_f64(amount)?,
             "type": "escrow",
             "task": memo,
             "nonce": hex::encode(nb),
@@ -568,8 +583,8 @@ impl Wallet {
         let mut body = json!({
             "chain": &self.chain,
             "provider": provider,
-            "limit_amount": limit_amount.to_string().parse::<f64>().unwrap_or(0.0),
-            "per_unit": per_unit.to_string().parse::<f64>().unwrap_or(0.0),
+            "limit_amount": decimal_to_f64(limit_amount)?,
+            "per_unit": decimal_to_f64(per_unit)?,
         });
         if let Some(exp) = expiry {
             body["expiry"] = json!(exp);
@@ -696,8 +711,8 @@ impl Wallet {
         let mut body = json!({
             "chain": &self.chain,
             "payee": payee,
-            "rate_per_second": rate_per_second.to_string().parse::<f64>().unwrap_or(0.0),
-            "max_total": max_total.to_string().parse::<f64>().unwrap_or(0.0),
+            "rate_per_second": decimal_to_f64(rate_per_second)?,
+            "max_total": decimal_to_f64(max_total)?,
         });
         if let Some(p) = permit {
             body["permit"] = serde_json::to_value(p).unwrap();
@@ -762,7 +777,7 @@ impl Wallet {
         validate_amount(amount)?;
         let mut body = json!({
             "chain": &self.chain,
-            "amount": amount.to_string().parse::<f64>().unwrap_or(0.0),
+            "amount": decimal_to_f64(amount)?,
             "task_description": task_description,
             "deadline": deadline,
         });
@@ -891,7 +906,7 @@ impl Wallet {
         let mut body = json!({
             "chain": &self.chain,
             "provider": provider,
-            "amount": amount.to_string().parse::<f64>().unwrap_or(0.0),
+            "amount": decimal_to_f64(amount)?,
             "expiry": expiry,
         });
         if let Some(p) = permit {
@@ -977,8 +992,13 @@ impl Wallet {
             body["agent_name"] = json!(name);
         }
         // Auto-sign a permit for the relayer (best-effort)
-        if let Ok(permit) = self.auto_permit("relayer", 999_999_999.0).await {
-            body["permit"] = serde_json::to_value(&permit).unwrap();
+        match self.auto_permit("relayer", 999_999_999.0).await {
+            Ok(permit) => {
+                body["permit"] = serde_json::to_value(&permit).unwrap();
+            }
+            Err(e) => {
+                eprintln!("[remitmd] fund link: auto_permit for relayer failed (link created without permit): {e}");
+            }
         }
         self.post("/api/v1/links/fund", body).await
     }
@@ -1007,8 +1027,13 @@ impl Wallet {
             body["agent_name"] = json!(name);
         }
         // Auto-sign a permit for the relayer (best-effort)
-        if let Ok(permit) = self.auto_permit("relayer", 999_999_999.0).await {
-            body["permit"] = serde_json::to_value(&permit).unwrap();
+        match self.auto_permit("relayer", 999_999_999.0).await {
+            Ok(permit) => {
+                body["permit"] = serde_json::to_value(&permit).unwrap();
+            }
+            Err(e) => {
+                eprintln!("[remitmd] withdraw link: auto_permit for relayer failed (link created without permit): {e}");
+            }
         }
         self.post("/api/v1/links/withdraw", body).await
     }
@@ -1213,9 +1238,17 @@ pub(crate) fn validate_address(addr: &str) -> Result<(), RemitError> {
     Ok(())
 }
 
-/// Convert a `Decimal` USDC amount to `f64` for permit signing.
-fn decimal_to_f64(d: Decimal) -> f64 {
-    d.to_string().parse::<f64>().unwrap_or(0.0)
+/// Convert a `Decimal` USDC amount to `f64` for permit signing and API serialization.
+///
+/// Returns an error instead of silently defaulting to zero — financial amounts
+/// must never be quietly zeroed out.
+fn decimal_to_f64(d: Decimal) -> Result<f64, RemitError> {
+    d.to_string().parse::<f64>().map_err(|e| {
+        remit_err(
+            codes::INVALID_AMOUNT,
+            format!("failed to convert amount {d} to f64: {e}"),
+        )
+    })
 }
 
 /// Validate a USDC amount. Returns descriptive errors for out-of-range values.

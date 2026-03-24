@@ -188,7 +188,7 @@ impl HttpTransport {
             path,
             timestamp,
             &nonce_bytes,
-        );
+        )?;
         let sig = self.signer.sign(&digest)?;
         let sig_hex = format!("0x{}", hex::encode(&sig));
 
@@ -264,7 +264,7 @@ pub(crate) fn compute_eip712_hash(
     path: &str,
     timestamp: u64,
     nonce: &[u8; 32],
-) -> [u8; 32] {
+) -> Result<[u8; 32], RemitError> {
     // Type hashes.
     let domain_type_hash = keccak256_hash(
         b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
@@ -281,7 +281,12 @@ pub(crate) fn compute_eip712_hash(
 
     // Parse verifying contract address → 32 bytes (left-zero-padded).
     let addr_hex = router_address.trim_start_matches("0x");
-    let addr_bytes = hex::decode(addr_hex).unwrap_or_default();
+    let addr_bytes = hex::decode(addr_hex).map_err(|e| {
+        remit_err(
+            codes::INVALID_ADDRESS,
+            format!("invalid router address hex {router_address:?}: {e}"),
+        )
+    })?;
     let mut addr_padded = [0u8; 32];
     if addr_bytes.len() == 20 {
         addr_padded[12..].copy_from_slice(&addr_bytes);
@@ -316,7 +321,7 @@ pub(crate) fn compute_eip712_hash(
     final_data[1] = 0x01;
     final_data[2..34].copy_from_slice(&domain_separator);
     final_data[34..66].copy_from_slice(&struct_hash);
-    keccak256_hash(&final_data)
+    Ok(keccak256_hash(&final_data))
 }
 
 /// Compute the EIP-712 hash for an ERC-2612 Permit struct.
@@ -331,7 +336,7 @@ pub(crate) fn compute_permit_digest(
     value: u64,
     nonce: u64,
     deadline: u64,
-) -> [u8; 32] {
+) -> Result<[u8; 32], RemitError> {
     // Type hashes.
     let domain_type_hash = keccak256_hash(
         b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
@@ -349,7 +354,12 @@ pub(crate) fn compute_permit_digest(
 
     // Parse USDC contract address → 32 bytes (left-zero-padded).
     let usdc_hex = usdc_addr.trim_start_matches("0x");
-    let usdc_bytes = hex::decode(usdc_hex).unwrap_or_default();
+    let usdc_bytes = hex::decode(usdc_hex).map_err(|e| {
+        remit_err(
+            codes::INVALID_ADDRESS,
+            format!("invalid USDC address hex {usdc_addr:?}: {e}"),
+        )
+    })?;
     let mut usdc_padded = [0u8; 32];
     if usdc_bytes.len() == 20 {
         usdc_padded[12..].copy_from_slice(&usdc_bytes);
@@ -365,14 +375,24 @@ pub(crate) fn compute_permit_digest(
 
     // Struct hash: Permit(owner, spender, value, nonce, deadline).
     let owner_hex = owner.trim_start_matches("0x");
-    let owner_bytes = hex::decode(owner_hex).unwrap_or_default();
+    let owner_bytes = hex::decode(owner_hex).map_err(|e| {
+        remit_err(
+            codes::INVALID_ADDRESS,
+            format!("invalid owner address hex {owner:?}: {e}"),
+        )
+    })?;
     let mut owner_padded = [0u8; 32];
     if owner_bytes.len() == 20 {
         owner_padded[12..].copy_from_slice(&owner_bytes);
     }
 
     let spender_hex = spender.trim_start_matches("0x");
-    let spender_bytes = hex::decode(spender_hex).unwrap_or_default();
+    let spender_bytes = hex::decode(spender_hex).map_err(|e| {
+        remit_err(
+            codes::INVALID_ADDRESS,
+            format!("invalid spender address hex {spender:?}: {e}"),
+        )
+    })?;
     let mut spender_padded = [0u8; 32];
     if spender_bytes.len() == 20 {
         spender_padded[12..].copy_from_slice(&spender_bytes);
@@ -403,7 +423,7 @@ pub(crate) fn compute_permit_digest(
     final_data[1] = 0x01;
     final_data[2..34].copy_from_slice(&domain_separator);
     final_data[34..66].copy_from_slice(&struct_hash);
-    keccak256_hash(&final_data)
+    Ok(keccak256_hash(&final_data))
 }
 
 /// Fetch the ERC-2612 nonce for `owner` from the USDC contract via JSON-RPC `eth_call`.
@@ -577,7 +597,8 @@ mod tests {
                 &v.message.path,
                 v.message.timestamp,
                 &nonce,
-            );
+            )
+            .expect("compute_eip712_hash should succeed for golden vectors");
             let got_hex = format!("0x{}", hex::encode(got));
             assert_eq!(
                 got_hex, v.expected_hash,
@@ -604,7 +625,8 @@ mod tests {
                 &v.message.path,
                 v.message.timestamp,
                 &nonce,
-            );
+            )
+            .expect("compute_eip712_hash should succeed for golden vectors");
             let sig = signer.sign(&digest).expect("sign");
             let got_sig = format!("0x{}", hex::encode(&sig));
             assert_eq!(

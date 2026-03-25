@@ -61,11 +61,22 @@ public class Wallet {
         return chainId;
     }
 
-    // ─── Balance ──────────────────────────────────────────────────────────────
+    // ─── Balance / Status ───────────────────────────────────────────────────
 
     /** Returns the current USDC balance of this wallet. */
     public Balance balance() {
-        return client.get("/api/v1/wallet/balance", Balance.class);
+        WalletStatus s = status();
+        Balance b = new Balance();
+        b.usdc = new BigDecimal(s.balance);
+        b.address = s.wallet;
+        b.chainId = chainId;
+        b.updatedAt = java.time.Instant.now();
+        return b;
+    }
+
+    /** Returns full wallet status including balance, volume, tier, and fee info. */
+    public WalletStatus status() {
+        return client.get("/api/v1/status/" + signer.address(), WalletStatus.class);
     }
 
     // ─── Direct Payment ───────────────────────────────────────────────────────
@@ -174,10 +185,13 @@ public class Wallet {
         PermitSignature p = permit != null ? permit : autoPermit("escrow", amount);
 
         // Step 1: create invoice on server.
-        byte[] nb = new byte[16];
-        new java.security.SecureRandom().nextBytes(nb);
-        String invoiceId = java.util.HexFormat.of().formatHex(nb);
-        String nonce = java.util.HexFormat.of().formatHex(nb);
+        byte[] idBytes = new byte[16];
+        new java.security.SecureRandom().nextBytes(idBytes);
+        String invoiceId = java.util.HexFormat.of().formatHex(idBytes);
+
+        byte[] nonceBytes = new byte[32]; // separate random bytes for nonce
+        new java.security.SecureRandom().nextBytes(nonceBytes);
+        String nonce = "0x" + java.util.HexFormat.of().formatHex(nonceBytes);
 
         Map<String, Object> invoiceBody = new java.util.HashMap<>();
         invoiceBody.put("id", invoiceId);
@@ -224,8 +238,32 @@ public class Wallet {
     }
 
     /** Signals the provider has started work on an escrow. */
-    public Escrow claimStart(String escrowId) {
-        return client.post("/api/v1/escrows/" + escrowId + "/claim-start", Map.of(), Escrow.class);
+    public Transaction claimStart(String escrowId) {
+        return client.post("/api/v1/escrows/" + escrowId + "/claim-start", Map.of(), Transaction.class);
+    }
+
+    /**
+     * Submits evidence for an escrow claim (milestone 0 by default).
+     *
+     * @param invoiceId    the escrow/invoice ID
+     * @param evidenceUri  URI pointing to the evidence
+     */
+    public Transaction submitEvidence(String invoiceId, String evidenceUri) {
+        return submitEvidence(invoiceId, evidenceUri, 0);
+    }
+
+    /**
+     * Submits evidence for an escrow claim at a specific milestone.
+     *
+     * @param invoiceId      the escrow/invoice ID
+     * @param evidenceUri    URI pointing to the evidence
+     * @param milestoneIndex which milestone this evidence is for (0-based)
+     */
+    public Transaction submitEvidence(String invoiceId, String evidenceUri, int milestoneIndex) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("evidence_uri", evidenceUri);
+        body.put("milestone_index", milestoneIndex);
+        return client.post("/api/v1/escrows/" + invoiceId + "/claim-start", body, Transaction.class);
     }
 
     // ─── Tab ──────────────────────────────────────────────────────────────────
@@ -291,11 +329,11 @@ public class Wallet {
      * @param finalAmount final cumulative charged amount
      * @param providerSig EIP-712 TabCharge signature for the final state
      */
-    public Tab closeTab(String tabId, BigDecimal finalAmount, String providerSig) {
+    public Transaction closeTab(String tabId, BigDecimal finalAmount, String providerSig) {
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("final_amount", finalAmount.toPlainString());
         body.put("provider_sig", providerSig);
-        return client.post("/api/v1/tabs/" + tabId + "/close", body, Tab.class);
+        return client.post("/api/v1/tabs/" + tabId + "/close", body, Transaction.class);
     }
 
     /**
@@ -380,8 +418,8 @@ public class Wallet {
     }
 
     /** Closes a stream and settles on-chain (payer only). */
-    public Stream closeStream(String streamId) {
-        return client.post("/api/v1/streams/" + streamId + "/close", Map.of(), Stream.class);
+    public Transaction closeStream(String streamId) {
+        return client.post("/api/v1/streams/" + streamId + "/close", Map.of(), Transaction.class);
     }
 
     /** Claims all vested stream payments (callable by recipient). */
@@ -428,10 +466,10 @@ public class Wallet {
      * @param evidenceHash 0x-prefixed hash of the evidence
      * @return submission with its ID (needed for {@link #awardBounty})
      */
-    public BountySubmission submitBounty(String bountyId, String evidenceHash) {
+    public Transaction submitBounty(String bountyId, String evidenceHash) {
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("evidence_hash", evidenceHash);
-        return client.post("/api/v1/bounties/" + bountyId + "/submit", body, BountySubmission.class);
+        return client.post("/api/v1/bounties/" + bountyId + "/submit", body, Transaction.class);
     }
 
     /**
@@ -440,9 +478,9 @@ public class Wallet {
      * @param bountyId     bounty UUID
      * @param submissionId submission ID returned by {@link #submitBounty}
      */
-    public Bounty awardBounty(String bountyId, int submissionId) {
+    public Transaction awardBounty(String bountyId, int submissionId) {
         return client.post("/api/v1/bounties/" + bountyId + "/award",
-            Map.of("submission_id", submissionId), Bounty.class);
+            Map.of("submission_id", submissionId), Transaction.class);
     }
 
     /**
@@ -496,8 +534,8 @@ public class Wallet {
     }
 
     /** Returns a deposit (provider-side, full refund to depositor). */
-    public Deposit returnDeposit(String depositId) {
-        return client.post("/api/v1/deposits/" + depositId + "/return", Map.of(), Deposit.class);
+    public Transaction returnDeposit(String depositId) {
+        return client.post("/api/v1/deposits/" + depositId + "/return", Map.of(), Transaction.class);
     }
 
     // ─── Analytics ────────────────────────────────────────────────────────────
@@ -576,9 +614,9 @@ public class Wallet {
         return client.post("/api/v1/webhooks", body, Webhook.class);
     }
 
-    /** Registers a webhook for all chains. */
+    /** Registers a webhook for the current chain. */
     public Webhook registerWebhook(String url, List<String> events) {
-        return registerWebhook(url, events, null);
+        return registerWebhook(url, events, List.of(chain));
     }
 
     // ─── One-time operator links ──────────────────────────────────────────────

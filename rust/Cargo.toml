@@ -22,6 +22,7 @@ k256 = { version = "0.13", features = ["ecdsa"] }
 sha3 = "0.10"
 getrandom = "0.2"
 hex = "0.4"
+base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"

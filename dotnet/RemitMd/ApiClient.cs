@@ -137,8 +137,16 @@ internal sealed class ApiClient : IDisposable
         if (!response.IsSuccessStatusCode)
         {
             // Try to parse a structured API error.
+            // Supports both flat {"code":"...", "message":"..."} and
+            // nested {"error": {"code":"...", "message":"..."}} formats.
             ApiError? err = null;
-            try { err = JsonSerializer.Deserialize<ApiError>(body, JsonOptions); }
+            try
+            {
+                err = JsonSerializer.Deserialize<ApiError>(body, JsonOptions);
+                // Check for nested {"error": {...}} format
+                if (err?.Code is null && err?.Nested is not null)
+                    err = err.Nested;
+            }
             catch { /* fall through to generic error */ }
 
             if (err?.Code is not null)
@@ -178,7 +186,8 @@ internal sealed class ApiClient : IDisposable
     private sealed record ApiError(
         [property: JsonPropertyName("code")] string? Code,
         [property: JsonPropertyName("message")] string? Message,
-        [property: JsonPropertyName("context")] Dictionary<string, object>? Context
+        [property: JsonPropertyName("context")] Dictionary<string, object>? Context,
+        [property: JsonPropertyName("error")] ApiError? Nested = null
     );
 }
 

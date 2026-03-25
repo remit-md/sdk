@@ -135,12 +135,12 @@ func TestMockEscrowClaimStart(t *testing.T) {
 		t.Fatalf("CreateEscrow failed: %v", err)
 	}
 
-	claimed, err := wallet.ClaimStart(ctx, escrow.InvoiceID)
+	tx, err := wallet.ClaimStart(ctx, escrow.InvoiceID)
 	if err != nil {
 		t.Fatalf("ClaimStartEscrow failed: %v", err)
 	}
-	if !claimed.ClaimStarted {
-		t.Error("expected ClaimStarted to be true after ClaimStart")
+	if tx.TxHash == "" {
+		t.Error("expected non-empty TxHash after ClaimStart")
 	}
 }
 

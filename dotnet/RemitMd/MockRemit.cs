@@ -53,7 +53,7 @@ public sealed class MockRemit
         lock (_lock)
             return _transactions
                 .Where(t => string.Equals(t.To, recipient, StringComparison.OrdinalIgnoreCase))
-                .Sum(t => t.Amount);
+                .Sum(t => t.Amount ?? 0m);
     }
 
     /// <summary>All transactions recorded since the last <see cref="Reset"/>.</summary>
@@ -101,14 +101,15 @@ public sealed class MockRemit
         {
             object result = path switch
             {
-                var p when p.StartsWith("/api/v1/status/") => (object)new Balance(
-                    _mock._balance, MockAddress, ChainId.BaseSepolia, DateTimeOffset.UtcNow),
+                var p when p.StartsWith("/api/v1/status/") => (object)new WalletStatus(
+                    MockAddress, _mock._balance.ToString("F6"), "0.000000", "new", 100,
+                    _mock._escrows.Count, _mock._tabs.Count, _mock._streams.Count, 0),
 
                 "/api/v1/invoices" =>
                     new TransactionList(_mock._transactions.ToList(), _mock._transactions.Count, 1, 20, false),
 
                 var p when p.StartsWith("/api/v1/reputation/") => new Reputation(
-                    MockAddress, 750, _mock._transactions.Sum(t => t.Amount), 0m,
+                    MockAddress, 750, _mock._transactions.Sum(t => t.Amount ?? 0m), 0m,
                     _mock._transactions.Count, DateTimeOffset.UtcNow.AddDays(-30)),
 
                 var p when p.StartsWith("/api/v1/escrows/") =>
@@ -287,7 +288,7 @@ public sealed class MockRemit
             var perUnit = decimal.Parse(d.GetValueOrDefault("per_unit")?.ToString() ?? "0");
             var expiry  = d.GetValueOrDefault("expiry")?.ToString();
 
-            var tab = new Tab(id, MockAddress, prov, limit, perUnit, 0m, limit, TabStatus.Open, now, expiry);
+            var tab = new Tab(id, MockAddress, prov, limit, perUnit, 0m, TabStatus.Open, now, expiry);
             lock (_mock._lock) _mock._tabs[id] = tab;
             return tab;
         }
@@ -306,12 +307,13 @@ public sealed class MockRemit
                 if (!_mock._tabs.TryGetValue(tabId, out var tab))
                     throw new RemitError(ErrorCodes.TabNotFound, $"Tab not found: {tabId}");
                 if (tab.Status != TabStatus.Open)
-                    throw new RemitError(ErrorCodes.TabAlreadyClosed, $"Tab {tabId} is not open.");
-                if (tab.Remaining < amount)
+                    throw new RemitError(ErrorCodes.TabDepleted, $"Tab {tabId} is not open.");
+                var remaining = tab.Limit - tab.Spent;
+                if (remaining < amount)
                     throw new RemitError(ErrorCodes.TabLimitExceeded,
-                        $"Tab limit exceeded: remaining {tab.Remaining:F6}, requested {amount:F6}.");
+                        $"Tab limit exceeded: remaining {remaining:F6}, requested {amount:F6}.");
 
-                _mock._tabs[tabId] = tab with { Used = tab.Used + amount, Remaining = tab.Remaining - amount };
+                _mock._tabs[tabId] = tab with { Spent = tab.Spent + amount };
                 return new TabCharge(tabId, amount, cumulative, callCount, provSig);
             }
         }
@@ -323,7 +325,7 @@ public sealed class MockRemit
             {
                 if (!_mock._tabs.TryGetValue(tabId, out var tab))
                     throw new RemitError(ErrorCodes.TabNotFound, $"Tab not found: {tabId}");
-                var closed = tab with { Status = TabStatus.Settled };
+                var closed = tab with { Status = TabStatus.Closed };
                 _mock._tabs[tabId] = closed;
                 return closed;
             }
@@ -344,7 +346,7 @@ public sealed class MockRemit
                     throw new RemitError(ErrorCodes.InsufficientFunds,
                         $"Insufficient funds for stream: balance {_mock._balance:F6}, max_total {maxTot:F6}.");
                 _mock._balance -= maxTot;
-                var stream = new Stream(id, MockAddress, payee, rate, maxTot, 0m, StreamStatus.Active, now, null);
+                var stream = new Stream(id, MockAddress, payee, rate, 0, maxTot, 0m, StreamStatus.Active, now, null);
                 _mock._streams[id] = stream;
                 return stream;
             }
@@ -360,9 +362,9 @@ public sealed class MockRemit
                 if (stream.Status != StreamStatus.Active)
                     throw new RemitError(ErrorCodes.StreamNotActive, $"Stream {streamId} is not active.");
 
-                _mock._streams[streamId] = stream with { Status = StreamStatus.Ended };
-                return new Transaction(id, "0x" + id, MockAddress, stream.Recipient,
-                    stream.Deposited, 0m, "stream close", ChainId.BaseSepolia, 1_000_003ul, now);
+                _mock._streams[streamId] = stream with { Status = StreamStatus.Closed };
+                return new Transaction(id, "0x" + id, MockAddress, stream.Payee,
+                    stream.MaxTotal ?? 0m, 0m, "stream close", ChainId.BaseSepolia, 1_000_003ul, now);
             }
         }
 
@@ -383,7 +385,7 @@ public sealed class MockRemit
                     throw new RemitError(ErrorCodes.InsufficientFunds,
                         $"Insufficient funds for bounty: balance {_mock._balance:F6}, amount {amount:F6}.");
                 _mock._balance -= amount;
-                var bounty = new Bounty(id, MockAddress, amount, desc, BountyStatus.Open, dl, now);
+                var bounty = new Bounty(id, MockAddress, amount, desc, BountyStatus.Open, "poster", 10, null, dl, now);
                 _mock._bounties[id] = bounty;
                 return bounty;
             }
@@ -440,7 +442,7 @@ public sealed class MockRemit
                     throw new RemitError(ErrorCodes.InsufficientFunds,
                         $"Insufficient funds for deposit: balance {_mock._balance:F6}, amount {amt:F6}.");
                 _mock._balance -= amt;
-                var deposit = new Deposit(id, MockAddress, prov, amt, DepositStatus.Locked, expiry, now);
+                var deposit = new Deposit(id, MockAddress, prov, amt, DepositStatus.Locked, expiry?.ToString(), now);
                 _mock._deposits[id] = deposit;
                 return deposit;
             }
@@ -455,7 +457,7 @@ public sealed class MockRemit
                     throw new RemitError(ErrorCodes.ServerError, $"Deposit not found: {depositId}");
                 _mock._balance += deposit.Amount; // full refund, no fee
                 _mock._deposits[depositId] = deposit with { Status = DepositStatus.Returned };
-                return new Transaction(id, "0x" + id, deposit.Provider, MockAddress,
+                return new Transaction(id, "0x" + id, deposit.Payee, MockAddress,
                     deposit.Amount, 0m, "deposit return", ChainId.BaseSepolia, 1_000_005ul, now);
             }
         }

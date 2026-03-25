@@ -26,7 +26,19 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
 
     private static let decoder: JSONDecoder = {
         let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
+        d.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            if let timestamp = try? container.decode(Double.self) {
+                return Date(timeIntervalSince1970: timestamp)
+            }
+            let string = try container.decode(String.self)
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: string) { return date }
+            formatter.formatOptions = [.withInternetDateTime]
+            if let date = formatter.date(from: string) { return date }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date from '\(string)'")
+        }
         return d
     }()
 
@@ -46,70 +58,81 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
         body: (any Encodable)?
     ) async throws -> T {
         let url = URL(string: baseURL + path)!
-        var req = URLRequest(url: url)
-        req.httpMethod = method
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("remitmd-swift/0.1.0", forHTTPHeaderField: "User-Agent")
-
-        if let body {
-            req.httpBody = try encodeBody(body)
-        }
-
-        // Generate 32-byte random nonce
-        var nonceBytes = [UInt8](repeating: 0, count: 32)
-        arc4random_buf(&nonceBytes, 32)
-        let nonceData = Data(nonceBytes)
-        let nonceHex = "0x" + nonceData.hexString
-
-        // Unix epoch timestamp in seconds
-        let timestamp = UInt64(Date().timeIntervalSince1970)
-
-        // EIP-712 hash and ECDSA signature
-        let digest = eip712Hash(
-            chainId: chainId,
-            routerAddress: routerAddress,
-            method: method,
-            path: path,
-            timestamp: timestamp,
-            nonce: nonceData
-        )
-        let sig = try signer.sign(digest: digest)
-
-        req.setValue(signer.address, forHTTPHeaderField: "X-Remit-Agent")
-        req.setValue(nonceHex, forHTTPHeaderField: "X-Remit-Nonce")
-        req.setValue(String(timestamp), forHTTPHeaderField: "X-Remit-Timestamp")
-        req.setValue(sig, forHTTPHeaderField: "X-Remit-Signature")
+        let bodyData: Data? = if let body { try encodeBody(body) } else { nil }
 
         // Idempotency key generated ONCE before the retry loop so every attempt
         // sends the same key, enabling server-side deduplication.
         let idempotencyKey = UUID().uuidString.lowercased()
-        if method == "POST" || method == "PUT" || method == "PATCH" {
-            req.setValue(idempotencyKey, forHTTPHeaderField: "X-Idempotency-Key")
-        }
+
+        // Sign the path without query string, matching server's OriginalUri.
+        let pathOnly = path.split(separator: "?").first.map(String.init) ?? path
 
         return try await withRetry(maxRetries: maxRetries) {
+            // Fresh timestamp, nonce, and signature for each retry attempt
+            // so the server never rejects a stale timestamp or reused nonce.
+            var nonceBytes = [UInt8](repeating: 0, count: 32)
+            for i in 0..<32 { nonceBytes[i] = UInt8.random(in: 0...255) }
+            let nonceData = Data(nonceBytes)
+            let nonceHex = "0x" + nonceData.hexString
+
+            let timestamp = UInt64(Date().timeIntervalSince1970)
+
+            let digest = eip712Hash(
+                chainId: self.chainId,
+                routerAddress: self.routerAddress,
+                method: method,
+                path: pathOnly,
+                timestamp: timestamp,
+                nonce: nonceData
+            )
+            let sig = try self.signer.sign(digest: digest)
+
+            var req = URLRequest(url: url)
+            req.httpMethod = method
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue("remitmd-swift/0.1.0", forHTTPHeaderField: "User-Agent")
+            req.httpBody = bodyData
+
+            req.setValue(self.signer.address, forHTTPHeaderField: "X-Remit-Agent")
+            req.setValue(nonceHex, forHTTPHeaderField: "X-Remit-Nonce")
+            req.setValue(String(timestamp), forHTTPHeaderField: "X-Remit-Timestamp")
+            req.setValue(sig, forHTTPHeaderField: "X-Remit-Signature")
+
+            if method == "POST" || method == "PUT" || method == "PATCH" {
+                req.setValue(idempotencyKey, forHTTPHeaderField: "X-Idempotency-Key")
+            }
+
             let (data, response) = try await self.session.data(for: req)
             let http = response as! HTTPURLResponse
 
             if http.statusCode == 200 || http.statusCode == 201 {
                 return try Self.decoder.decode(T.self, from: data)
             }
-
-            // Parse error body
-            if let errJSON = try? JSONDecoder().decode([String: String].self, from: data),
-               let code = errJSON["code"], let message = errJSON["message"] {
-                throw RemitError(code, message)
+            if http.statusCode == 204 {
+                // Empty response — try decoding an empty JSON object
+                let emptyJSON = Data("{}".utf8)
+                return try Self.decoder.decode(T.self, from: emptyJSON)
             }
 
-            if http.statusCode == 429 {
-                throw RemitError(RemitError.rateLimited, "too many requests — back off and retry")
+            // Parse error body — check nested error.code first (TS parity)
+            let errCode: String
+            let errMessage: String
+            if let parsed = try? JSONDecoder().decode(ApiErrorBody.self, from: data) {
+                errCode = parsed.error?.code ?? parsed.code ?? "HTTP_\(http.statusCode)"
+                errMessage = parsed.error?.message ?? parsed.message ?? "HTTP \(http.statusCode)"
+            } else {
+                errCode = "HTTP_\(http.statusCode)"
+                errMessage = "HTTP \(http.statusCode)"
             }
-            if http.statusCode == 401 {
-                throw RemitError(RemitError.unauthorized, "invalid or missing EIP-712 signature")
-            }
-            throw RemitError(RemitError.serverError, "HTTP \(http.statusCode)")
+
+            throw RemitError(errCode, errMessage)
         }
     }
+
+    /// Retryable HTTP status codes — matches TS SDK's RETRYABLE set.
+    private static let retryableStatuses: Set<Int> = [429, 500, 502, 503, 504]
+    /// Exponential-ish backoff delays in nanoseconds (200ms, 600ms, 1800ms).
+    private static let delayNs: [UInt64] = [200_000_000, 600_000_000, 1_800_000_000]
 
     private func withRetry<T>(maxRetries: Int, fn: () async throws -> T) async throws -> T {
         var lastError: Error?
@@ -117,21 +140,39 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
             do {
                 return try await fn()
             } catch let e as RemitError {
-                // Don't retry client errors
-                if [RemitError.invalidAddress, RemitError.invalidAmount,
-                    RemitError.unauthorized, RemitError.signatureInvalid,
-                    RemitError.nonceReused].contains(e.code) { throw e }
+                // Only retry on retryable HTTP status codes.
+                // Parse the HTTP status from the error code (e.g. "HTTP_502") or known codes.
+                let isRetryable = e.code == RemitError.rateLimited
+                    || e.code == RemitError.serverError
+                    || e.code == RemitError.networkError
+                    || e.code.hasPrefix("HTTP_") && Self.retryableStatuses.contains(Int(e.code.dropFirst(5)) ?? 0)
+
+                if !isRetryable { throw e }
                 lastError = e
             } catch {
+                // Network errors are retryable
                 lastError = error
             }
             if attempt < maxRetries - 1 {
-                let delay = UInt64(pow(2.0, Double(attempt)) * 0.5 * 1_000_000_000)
+                let delay = attempt < Self.delayNs.count ? Self.delayNs[attempt] : Self.delayNs.last!
                 try await Task.sleep(nanoseconds: delay)
             }
         }
         throw lastError!
     }
+}
+
+// MARK: - API error body for nested error parsing
+
+private struct ApiErrorBody: Codable {
+    let error: ApiErrorInner?
+    let code: String?
+    let message: String?
+}
+
+private struct ApiErrorInner: Codable {
+    let code: String?
+    let message: String?
 }
 
 // MARK: - EIP-712 hash computation

@@ -302,12 +302,20 @@ func TestComplianceEscrow_CancelTransitionsStatus(t *testing.T) {
 		t.Fatalf("CreateEscrow() failed: %v", err)
 	}
 
-	cancelled, err := payer.CancelEscrow(ctx, escrow.InvoiceID)
+	cancelTx, err := payer.CancelEscrow(ctx, escrow.InvoiceID)
 	if err != nil {
 		t.Fatalf("CancelEscrow() failed: %v", err)
 	}
-	if cancelled.Status != remitmd.EscrowStatusCancelled {
-		t.Errorf("expected status cancelled, got %s", cancelled.Status)
+	if cancelTx.TxHash == "" {
+		t.Error("expected non-empty tx_hash after cancel")
+	}
+	// Verify status via GetEscrow
+	fetched, err := payer.GetEscrow(ctx, escrow.InvoiceID)
+	if err != nil {
+		t.Fatalf("GetEscrow() after cancel failed: %v", err)
+	}
+	if fetched.Status != remitmd.EscrowStatusCancelled {
+		t.Errorf("expected status cancelled, got %s", fetched.Status)
 	}
 }
 

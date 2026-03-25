@@ -31,7 +31,7 @@ public final class PrivateKeySigner: Signer {
         let stripped = hex.hasPrefix("0x") ? String(hex.dropFirst(2)) : hex
         guard stripped.count == 64, let keyData = Data(hexString: stripped) else {
             throw RemitError(
-                RemitError.signatureInvalid,
+                RemitError.invalidSignature,
                 "private key must be 64 hex chars (32 bytes), got \(stripped.count) chars"
             )
         }
@@ -49,7 +49,7 @@ public final class PrivateKeySigner: Signer {
     public func sign(digest: Data) throws -> String {
         guard digest.count == 32 else {
             throw RemitError(
-                RemitError.signatureInvalid,
+                RemitError.invalidSignature,
                 "digest must be exactly 32 bytes, got \(digest.count)"
             )
         }

@@ -116,7 +116,7 @@ class RemitMdTools(private val wallet: Wallet) {
         finalAmount: BigDecimal,
         @ToolParam(description = "Provider EIP-712 signature for the final state")
         providerSig: String
-    ): Tab = wallet.closeTab(tabId, finalAmount, providerSig)
+    ): Transaction = wallet.closeTab(tabId, finalAmount, providerSig)
 
     @Tool(name = "remitmd_create_bounty", description = """
         Post a USDC bounty for a task that any agent can claim.
@@ -137,7 +137,7 @@ class RemitMdTools(private val wallet: Wallet) {
         bountyId: String,
         @ToolParam(description = "ID of the submission to award")
         submissionId: Int
-    ): Bounty = wallet.awardBounty(bountyId, submissionId)
+    ): Transaction = wallet.awardBounty(bountyId, submissionId)
 
     @Tool(name = "remitmd_balance", description = "Check your current USDC balance.")
     fun balance(): Balance = wallet.balance()

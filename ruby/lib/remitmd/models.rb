@@ -23,20 +23,23 @@ module Remitmd
   end
 
   module TabStatus
-    OPEN    = "open"
-    CLOSED  = "closed"
-    EXPIRED = "expired"
+    OPEN      = "open"
+    CLOSED    = "closed"
+    EXPIRED   = "expired"
+    SUSPENDED = "suspended"
   end
 
   module StreamStatus
     ACTIVE    = "active"
     CLOSED    = "closed"
     COMPLETED = "completed"
+    PAUSED    = "paused"
+    CANCELLED = "cancelled"
   end
 
   module BountyStatus
     OPEN      = "open"
-    CLAIMED   = "claimed"
+    CLOSED    = "closed"
     AWARDED   = "awarded"
     EXPIRED   = "expired"
     CANCELLED = "cancelled"
@@ -46,6 +49,7 @@ module Remitmd
     LOCKED    = "locked"
     RETURNED  = "returned"
     FORFEITED = "forfeited"
+    EXPIRED   = "expired"
   end
 
   # ─── Permit & Contract Addresses ─────────────────────────────────────────
@@ -203,21 +207,24 @@ module Remitmd
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
       @id          = h["id"]
-      @opener      = h["opener"] || h["payer"]
-      @provider    = h["provider"] || h["counterpart"]
+      @payer       = h["payer"] || h["opener"]
+      @payee       = h["payee"] || h["provider"] || h["counterpart"]
       @limit       = decimal(h["limit_amount"] || h["limit"])
-      @used        = decimal(h["used"] || "0")
+      @spent       = decimal(h["spent"] || h["used"] || "0")
       @remaining   = decimal(h["remaining"] || h["limit_amount"] || h["limit"])
       @status      = h["status"]
       @created_at  = parse_time(h["created_at"])
       @closes_at   = parse_time(h["closes_at"])
     end
 
-    attr_reader :id, :opener, :provider, :limit, :used, :remaining,
+    attr_reader :id, :payer, :payee, :limit, :spent, :remaining,
                 :status, :created_at, :closes_at
 
-    # Backward compatibility alias
-    alias counterpart provider
+    # Backward compatibility aliases
+    alias opener payer
+    alias provider payee
+    alias counterpart payee
+    alias used spent
 
     private :decimal, :parse_time
   end
@@ -242,19 +249,29 @@ module Remitmd
   class Stream < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
-      @id           = h["id"]
-      @sender       = h["sender"]
-      @recipient    = h["recipient"]
-      @rate_per_sec = decimal(h["rate_per_sec"])
-      @deposited    = decimal(h["deposited"])
-      @withdrawn    = decimal(h["withdrawn"] || "0")
-      @status       = h["status"]
-      @started_at   = parse_time(h["started_at"])
-      @ends_at      = parse_time(h["ends_at"])
+      @id              = h["id"]
+      @payer           = h["payer"] || h["sender"]
+      @payee           = h["payee"] || h["recipient"]
+      @rate_per_second = decimal(h["rate_per_second"] || h["rate_per_sec"])
+      @deposited       = decimal(h["deposited"])
+      @total_streamed  = decimal(h["total_streamed"] || h["withdrawn"] || "0")
+      @max_duration    = h["max_duration"]
+      @max_total       = decimal(h["max_total"])
+      @status          = h["status"]
+      @started_at      = parse_time(h["started_at"])
+      @ends_at         = parse_time(h["ends_at"])
+      @closed_at       = parse_time(h["closed_at"])
     end
 
-    attr_reader :id, :sender, :recipient, :rate_per_sec, :deposited,
-                :withdrawn, :status, :started_at, :ends_at
+    attr_reader :id, :payer, :payee, :rate_per_second, :deposited,
+                :total_streamed, :max_duration, :max_total,
+                :status, :started_at, :ends_at, :closed_at
+
+    # Backward compatibility aliases
+    alias sender payer
+    alias recipient payee
+    alias rate_per_sec rate_per_second
+    alias withdrawn total_streamed
 
     private :decimal, :parse_time
   end
@@ -262,22 +279,27 @@ module Remitmd
   class Bounty < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
-      @id               = h["id"]
-      @poster           = h["poster"]
-      @amount           = decimal(h["amount"] || h["award"])
-      @task_description = h["task_description"] || h["description"]
-      @status           = h["status"]
-      @winner           = h["winner"] || ""
-      @expires_at       = parse_time(h["expires_at"])
-      @created_at       = parse_time(h["created_at"])
+      @id           = h["id"]
+      @poster       = h["poster"]
+      @amount       = decimal(h["amount"] || h["award"])
+      @task         = h["task"] || h["task_description"] || h["description"]
+      @submissions  = h["submissions"] || []
+      @validation   = h["validation"]
+      @max_attempts = h["max_attempts"]
+      @deadline     = h["deadline"]
+      @status       = h["status"]
+      @winner       = h["winner"] || ""
+      @expires_at   = parse_time(h["expires_at"])
+      @created_at   = parse_time(h["created_at"])
     end
 
-    attr_reader :id, :poster, :amount, :task_description, :status,
-                :winner, :expires_at, :created_at
+    attr_reader :id, :poster, :amount, :task, :submissions, :validation,
+                :max_attempts, :deadline, :status, :winner, :expires_at, :created_at
 
     # Backward compatibility aliases
     alias award amount
-    alias description task_description
+    alias task_description task
+    alias description task
 
     private :decimal, :parse_time
   end
@@ -285,15 +307,19 @@ module Remitmd
   class BountySubmission < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
-      @id          = h["id"]
-      @bounty_id   = h["bounty_id"]
-      @submitter   = h["submitter"]
-      @evidence_hash = h["evidence_hash"]
-      @status      = h["status"]
-      @created_at  = parse_time(h["created_at"])
+      @id           = h["id"]
+      @bounty_id    = h["bounty_id"]
+      @submitter    = h["submitter"]
+      @evidence_uri = h["evidence_uri"] || h["evidence_hash"]
+      @accepted     = h.key?("accepted") ? h["accepted"] : h["status"]
+      @created_at   = parse_time(h["created_at"])
     end
 
-    attr_reader :id, :bounty_id, :submitter, :evidence_hash, :status, :created_at
+    attr_reader :id, :bounty_id, :submitter, :evidence_uri, :accepted, :created_at
+
+    # Backward compatibility aliases
+    alias evidence_hash evidence_uri
+    alias status accepted
 
     private :parse_time
   end
@@ -302,19 +328,21 @@ module Remitmd
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
       @id          = h["id"]
-      @depositor   = h["depositor"] || h["payer"]
-      @provider    = h["provider"] || h["beneficiary"]
+      @payer       = h["payer"] || h["depositor"]
+      @payee       = h["payee"] || h["provider"] || h["beneficiary"]
       @amount      = decimal(h["amount"])
       @status      = h["status"]
       @expires_at  = parse_time(h["expires_at"])
       @created_at  = parse_time(h["created_at"])
     end
 
-    attr_reader :id, :depositor, :provider, :amount,
+    attr_reader :id, :payer, :payee, :amount,
                 :status, :expires_at, :created_at
 
-    # Backward compatibility alias
-    alias beneficiary provider
+    # Backward compatibility aliases
+    alias depositor payer
+    alias provider payee
+    alias beneficiary payee
 
     private :decimal, :parse_time
   end

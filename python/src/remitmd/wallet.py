@@ -291,7 +291,7 @@ class Wallet(RemitClient):
             "from_agent": self.address.lower(),
             "to_agent": invoice.to.lower(),
             "amount": invoice.amount,
-            "type": invoice.payment_model or "escrow",
+            "type": invoice.payment_type or "escrow",
             "task": invoice.memo,
             "nonce": nonce,
             "signature": "0x",
@@ -308,47 +308,48 @@ class Wallet(RemitClient):
         data = await self._http.post("/api/v1/escrows", escrow_body)
         return Escrow.model_validate(data)
 
-    async def claim_start(self, invoice_id: str) -> Escrow:
+    async def claim_start(self, invoice_id: str) -> Transaction:
         """Payee calls this to start work and begin the escrow timer."""
         data = await self._http.post(f"/api/v1/escrows/{invoice_id}/claim-start", {})
-        return Escrow.model_validate(data)
+        return Transaction.model_validate(data)
 
     async def submit_evidence(
         self,
         invoice_id: str,
         evidence_uri: str,
-        evidence_hash: str = "",
-    ) -> Escrow:
+        milestone_index: int = 0,
+    ) -> Transaction:
         """Submit evidence for an escrow via the claim-start endpoint.
 
         Args:
             invoice_id: The invoice/escrow ID.
             evidence_uri: URI pointing to the evidence (e.g. IPFS hash).
-            evidence_hash: Optional hash of the evidence content.
+            milestone_index: Index of the milestone this evidence applies to (default 0).
         """
-        body: dict[str, Any] = {"evidence_uri": evidence_uri}
-        if evidence_hash:
-            body["evidence_hash"] = evidence_hash
+        body: dict[str, Any] = {
+            "evidence_uri": evidence_uri,
+            "milestone_index": milestone_index,
+        }
         data = await self._http.post(
             f"/api/v1/escrows/{invoice_id}/claim-start",
             body,
         )
-        return Escrow.model_validate(data)
+        return Transaction.model_validate(data)
 
-    async def release_escrow(self, invoice_id: str) -> Escrow:
+    async def release_escrow(self, invoice_id: str) -> Transaction:
         data = await self._http.post(f"/api/v1/escrows/{invoice_id}/release", {})
-        return Escrow.model_validate(data)
+        return Transaction.model_validate(data)
 
-    async def release_milestone(self, invoice_id: str, milestone_index: int) -> Escrow:
+    async def release_milestone(self, invoice_id: str, milestone_index: int) -> Transaction:
         data = await self._http.post(
             f"/api/v1/escrows/{invoice_id}/release",
             {"milestone_ids": [str(milestone_index)]},
         )
-        return Escrow.model_validate(data)
+        return Transaction.model_validate(data)
 
-    async def cancel_escrow(self, invoice_id: str) -> Escrow:
+    async def cancel_escrow(self, invoice_id: str) -> Transaction:
         data = await self._http.post(f"/api/v1/escrows/{invoice_id}/cancel", {})
-        return Escrow.model_validate(data)
+        return Transaction.model_validate(data)
 
     # ─── Metered tabs ─────────────────────────────────────────────────────────
 
@@ -399,12 +400,12 @@ class Wallet(RemitClient):
         tab_id: str,
         final_amount: float = 0,
         provider_sig: str = "0x",
-    ) -> Tab:
+    ) -> Transaction:
         data = await self._http.post(
             f"/api/v1/tabs/{tab_id}/close",
             {"final_amount": final_amount, "provider_sig": provider_sig},
         )
-        return Tab.model_validate(data)
+        return Transaction.model_validate(data)
 
     async def sign_tab_charge(
         self,
@@ -455,16 +456,20 @@ class Wallet(RemitClient):
         self,
         to: str,
         rate: float,
-        max_total: float,
+        max_total: float | None = None,
         permit: PermitSignature | None = None,
     ) -> Stream:
-        resolved = permit if permit is not None else await self._auto_permit("stream", max_total)
+        if max_total is not None:
+            resolved = permit if permit is not None else await self._auto_permit("stream", max_total)
+        else:
+            resolved = permit
         body: dict[str, Any] = {
             "chain": self.chain,
             "payee": to,
             "rate_per_second": rate,
-            "max_total": max_total,
         }
+        if max_total is not None:
+            body["max_total"] = max_total
         if resolved is not None:
             body["permit"] = resolved.to_dict()
         data = await self._http.post("/api/v1/streams", body)
@@ -502,24 +507,24 @@ class Wallet(RemitClient):
         bounty_id: str,
         evidence_hash: str,
         evidence_uri: str | None = None,
-    ) -> dict[str, Any]:
-        """Submit evidence for a bounty. Returns BountySubmission (with ``id``)."""
+    ) -> Transaction:
+        """Submit evidence for a bounty."""
         body: dict[str, Any] = {"evidence_hash": evidence_hash}
         if evidence_uri is not None:
             body["evidence_uri"] = evidence_uri
-        result: dict[str, Any] = await self._http.post(
+        data = await self._http.post(
             f"/api/v1/bounties/{bounty_id}/submit",
             body,
         )
-        return result
+        return Transaction.model_validate(data)
 
-    async def award_bounty(self, bounty_id: str, submission_id: int) -> Bounty:
+    async def award_bounty(self, bounty_id: str, submission_id: int) -> Transaction:
         """Award a bounty to a specific submission (poster-only)."""
         data = await self._http.post(
             f"/api/v1/bounties/{bounty_id}/award",
             {"submission_id": submission_id},
         )
-        return Bounty.model_validate(data)
+        return Transaction.model_validate(data)
 
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
@@ -560,8 +565,8 @@ class Wallet(RemitClient):
         return await self.get_status(self.address)
 
     async def balance(self) -> float:
-        # Server does not track on-chain USDC balance — requires direct chain query.
-        raise NotImplementedError("balance() requires on-chain query (not yet implemented)")
+        s = await self.status()
+        return float(s.balance)
 
     # ─── One-time operator links ───────────────────────────────────────────────
 
@@ -630,8 +635,7 @@ class Wallet(RemitClient):
         chains: list[str] | None = None,
     ) -> Webhook:
         body: dict[str, Any] = {"url": url, "events": events}
-        if chains is not None:
-            body["chains"] = chains
+        body["chains"] = chains if chains is not None else [self.chain]
         data = await self._http.post("/api/v1/webhooks", body)
         return Webhook.model_validate(data)
 

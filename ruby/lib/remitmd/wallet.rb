@@ -50,11 +50,8 @@ module Remitmd
       end
 
       @signer = signer || PrivateKeySigner.new(private_key)
-      # Normalize chain key for USDC lookups (underscore → hyphen).
+      # Normalize chain key (underscore → hyphen). Full chain name is sent in API bodies.
       @chain_key = chain.tr("_", "-")
-      # Normalize to the base chain name (strip testnet suffix) for use in pay body.
-      # The server accepts "base" — not "base_sepolia" etc.
-      @chain  = chain.sub(/_sepolia\z/, "").sub(/-sepolia\z/, "")
       cfg     = CHAIN_CONFIG.fetch(chain) do
         raise ArgumentError, "Unknown chain: #{chain}. Valid: #{CHAIN_CONFIG.keys.join(", ")}"
       end
@@ -154,8 +151,8 @@ module Remitmd
       validate_amount!(amount)
       resolved = permit || auto_permit("router", amount.to_f)
       nonce = SecureRandom.hex(16)
-      body = { to: to, amount: amount.to_s, task: memo || "", chain: @chain, nonce: nonce, signature: "0x" }
-      body[:permit] = resolved.to_h
+      body = { to: to, amount: amount.to_f, task: memo || "", chain: @chain_key, nonce: nonce, signature: "0x" }
+      body[:permit] = resolved&.to_h
       Transaction.new(@transport.post("/payments/direct", body))
     end
 
@@ -177,16 +174,16 @@ module Remitmd
       invoice_id = SecureRandom.hex(16)
       nonce      = SecureRandom.hex(16)
       inv_body = {
-        id: invoice_id, chain: @chain,
+        id: invoice_id, chain: @chain_key,
         from_agent: address.downcase, to_agent: payee.downcase,
-        amount: amount.to_s, type: "escrow",
+        amount: amount.to_f, type: "escrow",
         task: memo || "", nonce: nonce, signature: "0x"
       }
       inv_body[:escrow_timeout] = expires_in_secs if expires_in_secs
       @transport.post("/invoices", inv_body)
 
       # Step 2: fund the escrow.
-      esc_body = { invoice_id: invoice_id, permit: resolved.to_h }
+      esc_body = { invoice_id: invoice_id, permit: resolved&.to_h }
       Escrow.new(@transport.post("/escrows", esc_body))
     end
 
@@ -234,12 +231,12 @@ module Remitmd
       validate_amount!(limit_amount)
       resolved = permit || auto_permit("tab", limit_amount.to_f)
       body = {
-        chain: @chain,
+        chain: @chain_key,
         provider: provider,
         limit_amount: limit_amount.to_f,
         per_unit: per_unit.to_f,
         expiry: Time.now.to_i + expires_in_secs,
-        permit: resolved.to_h
+        permit: resolved&.to_h
       }
       Tab.new(@transport.post("/tabs", body))
     end
@@ -278,9 +275,10 @@ module Remitmd
     # @param provider_sig [String, nil] EIP-712 signature from the provider
     # @return [Tab]
     def close_tab(tab_id, final_amount: nil, provider_sig: nil)
-      body = {}
-      body[:final_amount] = final_amount.to_f if final_amount
-      body[:provider_sig] = provider_sig if provider_sig
+      body = {
+        final_amount: final_amount ? final_amount.to_f : 0,
+        provider_sig: provider_sig || "0x"
+      }
       Tab.new(@transport.post("/tabs/#{tab_id}/close", body))
     end
 
@@ -427,11 +425,11 @@ module Remitmd
       validate_amount!(max_total)
       resolved = permit || auto_permit("stream", max_total.to_f)
       body = {
-        chain: @chain,
+        chain: @chain_key,
         payee: payee,
         rate_per_second: rate_per_second.to_s,
         max_total: max_total.to_s,
-        permit: resolved.to_h
+        permit: resolved&.to_h
       }
       Stream.new(@transport.post("/streams", body))
     end
@@ -463,12 +461,12 @@ module Remitmd
       validate_amount!(amount)
       resolved = permit || auto_permit("bounty", amount.to_f)
       body = {
-        chain: @chain,
+        chain: @chain_key,
         amount: amount.to_f,
         task_description: task_description,
         deadline: deadline,
         max_attempts: max_attempts,
-        permit: resolved.to_h
+        permit: resolved&.to_h
       }
       Bounty.new(@transport.post("/bounties", body))
     end
@@ -518,11 +516,11 @@ module Remitmd
       validate_amount!(amount)
       resolved = permit || auto_permit("deposit", amount.to_f)
       body = {
-        chain: @chain,
+        chain: @chain_key,
         provider: provider,
         amount: amount.to_f,
         expiry: Time.now.to_i + expires_in_secs,
-        permit: resolved.to_h
+        permit: resolved&.to_h
       }
       Deposit.new(@transport.post("/deposits", body))
     end
@@ -563,7 +561,7 @@ module Remitmd
     # @return [Webhook]
     def register_webhook(url, events, chains: nil)
       body = { url: url, events: events }
-      body[:chains] = chains if chains
+      body[:chains] = chains || [@chain_key]
       Webhook.new(@transport.post("/webhooks", body))
     end
 
@@ -580,7 +578,7 @@ module Remitmd
       body[:agent_name] = agent_name if agent_name
       begin
         resolved = permit || auto_permit("relayer", 999_999_999.0)
-        body[:permit] = resolved.to_h
+        body[:permit] = resolved&.to_h
       rescue StandardError => e
         warn "[remitmd] create_fund_link: auto-permit failed: #{e.message}"
       end
@@ -598,7 +596,7 @@ module Remitmd
       body[:agent_name] = agent_name if agent_name
       begin
         resolved = permit || auto_permit("relayer", 999_999_999.0)
-        body[:permit] = resolved.to_h
+        body[:permit] = resolved&.to_h
       rescue StandardError => e
         warn "[remitmd] create_withdraw_link: auto-permit failed: #{e.message}"
       end
@@ -608,10 +606,25 @@ module Remitmd
     # ─── Testnet ──────────────────────────────────────────────────────────────
 
     # Mint testnet USDC. Max $2,500 per call, once per hour per wallet.
+    # Uses unauthenticated HTTP (no EIP-712 auth headers).
     # @param amount [Numeric] amount in USDC
     # @return [Hash] { "tx_hash" => "0x...", "balance" => 1234.56 }
     def mint(amount)
-      @transport.post("/mint", { wallet: address, amount: amount })
+      if @mock_mode
+        @transport.post("/mint", { wallet: address, amount: amount })
+      else
+        cfg = CHAIN_CONFIG[@chain_key]
+        base_url = cfg ? cfg[:url] : "https://testnet.remit.md/api/v1"
+        uri = URI("#{base_url}/mint")
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = uri.scheme == "https"
+        http.read_timeout = 15
+        req = Net::HTTP::Post.new(uri.path)
+        req["Content-Type"] = "application/json"
+        req.body = { wallet: address, amount: amount }.to_json
+        resp = http.request(req)
+        JSON.parse(resp.body.to_s)
+      end
     end
 
     private
@@ -681,18 +694,19 @@ module Remitmd
     end
 
     # Auto-sign a permit for the given contract type and amount.
+    # Returns nil on failure instead of raising, so callers can proceed without a permit.
     # @param contract [String] contract key — "router", "escrow", "tab", etc.
     # @param amount [Numeric] amount in USDC
-    # @return [PermitSignature]
+    # @return [PermitSignature, nil]
     def auto_permit(contract, amount)
       contracts = get_contracts
       spender = contracts.send(contract.to_sym)
-      raise RemitError.new(
-        RemitError::SERVER_ERROR,
-        "No #{contract} contract address available"
-      ) unless spender
+      return nil unless spender
 
       sign_permit(spender, amount)
+    rescue => e
+      warn "[remitmd] auto-permit failed for #{contract} (amount=#{amount}): #{e.message}"
+      nil
     end
 
     # Spender contract mapping for auto_permit.

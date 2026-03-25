@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -76,4 +78,189 @@ public record AgentCard(
         ) ?? throw new InvalidOperationException("Agent card response was empty.");
         return card;
     }
+}
+
+// ─── A2A task types ───────────────────────────────────────────────────────────
+
+/// <summary>Status of an A2A task.</summary>
+public sealed class A2ATaskStatus
+{
+    [JsonPropertyName("state")] public string State { get; set; } = "";
+    [JsonPropertyName("message")] public A2AMessage? Message { get; set; }
+}
+
+/// <summary>Message within an A2A task status.</summary>
+public sealed class A2AMessage
+{
+    [JsonPropertyName("text")] public string? Text { get; set; }
+}
+
+/// <summary>Part of an A2A artifact.</summary>
+public sealed class A2AArtifactPart
+{
+    [JsonPropertyName("kind")] public string Kind { get; set; } = "";
+    [JsonPropertyName("data")] public Dictionary<string, object>? Data { get; set; }
+}
+
+/// <summary>Artifact produced by an A2A task.</summary>
+public sealed class A2AArtifact
+{
+    [JsonPropertyName("name")] public string? Name { get; set; }
+    [JsonPropertyName("parts")] public List<A2AArtifactPart> Parts { get; set; } = new();
+}
+
+/// <summary>An A2A task.</summary>
+public sealed class A2ATask
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("status")] public A2ATaskStatus Status { get; set; } = new();
+    [JsonPropertyName("artifacts")] public List<A2AArtifact> Artifacts { get; set; } = new();
+
+    /// <summary>Extract txHash from task artifacts, if present.</summary>
+    public string? GetTxHash()
+    {
+        foreach (var artifact in Artifacts)
+            foreach (var part in artifact.Parts)
+                if (part.Data?.TryGetValue("txHash", out var tx) == true && tx is JsonElement je && je.ValueKind == JsonValueKind.String)
+                    return je.GetString();
+        return null;
+    }
+}
+
+// ─── IntentMandate ────────────────────────────────────────────────────────────
+
+/// <summary>An intent mandate for authorized payment delegation.</summary>
+public record IntentMandate(
+    [property: JsonPropertyName("mandateId")] string MandateId,
+    [property: JsonPropertyName("expiresAt")] string ExpiresAt,
+    [property: JsonPropertyName("issuer")] string Issuer,
+    [property: JsonPropertyName("allowance")] IntentMandateAllowance Allowance
+);
+
+/// <summary>Allowance within an IntentMandate.</summary>
+public record IntentMandateAllowance(
+    [property: JsonPropertyName("maxAmount")] string MaxAmount,
+    [property: JsonPropertyName("currency")] string Currency
+);
+
+// ─── A2A client ───────────────────────────────────────────────────────────────
+
+/// <summary>Options for the A2A client.</summary>
+public sealed class A2AClientOptions
+{
+    /// <summary>Full A2A endpoint URL from the agent card (e.g. "https://remit.md/a2a").</summary>
+    public string Endpoint { get; set; } = "";
+    /// <summary>Signer used for EIP-712 request authentication.</summary>
+    public IRemitSigner Signer { get; set; } = null!;
+    /// <summary>Chain ID for EIP-712 domain.</summary>
+    public long ChainId { get; set; } = 8453;
+    /// <summary>EIP-712 verifying contract address.</summary>
+    public string VerifyingContract { get; set; } = "";
+}
+
+/// <summary>
+/// A2A JSON-RPC client — send payments and manage tasks via the A2A protocol.
+/// </summary>
+public sealed class A2AClient : IDisposable
+{
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    private static readonly Dictionary<string, long> ChainIds = new()
+    {
+        ["base"] = 8453,
+        ["base-sepolia"] = 84532,
+    };
+
+    private readonly ApiClient _api;
+    private readonly string _path;
+
+    /// <summary>Creates an A2A client from explicit options.</summary>
+    public A2AClient(A2AClientOptions opts)
+    {
+        var parsed = new Uri(opts.Endpoint);
+        var baseUrl = $"{parsed.Scheme}://{parsed.Host}" +
+            (parsed.IsDefaultPort ? "" : $":{parsed.Port}");
+        _path = string.IsNullOrEmpty(parsed.AbsolutePath) || parsed.AbsolutePath == "/"
+            ? "/a2a" : parsed.AbsolutePath;
+        _api = new ApiClient(opts.Signer, opts.ChainId, opts.VerifyingContract, baseUrl);
+    }
+
+    /// <summary>Convenience constructor from an AgentCard and a signer.</summary>
+    public static A2AClient FromCard(AgentCard card, IRemitSigner signer, string chain = "base", string verifyingContract = "")
+    {
+        var chainId = ChainIds.TryGetValue(chain, out var cid) ? cid : 8453;
+        return new A2AClient(new A2AClientOptions
+        {
+            Endpoint = card.Url,
+            Signer = signer,
+            ChainId = chainId,
+            VerifyingContract = verifyingContract,
+        });
+    }
+
+    /// <summary>
+    /// Send a direct USDC payment via <c>message/send</c>.
+    /// </summary>
+    public Task<A2ATask> SendAsync(string to, decimal amount, string memo = "", IntentMandate? mandate = null, CancellationToken ct = default)
+    {
+        var nonce = Guid.NewGuid().ToString("N");
+        var messageId = Guid.NewGuid().ToString("N");
+
+        var message = new Dictionary<string, object>
+        {
+            ["messageId"] = messageId,
+            ["role"] = "user",
+            ["parts"] = new object[]
+            {
+                new Dictionary<string, object>
+                {
+                    ["kind"] = "data",
+                    ["data"] = new Dictionary<string, object>
+                    {
+                        ["model"] = "direct",
+                        ["to"] = to,
+                        ["amount"] = amount.ToString("F2"),
+                        ["memo"] = memo,
+                        ["nonce"] = nonce,
+                    },
+                },
+            },
+        };
+
+        if (mandate is not null)
+            message["metadata"] = new Dictionary<string, object> { ["mandate"] = mandate };
+
+        return RpcAsync<A2ATask>("message/send", new { message }, messageId, ct);
+    }
+
+    /// <summary>Fetch the current state of an A2A task by ID.</summary>
+    public Task<A2ATask> GetTaskAsync(string taskId, CancellationToken ct = default) =>
+        RpcAsync<A2ATask>("tasks/get", new { id = taskId }, taskId[..Math.Min(16, taskId.Length)], ct);
+
+    /// <summary>Cancel an in-progress A2A task.</summary>
+    public Task<A2ATask> CancelTaskAsync(string taskId, CancellationToken ct = default) =>
+        RpcAsync<A2ATask>("tasks/cancel", new { id = taskId }, taskId[..Math.Min(16, taskId.Length)], ct);
+
+    private async Task<T> RpcAsync<T>(string method, object @params, string callId, CancellationToken ct)
+    {
+        var body = new { jsonrpc = "2.0", id = callId, method, @params };
+        var response = await _api.PostAsync<JsonElement>(_path, body, ct);
+
+        if (response.TryGetProperty("error", out var error))
+        {
+            var errMsg = error.TryGetProperty("message", out var m) ? m.GetString() : JsonSerializer.Serialize(error);
+            throw new RemitError(ErrorCodes.ServerError, $"A2A error: {errMsg}");
+        }
+
+        if (response.TryGetProperty("result", out var result))
+            return JsonSerializer.Deserialize<T>(result.GetRawText(), JsonOpts)!;
+
+        return JsonSerializer.Deserialize<T>(response.GetRawText(), JsonOpts)!;
+    }
+
+    public void Dispose() => _api.Dispose();
 }

@@ -105,13 +105,18 @@ public class MockRemit {
 
     // ─── Internal mock handlers ───────────────────────────────────────────────
 
-    Balance mockBalance() {
-        Balance b = new Balance();
-        b.usdc = balance.get();
-        b.address = MOCK_ADDRESS;
-        b.chainId = MOCK_CHAIN_ID;
-        b.updatedAt = Instant.now();
-        return b;
+    WalletStatus mockStatus() {
+        WalletStatus s = new WalletStatus();
+        s.wallet = MOCK_ADDRESS;
+        s.balance = balance.get().toPlainString();
+        s.monthlyVolume = "0";
+        s.tier = "standard";
+        s.feeRateBps = 100;
+        s.activeEscrows = escrows.size();
+        s.activeTabs = tabs.size();
+        s.activeStreams = streams.size();
+        s.permitNonce = 0;
+        return s;
     }
 
     Transaction mockPay(String to, BigDecimal amount, String memo) {
@@ -230,7 +235,7 @@ public class MockRemit {
     Tab mockCreateTab(String provider, BigDecimal limitAmount) {
         Tab t = new Tab();
         t.id = "tab_" + counter.incrementAndGet();
-        t.opener = MOCK_ADDRESS;
+        t.payer = MOCK_ADDRESS;
         t.provider = provider;
         t.limitAmount = limitAmount;
         t.totalCharged = BigDecimal.ZERO;
@@ -263,7 +268,7 @@ public class MockRemit {
         return charge;
     }
 
-    Tab mockCloseTab(String tabId) {
+    Transaction mockCloseTab(String tabId) {
         Tab t = tabs.get(tabId);
         if (t == null) {
             throw new RemitError(ErrorCodes.TAB_NOT_FOUND, "Tab \"" + tabId + "\" not found.",
@@ -274,13 +279,13 @@ public class MockRemit {
         Transaction tx = new Transaction();
         tx.id = "tx_" + counter.incrementAndGet();
         tx.txHash = t.closedTxHash;
-        tx.from = t.opener;
+        tx.from = t.payer;
         tx.to = t.provider;
         tx.amount = t.totalCharged;
         tx.chainId = MOCK_CHAIN_ID;
         tx.createdAt = Instant.now();
         transactions.add(tx);
-        return t;
+        return tx;
     }
 
     Bounty mockCreateBounty(BigDecimal amount, String taskDescription) {
@@ -295,20 +300,24 @@ public class MockRemit {
         return b;
     }
 
-    BountySubmission mockSubmitBounty(String bountyId, String evidenceHash) {
+    Transaction mockSubmitBounty(String bountyId, String evidenceHash) {
         Bounty b = bounties.get(bountyId);
         if (b == null) {
             throw new RemitError(ErrorCodes.BOUNTY_NOT_FOUND, "Bounty \"" + bountyId + "\" not found.",
                 Map.of("bounty_id", bountyId));
         }
-        BountySubmission sub = new BountySubmission();
-        sub.id = (int) counter.incrementAndGet();
-        sub.bountyId = bountyId;
-        sub.submitter = MOCK_ADDRESS;
-        return sub;
+        Transaction tx = new Transaction();
+        tx.id = "tx_" + counter.incrementAndGet();
+        tx.txHash = "0x" + "ab".repeat(32);
+        tx.from = MOCK_ADDRESS;
+        tx.to = b.poster;
+        tx.amount = b.amount;
+        tx.chainId = MOCK_CHAIN_ID;
+        tx.createdAt = Instant.now();
+        return tx;
     }
 
-    Bounty mockAwardBounty(String bountyId, int submissionId) {
+    Transaction mockAwardBounty(String bountyId, int submissionId) {
         Bounty b = bounties.get(bountyId);
         if (b == null) {
             throw new RemitError(ErrorCodes.BOUNTY_NOT_FOUND, "Bounty \"" + bountyId + "\" not found.",
@@ -324,7 +333,7 @@ public class MockRemit {
         tx.chainId = MOCK_CHAIN_ID;
         tx.createdAt = Instant.now();
         transactions.add(tx);
-        return b;
+        return tx;
     }
 
     Stream mockCreateStream(String payee, BigDecimal ratePerSecond, BigDecimal maxTotal) {
@@ -342,7 +351,7 @@ public class MockRemit {
         return s;
     }
 
-    Stream mockCloseStream(String streamId) {
+    Transaction mockCloseStream(String streamId) {
         Stream s = streams.get(streamId);
         if (s == null) {
             throw new RemitError(ErrorCodes.STREAM_NOT_FOUND, "Stream \"" + streamId + "\" not found.",
@@ -350,7 +359,16 @@ public class MockRemit {
         }
         s.status = "closed";
         s.closedTxHash = "0x" + "f".repeat(64);
-        return s;
+        Transaction tx = new Transaction();
+        tx.id = "tx_" + counter.incrementAndGet();
+        tx.txHash = s.closedTxHash;
+        tx.from = s.payer;
+        tx.to = s.payee;
+        tx.amount = s.maxTotal;
+        tx.chainId = MOCK_CHAIN_ID;
+        tx.createdAt = Instant.now();
+        transactions.add(tx);
+        return tx;
     }
 
     Deposit mockLockDeposit(String provider, BigDecimal amount) {
@@ -363,8 +381,8 @@ public class MockRemit {
         balance.set(current.subtract(amount));
         Deposit d = new Deposit();
         d.id = "dep_" + counter.incrementAndGet();
-        d.depositor = MOCK_ADDRESS;
-        d.provider = provider;
+        d.payer = MOCK_ADDRESS;
+        d.payee = provider;
         d.amount = amount;
         d.status = "locked";
         d.createdAt = Instant.now();
@@ -372,7 +390,7 @@ public class MockRemit {
         return d;
     }
 
-    Deposit mockReturnDeposit(String depositId) {
+    Transaction mockReturnDeposit(String depositId) {
         Deposit d = deposits.get(depositId);
         if (d == null) {
             throw new RemitError(ErrorCodes.DEPOSIT_NOT_FOUND, "Deposit \"" + depositId + "\" not found.",
@@ -380,7 +398,16 @@ public class MockRemit {
         }
         d.status = "returned";
         balance.set(balance.get().add(d.amount));
-        return d;
+        Transaction tx = new Transaction();
+        tx.id = "tx_" + counter.incrementAndGet();
+        tx.txHash = "0x" + "dd".repeat(32);
+        tx.from = d.payee;
+        tx.to = d.payer;
+        tx.amount = d.amount;
+        tx.chainId = MOCK_CHAIN_ID;
+        tx.createdAt = Instant.now();
+        transactions.add(tx);
+        return tx;
     }
 
     Reputation mockReputation(String address) {
@@ -476,8 +503,8 @@ public class MockRemit {
         private <T> T dispatch(String method, String path, Object body, Class<T> responseType) {
             Map<String, Object> b = body instanceof Map ? (Map<String, Object>) body : Map.of();
 
-            if ("GET".equals(method) && "/api/v1/wallet/balance".equals(path)) {
-                return (T) mock.mockBalance();
+            if ("GET".equals(method) && path.startsWith("/api/v1/status/")) {
+                return (T) mock.mockStatus();
             }
             if ("GET".equals(method) && "/api/v1/wallet/history".equals(path)) {
                 return (T) mock.mockHistory();
@@ -516,7 +543,16 @@ public class MockRemit {
             }
             if ("POST".equals(method) && path.endsWith("/claim-start")) {
                 String escrowId = path.replace("/api/v1/escrows/", "").replace("/claim-start", "");
-                return (T) mock.mockGetEscrow(escrowId);
+                Escrow e = mock.mockGetEscrow(escrowId);
+                Transaction claimTx = new Transaction();
+                claimTx.id = "tx_" + mock.counter.incrementAndGet();
+                claimTx.txHash = "0x" + "cc".repeat(32);
+                claimTx.from = MockRemit.MOCK_ADDRESS;
+                claimTx.to = e.payee;
+                claimTx.amount = e.amount;
+                claimTx.chainId = MockRemit.MOCK_CHAIN_ID;
+                claimTx.createdAt = Instant.now();
+                return (T) claimTx;
             }
             if ("POST".equals(method) && path.endsWith("/release")) {
                 String escrowId = path.replace("/api/v1/escrows/", "").replace("/release", "");

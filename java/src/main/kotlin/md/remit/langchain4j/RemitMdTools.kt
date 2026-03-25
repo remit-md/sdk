@@ -92,8 +92,8 @@ class RemitMdTools(private val wallet: Wallet) {
         @P("Final charged amount") finalAmount: BigDecimal,
         @P("Provider EIP-712 signature") providerSig: String
     ): String {
-        val t = wallet.closeTab(tabId, finalAmount, providerSig)
-        return "Tab closed: ${t.totalCharged} USDC finalized on-chain (tx: ${t.closedTxHash})"
+        val tx = wallet.closeTab(tabId, finalAmount, providerSig)
+        return "Tab closed: ${tx.amount} USDC finalized on-chain (tx: ${tx.txHash})"
     }
 
     @Tool("Post a USDC bounty that any agent can claim by completing the task.")
@@ -111,8 +111,8 @@ class RemitMdTools(private val wallet: Wallet) {
         @P("Bounty ID to award") bountyId: String,
         @P("Submission ID to award") submissionId: Int
     ): String {
-        val b = wallet.awardBounty(bountyId, submissionId)
-        return "Bounty awarded: ${b.amount} USDC (status: ${b.status})"
+        val tx = wallet.awardBounty(bountyId, submissionId)
+        return "Bounty awarded: ${tx.amount} USDC (tx: ${tx.txHash})"
     }
 
     @Tool("Check your current USDC wallet balance.")

@@ -24,8 +24,8 @@ func TestMockPay(t *testing.T) {
 	if tx.ID == "" {
 		t.Error("expected non-empty transaction ID")
 	}
-	if !tx.Amount.Equal(amount) {
-		t.Errorf("amount mismatch: got %s, want %s", tx.Amount.String(), amount.String())
+	if tx.Amount == nil || !tx.Amount.Equal(amount) {
+		t.Errorf("amount mismatch: got %v, want %s", tx.Amount, amount.String())
 	}
 	if !mock.WasPaid(recipient, amount) {
 		t.Error("WasPaid returned false after payment")
@@ -72,8 +72,8 @@ func TestMockEscrowLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReleaseEscrow failed: %v", err)
 	}
-	if !released.Amount.Equal(amount) {
-		t.Errorf("release amount mismatch: got %s, want %s", released.Amount.String(), amount.String())
+	if released.TxHash == "" {
+		t.Error("expected non-empty tx_hash after release")
 	}
 }
 

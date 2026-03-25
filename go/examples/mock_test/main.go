@@ -57,7 +57,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("ReleaseEscrow failed: %v", err)
 	}
-	fmt.Printf("Escrow released: %s USDC to %s\n", relTx.Amount, relTx.Payee)
+	fmt.Printf("Escrow released: tx %s to %s\n", relTx.TxHash, relTx.To)
 
 	// Final balance
 	bal, _ = wallet.Balance(ctx)

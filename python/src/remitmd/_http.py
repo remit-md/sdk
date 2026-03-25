@@ -98,8 +98,9 @@ class AuthenticatedClient:
         last_exc: Exception | None = None
         for attempt in range(_MAX_RETRIES + 1):
             if attempt > 0:
-                # Exponential backoff: 1s, 2s, 4s
-                wait = 2 ** (attempt - 1)
+                # Fixed delays matching TS SDK: 0.2s, 0.6s, 1.8s
+                delays = [0.2, 0.6, 1.8]
+                wait = delays[min(attempt - 1, len(delays) - 1)]
                 await _async_sleep(wait)
 
             # Fresh nonce + timestamp on every attempt.
@@ -146,8 +147,18 @@ class AuthenticatedClient:
             return None  # unreachable
 
         if not resp.is_success:
-            code = data.get("code", "SERVER_ERROR") if isinstance(data, dict) else "SERVER_ERROR"
-            message = data.get("message", resp.text) if isinstance(data, dict) else resp.text
+            if isinstance(data, dict):
+                # Try nested error first: {error: {code, message}}, then flat: {code, message}
+                nested = data.get("error", {})
+                if isinstance(nested, dict) and nested.get("code"):
+                    code = nested["code"]
+                    message = nested.get("message", resp.text)
+                else:
+                    code = data.get("code", f"HTTP_{resp.status_code}")
+                    message = data.get("message", resp.text)
+            else:
+                code = f"HTTP_{resp.status_code}"
+                message = resp.text
             raise from_error_code(str(code), str(message), resp.status_code)
 
         return data

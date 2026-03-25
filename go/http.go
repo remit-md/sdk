@@ -36,6 +36,7 @@ var chainConfig = map[string]struct {
 }{
 	"base":         {ChainID: ChainBase, APIURL: "https://remit.md", Testnet: false},
 	"base-sepolia": {ChainID: ChainBaseSep, APIURL: "https://testnet.remit.md", Testnet: true},
+	"localhost":    {ChainID: ChainLocalhost, APIURL: "http://localhost:3000", Testnet: true},
 }
 
 // httpClient is the authenticated HTTP client used by Wallet.
@@ -206,6 +207,14 @@ type apiErrorResponse struct {
 func (c *httpClient) parseAPIError(statusCode int, body []byte) *RemitError {
 	var apiErr apiErrorResponse
 	if err := json.Unmarshal(body, &apiErr); err != nil || apiErr.Code == "" {
+		// Try nested error shape: {"error": {"code": "...", "message": "..."}}
+		var nested struct {
+			Error apiErrorResponse `json:"error"`
+		}
+		if err2 := json.Unmarshal(body, &nested); err2 == nil && nested.Error.Code != "" {
+			return remitErr(nested.Error.Code, nested.Error.Message, nested.Error.Context)
+		}
+
 		// Fallback for non-standard error responses
 		if statusCode == 429 {
 			return remitErr(ErrCodeRateLimited, "rate limit exceeded — reduce request frequency", nil)

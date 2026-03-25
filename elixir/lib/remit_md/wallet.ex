@@ -22,7 +22,7 @@ defmodule RemitMd.Wallet do
   alias RemitMd.Models.{
     Balance, Bounty, BountySubmission, Budget, ContractAddresses, Deposit, Escrow,
     MintResponse, PermitSignature, Reputation, SpendingSummary, Stream, Tab, TabCharge,
-    Transaction, TransactionList, Webhook
+    Transaction, TransactionList, WalletStatus, Webhook
   }
 
   @min_amount Decimal.new("0.000001")
@@ -86,9 +86,9 @@ defmodule RemitMd.Wallet do
       raw_chain = opts |> Keyword.get(:chain, "base")
       # chain_key preserves the full name for USDC lookups (e.g. "base_sepolia" → "base-sepolia")
       chain_key = raw_chain |> String.replace("_", "-")
-      # Normalize to base chain name (strip testnet suffix) for use in pay body.
-      # The server accepts "base" — not "base_sepolia" etc.
-      chain = base_chain_name(raw_chain)
+      # Send the full chain name (e.g. "base-sepolia") in API request bodies.
+      # The server expects the full chain name, matching the TS SDK.
+      chain = chain_key
       %__MODULE__{
         signer: signer, transport: transport, mock_pid: nil, address: address,
         chain: chain, chain_key: chain_key
@@ -124,16 +124,32 @@ defmodule RemitMd.Wallet do
   # ─── Balance & Analytics ──────────────────────────────────────────────────
 
   @doc """
-  Fetch current USDC balance.
-  Returns `{:ok, %RemitMd.Models.Balance{}}` or `{:error, %RemitMd.Error{}}`.
+  Fetch wallet status including balance, tier info, and permit nonce.
+  Returns `{:ok, %RemitMd.Models.WalletStatus{}}` or `{:error, %RemitMd.Error{}}`.
+  """
+  def status(%__MODULE__{} = w) do
+    with {:ok, data} <- call_mock_or_http(w, fn pid ->
+           MockRemit.do_balance(pid, w.address)
+         end, fn ->
+           do_http_get(w, "/status/#{w.address}")
+         end) do
+      {:ok, WalletStatus.from_map(data)}
+    end
+  end
+
+  @doc """
+  Fetch current USDC balance (convenience wrapper around status/1).
+  Returns `{:ok, balance_string}` or `{:error, %RemitMd.Error{}}`.
   """
   def balance(%__MODULE__{} = w) do
     with {:ok, data} <- call_mock_or_http(w, fn pid ->
            MockRemit.do_balance(pid, w.address)
          end, fn ->
-           do_http_get(w, "/wallet/balance")
+           do_http_get(w, "/status/#{w.address}")
          end) do
-      {:ok, Balance.from_map(data)}
+      # Support both WalletStatus format and legacy Balance format
+      balance_val = Map.get(data, "balance") || Map.get(data, "usdc")
+      {:ok, Balance.from_map(%{"address" => w.address, "usdc" => balance_val})}
     end
   end
 
@@ -246,42 +262,58 @@ defmodule RemitMd.Wallet do
   end
 
   @doc """
-  Create an escrow payment with milestone-based release.
+  Create an escrow payment with milestone-based release (two-step flow).
+
+  Step 1: POST /invoices to create the invoice
+  Step 2: POST /escrows with invoice_id + permit to fund the escrow
 
   ## Options
 
-  - `:milestones` — list of milestone ID strings (default: `["complete"]`)
-  - `:description` — task description
-  - `:expires_in` — seconds until escrow expires (default: 7 days)
+  - `:description` — task description (sent as `task`)
+  - `:escrow_timeout` — seconds until escrow expires (default: 7 days)
 
   ## Example
 
       {:ok, esc} = RemitMd.Wallet.create_escrow(wallet, "0xContractor", "50.00",
-        milestones: ["design_approved", "code_reviewed", "deployed"])
+        description: "Design and deploy")
   """
   def create_escrow(%__MODULE__{} = w, to, amount_usdc, opts \\ []) do
     with :ok <- validate_address(to),
          :ok <- validate_amount(amount_usdc) do
-      permit = resolve_permit(w, "escrow", amount_usdc, opts)
-      milestones  = Keyword.get(opts, :milestones, ["complete"])
-      description = Keyword.get(opts, :description)
-      expires_in  = Keyword.get(opts, :expires_in, 7 * 86_400)
+      call_mock_or_http(w, fn pid ->
+        MockRemit.do_create_escrow(pid, w.address, to, amount_usdc, opts)
+      end, fn ->
+        # Step 1: Create invoice
+        invoice_id = :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
+        nonce = :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
+        memo = Keyword.get(opts, :description, "")
+        escrow_timeout = Keyword.get(opts, :escrow_timeout, 7 * 86_400)
 
-      body = %{
-        to:          to,
-        amount_usdc: amount_usdc,
-        milestones:  milestones,
-        description: description,
-        expires_in:  expires_in
-      }
-      body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
+        invoice_body = %{
+          id: invoice_id,
+          chain: w.chain,
+          from_agent: String.downcase(w.address),
+          to_agent: String.downcase(to),
+          amount: amount_usdc,
+          type: "escrow",
+          task: memo,
+          nonce: nonce,
+          signature: "0x",
+          escrow_timeout: escrow_timeout
+        }
 
-      with {:ok, data} <- call_mock_or_http(w, fn pid ->
-             MockRemit.do_create_escrow(pid, w.address, to, amount_usdc, opts)
-           end, fn ->
-             do_http_post(w, "/escrows", body)
-           end) do
-        {:ok, Escrow.from_map(data)}
+        do_http_post(w, "/invoices", invoice_body)
+
+        # Step 2: Fund the escrow
+        permit = resolve_permit(w, "escrow", amount_usdc, opts)
+        escrow_body = %{invoice_id: invoice_id}
+        escrow_body = if permit, do: Map.put(escrow_body, :permit, PermitSignature.to_map(permit)), else: escrow_body
+
+        do_http_post(w, "/escrows", escrow_body)
+      end)
+      |> case do
+        {:ok, data} -> {:ok, Escrow.from_map(data)}
+        error -> error
       end
     end
   end
@@ -304,14 +336,38 @@ defmodule RemitMd.Wallet do
   @doc "Provider claims start on an escrow (begins the escrow timer)."
   def claim_start(%__MODULE__{} = w, escrow_id) do
     with {:ok, data} <- do_call(w, :post, "/escrows/#{escrow_id}/claim-start", %{}) do
-      {:ok, Escrow.from_map(data)}
+      {:ok, Transaction.from_map(data)}
     end
   end
 
   @doc "Release an escrow, transferring funds to the provider."
   def release_escrow(%__MODULE__{} = w, escrow_id) do
     with {:ok, data} <- do_call(w, :post, "/escrows/#{escrow_id}/release", %{}) do
-      {:ok, Escrow.from_map(data)}
+      {:ok, Transaction.from_map(data)}
+    end
+  end
+
+  @doc "Release a specific milestone of an escrow."
+  def release_milestone(%__MODULE__{} = w, invoice_id, milestone_index) do
+    body = %{milestone_ids: [to_string(milestone_index)]}
+    with {:ok, data} <- do_call(w, :post, "/escrows/#{invoice_id}/release", body) do
+      {:ok, Transaction.from_map(data)}
+    end
+  end
+
+  @doc """
+  Submit evidence for an escrow claim.
+
+  ## Parameters
+
+  - `invoice_id` — escrow invoice ID
+  - `evidence_uri` — URI pointing to the evidence
+  - `milestone_index` — milestone index (default: 0)
+  """
+  def submit_evidence(%__MODULE__{} = w, invoice_id, evidence_uri, milestone_index \\ 0) do
+    body = %{evidence_uri: evidence_uri, milestone_index: milestone_index}
+    with {:ok, data} <- do_call(w, :post, "/escrows/#{invoice_id}/claim-start", body) do
+      {:ok, Transaction.from_map(data)}
     end
   end
 
@@ -322,7 +378,7 @@ defmodule RemitMd.Wallet do
          end, fn ->
            do_http_post(w, "/escrows/#{escrow_id}/cancel", %{})
          end) do
-      {:ok, Escrow.from_map(data)}
+      {:ok, Transaction.from_map(data)}
     end
   end
 
@@ -405,7 +461,7 @@ defmodule RemitMd.Wallet do
     body = %{final_amount: final_amount, provider_sig: provider_sig}
 
     with {:ok, data} <- do_call(w, :post, "/tabs/#{tab_id}/close", body) do
-      {:ok, Tab.from_map(data)}
+      {:ok, Transaction.from_map(data)}
     end
   end
 
@@ -583,7 +639,7 @@ defmodule RemitMd.Wallet do
   @doc "Close a running payment stream."
   def close_stream(%__MODULE__{} = w, stream_id) do
     with {:ok, data} <- do_call(w, :post, "/streams/#{stream_id}/close", %{}) do
-      {:ok, Stream.from_map(data)}
+      {:ok, Transaction.from_map(data)}
     end
   end
 
@@ -707,9 +763,8 @@ defmodule RemitMd.Wallet do
         ["payment.sent", "escrow.funded"])
   """
   def register_webhook(%__MODULE__{} = w, url, events, opts \\ []) do
-    chains = Keyword.get(opts, :chains)
-    body = %{url: url, events: events}
-    body = if chains, do: Map.put(body, :chains, chains), else: body
+    chains = Keyword.get(opts, :chains) || [w.chain]
+    body = %{url: url, events: events, chains: chains}
 
     with {:ok, data} <- do_call(w, :post, "/webhooks", body) do
       {:ok, Webhook.from_map(data)}
@@ -801,7 +856,7 @@ defmodule RemitMd.Wallet do
   """
   def return_deposit(%__MODULE__{} = w, deposit_id) do
     with {:ok, data} <- do_call(w, :post, "/deposits/#{deposit_id}/return", %{}) do
-      {:ok, Deposit.from_map(data)}
+      {:ok, Transaction.from_map(data)}
     end
   end
 
@@ -821,6 +876,7 @@ defmodule RemitMd.Wallet do
 
   @doc """
   Mint testnet USDC to this wallet (testnet only).
+  Uses unauthenticated HTTP (no EIP-712 headers), matching the TS SDK.
 
   ## Example
 
@@ -828,10 +884,31 @@ defmodule RemitMd.Wallet do
   """
   def mint(%__MODULE__{} = w, amount_usdc) do
     with :ok <- validate_amount(amount_usdc) do
-      body = %{wallet: w.address, amount: amount_usdc}
+      :inets.start()
+      :ssl.start()
 
-      with {:ok, data} <- do_call(w, :post, "/mint", body) do
-        {:ok, MintResponse.from_map(data)}
+      body = Jason.encode!(%{wallet: w.address, amount: amount_usdc})
+      url = String.to_charlist(w.transport.base_url <> "/mint")
+      headers = [{~c"content-type", ~c"application/json"}]
+
+      case :httpc.request(:post, {url, headers, ~c"application/json", String.to_charlist(body)},
+                          [{:timeout, 10_000}, {:connect_timeout, 5_000}], []) do
+        {:ok, {{_ver, status, _reason}, _resp_headers, resp_body}} when status in 200..299 ->
+          case Jason.decode(to_string(resp_body)) do
+            {:ok, data} -> {:ok, MintResponse.from_map(data)}
+            {:error, _} -> {:error, Error.new(Error.server_error(), "Invalid JSON from mint")}
+          end
+
+        {:ok, {{_ver, status, _reason}, _resp_headers, resp_body}} ->
+          msg =
+            case Jason.decode(to_string(resp_body)) do
+              {:ok, %{"message" => m}} -> m
+              _ -> "mint failed (#{status})"
+            end
+          {:error, Error.new(Error.server_error(), msg)}
+
+        {:error, reason} ->
+          {:error, Error.new(Error.network_error(), "Mint network error: #{inspect(reason)}")}
       end
     end
   end
@@ -976,16 +1053,10 @@ defmodule RemitMd.Wallet do
     end
   end
 
-  # Strip testnet suffixes so we send "base" not "base_sepolia" in the pay body.
-  defp base_chain_name(chain) do
-    chain
-    |> String.replace_suffix("_sepolia", "")
-    |> String.replace_suffix("-sepolia", "")
-  end
-
   # Return the numeric chain ID for EIP-712 signing.
   defp chain_id(%__MODULE__{transport: %Http{chain_id: id}}), do: id
   defp chain_id(%__MODULE__{chain: "base"}), do: 8453
+  defp chain_id(%__MODULE__{chain: "base-sepolia"}), do: 84532
   defp chain_id(%__MODULE__{chain: "base_sepolia"}), do: 84532
   defp chain_id(%__MODULE__{chain: chain}) do
     raise Error.new(Error.chain_unsupported(), "Unknown chain: #{inspect(chain)}")

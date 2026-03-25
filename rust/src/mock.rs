@@ -130,7 +130,10 @@ impl MockRemit {
         let s = self.state.lock().await;
         s.transactions
             .iter()
-            .any(|tx| tx.to.to_lowercase() == recipient.to_lowercase() && tx.amount == amount)
+            .any(|tx| {
+                tx.to.as_deref().map(|s| s.to_lowercase()).as_deref() == Some(&recipient.to_lowercase())
+                    && tx.amount == Some(amount)
+            })
     }
 
     /// Return the sum of all USDC sent to `recipient`.
@@ -138,8 +141,10 @@ impl MockRemit {
         let s = self.state.lock().await;
         s.transactions
             .iter()
-            .filter(|tx| tx.to.to_lowercase() == recipient.to_lowercase())
-            .map(|tx| tx.amount)
+            .filter(|tx| {
+                tx.to.as_deref().map(|s| s.to_lowercase()).as_deref() == Some(&recipient.to_lowercase())
+            })
+            .map(|tx| tx.amount.unwrap_or(Decimal::ZERO))
             .fold(Decimal::ZERO, |acc, a| acc + a)
     }
 
@@ -208,6 +213,23 @@ impl MockTransport {
                 }))
             }
 
+            // ─── Status ─────────────────────────────────────────────────
+            ("GET", path) if path.starts_with("/api/v1/status/") => {
+                let addr = path.trim_start_matches("/api/v1/status/");
+                let s = self.state.lock().await;
+                Ok(json!({
+                    "wallet": addr,
+                    "balance": s.balance.to_string(),
+                    "monthly_volume": "0",
+                    "tier": "standard",
+                    "fee_rate_bps": 100u32,
+                    "active_escrows": 0u32,
+                    "active_tabs": 0u32,
+                    "active_streams": 0u32,
+                    "permit_nonce": null,
+                }))
+            }
+
             // ─── Direct payment ───────────────────────────────────────────
             ("POST", "/api/v1/payments/direct") => {
                 let to = str_field(&b, "to")?;
@@ -221,14 +243,15 @@ impl MockTransport {
                 let tx = Transaction {
                     id: new_id("tx"),
                     tx_hash: format!("0x{}", mock_hash()),
-                    from: "0xMockWallet0000000000000000000000000001".to_string(),
-                    to,
-                    amount,
-                    fee: Decimal::new(1, 3),
-                    memo,
+                    from: Some("0xMockWallet0000000000000000000000000001".to_string()),
+                    to: Some(to),
+                    amount: Some(amount),
+                    fee: Some(Decimal::new(1, 3)),
+                    memo: Some(memo),
                     chain_id: ChainId::BASE_SEPOLIA,
-                    block_number: 0,
+                    block_number: Some(0),
                     created_at: Utc::now(),
+                    invoice_id: None,
                 };
                 s.transactions.push(tx.clone());
                 Ok(serde_json::to_value(&tx).unwrap())
@@ -436,6 +459,7 @@ impl MockTransport {
                     started_at: Utc::now(),
                     tx_hash: format!("0x{}", mock_hash()),
                     ends_at: None,
+                    max_duration: None,
                 };
                 s.streams.insert(stream.id.clone(), stream.clone());
                 Ok(serde_json::to_value(&stream).unwrap())
@@ -476,6 +500,8 @@ impl MockTransport {
                     expires_at: None,
                     tx_hash: format!("0x{}", mock_hash()),
                     created_at: Utc::now(),
+                    submissions: None,
+                    validation: None,
                 };
                 s.bounties.insert(bounty.id.clone(), bounty.clone());
                 Ok(serde_json::to_value(&bounty).unwrap())
@@ -548,7 +574,7 @@ impl MockTransport {
             // ─── Spending summary ─────────────────────────────────────────
             ("GET", path) if path.starts_with("/api/v1/wallet/spending") => {
                 let s = self.state.lock().await;
-                let total: Decimal = s.transactions.iter().map(|tx| tx.amount).sum();
+                let total: Decimal = s.transactions.iter().map(|tx| tx.amount.unwrap_or(Decimal::ZERO)).sum();
                 let count = s.transactions.len() as u64;
                 Ok(json!({
                     "address": "0xMockWallet0000000000000000000000000001",
@@ -651,14 +677,15 @@ impl MockTransport {
                 let tx = Transaction {
                     id: new_id("tx"),
                     tx_hash: format!("0x{}", mock_hash()),
-                    from: stream.payer.clone(),
-                    to: stream.payee.clone(),
-                    amount: stream.max_total,
-                    fee: Decimal::ZERO,
-                    memo: "stream withdraw".to_string(),
+                    from: Some(stream.payer.clone()),
+                    to: Some(stream.payee.clone()),
+                    amount: Some(stream.max_total),
+                    fee: Some(Decimal::ZERO),
+                    memo: Some("stream withdraw".to_string()),
                     chain_id: ChainId::BASE_SEPOLIA,
-                    block_number: 0,
+                    block_number: Some(0),
                     created_at: Utc::now(),
+                    invoice_id: None,
                 };
                 Ok(serde_json::to_value(&tx).unwrap())
             }
@@ -764,8 +791,8 @@ mod tests {
         let wallet = mock.wallet();
 
         let tx = wallet.pay(RECIPIENT, dec!(5.00)).await.unwrap();
-        assert_eq!(tx.amount, dec!(5.00));
-        assert_eq!(tx.to, RECIPIENT);
+        assert_eq!(tx.amount, Some(dec!(5.00)));
+        assert_eq!(tx.to.as_deref(), Some(RECIPIENT));
         assert!(mock.was_paid(RECIPIENT, dec!(5.00)).await);
         assert_eq!(mock.balance().await, dec!(9995.00));
     }
@@ -778,7 +805,7 @@ mod tests {
             .pay_with_memo(RECIPIENT, dec!(1.00), "API call fee")
             .await
             .unwrap();
-        assert_eq!(tx.memo, "API call fee");
+        assert_eq!(tx.memo.as_deref(), Some("API call fee"));
     }
 
     #[tokio::test]

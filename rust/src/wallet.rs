@@ -28,7 +28,7 @@ use crate::signer::{PrivateKeySigner, Signer};
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let wallet = Wallet::from_env()?;
 ///     let tx = wallet.pay("0xRecipient...", dec!(1.50)).await?;
-///     println!("paid: {} in tx {}", tx.amount, tx.tx_hash);
+///     println!("paid: {:?} in tx {}", tx.amount, tx.tx_hash);
 ///     Ok(())
 /// }
 /// ```
@@ -295,9 +295,24 @@ impl Wallet {
 // ─── Payment methods ─────────────────────────────────────────────────────────
 
 impl Wallet {
+    /// Return the full wallet status including balance, volume, fee tier, and active counts.
+    pub async fn status(&self) -> Result<WalletStatus, RemitError> {
+        self.get(&format!("/api/v1/status/{}", self.address))
+            .await
+    }
+
     /// Return the current USDC balance of this wallet.
+    ///
+    /// Calls the `/api/v1/status/{address}` endpoint and parses the balance.
     pub async fn balance(&self) -> Result<Balance, RemitError> {
-        self.get("/api/v1/wallet/balance").await
+        let ws: WalletStatus = self.status().await?;
+        let usdc = Decimal::from_str(&ws.balance).unwrap_or_default();
+        Ok(Balance {
+            usdc,
+            address: ws.wallet,
+            chain_id: self.chain_id,
+            updated_at: chrono::Utc::now(),
+        })
     }
 
     /// Send a direct USDC payment.
@@ -513,6 +528,46 @@ impl Wallet {
         self.get(&format!("/api/v1/escrows/{escrow_id}")).await
     }
 
+    /// Submit evidence for an escrow milestone.
+    ///
+    /// # Arguments
+    /// - `invoice_id` — the escrow invoice ID
+    /// - `evidence_uri` — URI pointing to the evidence (e.g. IPFS hash)
+    /// - `milestone_index` — optional milestone index (0-based)
+    pub async fn submit_evidence(
+        &self,
+        invoice_id: &str,
+        evidence_uri: &str,
+        milestone_index: Option<u32>,
+    ) -> Result<Value, RemitError> {
+        let mut body = json!({ "evidence_uri": evidence_uri });
+        if let Some(idx) = milestone_index {
+            body["milestone_index"] = json!(idx);
+        }
+        self.post(
+            &format!("/api/v1/escrows/{invoice_id}/evidence"),
+            body,
+        )
+        .await
+    }
+
+    /// Release a specific milestone within an escrow.
+    ///
+    /// # Arguments
+    /// - `invoice_id` — the escrow invoice ID
+    /// - `milestone_index` — the milestone index to release (0-based)
+    pub async fn release_milestone(
+        &self,
+        invoice_id: &str,
+        milestone_index: u32,
+    ) -> Result<Escrow, RemitError> {
+        self.post(
+            &format!("/api/v1/escrows/{invoice_id}/release"),
+            json!({ "milestone_index": milestone_index }),
+        )
+        .await
+    }
+
     // ─── Tab ─────────────────────────────────────────────────────────────────
 
     /// Open a payment channel for batched micro-payments.
@@ -570,15 +625,20 @@ impl Wallet {
         permit: Option<PermitSignature>,
     ) -> Result<Tab, RemitError> {
         validate_address(provider)?;
+        let exp = expiry.unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                + 86400
+        });
         let mut body = json!({
             "chain": &self.chain,
             "provider": provider,
             "limit_amount": decimal_to_f64(limit_amount)?,
             "per_unit": decimal_to_f64(per_unit)?,
+            "expiry": exp,
         });
-        if let Some(exp) = expiry {
-            body["expiry"] = json!(exp);
-        }
         if let Some(p) = permit {
             body["permit"] = serde_json::to_value(p).unwrap();
         }
@@ -765,15 +825,14 @@ impl Wallet {
         permit: Option<PermitSignature>,
     ) -> Result<Bounty, RemitError> {
         validate_amount(amount)?;
+        let ma = max_attempts.unwrap_or(10);
         let mut body = json!({
             "chain": &self.chain,
             "amount": decimal_to_f64(amount)?,
             "task_description": task_description,
             "deadline": deadline,
+            "max_attempts": ma,
         });
-        if let Some(ma) = max_attempts {
-            body["max_attempts"] = json!(ma);
-        }
         if let Some(p) = permit {
             body["permit"] = serde_json::to_value(p).unwrap();
         }
@@ -948,13 +1007,15 @@ impl Wallet {
         events: &[&str],
         chains: Option<&[&str]>,
     ) -> Result<Webhook, RemitError> {
-        let mut body = json!({
+        let chain_list: Vec<&str> = match chains {
+            Some(c) => c.to_vec(),
+            None => vec![&self.chain],
+        };
+        let body = json!({
             "url": url,
             "events": events,
+            "chains": chain_list,
         });
-        if let Some(chains) = chains {
-            body["chains"] = json!(chains);
-        }
         self.post("/api/v1/webhooks", body).await
     }
 

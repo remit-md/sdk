@@ -168,8 +168,8 @@ class WalletTest {
         assertThat(c2.cumulative).isEqualByComparingTo(BigDecimal.valueOf(0.006));
 
         // Close
-        Tab closed = wallet.closeTab(tab.id, BigDecimal.valueOf(0.006), "0x");
-        assertThat(closed.status).isEqualTo("closed");
+        Transaction closeTx = wallet.closeTab(tab.id, BigDecimal.valueOf(0.006), "0x");
+        assertThat(closeTx.id).startsWith("tx_");
     }
 
     @Test
@@ -196,11 +196,11 @@ class WalletTest {
         assertThat(bounty.status).isEqualTo("open");
         assertThat(bounty.amount).isEqualByComparingTo(BigDecimal.valueOf(25.00));
 
-        BountySubmission sub = wallet.submitBounty(bounty.id, "0x" + "ab".repeat(32));
-        assertThat(sub.id).isGreaterThan(0);
+        Transaction subTx = wallet.submitBounty(bounty.id, "0x" + "ab".repeat(32));
+        assertThat(subTx.id).startsWith("tx_");
 
-        Bounty awarded = wallet.awardBounty(bounty.id, sub.id);
-        assertThat(awarded.status).isEqualTo("awarded");
+        Transaction awardTx = wallet.awardBounty(bounty.id, 1);
+        assertThat(awardTx.id).startsWith("tx_");
     }
 
     // ─── Reset ────────────────────────────────────────────────────────────────

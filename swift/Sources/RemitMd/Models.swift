@@ -29,19 +29,19 @@ public enum EscrowStatus: String, Codable, Sendable {
 }
 
 public enum TabStatus: String, Codable, Sendable {
-    case open, closed, expired
+    case open, closed, expired, suspended
 }
 
 public enum StreamStatus: String, Codable, Sendable {
-    case active, closed, completed
+    case active, closed, completed, paused, cancelled
 }
 
 public enum BountyStatus: String, Codable, Sendable {
-    case open, claimed, awarded, expired, cancelled
+    case open, closed, awarded, expired, cancelled
 }
 
 public enum DepositStatus: String, Codable, Sendable {
-    case locked, returned, forfeited
+    case locked, returned, forfeited, expired
 }
 
 // MARK: - Permit & Contract Addresses
@@ -88,22 +88,23 @@ public struct ContractAddresses: Codable, Sendable {
 // MARK: - Core models
 
 public struct Transaction: Codable, Sendable {
-    public let id: String
-    public let from: String
-    public let to: String
-    public let amount: Double
-    public let currency: String
-    public let status: String
-    public let memo: String?
-    public let blockNumber: Int?
+    public let invoiceId: String?
     public let txHash: String?
-    public let createdAt: Date
+    public let chain: String
+    public let status: String
+    public let createdAt: Double
 
     enum CodingKeys: String, CodingKey {
-        case id, from, to, amount, currency, status, memo
-        case blockNumber = "block_number"
+        case invoiceId = "invoice_id"
         case txHash = "tx_hash"
+        case chain, status
         case createdAt = "created_at"
+    }
+
+    public init(invoiceId: String? = nil, txHash: String? = nil, chain: String = "base",
+                status: String = "confirmed", createdAt: Double = Date().timeIntervalSince1970) {
+        self.invoiceId = invoiceId; self.txHash = txHash; self.chain = chain
+        self.status = status; self.createdAt = createdAt
     }
 }
 
@@ -116,6 +117,23 @@ public struct Balance: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case address, balance, currency
         case chainId = "chain_id"
+    }
+}
+
+public struct WalletStatus: Codable, Sendable {
+    public let address: String
+    public let balance: Double
+    public let chainId: Int
+    public let permitNonce: Int?
+    public let monthlyVolume: Double?
+    public let feeRate: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case address, balance
+        case chainId = "chain_id"
+        case permitNonce = "permit_nonce"
+        case monthlyVolume = "monthly_volume"
+        case feeRate = "fee_rate"
     }
 }
 
@@ -141,26 +159,38 @@ public struct Reputation: Codable, Sendable {
 public struct Escrow: Codable, Sendable {
     public let id: String
     public let payer: String
-    public let recipient: String
+    public let payee: String
     public let amount: Double
-    public let currency: String
     public let status: EscrowStatus
-    public let conditions: String?
-    public let expiresAt: Date?
-    public let createdAt: Date
+    public let txHash: String?
+    public let chain: String?
+    public let milestoneIndex: Int?
+    public let claimStartedAt: Double?
+    public let evidenceUri: String?
+    public let expiresAt: Double?
+    public let createdAt: Double
 
     enum CodingKeys: String, CodingKey {
-        case id, payer, recipient, amount, currency, status, conditions
+        case id, payer, payee, amount, status
         case invoiceId = "invoice_id"
+        case txHash = "tx_hash"
+        case chain
+        case milestoneIndex = "milestone_index"
+        case claimStartedAt = "claim_started_at"
+        case evidenceUri = "evidence_uri"
         case expiresAt = "expires_at"
         case createdAt = "created_at"
     }
 
-    public init(id: String, payer: String, recipient: String, amount: Double, currency: String,
-                status: EscrowStatus, conditions: String?, expiresAt: Date?, createdAt: Date) {
-        self.id = id; self.payer = payer; self.recipient = recipient; self.amount = amount
-        self.currency = currency; self.status = status; self.conditions = conditions
-        self.expiresAt = expiresAt; self.createdAt = createdAt
+    public init(id: String, payer: String, payee: String, amount: Double,
+                status: EscrowStatus, txHash: String? = nil, chain: String? = nil,
+                milestoneIndex: Int? = nil, claimStartedAt: Double? = nil,
+                evidenceUri: String? = nil, expiresAt: Double? = nil,
+                createdAt: Double = Date().timeIntervalSince1970) {
+        self.id = id; self.payer = payer; self.payee = payee; self.amount = amount
+        self.status = status; self.txHash = txHash; self.chain = chain
+        self.milestoneIndex = milestoneIndex; self.claimStartedAt = claimStartedAt
+        self.evidenceUri = evidenceUri; self.expiresAt = expiresAt; self.createdAt = createdAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -172,24 +202,30 @@ public struct Escrow: Codable, Sendable {
             self.id = try c.decode(String.self, forKey: .id)
         }
         self.payer = try c.decode(String.self, forKey: .payer)
-        self.recipient = try c.decode(String.self, forKey: .recipient)
+        self.payee = try c.decode(String.self, forKey: .payee)
         self.amount = try c.decode(Double.self, forKey: .amount)
-        self.currency = (try? c.decode(String.self, forKey: .currency)) ?? "USDC"
         self.status = (try? c.decode(EscrowStatus.self, forKey: .status)) ?? .pending
-        self.conditions = try? c.decode(String.self, forKey: .conditions)
-        self.expiresAt = try? c.decode(Date.self, forKey: .expiresAt)
-        self.createdAt = (try? c.decode(Date.self, forKey: .createdAt)) ?? Date()
+        self.txHash = try? c.decode(String.self, forKey: .txHash)
+        self.chain = try? c.decode(String.self, forKey: .chain)
+        self.milestoneIndex = try? c.decode(Int.self, forKey: .milestoneIndex)
+        self.claimStartedAt = try? c.decode(Double.self, forKey: .claimStartedAt)
+        self.evidenceUri = try? c.decode(String.self, forKey: .evidenceUri)
+        self.expiresAt = try? c.decode(Double.self, forKey: .expiresAt)
+        self.createdAt = (try? c.decode(Double.self, forKey: .createdAt)) ?? Date().timeIntervalSince1970
     }
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encode(payer, forKey: .payer)
-        try c.encode(recipient, forKey: .recipient)
+        try c.encode(payee, forKey: .payee)
         try c.encode(amount, forKey: .amount)
-        try c.encode(currency, forKey: .currency)
         try c.encode(status, forKey: .status)
-        try c.encodeIfPresent(conditions, forKey: .conditions)
+        try c.encodeIfPresent(txHash, forKey: .txHash)
+        try c.encodeIfPresent(chain, forKey: .chain)
+        try c.encodeIfPresent(milestoneIndex, forKey: .milestoneIndex)
+        try c.encodeIfPresent(claimStartedAt, forKey: .claimStartedAt)
+        try c.encodeIfPresent(evidenceUri, forKey: .evidenceUri)
         try c.encodeIfPresent(expiresAt, forKey: .expiresAt)
         try c.encode(createdAt, forKey: .createdAt)
     }
@@ -198,16 +234,28 @@ public struct Escrow: Codable, Sendable {
 public struct Tab: Codable, Sendable {
     public let id: String
     public let payer: String
-    public let recipient: String
+    public let payee: String
     public let limit: Double
     public let spent: Double
-    public let currency: String
+    public let perUnit: Double?
     public let status: TabStatus
-    public let createdAt: Date
+    public let chain: String?
+    public let expiresAt: Double?
+    public let createdAt: Double
 
     enum CodingKeys: String, CodingKey {
-        case id, payer, recipient, limit, spent, currency, status
+        case id, payer, payee, limit, spent, status, chain
+        case perUnit = "per_unit"
+        case expiresAt = "expires_at"
         case createdAt = "created_at"
+    }
+
+    public init(id: String, payer: String, payee: String, limit: Double, spent: Double,
+                perUnit: Double? = nil, status: TabStatus, chain: String? = nil,
+                expiresAt: Double? = nil, createdAt: Double = Date().timeIntervalSince1970) {
+        self.id = id; self.payer = payer; self.payee = payee; self.limit = limit
+        self.spent = spent; self.perUnit = perUnit; self.status = status
+        self.chain = chain; self.expiresAt = expiresAt; self.createdAt = createdAt
     }
 }
 
@@ -229,38 +277,71 @@ public struct TabDebit: Codable, Sendable {
 public struct Stream: Codable, Sendable {
     public let id: String
     public let payer: String
-    public let recipient: String
+    public let payee: String
     public let ratePerSecond: Double
-    public let currency: String
     public let status: StreamStatus
     public let totalStreamed: Double
-    public let startedAt: Date
-    public let endedAt: Date?
+    public let maxDuration: Double?
+    public let maxTotal: Double?
+    public let chain: String?
+    public let startedAt: Double
+    public let closedAt: Double?
 
     enum CodingKeys: String, CodingKey {
-        case id, payer, recipient, currency, status
+        case id, payer, payee, status, chain
         case ratePerSecond = "rate_per_second"
         case totalStreamed = "total_streamed"
+        case maxDuration = "max_duration"
+        case maxTotal = "max_total"
         case startedAt = "started_at"
-        case endedAt = "ended_at"
+        case closedAt = "closed_at"
+    }
+
+    public init(id: String, payer: String, payee: String, ratePerSecond: Double,
+                status: StreamStatus, totalStreamed: Double,
+                maxDuration: Double? = nil, maxTotal: Double? = nil,
+                chain: String? = nil, startedAt: Double = Date().timeIntervalSince1970,
+                closedAt: Double? = nil) {
+        self.id = id; self.payer = payer; self.payee = payee
+        self.ratePerSecond = ratePerSecond; self.status = status
+        self.totalStreamed = totalStreamed; self.maxDuration = maxDuration
+        self.maxTotal = maxTotal; self.chain = chain
+        self.startedAt = startedAt; self.closedAt = closedAt
     }
 }
 
 public struct Bounty: Codable, Sendable {
     public let id: String
-    public let payer: String
+    public let poster: String
     public let amount: Double
-    public let currency: String
-    public let description: String
+    public let task: String
     public let status: BountyStatus
     public let winner: String?
-    public let expiresAt: Date?
-    public let createdAt: Date
+    public let submissions: [BountySubmission]?
+    public let validation: String?
+    public let maxAttempts: Int?
+    public let chain: String?
+    public let deadline: Double?
+    public let expiresAt: Double?
+    public let createdAt: Double
 
     enum CodingKeys: String, CodingKey {
-        case id, payer, amount, currency, description, status, winner
+        case id, poster, amount, task, status, winner, submissions, validation, chain, deadline
+        case maxAttempts = "max_attempts"
         case expiresAt = "expires_at"
         case createdAt = "created_at"
+    }
+
+    public init(id: String, poster: String, amount: Double, task: String,
+                status: BountyStatus, winner: String? = nil,
+                submissions: [BountySubmission]? = nil, validation: String? = nil,
+                maxAttempts: Int? = nil, chain: String? = nil,
+                deadline: Double? = nil, expiresAt: Double? = nil,
+                createdAt: Double = Date().timeIntervalSince1970) {
+        self.id = id; self.poster = poster; self.amount = amount; self.task = task
+        self.status = status; self.winner = winner; self.submissions = submissions
+        self.validation = validation; self.maxAttempts = maxAttempts; self.chain = chain
+        self.deadline = deadline; self.expiresAt = expiresAt; self.createdAt = createdAt
     }
 }
 
@@ -268,15 +349,21 @@ public struct BountySubmission: Codable, Sendable {
     public let id: Int
     public let bountyId: String
     public let submitter: String
-    public let evidenceHash: String
-    public let status: String
+    public let evidenceUri: String
+    public let accepted: Bool?
     public let submittedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, submitter, status
+        case id, submitter, accepted
         case bountyId = "bounty_id"
-        case evidenceHash = "evidence_hash"
+        case evidenceUri = "evidence_uri"
         case submittedAt = "submitted_at"
+    }
+
+    public init(id: Int, bountyId: String, submitter: String, evidenceUri: String,
+                accepted: Bool? = nil, submittedAt: String = "") {
+        self.id = id; self.bountyId = bountyId; self.submitter = submitter
+        self.evidenceUri = evidenceUri; self.accepted = accepted; self.submittedAt = submittedAt
     }
 }
 
@@ -300,17 +387,29 @@ public struct TabCharge: Codable, Sendable {
 
 public struct Deposit: Codable, Sendable {
     public let id: String
-    public let depositor: String
-    public let recipient: String
+    public let payer: String
+    public let payee: String
     public let amount: Double
-    public let currency: String
     public let status: DepositStatus
-    public let reason: String?
-    public let createdAt: Date
+    public let chain: String?
+    public let expiresAt: Double?
+    public let releasedAt: Double?
+    public let createdAt: Double
 
     enum CodingKeys: String, CodingKey {
-        case id, depositor, recipient, amount, currency, status, reason
+        case id, payer, payee, amount, status, chain
+        case expiresAt = "expires_at"
+        case releasedAt = "released_at"
         case createdAt = "created_at"
+    }
+
+    public init(id: String, payer: String, payee: String, amount: Double,
+                status: DepositStatus, chain: String? = nil,
+                expiresAt: Double? = nil, releasedAt: Double? = nil,
+                createdAt: Double = Date().timeIntervalSince1970) {
+        self.id = id; self.payer = payer; self.payee = payee; self.amount = amount
+        self.status = status; self.chain = chain; self.expiresAt = expiresAt
+        self.releasedAt = releasedAt; self.createdAt = createdAt
     }
 }
 
@@ -322,7 +421,7 @@ public struct Intent: Codable, Sendable {
     public let currency: String
     public let model: String
     public let status: String
-    public let expiresAt: Date
+    public let expiresAt: Double
 
     enum CodingKeys: String, CodingKey {
         case id, from, to, amount, currency, model, status

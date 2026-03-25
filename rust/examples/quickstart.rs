@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2. Direct payment -- one-way, instant, no escrow
     let tx = wallet.pay(recipient, dec!(1.50)).await?;
     println!(
-        "\n[Direct] Paid {} USDC -> {} (tx: {})",
+        "\n[Direct] Paid {:?} USDC -> {:?} (tx: {})",
         tx.amount, tx.to, tx.id
     );
 

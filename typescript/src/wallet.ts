@@ -125,7 +125,8 @@ export class Wallet extends RemitClient {
 
     if (!privateKey && !signer) {
       throw new Error(
-        "Wallet requires privateKey, signer, or the REMITMD_KEY environment variable."
+        "Wallet requires privateKey, signer, or the REMITMD_KEY environment variable. " +
+        "For OWS wallet support, use: await Wallet.withOws()"
       );
     }
 
@@ -154,8 +155,63 @@ export class Wallet extends RemitClient {
   static fromEnv(overrides?: RemitClientOptions): Wallet {
     const key = process.env["REMITMD_KEY"];
     const chain = process.env["REMITMD_CHAIN"] ?? "base";
-    if (!key) throw new Error("REMITMD_KEY environment variable is not set.");
+    if (!key) {
+      if (process.env["OWS_WALLET_ID"]) {
+        throw new Error(
+          "OWS_WALLET_ID is set but fromEnv() only supports raw keys. " +
+          "Use: await Wallet.withOws()"
+        );
+      }
+      throw new Error("REMITMD_KEY environment variable is not set.");
+    }
     return new Wallet({ chain, ...overrides, privateKey: key });
+  }
+
+  /**
+   * Create a Wallet backed by the Open Wallet Standard.
+   *
+   * Reads OWS_WALLET_ID, OWS_API_KEY, and REMITMD_CHAIN from env unless
+   * overridden. Falls back to REMITMD_KEY if OWS_WALLET_ID is not set.
+   *
+   * @example
+   * ```typescript
+   * const wallet = await Wallet.withOws();
+   * // or with explicit options:
+   * const wallet = await Wallet.withOws({ walletId: "remit-my-agent" });
+   * ```
+   */
+  static async withOws(
+    options?: RemitClientOptions & {
+      walletId?: string;
+      owsApiKey?: string;
+    },
+  ): Promise<Wallet> {
+    const owsWalletId = options?.walletId ?? process.env["OWS_WALLET_ID"];
+    const remitKey = process.env["REMITMD_KEY"];
+    const chain = options?.chain ?? process.env["REMITMD_CHAIN"] ?? "base";
+
+    if (owsWalletId && remitKey) {
+      console.warn("[remitmd] Both OWS_WALLET_ID and REMITMD_KEY set. Using OWS.");
+    }
+
+    if (owsWalletId) {
+      const { OwsSigner } = await import("./ows-signer.js");
+      const signer = await OwsSigner.create({
+        walletId: owsWalletId,
+        chain,
+        owsApiKey: options?.owsApiKey ?? process.env["OWS_API_KEY"],
+      });
+      return new Wallet({ chain, ...options, signer });
+    }
+
+    if (remitKey) {
+      return new Wallet({ chain, ...options, privateKey: remitKey });
+    }
+
+    throw new Error(
+      "Wallet.withOws() requires OWS_WALLET_ID or REMITMD_KEY. " +
+      "Install OWS: npm install -g @open-wallet-standard/core"
+    );
   }
 
   /** Checksummed public address. */

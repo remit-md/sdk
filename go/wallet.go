@@ -1,11 +1,15 @@
 package remitmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -163,15 +167,31 @@ func (w *Wallet) ChainID() ChainID {
 	return w.chainID
 }
 
-// ─── Balance ──────────────────────────────────────────────────────────────────
+// ─── Status / Balance ─────────────────────────────────────────────────────────
 
-// Balance returns the current USDC balance of this wallet.
-func (w *Wallet) Balance(ctx context.Context) (*Balance, error) {
-	var b Balance
-	if err := w.http.get(ctx, "/api/v1/wallet/balance", &b); err != nil {
+// Status returns the full wallet status from GET /api/v1/status/{address}.
+func (w *Wallet) Status(ctx context.Context) (*WalletStatus, error) {
+	var s WalletStatus
+	if err := w.http.get(ctx, "/api/v1/status/"+strings.ToLower(w.Address()), &s); err != nil {
 		return nil, err
 	}
-	return &b, nil
+	return &s, nil
+}
+
+// Balance returns the current USDC balance of this wallet.
+// Delegates to Status() and returns the balance field.
+func (w *Wallet) Balance(ctx context.Context) (*Balance, error) {
+	status, err := w.Status(ctx)
+	if err != nil {
+		return nil, err
+	}
+	usdcBal, _ := decimal.NewFromString(status.Balance)
+	return &Balance{
+		USDC:      usdcBal,
+		Address:   status.Wallet,
+		ChainID:   w.chainID,
+		UpdatedAt: time.Now(),
+	}, nil
 }
 
 // ─── Direct Payment ───────────────────────────────────────────────────────────
@@ -372,35 +392,53 @@ func (w *Wallet) CreateEscrow(ctx context.Context, payee string, amount decimal.
 }
 
 // ReleaseEscrow releases funds to the payee, optionally releasing specific milestones.
-func (w *Wallet) ReleaseEscrow(ctx context.Context, escrowID string, milestoneIDs ...string) (*Escrow, error) {
+func (w *Wallet) ReleaseEscrow(ctx context.Context, escrowID string, milestoneIDs ...string) (*Transaction, error) {
 	body := map[string]any{}
 	if len(milestoneIDs) > 0 {
 		body["milestone_ids"] = milestoneIDs
 	}
-	var escrow Escrow
-	if err := w.http.post(ctx, "/api/v1/escrows/"+escrowID+"/release", body, &escrow); err != nil {
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v1/escrows/"+escrowID+"/release", body, &tx); err != nil {
 		return nil, err
 	}
-	return &escrow, nil
+	return &tx, nil
 }
 
 // ClaimStart signals that the payee has started work on an escrow.
 // Must be called by the payee before the payer can release funds.
-func (w *Wallet) ClaimStart(ctx context.Context, escrowID string) (*Escrow, error) {
-	var escrow Escrow
-	if err := w.http.post(ctx, "/api/v1/escrows/"+escrowID+"/claim-start", map[string]any{}, &escrow); err != nil {
+func (w *Wallet) ClaimStart(ctx context.Context, escrowID string) (*Transaction, error) {
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v1/escrows/"+escrowID+"/claim-start", map[string]any{}, &tx); err != nil {
 		return nil, err
 	}
-	return &escrow, nil
+	return &tx, nil
 }
 
 // CancelEscrow cancels an escrow and returns funds to the payer.
-func (w *Wallet) CancelEscrow(ctx context.Context, escrowID string) (*Escrow, error) {
-	var escrow Escrow
-	if err := w.http.post(ctx, "/api/v1/escrows/"+escrowID+"/cancel", map[string]any{}, &escrow); err != nil {
+func (w *Wallet) CancelEscrow(ctx context.Context, escrowID string) (*Transaction, error) {
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v1/escrows/"+escrowID+"/cancel", map[string]any{}, &tx); err != nil {
 		return nil, err
 	}
-	return &escrow, nil
+	return &tx, nil
+}
+
+// SubmitEvidence submits evidence for an escrow claim.
+// POST to /api/v1/escrows/{invoiceID}/claim-start with evidence_uri and milestone_index.
+// milestoneIndex defaults to 0 if not provided.
+func (w *Wallet) SubmitEvidence(ctx context.Context, invoiceID, evidenceURI string, milestoneIndex ...int) (*Transaction, error) {
+	idx := 0
+	if len(milestoneIndex) > 0 {
+		idx = milestoneIndex[0]
+	}
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v1/escrows/"+invoiceID+"/claim-start", map[string]any{
+		"evidence_uri":    evidenceURI,
+		"milestone_index": idx,
+	}, &tx); err != nil {
+		return nil, err
+	}
+	return &tx, nil
 }
 
 // GetEscrow returns the current state of an escrow.
@@ -514,23 +552,23 @@ func WithCloseTabSig(sig string) CloseTabOption {
 }
 
 // CloseTab settles all charges on-chain and closes the tab.
-func (w *Wallet) CloseTab(ctx context.Context, tabID string, opts ...CloseTabOption) (*Tab, error) {
+func (w *Wallet) CloseTab(ctx context.Context, tabID string, opts ...CloseTabOption) (*Transaction, error) {
 	cfg := &CloseTabOptions{ProviderSig: "0x"}
 	for _, o := range opts {
 		o(cfg)
 	}
-	var tab Tab
+	var tx Transaction
 	if err := w.http.post(ctx, "/api/v1/tabs/"+tabID+"/close", map[string]any{
 		"final_amount": cfg.FinalAmount,
 		"provider_sig": cfg.ProviderSig,
-	}, &tab); err != nil {
+	}, &tx); err != nil {
 		return nil, err
 	}
-	return &tab, nil
+	return &tx, nil
 }
 
 // SettleTab is an alias for CloseTab for backward compatibility.
-func (w *Wallet) SettleTab(ctx context.Context, tabID string) (*Tab, error) {
+func (w *Wallet) SettleTab(ctx context.Context, tabID string) (*Transaction, error) {
 	return w.CloseTab(ctx, tabID)
 }
 
@@ -598,12 +636,12 @@ func (w *Wallet) CreateStream(ctx context.Context, payee string, ratePerSecond d
 }
 
 // CloseStream closes an active payment stream.
-func (w *Wallet) CloseStream(ctx context.Context, streamID string) (*Stream, error) {
-	var stream Stream
-	if err := w.http.post(ctx, "/api/v1/streams/"+streamID+"/close", map[string]any{}, &stream); err != nil {
+func (w *Wallet) CloseStream(ctx context.Context, streamID string) (*Transaction, error) {
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v1/streams/"+streamID+"/close", map[string]any{}, &tx); err != nil {
 		return nil, err
 	}
-	return &stream, nil
+	return &tx, nil
 }
 
 // WithdrawStream claims all vested stream payments (callable by recipient).
@@ -672,25 +710,30 @@ func (w *Wallet) CreateBounty(ctx context.Context, amount decimal.Decimal, task 
 }
 
 // SubmitBounty submits evidence to claim a bounty.
-func (w *Wallet) SubmitBounty(ctx context.Context, bountyID string, evidenceHash string) (*BountySubmission, error) {
-	var sub BountySubmission
-	if err := w.http.post(ctx, "/api/v1/bounties/"+bountyID+"/submit", map[string]any{
+// An optional evidenceURI can be provided as a link to the evidence.
+func (w *Wallet) SubmitBounty(ctx context.Context, bountyID string, evidenceHash string, evidenceURI ...string) (*BountySubmission, error) {
+	body := map[string]any{
 		"evidence_hash": evidenceHash,
-	}, &sub); err != nil {
+	}
+	if len(evidenceURI) > 0 && evidenceURI[0] != "" {
+		body["evidence_uri"] = evidenceURI[0]
+	}
+	var sub BountySubmission
+	if err := w.http.post(ctx, "/api/v1/bounties/"+bountyID+"/submit", body, &sub); err != nil {
 		return nil, err
 	}
 	return &sub, nil
 }
 
 // AwardBounty awards the bounty to a specific submission.
-func (w *Wallet) AwardBounty(ctx context.Context, bountyID string, submissionID int) (*Bounty, error) {
-	var bounty Bounty
+func (w *Wallet) AwardBounty(ctx context.Context, bountyID string, submissionID int) (*Transaction, error) {
+	var tx Transaction
 	if err := w.http.post(ctx, "/api/v1/bounties/"+bountyID+"/award", map[string]any{
 		"submission_id": submissionID,
-	}, &bounty); err != nil {
+	}, &tx); err != nil {
 		return nil, err
 	}
-	return &bounty, nil
+	return &tx, nil
 }
 
 // BountyListOptions controls filtering for ListBounties.
@@ -861,13 +904,61 @@ func (w *Wallet) GetContracts(ctx context.Context) (*ContractAddresses, error) {
 // ─── Mint ─────────────────────────────────────────────────────────────────────
 
 // Mint mints testnet USDC. Returns the tx hash and new balance.
+// Uses unauthenticated HTTP (no EIP-712 headers) since mint is a public endpoint.
 func (w *Wallet) Mint(ctx context.Context, amount float64) (*MintResponse, error) {
-	var resp MintResponse
-	if err := w.http.post(ctx, "/api/v1/mint", map[string]any{
+	// Resolve the base URL from the http transport.
+	var baseURL string
+	switch t := w.http.(type) {
+	case *httpClient:
+		baseURL = t.baseURL
+	default:
+		// Mock or custom transport — delegate normally.
+		var resp MintResponse
+		if err := w.http.post(ctx, "/api/v1/mint", map[string]any{
+			"wallet": w.Address(),
+			"amount": amount,
+		}, &resp); err != nil {
+			return nil, err
+		}
+		return &resp, nil
+	}
+
+	body, err := json.Marshal(map[string]any{
 		"wallet": w.Address(),
 		"amount": amount,
-	}, &resp); err != nil {
-		return nil, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal mint request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/v1/mint", bytes.NewReader(body))
+	if err != nil {
+		return nil, remitErr(ErrCodeNetworkError, fmt.Sprintf("create mint request: %s", err), nil)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	httpResp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, remitErr(ErrCodeNetworkError, fmt.Sprintf("mint request failed: %s", err), nil)
+	}
+	defer httpResp.Body.Close()
+
+	respBytes, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return nil, remitErr(ErrCodeNetworkError, "read mint response failed", nil)
+	}
+
+	if httpResp.StatusCode >= 400 {
+		var apiErr apiErrorResponse
+		if err := json.Unmarshal(respBytes, &apiErr); err == nil && apiErr.Code != "" {
+			return nil, remitErr(apiErr.Code, apiErr.Message, apiErr.Context)
+		}
+		return nil, remitErr(ErrCodeServerError, fmt.Sprintf("mint error (HTTP %d): %s", httpResp.StatusCode, string(respBytes)), nil)
+	}
+
+	var resp MintResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return nil, remitErr(ErrCodeServerError, fmt.Sprintf("parse mint response: %s", err), nil)
 	}
 	return &resp, nil
 }
@@ -1115,11 +1206,13 @@ func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64
 
 // RegisterWebhook registers a webhook endpoint to receive real-time event notifications.
 // events must contain at least one valid event type (e.g. "payment.sent", "escrow.funded").
+// If no chains are specified, defaults to the wallet's current chain.
 func (w *Wallet) RegisterWebhook(ctx context.Context, url string, events []string, chains ...string) (*Webhook, error) {
-	body := map[string]any{"url": url, "events": events}
-	if len(chains) > 0 {
-		body["chains"] = chains
+	chainList := chains
+	if len(chainList) == 0 {
+		chainList = []string{w.chain}
 	}
+	body := map[string]any{"url": url, "events": events, "chains": chainList}
 	var wh Webhook
 	if err := w.http.post(ctx, "/api/v1/webhooks", body, &wh); err != nil {
 		return nil, err

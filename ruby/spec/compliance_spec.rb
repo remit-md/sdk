@@ -97,7 +97,7 @@ RSpec.describe "Ruby SDK compliance" do
 
     it "unauthenticated POST /payments/direct returns 401" do
       resp = http_post("/api/v1/payments/direct",
-        { "to" => "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "amount" => "1.000000" })
+                        { "to" => "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "amount" => "1.000000" })
       expect(resp.code.to_i).to eq(401)
     end
   end

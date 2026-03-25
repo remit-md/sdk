@@ -54,7 +54,7 @@ public sealed class Wallet
     /// <param name="routerAddress">EIP-712 verifying contract address. Required for production use.</param>
     public Wallet(IRemitSigner signer, string chain = "base", bool testnet = false, string? baseUrl = null, string? routerAddress = null)
     {
-        var key = testnet ? $"{chain}-sepolia" : chain;
+        var key = testnet && !chain.Contains("sepolia") ? $"{chain}-sepolia" : chain;
 
         if (!Chains.TryGetValue(key, out var cc))
         {
@@ -67,7 +67,7 @@ public sealed class Wallet
 
         _signer = signer;
         _chainId = cc.ChainId;
-        _chain = chain;
+        _chain = key;
         _chainKey = key;
         _isMock = false;
         var envUrl = Environment.GetEnvironmentVariable("REMITMD_API_URL");
@@ -135,7 +135,7 @@ public sealed class Wallet
         var body = new Dictionary<string, object?>
         {
             ["to"]        = recipient,
-            ["amount"]    = amount.ToString("F6"),
+            ["amount"]    = (object)amount,
             ["task"]      = memo,
             ["chain"]     = _chain,
             ["nonce"]     = nonce,
@@ -145,11 +145,22 @@ public sealed class Wallet
         return await _transport.PostAsync<Transaction>("/api/v1/payments/direct", body, ct);
     }
 
-    // ─── Balance & reputation ─────────────────────────────────────────────────
+    // ─── Status & balance ──────────────────────────────────────────────────────
+
+    /// <summary>Returns full wallet status including balance, tier, fee rate, and active primitives.</summary>
+    public Task<WalletStatus> StatusAsync(CancellationToken ct = default) =>
+        _transport.GetAsync<WalletStatus>($"/api/v1/status/{Address}", ct);
 
     /// <summary>Returns the current USDC balance for this wallet.</summary>
-    public Task<Balance> BalanceAsync(CancellationToken ct = default) =>
-        _transport.GetAsync<Balance>($"/api/v1/status/{Address}", ct);
+    public async Task<Balance> BalanceAsync(CancellationToken ct = default)
+    {
+        var status = await StatusAsync(ct);
+        return new Balance(
+            decimal.Parse(status.Balance),
+            status.Wallet,
+            (ChainId)_chainId,
+            DateTimeOffset.UtcNow);
+    }
 
     /// <summary>Returns the payment history for this wallet (newest first).</summary>
     /// <param name="page">Page number (1-based).</param>
@@ -193,7 +204,7 @@ public sealed class Wallet
             ["chain"]      = _chain,
             ["from_agent"] = Address.ToLowerInvariant(),
             ["to_agent"]   = payee.ToLowerInvariant(),
-            ["amount"]     = amount.ToString("F6"),
+            ["amount"]     = (object)amount,
             ["type"]       = "escrow",
             ["task"]       = memo,
             ["nonce"]      = nonce,
@@ -257,8 +268,8 @@ public sealed class Wallet
         {
             ["chain"]        = _chain,
             ["provider"]     = provider,
-            ["limit_amount"] = limitAmount.ToString("F6"),
-            ["per_unit"]     = perUnit.ToString("F6"),
+            ["limit_amount"] = (object)limitAmount,
+            ["per_unit"]     = (object)perUnit,
             ["expiry"]       = expiry,
             ["permit"]       = permit,
         };
@@ -282,8 +293,8 @@ public sealed class Wallet
         ValidateAmount(amount);
         return _transport.PostAsync<TabCharge>($"/api/v1/tabs/{tabId}/charge", new Dictionary<string, object?>
         {
-            ["amount"]       = amount.ToString("F6"),
-            ["cumulative"]   = cumulative.ToString("F6"),
+            ["amount"]       = (object)amount,
+            ["cumulative"]   = (object)cumulative,
             ["call_count"]   = callCount,
             ["provider_sig"] = providerSig,
         }, ct);
@@ -300,7 +311,7 @@ public sealed class Wallet
         CancellationToken ct = default) =>
         _transport.PostAsync<Tab>($"/api/v1/tabs/{tabId}/close", new Dictionary<string, object?>
         {
-            ["final_amount"] = finalAmount.ToString("F6"),
+            ["final_amount"] = (object)finalAmount,
             ["provider_sig"] = providerSig,
         }, ct);
 
@@ -372,8 +383,8 @@ public sealed class Wallet
         {
             ["chain"]           = _chain,
             ["payee"]           = payee,
-            ["rate_per_second"] = ratePerSecond.ToString("F9"),
-            ["max_total"]       = maxTotal.ToString("F6"),
+            ["rate_per_second"] = (object)ratePerSecond,
+            ["max_total"]       = (object)maxTotal,
             ["permit"]          = permit,
         };
         return await _transport.PostAsync<Stream>("/api/v1/streams", body, ct);
@@ -406,7 +417,7 @@ public sealed class Wallet
         var body = new Dictionary<string, object?>
         {
             ["chain"]            = _chain,
-            ["amount"]           = amount.ToString("F6"),
+            ["amount"]           = (object)amount,
             ["task_description"] = taskDescription,
             ["deadline"]         = deadline,
             ["max_attempts"]     = maxAttempts,
@@ -482,7 +493,7 @@ public sealed class Wallet
         {
             ["chain"]    = _chain,
             ["provider"] = provider,
-            ["amount"]   = amount.ToString("F6"),
+            ["amount"]   = (object)amount,
             ["expiry"]   = expiry,
             ["permit"]   = permit,
         };
@@ -516,7 +527,7 @@ public sealed class Wallet
         return _transport.PostAsync<Intent>("/api/v1/invoices", new
         {
             to,
-            amount = amount.ToString("F6"),
+            amount = (object)amount,
             type,
         }, ct);
     }
@@ -537,7 +548,7 @@ public sealed class Wallet
         {
             url,
             events = events.ToList(),
-            chains = chains?.ToList(),
+            chains = (chains ?? new[] { _chain }).ToList(),
         }, ct);
 
     // ─── One-time operator links ──────────────────────────────────────────────
@@ -557,15 +568,19 @@ public sealed class Wallet
         return await _transport.PostAsync<LinkResponse>("/api/v1/links/fund", body, ct);
     }
 
-    /// <summary>Generates a one-time URL for the operator to withdraw funds.</summary>
+    /// <summary>Generates a one-time URL for the operator to withdraw funds.
+    /// Auto-signs a permit (999M USDC to relayer) so the operator can withdraw.</summary>
     /// <param name="messages">Optional chat-style messages shown on the withdraw page (role: "agent" or "system", text: message).</param>
     /// <param name="agentName">Optional agent display name shown on the withdraw page.</param>
-    public Task<LinkResponse> CreateWithdrawLinkAsync(LinkMessage[]? messages = null, string? agentName = null, CancellationToken ct = default)
+    /// <param name="permit">Optional pre-signed permit. Auto-signed if omitted.</param>
+    public async Task<LinkResponse> CreateWithdrawLinkAsync(LinkMessage[]? messages = null, string? agentName = null, PermitSignature? permit = null, CancellationToken ct = default)
     {
+        permit ??= await AutoPermitAsync("relayer", 999_999_999m);
         var body = new Dictionary<string, object>();
         if (messages is { Length: > 0 }) body["messages"] = messages;
         if (!string.IsNullOrEmpty(agentName)) body["agent_name"] = agentName!;
-        return _transport.PostAsync<LinkResponse>("/api/v1/links/withdraw", body, ct);
+        if (permit is not null) body["permit"] = permit;
+        return await _transport.PostAsync<LinkResponse>("/api/v1/links/withdraw", body, ct);
     }
 
     // ─── Contracts ─────────────────────────────────────────────────────────
@@ -588,7 +603,7 @@ public sealed class Wallet
         return _transport.PostAsync<MintResponse>("/api/v1/mint", new
         {
             wallet = Address,
-            amount = amount.ToString("F6"),
+            amount = (object)amount,
         }, ct);
     }
 

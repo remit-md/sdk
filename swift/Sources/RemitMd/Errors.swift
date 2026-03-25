@@ -13,30 +13,77 @@
 /// }
 /// ```
 public struct RemitError: Error, CustomStringConvertible {
-    // MARK: - Error code constants
+    // MARK: - Error code constants (canonical — matches TS SDK)
 
+    // Auth errors
+    public static let invalidSignature      = "INVALID_SIGNATURE"
+    public static let nonceReused           = "NONCE_REUSED"
+    public static let timestampExpired      = "TIMESTAMP_EXPIRED"
+    public static let unauthorized          = "UNAUTHORIZED"
+
+    // Balance / funds
+    public static let insufficientBalance   = "INSUFFICIENT_BALANCE"
+    public static let belowMinimum          = "BELOW_MINIMUM"
+
+    // Escrow errors
+    public static let escrowNotFound        = "ESCROW_NOT_FOUND"
+    public static let escrowAlreadyFunded   = "ESCROW_ALREADY_FUNDED"
+    public static let escrowExpired         = "ESCROW_EXPIRED"
+
+    // Invoice errors
+    public static let invalidInvoice        = "INVALID_INVOICE"
+    public static let duplicateInvoice      = "DUPLICATE_INVOICE"
+    public static let selfPayment           = "SELF_PAYMENT"
+    public static let invalidPaymentType    = "INVALID_PAYMENT_TYPE"
+
+    // Tab errors
+    public static let tabDepleted           = "TAB_DEPLETED"
+    public static let tabExpired            = "TAB_EXPIRED"
+    public static let tabNotFound           = "TAB_NOT_FOUND"
+
+    // Stream errors
+    public static let streamNotFound        = "STREAM_NOT_FOUND"
+    public static let rateExceedsCap        = "RATE_EXCEEDS_CAP"
+
+    // Bounty errors
+    public static let bountyExpired         = "BOUNTY_EXPIRED"
+    public static let bountyClaimed         = "BOUNTY_CLAIMED"
+    public static let bountyMaxAttempts     = "BOUNTY_MAX_ATTEMPTS"
+    public static let bountyNotFound        = "BOUNTY_NOT_FOUND"
+
+    // Chain errors
+    public static let chainMismatch         = "CHAIN_MISMATCH"
+    public static let chainUnsupported      = "CHAIN_UNSUPPORTED"
+
+    // Rate limiting
+    public static let rateLimited           = "RATE_LIMITED"
+
+    // Cancellation errors
+    public static let cancelBlockedClaimStart = "CANCEL_BLOCKED_CLAIM_START"
+    public static let cancelBlockedEvidence   = "CANCEL_BLOCKED_EVIDENCE"
+
+    // Protocol errors
+    public static let versionMismatch       = "VERSION_MISMATCH"
+    public static let networkError          = "NETWORK_ERROR"
+
+    // Legacy aliases (kept for backward compatibility within SDK internals)
     public static let invalidAddress        = "INVALID_ADDRESS"
     public static let invalidAmount         = "INVALID_AMOUNT"
-    public static let insufficientFunds     = "INSUFFICIENT_FUNDS"
-    public static let escrowNotFound        = "ESCROW_NOT_FOUND"
-    public static let tabNotFound           = "TAB_NOT_FOUND"
-    public static let streamNotFound        = "STREAM_NOT_FOUND"
-    public static let bountyNotFound        = "BOUNTY_NOT_FOUND"
-    public static let depositNotFound       = "DEPOSIT_NOT_FOUND"
-    public static let unauthorized          = "UNAUTHORIZED"
-    public static let rateLimited           = "RATE_LIMITED"
-    public static let networkError          = "NETWORK_ERROR"
     public static let serverError           = "SERVER_ERROR"
-    public static let nonceReused           = "NONCE_REUSED"
-    public static let signatureInvalid      = "SIGNATURE_INVALID"
     public static let escrowAlreadyCompleted = "ESCROW_ALREADY_COMPLETED"
-    public static let escrowExpired         = "ESCROW_EXPIRED"
     public static let tabLimitExceeded      = "TAB_LIMIT_EXCEEDED"
     public static let bountyAlreadyAwarded  = "BOUNTY_ALREADY_AWARDED"
+    public static let depositNotFound       = "DEPOSIT_NOT_FOUND"
     public static let streamNotActive       = "STREAM_NOT_ACTIVE"
     public static let depositAlreadyResolved = "DEPOSIT_ALREADY_RESOLVED"
     public static let usdcTransferFailed    = "USDC_TRANSFER_FAILED"
     public static let chainUnavailable      = "CHAIN_UNAVAILABLE"
+
+    // Removed aliases — old names that mapped to wrong codes
+    @available(*, deprecated, renamed: "invalidSignature")
+    public static let signatureInvalid      = "INVALID_SIGNATURE"
+    @available(*, deprecated, renamed: "insufficientBalance")
+    public static let insufficientFunds     = "INSUFFICIENT_BALANCE"
 
     // MARK: - Properties
 
@@ -70,8 +117,8 @@ public struct RemitError: Error, CustomStringConvertible {
             context: ["amount": "\(amount)"])
     }
 
-    static func insufficientFunds(available: Double, required: Double) -> RemitError {
-        RemitError(insufficientFunds,
+    static func insufficientBalance(available: Double, required: Double) -> RemitError {
+        RemitError(insufficientBalance,
             "wallet has \(available) USDC but \(required) USDC required",
             context: ["available": "\(available)", "required": "\(required)"])
     }

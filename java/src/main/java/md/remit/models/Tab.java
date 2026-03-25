@@ -1,5 +1,6 @@
 package md.remit.models;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -13,8 +14,9 @@ public class Tab {
     @JsonProperty("id")
     public String id;
 
-    @JsonProperty("opener")
-    public String opener;
+    @JsonProperty("payer")
+    @JsonAlias("opener")
+    public String payer;
 
     @JsonProperty("provider")
     public String provider;

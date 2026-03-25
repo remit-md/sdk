@@ -31,12 +31,14 @@ public final class RemitMd {
     // API endpoints per chain
     private static final Map<String, String> API_URLS = Map.of(
         "base",           "https://remit.md",
-        "base-sepolia",   "https://testnet.remit.md"
+        "base-sepolia",   "https://testnet.remit.md",
+        "localhost",      "http://localhost:3000"
     );
 
     private static final Map<String, Long> CHAIN_IDS = Map.of(
         "base",           8453L,
-        "base-sepolia",   84532L
+        "base-sepolia",   84532L,
+        "localhost",      31337L
     );
 
     private RemitMd() {}
@@ -122,7 +124,7 @@ public final class RemitMd {
 
         /** Builds the {@link Wallet}. */
         public Wallet build() {
-            String chainKey = testnet ? chain + "-sepolia" : chain;
+            String chainKey = "localhost".equals(chain) ? "localhost" : (testnet ? chain + "-sepolia" : chain);
             if (!API_URLS.containsKey(chainKey)) {
                 throw new RemitError(ErrorCodes.INVALID_CHAIN,
                     "Unsupported chain \"" + chain + "\". Valid chains: base. " +

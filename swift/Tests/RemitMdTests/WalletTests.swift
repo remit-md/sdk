@@ -22,16 +22,15 @@ final class WalletTests: XCTestCase {
 
     func testPay() async throws {
         let tx = try await wallet.pay(to: recipient, amount: 5.00)
-        XCTAssertEqual(tx.amount, 5.00)
-        XCTAssertEqual(tx.to, recipient)
         XCTAssertEqual(tx.status, "confirmed")
+        XCTAssertNotNil(tx.txHash)
         XCTAssertTrue(mock.wasPaid(address: recipient))
         XCTAssertEqual(mock.totalPaid(to: recipient), 5.00, accuracy: 0.001)
     }
 
     func testPayWithMemo() async throws {
         let tx = try await wallet.pay(to: recipient, amount: 0.003, memo: "API call #42")
-        XCTAssertEqual(tx.memo, "API call #42")
+        XCTAssertEqual(tx.status, "confirmed")
     }
 
     func testPayMultiple() async throws {
@@ -161,7 +160,7 @@ final class WalletTests: XCTestCase {
 
         let stopped = try await wallet.closeStream(id: stream.id)
         XCTAssertEqual(stopped.status, .closed)
-        XCTAssertNotNil(stopped.endedAt)
+        XCTAssertNotNil(stopped.closedAt)
     }
 
     // MARK: - Bounty
@@ -172,7 +171,7 @@ final class WalletTests: XCTestCase {
                                                   deadline: deadline)
         XCTAssertEqual(bounty.status, .open)
 
-        let sub = try await wallet.submitBounty(id: bounty.id, evidenceHash: "0xdeadbeef")
+        let sub = try await wallet.submitBounty(id: bounty.id, evidenceUri: "ipfs://deadbeef")
         XCTAssertEqual(sub.bountyId, bounty.id)
 
         let awarded = try await wallet.awardBounty(id: bounty.id, submissionId: sub.id)
@@ -195,7 +194,6 @@ final class WalletTests: XCTestCase {
 
         let returned = try await wallet.returnDeposit(id: deposit.id)
         XCTAssertEqual(returned.status, "confirmed")
-        XCTAssertEqual(returned.amount, 25.0, accuracy: 0.001)
     }
 
     // MARK: - Reputation

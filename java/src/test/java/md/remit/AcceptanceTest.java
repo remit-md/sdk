@@ -389,14 +389,13 @@ class AcceptanceTest {
         String closeSig = provider.wallet.signTabCharge(
                 tabContract, tab.id, chargeUnits, callCount);
 
-        Tab closed = agent.wallet.closeTab(
+        Transaction closeTx = agent.wallet.closeTab(
                 tab.id,
                 new BigDecimal("2.0"),
                 closeSig);
-        assertEquals("closed", closed.status, "tab should be closed, got " + closed.status);
-        assertNotNull(closed.closedTxHash, "close should return tx hash");
-        assertTrue(closed.closedTxHash.startsWith("0x"),
-                "close tx hash should start with 0x, got: " + closed.closedTxHash);
+        assertNotNull(closeTx.txHash, "close should return tx hash");
+        assertTrue(closeTx.txHash.startsWith("0x"),
+                "close tx hash should start with 0x, got: " + closeTx.txHash);
 
         // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
@@ -451,8 +450,8 @@ class AcceptanceTest {
         Thread.sleep(5_000);
 
         // Step 3: Close stream (payer only)
-        Stream closed = agent.wallet.closeStream(stream.id);
-        assertEquals("closed", closed.status, "stream should be closed, got " + closed.status);
+        Transaction closeTx = agent.wallet.closeStream(stream.id);
+        assertNotNull(closeTx.txHash, "close stream should return tx hash");
 
         // Wait for settlement (provider balance should increase)
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
@@ -524,15 +523,15 @@ class AcceptanceTest {
 
         // Step 2: Provider submits evidence
         String evidenceHash = "0x" + "ab".repeat(32);
-        BountySubmission submission = provider.wallet.submitBounty(bounty.id, evidenceHash);
-        assertTrue(submission.id > 0, "submission should have an id");
+        Transaction submitTx = provider.wallet.submitBounty(bounty.id, evidenceHash);
+        assertNotNull(submitTx.id, "submission should have an id");
 
         // Wait for submission tx
         Thread.sleep(5_000);
 
         // Step 3: Poster awards to the submission
-        Bounty awarded = poster.wallet.awardBounty(bounty.id, submission.id);
-        assertEquals("awarded", awarded.status, "bounty should be awarded, got " + awarded.status);
+        Transaction awardTx = poster.wallet.awardBounty(bounty.id, 1);
+        assertNotNull(awardTx.txHash, "award should return tx hash");
 
         // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
@@ -584,8 +583,8 @@ class AcceptanceTest {
         assertBalanceChange("agent locked", agentBefore, agentMid, -amount);
 
         // Step 2: Provider returns the deposit
-        Deposit returned = provider.wallet.returnDeposit(deposit.id);
-        assertEquals("returned", returned.status, "deposit should be returned, got " + returned.status);
+        Transaction returnTx = provider.wallet.returnDeposit(deposit.id);
+        assertNotNull(returnTx.txHash, "return deposit should return tx hash");
 
         // Wait for return settlement (agent gets full refund)
         double agentAfter = waitForBalanceChange(agent.address(), agentMid);

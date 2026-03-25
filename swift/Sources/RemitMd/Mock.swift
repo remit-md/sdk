@@ -19,6 +19,8 @@ public final class MockRemit: @unchecked Sendable {
 
     // In-memory state
     private var _transactions: [Transaction] = []
+    /// Internal record of payments for assertion helpers (to, amount).
+    private var _paymentRecords: [(to: String, amount: Double)] = []
     private var _balances: [String: Double] = [:]
     private var _escrows: [String: Escrow] = [:]
     private var _tabs: [String: Tab] = [:]
@@ -56,12 +58,12 @@ public final class MockRemit: @unchecked Sendable {
     // MARK: - Assertions
 
     public func wasPaid(address: String) -> Bool {
-        lock.remitLock { _transactions.contains { $0.to == address } }
+        lock.remitLock { _paymentRecords.contains { $0.to == address } }
     }
 
     public func totalPaid(to address: String) -> Double {
         lock.remitLock {
-            _transactions.filter { $0.to == address }.map(\.amount).reduce(0, +)
+            _paymentRecords.filter { $0.to == address }.map(\.amount).reduce(0, +)
         }
     }
 
@@ -76,6 +78,7 @@ public final class MockRemit: @unchecked Sendable {
     public func reset() {
         lock.remitLock {
             _transactions.removeAll()
+            _paymentRecords.removeAll()
             _balances.removeAll()
             _escrows.removeAll()
             _tabs.removeAll()
@@ -95,6 +98,9 @@ public final class MockRemit: @unchecked Sendable {
 
         if path == "/api/v1/payments/direct" {
             return try cast(handlePay(body: body))
+        }
+        if path.hasPrefix("/api/v1/status/") {
+            return try cast(handleStatus(address: parts.last ?? walletAddress))
         }
         if path.hasPrefix("/api/v1/balance/") {
             return try cast(handleBalance(address: parts.last ?? walletAddress))
@@ -173,13 +179,21 @@ public final class MockRemit: @unchecked Sendable {
         try validate(amount: b.amount)
         return lock.remitLock {
             let tx = Transaction(
-                id: newID("tx"), from: walletAddress, to: b.to,
-                amount: b.amount, currency: "USDC", status: "confirmed",
-                memo: b.memo, blockNumber: 1, txHash: "0x" + String(repeating: "ab", count: 32),
-                createdAt: Date()
+                invoiceId: newID("tx"),
+                txHash: "0x" + String(repeating: "ab", count: 32),
+                chain: "base-sepolia", status: "confirmed",
+                createdAt: Date().timeIntervalSince1970
             )
             _transactions.append(tx)
+            _paymentRecords.append((to: b.to, amount: b.amount))
             return tx
+        }
+    }
+
+    private func handleStatus(address: String) throws -> WalletStatus {
+        return lock.remitLock {
+            WalletStatus(address: address, balance: _balances[address, default: 1000.0],
+                         chainId: 84532, permitNonce: 0, monthlyVolume: 0, feeRate: 100)
         }
     }
 
@@ -209,12 +223,10 @@ public final class MockRemit: @unchecked Sendable {
             guard let inv = _pendingInvoices.removeValue(forKey: b.invoice_id) else {
                 throw RemitError.notFound(RemitError.escrowNotFound, b.invoice_id)
             }
-            let recipient = inv["to_agent"] as? String ?? ""
+            let payee = inv["to_agent"] as? String ?? ""
             let amount = Double(inv["amount"] as? String ?? "0") ?? 0
-            let conditions = inv["task"] as? String
-            let e = Escrow(id: b.invoice_id, payer: walletAddress, recipient: recipient,
-                           amount: amount, currency: "USDC", status: .pending,
-                           conditions: conditions, expiresAt: nil, createdAt: Date())
+            let e = Escrow(id: b.invoice_id, payer: walletAddress, payee: payee,
+                           amount: amount, status: .pending)
             _escrows[e.id] = e
             return e
         }
@@ -233,9 +245,9 @@ public final class MockRemit: @unchecked Sendable {
                 throw RemitError.notFound(RemitError.escrowNotFound, id)
             }
             if e.status == .completed { throw RemitError(RemitError.escrowAlreadyCompleted, "escrow \(id) already completed") }
-            let updated = Escrow(id: e.id, payer: e.payer, recipient: e.recipient,
-                                 amount: e.amount, currency: e.currency, status: .completed,
-                                 conditions: e.conditions, expiresAt: e.expiresAt, createdAt: e.createdAt)
+            let updated = Escrow(id: e.id, payer: e.payer, payee: e.payee,
+                                 amount: e.amount, status: .completed,
+                                 createdAt: e.createdAt)
             _escrows[id] = updated
             return updated
         }
@@ -246,9 +258,9 @@ public final class MockRemit: @unchecked Sendable {
             guard let e = _escrows[id] else {
                 throw RemitError.notFound(RemitError.escrowNotFound, id)
             }
-            let updated = Escrow(id: e.id, payer: e.payer, recipient: e.recipient,
-                                 amount: e.amount, currency: e.currency, status: .cancelled,
-                                 conditions: e.conditions, expiresAt: e.expiresAt, createdAt: e.createdAt)
+            let updated = Escrow(id: e.id, payer: e.payer, payee: e.payee,
+                                 amount: e.amount, status: .cancelled,
+                                 createdAt: e.createdAt)
             _escrows[id] = updated
             return updated
         }
@@ -259,8 +271,9 @@ public final class MockRemit: @unchecked Sendable {
         try validate(address: b.provider)
         try validate(amount: b.limit_amount)
         return lock.remitLock {
-            let t = Tab(id: newID("tab"), payer: walletAddress, recipient: b.provider,
-                        limit: b.limit_amount, spent: 0, currency: "USDC", status: .open, createdAt: Date())
+            let t = Tab(id: newID("tab"), payer: walletAddress, payee: b.provider,
+                        limit: b.limit_amount, spent: 0, perUnit: b.per_unit,
+                        status: .open)
             _tabs[t.id] = t
             return t
         }
@@ -276,8 +289,8 @@ public final class MockRemit: @unchecked Sendable {
                 throw RemitError(RemitError.tabLimitExceeded,
                     "charge would bring spent to \(newSpent) USDC, exceeding limit of \(t.limit) USDC")
             }
-            let updated = Tab(id: t.id, payer: t.payer, recipient: t.recipient,
-                              limit: t.limit, spent: newSpent, currency: t.currency,
+            let updated = Tab(id: t.id, payer: t.payer, payee: t.payee,
+                              limit: t.limit, spent: newSpent, perUnit: t.perUnit,
                               status: t.status, createdAt: t.createdAt)
             _tabs[id] = updated
             _counter += 1
@@ -290,8 +303,8 @@ public final class MockRemit: @unchecked Sendable {
     private func handleCloseTab(id: String, body: (any Encodable)?) throws -> Tab {
         return try lock.remitLock {
             guard let t = _tabs[id] else { throw RemitError.notFound(RemitError.tabNotFound, id) }
-            let updated = Tab(id: t.id, payer: t.payer, recipient: t.recipient,
-                              limit: t.limit, spent: t.spent, currency: t.currency,
+            let updated = Tab(id: t.id, payer: t.payer, payee: t.payee,
+                              limit: t.limit, spent: t.spent, perUnit: t.perUnit,
                               status: .closed, createdAt: t.createdAt)
             _tabs[id] = updated
             return updated
@@ -305,9 +318,9 @@ public final class MockRemit: @unchecked Sendable {
             throw RemitError(RemitError.invalidAmount, "rate_per_second must be positive")
         }
         return lock.remitLock {
-            let s = Stream(id: newID("stream"), payer: walletAddress, recipient: b.payee,
-                           ratePerSecond: b.rate_per_second, currency: "USDC", status: .active,
-                           totalStreamed: 0, startedAt: Date(), endedAt: nil)
+            let s = Stream(id: newID("stream"), payer: walletAddress, payee: b.payee,
+                           ratePerSecond: b.rate_per_second, status: .active,
+                           totalStreamed: 0, maxTotal: b.max_total)
             _streams[s.id] = s
             return s
         }
@@ -316,10 +329,11 @@ public final class MockRemit: @unchecked Sendable {
     private func handleStopStream(id: String) throws -> Stream {
         return try lock.remitLock {
             guard let s = _streams[id] else { throw RemitError.notFound(RemitError.streamNotFound, id) }
-            let updated = Stream(id: s.id, payer: s.payer, recipient: s.recipient,
-                                 ratePerSecond: s.ratePerSecond, currency: s.currency,
+            let updated = Stream(id: s.id, payer: s.payer, payee: s.payee,
+                                 ratePerSecond: s.ratePerSecond,
                                  status: .closed, totalStreamed: s.totalStreamed,
-                                 startedAt: s.startedAt, endedAt: Date())
+                                 maxTotal: s.maxTotal,
+                                 startedAt: s.startedAt, closedAt: Date().timeIntervalSince1970)
             _streams[id] = updated
             return updated
         }
@@ -329,16 +343,15 @@ public final class MockRemit: @unchecked Sendable {
         let b = try jsonDecode(BountyBody.self, from: body)
         try validate(amount: b.amount)
         return lock.remitLock {
-            let bounty = Bounty(id: newID("bounty"), payer: walletAddress,
-                                amount: b.amount, currency: "USDC",
-                                description: b.task_description, status: .open,
-                                winner: nil, expiresAt: nil, createdAt: Date())
+            let bounty = Bounty(id: newID("bounty"), poster: walletAddress,
+                                amount: b.amount, task: b.task_description, status: .open,
+                                maxAttempts: b.max_attempts)
             _bounties[bounty.id] = bounty
             return bounty
         }
     }
 
-    private struct SubmitBountyBody: Codable { let evidence_hash: String }
+    private struct SubmitBountyBody: Codable { let evidence_uri: String }
 
     private func handleSubmitBounty(id: String, body: (any Encodable)?) throws -> BountySubmission {
         let b = try jsonDecode(SubmitBountyBody.self, from: body)
@@ -346,7 +359,7 @@ public final class MockRemit: @unchecked Sendable {
             guard _bounties[id] != nil else { throw RemitError.notFound(RemitError.bountyNotFound, id) }
             _counter += 1
             return BountySubmission(id: _counter, bountyId: id, submitter: walletAddress,
-                                    evidenceHash: b.evidence_hash, status: "pending",
+                                    evidenceUri: b.evidence_uri,
                                     submittedAt: ISO8601DateFormatter().string(from: Date()))
         }
     }
@@ -356,10 +369,10 @@ public final class MockRemit: @unchecked Sendable {
         return try lock.remitLock {
             guard let bounty = _bounties[id] else { throw RemitError.notFound(RemitError.bountyNotFound, id) }
             if bounty.status == .awarded { throw RemitError(RemitError.bountyAlreadyAwarded, "bounty \(id) already awarded") }
-            let updated = Bounty(id: bounty.id, payer: bounty.payer, amount: bounty.amount,
-                                 currency: bounty.currency, description: bounty.description,
-                                 status: .awarded, winner: "submission_\(b.submission_id)",
-                                 expiresAt: bounty.expiresAt, createdAt: bounty.createdAt)
+            let updated = Bounty(id: bounty.id, poster: bounty.poster, amount: bounty.amount,
+                                 task: bounty.task, status: .awarded,
+                                 winner: "submission_\(b.submission_id)",
+                                 createdAt: bounty.createdAt)
             _bounties[id] = updated
             return updated
         }
@@ -370,9 +383,8 @@ public final class MockRemit: @unchecked Sendable {
         try validate(address: b.provider)
         try validate(amount: b.amount)
         return lock.remitLock {
-            let d = Deposit(id: newID("dep"), depositor: walletAddress, recipient: b.provider,
-                            amount: b.amount, currency: "USDC", status: .locked,
-                            reason: nil, createdAt: Date())
+            let d = Deposit(id: newID("dep"), payer: walletAddress, payee: b.provider,
+                            amount: b.amount, status: .locked)
             _deposits[d.id] = d
             return d
         }
@@ -381,16 +393,15 @@ public final class MockRemit: @unchecked Sendable {
     private func handleReturnDeposit(id: String) throws -> Transaction {
         return try lock.remitLock {
             guard let d = _deposits[id] else { throw RemitError.notFound(RemitError.depositNotFound, id) }
-            let updated = Deposit(id: d.id, depositor: d.depositor, recipient: d.recipient,
-                                  amount: d.amount, currency: d.currency, status: .returned,
-                                  reason: d.reason, createdAt: d.createdAt)
+            let updated = Deposit(id: d.id, payer: d.payer, payee: d.payee,
+                                  amount: d.amount, status: .returned,
+                                  createdAt: d.createdAt)
             _deposits[id] = updated
             return Transaction(
-                id: newID("tx"), from: d.recipient, to: d.depositor,
-                amount: d.amount, currency: "USDC", status: "confirmed",
-                memo: "deposit returned", blockNumber: 1,
+                invoiceId: newID("tx"),
                 txHash: "0x" + String(repeating: "cd", count: 32),
-                createdAt: Date()
+                chain: "base-sepolia", status: "confirmed",
+                createdAt: Date().timeIntervalSince1970
             )
         }
     }
@@ -415,7 +426,8 @@ public final class MockRemit: @unchecked Sendable {
 
     private func handleHistory(address: String) throws -> TransactionList {
         return lock.remitLock {
-            let txs = _transactions.filter { $0.from == address || $0.to == address }
+            // Return all transactions in mock (no from/to filtering since Transaction model is minimal)
+            let txs = _transactions
             return TransactionList(transactions: txs, total: txs.count, page: 1, perPage: 50)
         }
     }
@@ -432,7 +444,7 @@ public final class MockRemit: @unchecked Sendable {
         return Intent(id: newID("intent"), from: walletAddress, to: b.to,
                       amount: b.amount, currency: "USDC", model: b.model,
                       status: "pending",
-                      expiresAt: Date().addingTimeInterval(300))
+                      expiresAt: Date().timeIntervalSince1970 + 300)
     }
 
     // MARK: - Helpers
@@ -463,12 +475,8 @@ public final class MockRemit: @unchecked Sendable {
     }
 
     private func cast<T: Decodable>(_ value: some Encodable) throws -> T {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(value)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(T.self, from: data)
+        let data = try JSONEncoder().encode(value)
+        return try JSONDecoder().decode(T.self, from: data)
     }
 }
 

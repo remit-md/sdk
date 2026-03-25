@@ -263,10 +263,10 @@ public final class RemitWallet: @unchecked Sendable {
     }
 
     /// Submit evidence to claim a bounty.
-    public func submitBounty(id: String, evidenceHash: String) async throws -> BountySubmission {
+    public func submitBounty(id: String, evidenceUri: String) async throws -> BountySubmission {
         return try await transport.request(
             method: "POST", path: "/api/v1/bounties/\(id)/submit",
-            body: SubmitBountyBody(evidence_hash: evidenceHash)
+            body: SubmitBountyBody(evidence_uri: evidenceUri)
         )
     }
 
@@ -338,7 +338,15 @@ public final class RemitWallet: @unchecked Sendable {
         )
     }
 
-    // MARK: - Analytics
+    // MARK: - Status & Balance
+
+    /// Get full wallet status (balance, permit nonce, monthly volume, fee rate).
+    public func status(of address: String? = nil) async throws -> WalletStatus {
+        let addr = address ?? signerAddress
+        return try await transport.request(
+            method: "GET", path: "/api/v1/status/\(addr)", body: Optional<EmptyBody>.none
+        )
+    }
 
     public func balance(of address: String? = nil) async throws -> Balance {
         let addr = address ?? signerAddress
@@ -346,6 +354,26 @@ public final class RemitWallet: @unchecked Sendable {
             method: "GET", path: "/api/v1/balance/\(addr)", body: Optional<EmptyBody>.none
         )
     }
+
+    // MARK: - Escrow evidence & milestone
+
+    /// Submit evidence to start a claim on an escrow.
+    public func submitEvidence(invoiceId: String, evidenceUri: String, milestoneIndex: Int = 0) async throws -> Escrow {
+        return try await transport.request(
+            method: "POST", path: "/api/v1/escrows/\(invoiceId)/claim-start",
+            body: SubmitEvidenceBody(evidence_uri: evidenceUri, milestone_index: milestoneIndex)
+        )
+    }
+
+    /// Release a milestone on an escrow (payer action).
+    public func releaseMilestone(invoiceId: String, milestoneIndex: Int) async throws -> Escrow {
+        return try await transport.request(
+            method: "POST", path: "/api/v1/escrows/\(invoiceId)/release",
+            body: ReleaseMilestoneBody(milestone_index: milestoneIndex)
+        )
+    }
+
+    // MARK: - Analytics
 
     public func reputation(of address: String? = nil) async throws -> Reputation {
         let addr = address ?? signerAddress
@@ -452,7 +480,7 @@ public final class RemitWallet: @unchecked Sendable {
         usdcAddress: String? = nil
     ) throws -> PermitSignature {
         guard let signer = self.signer else {
-            throw RemitError(RemitError.signatureInvalid, "Cannot sign permits in mock mode — no signer available")
+            throw RemitError(RemitError.invalidSignature, "Cannot sign permits in mock mode — no signer available")
         }
 
         let usdcAddr = usdcAddress ?? RemitWallet.usdcAddresses[chain.chainName]
@@ -551,11 +579,11 @@ public final class RemitWallet: @unchecked Sendable {
         // Mock mode: return 0 directly
         if isMock { return 0 }
 
-        let status: StatusResponse = try await transport.request(
+        let walletStatus: WalletStatus = try await transport.request(
             method: "GET", path: "/api/v1/status/\(signerAddress)",
             body: Optional<EmptyBody>.none
         )
-        guard let nonce = status.permitNonce else {
+        guard let nonce = walletStatus.permitNonce else {
             throw RemitError(RemitError.serverError, "permit_nonce not available from /status API for \(signerAddress)")
         }
         return nonce
@@ -578,9 +606,10 @@ public final class RemitWallet: @unchecked Sendable {
     ///   - events: Event types to subscribe to (e.g. ["payment.sent", "escrow.funded"]).
     ///   - chains: Optional chain names to filter by. Pass nil for all chains.
     public func registerWebhook(url: String, events: [String], chains: [String]? = nil) async throws -> Webhook {
+        let resolvedChains = chains ?? [chainName]
         return try await transport.request(
             method: "POST", path: "/api/v1/webhooks",
-            body: WebhookBody(url: url, events: events, chains: chains)
+            body: WebhookBody(url: url, events: events, chains: resolvedChains)
         )
     }
 
@@ -661,14 +690,7 @@ public final class RemitWallet: @unchecked Sendable {
 private struct EmptyBody: Codable {}
 private struct EmptyObject: Codable {}
 
-/// Response from GET /status/{address}. Only the fields we need for permit nonce.
-private struct StatusResponse: Codable {
-    let permitNonce: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case permitNonce = "permit_nonce"
-    }
-}
+// StatusResponse is now replaced by the public WalletStatus model.
 
 /// Chat-style message shown on a fund/withdraw page.
 public struct LinkMessageBody: Codable, Sendable {
@@ -714,7 +736,9 @@ private struct BountyBody: Codable {
     let deadline: Int; let max_attempts: Int; let permit: PermitSignature?
 }
 private struct BountyListResponse: Codable { let data: [Bounty] }
-private struct SubmitBountyBody: Codable { let evidence_hash: String }
+private struct SubmitEvidenceBody: Codable { let evidence_uri: String; let milestone_index: Int }
+private struct ReleaseMilestoneBody: Codable { let milestone_index: Int }
+private struct SubmitBountyBody: Codable { let evidence_uri: String }
 private struct AwardBody: Codable { let submission_id: Int }
 private struct DepositBody: Codable {
     let chain: String; let provider: String; let amount: Double

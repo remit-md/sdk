@@ -41,6 +41,7 @@ pub enum TabStatus {
     Open,
     Closed,
     Expired,
+    Suspended,
 }
 
 /// Status of a payment stream.
@@ -50,6 +51,8 @@ pub enum StreamStatus {
     Active,
     Closed,
     Completed,
+    Paused,
+    Cancelled,
 }
 
 /// Status of a bounty.
@@ -57,7 +60,8 @@ pub enum StreamStatus {
 #[serde(rename_all = "lowercase")]
 pub enum BountyStatus {
     Open,
-    Claimed,
+    #[serde(rename = "closed")]
+    Closed,
     Awarded,
     Expired,
     Cancelled,
@@ -70,6 +74,7 @@ pub enum DepositStatus {
     Locked,
     Returned,
     Forfeited,
+    Expired,
 }
 
 /// ERC-2612 permit signature for gasless USDC approvals.
@@ -130,26 +135,36 @@ pub struct LinkResponse {
 /// Result of any payment operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
-    /// Payment / invoice ID.  The server may return this as `invoice_id`.
-    #[serde(default, alias = "invoice_id")]
+    /// Payment / invoice ID.
+    #[serde(default)]
     pub id: String,
     pub tx_hash: String,
-    #[serde(default)]
-    pub from: String,
-    #[serde(default)]
-    pub to: String,
-    #[serde(default, with = "rust_decimal::serde::float")]
-    pub amount: Decimal,
-    #[serde(default, with = "rust_decimal::serde::float")]
-    pub fee: Decimal,
-    #[serde(default)]
-    pub memo: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::models::opt_decimal"
+    )]
+    pub amount: Option<Decimal>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::models::opt_decimal"
+    )]
+    pub fee: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memo: Option<String>,
     #[serde(default)]
     pub chain_id: ChainId,
-    #[serde(default)]
-    pub block_number: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_number: Option<u64>,
     #[serde(default)]
     pub created_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invoice_id: Option<String>,
 }
 
 /// Current USDC balance of a wallet.
@@ -240,13 +255,13 @@ pub struct Tab {
     pub chain: String,
     #[serde(default, alias = "opener")]
     pub payer: String,
-    #[serde(alias = "counterpart")]
+    #[serde(alias = "counterpart", alias = "payee")]
     pub provider: String,
     #[serde(with = "rust_decimal::serde::float", alias = "limit")]
     pub limit_amount: Decimal,
     #[serde(default, with = "rust_decimal::serde::float")]
     pub per_unit: Decimal,
-    #[serde(default, with = "rust_decimal::serde::float")]
+    #[serde(default, with = "rust_decimal::serde::float", alias = "spent")]
     pub used: Decimal,
     #[serde(default, with = "rust_decimal::serde::float")]
     pub remaining: Decimal,
@@ -294,7 +309,11 @@ pub struct BountySubmission {
     pub id: i64,
     pub bounty_id: String,
     pub submitter: String,
+    #[serde(alias = "evidence_uri")]
     pub evidence_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accepted: Option<bool>,
+    #[serde(default)]
     pub status: String,
     pub submitted_at: DateTime<Utc>,
 }
@@ -312,15 +331,17 @@ pub struct Stream {
     pub rate_per_second: Decimal,
     #[serde(with = "rust_decimal::serde::float")]
     pub max_total: Decimal,
-    #[serde(default, with = "rust_decimal::serde::float")]
+    #[serde(default, with = "rust_decimal::serde::float", alias = "total_streamed")]
     pub withdrawn: Decimal,
     pub status: StreamStatus,
     #[serde(default)]
     pub started_at: DateTime<Utc>,
     #[serde(default)]
     pub tx_hash: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "closed_at")]
     pub ends_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_duration: Option<u64>,
 }
 
 /// A task with a USDC reward for completion.
@@ -332,7 +353,7 @@ pub struct Bounty {
     pub poster: String,
     #[serde(with = "rust_decimal::serde::float", alias = "award")]
     pub amount: Decimal,
-    #[serde(alias = "description")]
+    #[serde(alias = "description", alias = "task")]
     pub task_description: String,
     pub status: BountyStatus,
     #[serde(default)]
@@ -346,6 +367,10 @@ pub struct Bounty {
     #[serde(default)]
     pub tx_hash: String,
     pub created_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submissions: Option<Vec<BountySubmission>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation: Option<String>,
 }
 
 /// Security deposit held as collateral.
@@ -354,8 +379,9 @@ pub struct Deposit {
     pub id: String,
     #[serde(default)]
     pub chain: String,
+    #[serde(alias = "payer")]
     pub depositor: String,
-    #[serde(alias = "beneficiary")]
+    #[serde(alias = "beneficiary", alias = "payee")]
     pub provider: String,
     #[serde(with = "rust_decimal::serde::float")]
     pub amount: Decimal,
@@ -446,4 +472,52 @@ pub struct TransactionList {
     pub page: u32,
     pub per_page: u32,
     pub has_more: bool,
+}
+
+/// Wallet status returned by `/api/v1/status/{address}`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WalletStatus {
+    pub wallet: String,
+    pub balance: String,
+    #[serde(default)]
+    pub monthly_volume: String,
+    #[serde(default)]
+    pub tier: String,
+    #[serde(default)]
+    pub fee_rate_bps: u32,
+    #[serde(default)]
+    pub active_escrows: u32,
+    #[serde(default)]
+    pub active_tabs: u32,
+    #[serde(default)]
+    pub active_streams: u32,
+    pub permit_nonce: Option<u64>,
+}
+
+/// Serde helper for `Option<Decimal>` using float representation.
+pub(crate) mod opt_decimal {
+    use rust_decimal::Decimal;
+    use serde::{self, Deserialize, Deserializer, Serializer};
+    use std::str::FromStr;
+
+    pub fn serialize<S>(value: &Option<Decimal>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            Some(d) => {
+                let f = d.to_string().parse::<f64>().unwrap_or(0.0);
+                serializer.serialize_f64(f)
+            }
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Decimal>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let opt: Option<f64> = Option::deserialize(deserializer)?;
+        Ok(opt.map(|f| Decimal::from_str(&format!("{f}")).unwrap_or_default()))
+    }
 }

@@ -62,6 +62,11 @@ class InsufficientAllowance(RemitError):
     http_status = 402
 
 
+class BelowMinimum(RemitError):
+    code = "BELOW_MINIMUM"
+    http_status = 400
+
+
 # ─── Not found ────────────────────────────────────────────────────────────────
 
 
@@ -108,14 +113,49 @@ class InvalidState(RemitError):
     http_status = 409
 
 
+class EscrowAlreadyFunded(RemitError):
+    code = "ESCROW_ALREADY_FUNDED"
+    http_status = 409
+
+
+class EscrowExpired(RemitError):
+    code = "ESCROW_EXPIRED"
+    http_status = 410
+
+
+class InvalidInvoice(RemitError):
+    code = "INVALID_INVOICE"
+    http_status = 400
+
+
+class DuplicateInvoice(RemitError):
+    code = "DUPLICATE_INVOICE"
+    http_status = 409
+
+
+class SelfPayment(RemitError):
+    code = "SELF_PAYMENT"
+    http_status = 400
+
+
+class InvalidPaymentType(RemitError):
+    code = "INVALID_PAYMENT_TYPE"
+    http_status = 400
+
+
 class TabLimitExceeded(RemitError):
     code = "TAB_LIMIT_EXCEEDED"
     http_status = 402
 
 
+class TabDepleted(RemitError):
+    code = "TAB_DEPLETED"
+    http_status = 402
+
+
 class TabExpired(RemitError):
     code = "TAB_EXPIRED"
-    http_status = 409
+    http_status = 410
 
 
 class EscrowTimeout(RemitError):
@@ -126,6 +166,26 @@ class EscrowTimeout(RemitError):
 class MilestoneNotFound(RemitError):
     code = "MILESTONE_NOT_FOUND"
     http_status = 404
+
+
+class RateExceedsCap(RemitError):
+    code = "RATE_EXCEEDS_CAP"
+    http_status = 422
+
+
+class BountyExpired(RemitError):
+    code = "BOUNTY_EXPIRED"
+    http_status = 410
+
+
+class BountyClaimed(RemitError):
+    code = "BOUNTY_CLAIMED"
+    http_status = 409
+
+
+class BountyMaxAttempts(RemitError):
+    code = "BOUNTY_MAX_ATTEMPTS"
+    http_status = 422
 
 
 class InvalidAmount(RemitError):
@@ -143,12 +203,48 @@ class InvalidChain(RemitError):
     http_status = 422
 
 
+class ChainMismatch(RemitError):
+    code = "CHAIN_MISMATCH"
+    http_status = 409
+
+
+class ChainUnsupported(RemitError):
+    code = "CHAIN_UNSUPPORTED"
+    http_status = 422
+
+
 # ─── Rate limiting ────────────────────────────────────────────────────────────
 
 
 class RateLimitExceeded(RemitError):
     code = "RATE_LIMITED"
     http_status = 429
+
+
+# ─── Cancellation errors ─────────────────────────────────────────────────────
+
+
+class CancelBlockedClaimStart(RemitError):
+    code = "CANCEL_BLOCKED_CLAIM_START"
+    http_status = 409
+
+
+class CancelBlockedEvidence(RemitError):
+    code = "CANCEL_BLOCKED_EVIDENCE"
+    http_status = 409
+
+
+# ─── Protocol errors ─────────────────────────────────────────────────────────
+
+
+class VersionMismatch(RemitError):
+    code = "VERSION_MISMATCH"
+    http_status = 422
+
+
+class NetworkError(RemitError):
+    code = "NETWORK_ERROR"
+    http_status = 503
 
 
 # ─── Server errors ────────────────────────────────────────────────────────────
@@ -172,13 +268,17 @@ class ServerError(RemitError):
 # ─── Error code → exception class mapping ────────────────────────────────────
 
 _CODE_MAP: dict[str, type[RemitError]] = {
+    # Auth
     "INVALID_SIGNATURE": InvalidSignature,
     "TIMESTAMP_EXPIRED": SignatureExpired,
     "SIGNATURE_EXPIRED": SignatureExpired,  # backwards-compat alias
     "NONCE_REUSED": NonceReused,
     "UNAUTHORIZED": Unauthorized,
+    # Balance / funds
     "INSUFFICIENT_BALANCE": InsufficientBalance,
     "INSUFFICIENT_ALLOWANCE": InsufficientAllowance,
+    "BELOW_MINIMUM": BelowMinimum,
+    # Not found
     "INVOICE_NOT_FOUND": InvoiceNotFound,
     "ESCROW_NOT_FOUND": EscrowNotFound,
     "TAB_NOT_FOUND": TabNotFound,
@@ -186,16 +286,43 @@ _CODE_MAP: dict[str, type[RemitError]] = {
     "BOUNTY_NOT_FOUND": BountyNotFound,
     "DEPOSIT_NOT_FOUND": DepositNotFound,
     "WEBHOOK_NOT_FOUND": WebhookNotFound,
+    "MILESTONE_NOT_FOUND": MilestoneNotFound,
+    # Escrow
+    "ESCROW_ALREADY_FUNDED": EscrowAlreadyFunded,
+    "ESCROW_EXPIRED": EscrowExpired,
+    "ESCROW_TIMEOUT": EscrowTimeout,
+    # Invoice
+    "INVALID_INVOICE": InvalidInvoice,
+    "DUPLICATE_INVOICE": DuplicateInvoice,
+    "SELF_PAYMENT": SelfPayment,
+    "INVALID_PAYMENT_TYPE": InvalidPaymentType,
+    # State / validation
     "INVALID_STATE": InvalidState,
     "TAB_LIMIT_EXCEEDED": TabLimitExceeded,
+    "TAB_DEPLETED": TabDepleted,
     "TAB_EXPIRED": TabExpired,
-    "ESCROW_TIMEOUT": EscrowTimeout,
-    "MILESTONE_NOT_FOUND": MilestoneNotFound,
     "INVALID_AMOUNT": InvalidAmount,
     "INVALID_ADDRESS": InvalidAddress,
     "INVALID_CHAIN": InvalidChain,
+    # Stream
+    "RATE_EXCEEDS_CAP": RateExceedsCap,
+    # Bounty
+    "BOUNTY_EXPIRED": BountyExpired,
+    "BOUNTY_CLAIMED": BountyClaimed,
+    "BOUNTY_MAX_ATTEMPTS": BountyMaxAttempts,
+    # Chain
+    "CHAIN_MISMATCH": ChainMismatch,
+    "CHAIN_UNSUPPORTED": ChainUnsupported,
+    # Rate limiting
     "RATE_LIMITED": RateLimitExceeded,
     "RATE_LIMIT_EXCEEDED": RateLimitExceeded,  # backwards-compat alias
+    # Cancellation
+    "CANCEL_BLOCKED_CLAIM_START": CancelBlockedClaimStart,
+    "CANCEL_BLOCKED_EVIDENCE": CancelBlockedEvidence,
+    # Protocol
+    "VERSION_MISMATCH": VersionMismatch,
+    "NETWORK_ERROR": NetworkError,
+    # Server
     "CHAIN_UNAVAILABLE": ChainUnavailable,
     "TRANSACTION_FAILED": TransactionFailed,
     "SERVER_ERROR": ServerError,

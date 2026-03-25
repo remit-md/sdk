@@ -10,8 +10,9 @@ import (
 type ChainID int
 
 const (
-	ChainBase    ChainID = 8453
-	ChainBaseSep ChainID = 84532 // Base Sepolia testnet
+	ChainBase      ChainID = 8453
+	ChainBaseSep   ChainID = 84532 // Base Sepolia testnet
+	ChainLocalhost ChainID = 31337 // Local Anvil/Hardhat
 )
 
 // Status values for payment primitives.
@@ -27,35 +28,39 @@ type (
 const (
 	InvoiceStatusPending   InvoiceStatus = "pending"
 	InvoiceStatusFunded    InvoiceStatus = "funded"
-	InvoiceStatusReleased  InvoiceStatus = "released"
+	InvoiceStatusActive    InvoiceStatus = "active"
+	InvoiceStatusCompleted InvoiceStatus = "completed"
 	InvoiceStatusCancelled InvoiceStatus = "cancelled"
-	InvoiceStatusExpired   InvoiceStatus = "expired"
+	InvoiceStatusFailed    InvoiceStatus = "failed"
 
+	EscrowStatusPending   EscrowStatus = "pending"
 	EscrowStatusFunded    EscrowStatus = "funded"
 	EscrowStatusActive    EscrowStatus = "active"
 	EscrowStatusCompleted EscrowStatus = "completed"
-	EscrowStatusDisputed  EscrowStatus = "disputed"
 	EscrowStatusCancelled EscrowStatus = "cancelled"
-	EscrowStatusTimedOut  EscrowStatus = "timed_out"
+	EscrowStatusFailed    EscrowStatus = "failed"
 
-	TabStatusOpen     TabStatus = "open"
-	TabStatusDepleted TabStatus = "depleted"
-	TabStatusClosed   TabStatus = "closed"
-	TabStatusExpired  TabStatus = "expired"
+	TabStatusOpen      TabStatus = "open"
+	TabStatusClosed    TabStatus = "closed"
+	TabStatusExpired   TabStatus = "expired"
+	TabStatusSuspended TabStatus = "suspended"
 
-	StreamStatusActive     StreamStatus = "active"
-	StreamStatusClosed     StreamStatus = "closed"
-	StreamStatusTerminated StreamStatus = "terminated"
+	StreamStatusActive    StreamStatus = "active"
+	StreamStatusPaused    StreamStatus = "paused"
+	StreamStatusClosed    StreamStatus = "closed"
+	StreamStatusCompleted StreamStatus = "completed"
+	StreamStatusCancelled StreamStatus = "cancelled"
 
 	BountyStatusOpen      BountyStatus = "open"
-	BountyStatusClaimed   BountyStatus = "claimed"
+	BountyStatusClosed    BountyStatus = "closed"
 	BountyStatusAwarded   BountyStatus = "awarded"
 	BountyStatusExpired   BountyStatus = "expired"
-	BountyStatusReclaimed BountyStatus = "reclaimed"
+	BountyStatusCancelled BountyStatus = "cancelled"
 
 	DepositStatusLocked    DepositStatus = "locked"
 	DepositStatusReturned  DepositStatus = "returned"
 	DepositStatusForfeited DepositStatus = "forfeited"
+	DepositStatusExpired   DepositStatus = "expired"
 )
 
 // PermitSignature holds an EIP-2612 permit signature for gasless USDC approval.
@@ -90,16 +95,16 @@ type MintResponse struct {
 
 // Transaction is the result of any payment operation.
 type Transaction struct {
-	ID          string          `json:"id"`
-	TxHash      string          `json:"tx_hash"`
-	From        string          `json:"from"`
-	To          string          `json:"to"`
-	Amount      decimal.Decimal `json:"amount"`
-	Fee         decimal.Decimal `json:"fee"`
-	Memo        string          `json:"memo"`
-	ChainID     ChainID         `json:"chain_id"`
-	BlockNumber uint64          `json:"block_number"`
-	CreatedAt   time.Time       `json:"created_at"`
+	ID          string           `json:"id"`
+	TxHash      string           `json:"tx_hash"`
+	From        string           `json:"from,omitempty"`
+	To          string           `json:"to,omitempty"`
+	Amount      *decimal.Decimal `json:"amount,omitempty"`
+	Fee         *decimal.Decimal `json:"fee,omitempty"`
+	Memo        string           `json:"memo,omitempty"`
+	ChainID     ChainID          `json:"chain_id"`
+	BlockNumber *uint64          `json:"block_number,omitempty"`
+	CreatedAt   time.Time        `json:"created_at"`
 }
 
 // Balance represents a wallet's current USDC balance.
@@ -130,8 +135,8 @@ type Milestone struct {
 
 // Split distributes an escrow payment among multiple recipients.
 type Split struct {
-	Recipient string          `json:"recipient"`
-	Amount    decimal.Decimal `json:"amount"`
+	Recipient   string `json:"recipient"`
+	BasisPoints int    `json:"basis_points"`
 }
 
 // Escrow holds funds until conditions are met.

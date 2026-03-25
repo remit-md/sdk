@@ -1,5 +1,6 @@
 package md.remit.models;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -13,11 +14,13 @@ public class Deposit {
     @JsonProperty("id")
     public String id;
 
-    @JsonProperty("depositor")
-    public String depositor;
+    @JsonProperty("payer")
+    @JsonAlias("depositor")
+    public String payer;
 
-    @JsonProperty("provider")
-    public String provider;
+    @JsonProperty("payee")
+    @JsonAlias("provider")
+    public String payee;
 
     @JsonProperty("amount")
     public BigDecimal amount;

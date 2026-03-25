@@ -17,7 +17,7 @@
 //!
 //!     // Direct payment
 //!     let tx = wallet.pay("0xRecipient...", dec!(1.50)).await?;
-//!     println!("paid {} USDC in {}", tx.amount, tx.tx_hash);
+//!     println!("paid {:?} USDC in {}", tx.amount, tx.tx_hash);
 //!
 //!     // Escrow for high-value work
 //!     let escrow = wallet.create_escrow("0xAgent...", dec!(100.00)).await?;
@@ -59,7 +59,7 @@
 //!     Err(e) if e.code == codes::INVALID_ADDRESS => {
 //!         eprintln!("fix the address: {}", e.message);
 //!     }
-//!     Err(e) if e.code == codes::INSUFFICIENT_FUNDS => {
+//!     Err(e) if e.code == codes::INSUFFICIENT_BALANCE => {
 //!         eprintln!("top up your wallet: {}", e.message);
 //!     }
 //!     Err(e) => eprintln!("payment error: {e}"),
@@ -76,6 +76,7 @@ mod mock;
 mod models;
 mod signer;
 mod wallet;
+pub mod x402;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ pub use models::{
     Balance, Bounty, BountyStatus, BountySubmission, Budget, ChainId, ContractAddresses, Deposit,
     DepositStatus, Escrow, EscrowStatus, Intent, Milestone, MintResponse, PermitSignature,
     Reputation, SpendingSummary, Split, Stream, StreamStatus, Tab, TabCharge, TabDebit, TabStatus,
-    TopRecipient, Transaction, TransactionList,
+    TopRecipient, Transaction, TransactionList, WalletStatus,
 };
 pub use signer::{PrivateKeySigner, Signer};
 pub use wallet::{Wallet, WalletBuilder, WithKey, WithSigner};

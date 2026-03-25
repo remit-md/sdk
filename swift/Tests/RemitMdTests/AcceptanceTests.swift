@@ -405,7 +405,7 @@ final class AcceptanceTests: XCTestCase {
         // 2. Submit evidence (as submitter)
         let evidenceBytes = keccak256("test evidence".data(using: .utf8)!)
         let evidenceHash = "0x" + evidenceBytes.map { String(format: "%02x", $0) }.joined()
-        let sub = try await submitter.wallet.submitBounty(id: bounty.id, evidenceHash: evidenceHash)
+        let sub = try await submitter.wallet.submitBounty(id: bounty.id, evidenceUri: evidenceHash)
         XCTAssertEqual(sub.bountyId, bounty.id, "submission bounty_id mismatch")
 
         // 3. Award bounty (as poster)

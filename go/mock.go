@@ -115,7 +115,7 @@ func (m *MockRemit) WasPaid(recipient string, amount decimal.Decimal) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, tx := range m.transactions {
-		if strings.EqualFold(tx.To, recipient) && tx.Amount.Equal(amount) {
+		if strings.EqualFold(tx.To, recipient) && tx.Amount != nil && tx.Amount.Equal(amount) {
 			return true
 		}
 	}
@@ -128,8 +128,8 @@ func (m *MockRemit) TotalPaidTo(recipient string) decimal.Decimal {
 	defer m.mu.Unlock()
 	total := decimal.Zero
 	for _, tx := range m.transactions {
-		if strings.EqualFold(tx.To, recipient) {
-			total = total.Add(tx.Amount)
+		if strings.EqualFold(tx.To, recipient) && tx.Amount != nil {
+			total = total.Add(*tx.Amount)
 		}
 	}
 	return total
@@ -156,6 +156,9 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 	switch {
 	case method == "GET" && path == "/api/v1/wallet/balance":
 		return t.respond(dst, m.mockBalance())
+
+	case method == "GET" && strings.HasPrefix(path, "/api/v1/status/"):
+		return t.respond(dst, m.mockStatus())
 
 	case method == "POST" && path == "/api/v1/payments/direct":
 		b := mustBody(body)
@@ -199,27 +202,27 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 
 	case method == "POST" && strings.HasSuffix(path, "/claim-start"):
 		escrowID := extractID(path, "/api/v1/escrows/", "/claim-start")
-		escrow, err := m.mockClaimStart(escrowID)
+		tx, err := m.mockClaimStart(escrowID)
 		if err != nil {
 			return err
 		}
-		return t.respond(dst, escrow)
+		return t.respond(dst, tx)
 
 	case method == "POST" && strings.HasSuffix(path, "/release"):
 		escrowID := extractID(path, "/api/v1/escrows/", "/release")
-		escrow, err := m.mockReleaseEscrow(escrowID)
+		tx, err := m.mockReleaseEscrow(escrowID)
 		if err != nil {
 			return err
 		}
-		return t.respond(dst, escrow)
+		return t.respond(dst, tx)
 
 	case method == "POST" && strings.HasSuffix(path, "/cancel"):
 		escrowID := extractID(path, "/api/v1/escrows/", "/cancel")
-		escrow, err := m.mockCancelEscrow(escrowID)
+		tx, err := m.mockCancelEscrow(escrowID)
 		if err != nil {
 			return err
 		}
-		return t.respond(dst, escrow)
+		return t.respond(dst, tx)
 
 	case method == "GET" && strings.HasPrefix(path, "/api/v1/escrows/"):
 		escrowID := strings.TrimPrefix(path, "/api/v1/escrows/")
@@ -276,13 +279,14 @@ func (m *MockRemit) mockPay(to string, amount decimal.Decimal, memo string) (*Tr
 		)
 	}
 	m.balance = m.balance.Sub(amount)
+	fee := decimal.NewFromFloat(0.001)
 	tx := Transaction{
 		ID:        newID("tx"),
 		TxHash:    "0x" + randomHex(32),
 		From:      "0xMockWallet0000000000000000000000000000001",
 		To:        to,
-		Amount:    amount,
-		Fee:       decimal.NewFromFloat(0.001),
+		Amount:    &amount,
+		Fee:       &fee,
 		Memo:      memo,
 		ChainID:   ChainBaseSep,
 		CreatedAt: time.Now(),
@@ -316,7 +320,7 @@ func (m *MockRemit) mockCreateEscrow(payee string, amount decimal.Decimal, memo 
 	return escrow, nil
 }
 
-func (m *MockRemit) mockClaimStart(escrowID string) (*Escrow, error) {
+func (m *MockRemit) mockClaimStart(escrowID string) (*Transaction, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -328,10 +332,10 @@ func (m *MockRemit) mockClaimStart(escrowID string) (*Escrow, error) {
 		)
 	}
 	escrow.ClaimStarted = true
-	return escrow, nil
+	return m.mockTxFromEscrow(escrow), nil
 }
 
-func (m *MockRemit) mockReleaseEscrow(escrowID string) (*Escrow, error) {
+func (m *MockRemit) mockReleaseEscrow(escrowID string) (*Transaction, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -343,10 +347,10 @@ func (m *MockRemit) mockReleaseEscrow(escrowID string) (*Escrow, error) {
 		)
 	}
 	escrow.Status = EscrowStatusCompleted
-	return escrow, nil
+	return m.mockTxFromEscrow(escrow), nil
 }
 
-func (m *MockRemit) mockCancelEscrow(escrowID string) (*Escrow, error) {
+func (m *MockRemit) mockCancelEscrow(escrowID string) (*Transaction, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -360,13 +364,42 @@ func (m *MockRemit) mockCancelEscrow(escrowID string) (*Escrow, error) {
 	escrow.Status = EscrowStatusCancelled
 	// Return funds to payer's balance
 	m.balance = m.balance.Add(escrow.Amount)
-	return escrow, nil
+	return m.mockTxFromEscrow(escrow), nil
+}
+
+// mockTxFromEscrow creates a mock Transaction from an Escrow for return type compatibility.
+func (m *MockRemit) mockTxFromEscrow(escrow *Escrow) *Transaction {
+	fee := decimal.NewFromFloat(0.001)
+	return &Transaction{
+		ID:        newID("tx"),
+		TxHash:    "0x" + randomHex(32),
+		From:      escrow.Payer,
+		To:        escrow.Payee,
+		Amount:    &escrow.Amount,
+		Fee:       &fee,
+		ChainID:   ChainBaseSep,
+		CreatedAt: time.Now(),
+	}
 }
 
 func (m *MockRemit) mockGetEscrow(escrowID string) *Escrow {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.escrows[escrowID]
+}
+
+func (m *MockRemit) mockStatus() *WalletStatus {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	nonce := 0
+	return &WalletStatus{
+		Wallet:        "0xMockWallet0000000000000000000000000000001",
+		Balance:       m.balance.String(),
+		MonthlyVolume: "0",
+		Tier:          "standard",
+		FeeRateBps:    100,
+		PermitNonce:   &nonce,
+	}
 }
 
 func (m *MockRemit) mockReputation(address string) *Reputation {
@@ -385,7 +418,9 @@ func (m *MockRemit) mockSpendingSummary() *SpendingSummary {
 	defer m.mu.Unlock()
 	total := decimal.Zero
 	for _, tx := range m.transactions {
-		total = total.Add(tx.Amount)
+		if tx.Amount != nil {
+			total = total.Add(*tx.Amount)
+		}
 	}
 	return &SpendingSummary{
 		Address:    "0xMockWallet0000000000000000000000000000001",

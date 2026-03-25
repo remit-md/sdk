@@ -65,10 +65,12 @@ public class Escrow {
     /** Split distribution within an escrow. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Split {
-        @JsonProperty("address")
-        public String address;
+        @JsonProperty("recipient")
+        @JsonAlias("address")
+        public String recipient;
 
-        @JsonProperty("bps")
-        public int bps; // basis points, 100 = 1%
+        @JsonProperty("basisPoints")
+        @JsonAlias("bps")
+        public int basisPoints; // basis points, 100 = 1%
     }
 }

@@ -24,6 +24,7 @@ def load_vectors
   file = JSON.parse(File.read(VECTORS_PATH))
   vectors = file["vectors"]
   raise "vectors array must not be empty" if vectors.empty?
+
   vectors
 end
 
@@ -74,7 +75,7 @@ RSpec.describe "Golden vectors: EIP-712 hash matches server" do
       got_hex = "0x#{got_hash.unpack1("H*")}"
 
       expect(got_hex).to eq(v["expected_hash"]),
-        "EIP-712 hash mismatch for '#{v["description"]}'"
+                           "EIP-712 hash mismatch for '#{v["description"]}'"
     end
   end
 end
@@ -115,10 +116,10 @@ RSpec.describe "Golden vectors: signature matches server" do
       sig_bytes = [got_sig.delete_prefix("0x")].pack("H*")
 
       expect(sig_bytes.bytesize).to eq(65),
-        "Signature must be 65 bytes for '#{v["description"]}'"
+                                      "Signature must be 65 bytes for '#{v["description"]}'"
       v_byte = sig_bytes.getbyte(64)
       expect(v_byte).to be_between(27, 28),
-        "v must be 27 or 28 for '#{v["description"]}', got #{v_byte}"
+                         "v must be 27 or 28 for '#{v["description"]}', got #{v_byte}"
     end
   end
 end

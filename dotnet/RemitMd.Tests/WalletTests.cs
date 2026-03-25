@@ -126,8 +126,8 @@ public sealed class MockPayTests
     {
         var tab = await _wallet.CreateTabAsync(
             "0xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", 5m, 0.10m);
-        Assert.Equal(5m, tab.LimitAmount);
-        Assert.Equal(0m, tab.Used);
+        Assert.Equal(5m, tab.Limit);
+        Assert.Equal(0m, tab.Spent);
 
         await _wallet.ChargeTabAsync(tab.Id, 1.00m, 1.00m, 1, "0xsig1");
         await _wallet.ChargeTabAsync(tab.Id, 0.50m, 1.50m, 2, "0xsig2");
@@ -146,7 +146,7 @@ public sealed class MockPayTests
         await _wallet.ChargeTabAsync(tab.Id, 2m, 2m, 1, "0xsig1");
         var closed = await _wallet.CloseTabAsync(tab.Id, 2m, "0xsig_final");
 
-        Assert.Equal(TabStatus.Settled, closed.Status);
+        Assert.Equal(TabStatus.Closed, closed.Status);
     }
 
     // ─── Stream ───────────────────────────────────────────────────────────────

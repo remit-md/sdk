@@ -180,6 +180,7 @@ module Remitmd
         invoice_id = fetch!(b, :invoice_id)
         inv = @state[:pending_invoices].delete(invoice_id)
         raise not_found(RemitError::ESCROW_NOT_FOUND, invoice_id) unless inv
+
         payee  = (inv[:to_agent] || inv["to_agent"]).to_s
         amount = decimal!(inv, :amount)
         memo   = (inv[:task] || inv["task"]).to_s
@@ -310,7 +311,7 @@ module Remitmd
       # Bounty submit
       in ["POST", path] if path.end_with?("/submit") && path.include?("/bounties/")
         id = extract_id(path, "/bounties/", "/submit")
-        bnt = @state[:bounties].fetch(id) { raise not_found(RemitError::BOUNTY_NOT_FOUND, id) }
+        @state[:bounties].fetch(id) { raise not_found(RemitError::BOUNTY_NOT_FOUND, id) }
         {
           "id"            => 1,
           "bounty_id"     => id,
@@ -322,9 +323,9 @@ module Remitmd
 
       # Bounty award
       in ["POST", path] if path.end_with?("/award") && path.include?("/bounties/")
-        id            = extract_id(path, "/bounties/", "/award")
-        submission_id = (b[:submission_id] || b["submission_id"]).to_i
-        bnt           = @state[:bounties].fetch(id) { raise not_found(RemitError::BOUNTY_NOT_FOUND, id) }
+        id  = extract_id(path, "/bounties/", "/award")
+        _submission_id = (b[:submission_id] || b["submission_id"]).to_i
+        bnt = @state[:bounties].fetch(id) { raise not_found(RemitError::BOUNTY_NOT_FOUND, id) }
         new_bnt = update_bounty(bnt, status: BountyStatus::AWARDED)
         @state[:bounties][id] = new_bnt
         bounty_hash(new_bnt)
@@ -620,6 +621,7 @@ module Remitmd
     def check_balance!(amount)
       bal = @state[:balance]
       return if bal >= amount
+
       raise RemitError.new(
         RemitError::INSUFFICIENT_FUNDS,
         "Insufficient balance: have #{bal.to_s("F")} USDC, need #{amount.to_s("F")} USDC",

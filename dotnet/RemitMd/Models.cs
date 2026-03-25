@@ -13,32 +13,46 @@ public enum ChainId
 
 // ─── Status enums ─────────────────────────────────────────────────────────────
 
-public enum InvoiceStatus { Pending, Funded, Released, Cancelled, Expired }
+public enum InvoiceStatus { Pending, Funded, Active, Completed, Cancelled, Failed }
 
-public enum EscrowStatus { Funded, Active, Completed, Cancelled, TimedOut }
+public enum EscrowStatus { Pending, Funded, Active, Completed, Cancelled, Failed }
 
-public enum TabStatus { Open, Closed, Settled }
+public enum TabStatus { Open, Closed, Expired, Suspended }
 
-public enum StreamStatus { Active, Paused, Ended, Cancelled }
+public enum StreamStatus { Active, Paused, Closed, Completed, Cancelled }
 
-public enum BountyStatus { Open, Awarded, Expired, Reclaimed }
+public enum BountyStatus { Open, Closed, Awarded, Expired, Cancelled }
 
-public enum DepositStatus { Locked, Returned, Forfeited }
+public enum DepositStatus { Locked, Returned, Forfeited, Expired }
 
 // ─── Core models ──────────────────────────────────────────────────────────────
 
 /// <summary>Result of a completed payment operation.</summary>
 public record Transaction(
     [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("tx_hash")] string TxHash,
-    [property: JsonPropertyName("from")] string From,
-    [property: JsonPropertyName("to")] string To,
-    [property: JsonPropertyName("amount")] decimal Amount,
-    [property: JsonPropertyName("fee")] decimal Fee,
+    [property: JsonPropertyName("tx_hash")] string? TxHash,
+    [property: JsonPropertyName("from")] string? From,
+    [property: JsonPropertyName("to")] string? To,
+    [property: JsonPropertyName("amount")] decimal? Amount,
+    [property: JsonPropertyName("fee")] decimal? Fee,
     [property: JsonPropertyName("memo")] string Memo,
     [property: JsonPropertyName("chain_id")] ChainId ChainId,
-    [property: JsonPropertyName("block_number")] ulong BlockNumber,
-    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
+    [property: JsonPropertyName("block_number")] ulong? BlockNumber,
+    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("invoice_id")] string? InvoiceId = null
+);
+
+/// <summary>Wallet status including balance, tier, and fee info.</summary>
+public record WalletStatus(
+    [property: JsonPropertyName("wallet")] string Wallet,
+    [property: JsonPropertyName("balance")] string Balance,
+    [property: JsonPropertyName("monthly_volume")] string MonthlyVolume,
+    [property: JsonPropertyName("tier")] string Tier,
+    [property: JsonPropertyName("fee_rate_bps")] int FeeRateBps,
+    [property: JsonPropertyName("active_escrows")] int ActiveEscrows,
+    [property: JsonPropertyName("active_tabs")] int ActiveTabs,
+    [property: JsonPropertyName("active_streams")] int ActiveStreams,
+    [property: JsonPropertyName("permit_nonce")] int? PermitNonce
 );
 
 /// <summary>Chat-style message shown on a fund/withdraw page.</summary>
@@ -84,7 +98,7 @@ public record Milestone(
 /// <summary>Distributes an escrow payment among multiple recipients.</summary>
 public record Split(
     [property: JsonPropertyName("recipient")] string Recipient,
-    [property: JsonPropertyName("amount")] decimal Amount
+    [property: JsonPropertyName("basis_points")] int BasisPoints
 );
 
 /// <summary>Escrow — holds funds until work is delivered and approved.</summary>
@@ -105,15 +119,14 @@ public record Escrow(
 /// <summary>Tab — off-chain payment channel for batched micro-payments.</summary>
 public record Tab(
     [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("opener")] string Opener,
-    [property: JsonPropertyName("provider")] string Provider,
-    [property: JsonPropertyName("limit_amount")] decimal LimitAmount,
+    [property: JsonPropertyName("payer")] string Payer,
+    [property: JsonPropertyName("payee")] string Payee,
+    [property: JsonPropertyName("limit")] decimal Limit,
     [property: JsonPropertyName("per_unit")] decimal PerUnit,
-    [property: JsonPropertyName("used")] decimal Used,
-    [property: JsonPropertyName("remaining")] decimal Remaining,
+    [property: JsonPropertyName("spent")] decimal Spent,
     [property: JsonPropertyName("status")] TabStatus Status,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("expiry")] string? Expiry
+    [property: JsonPropertyName("expires_at")] string? ExpiresAt
 );
 
 /// <summary>A single charge against a Tab (returned by POST /tabs/{id}/charge).</summary>
@@ -128,14 +141,15 @@ public record TabCharge(
 /// <summary>Stream — time-based payment flow (pay-per-second).</summary>
 public record Stream(
     [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("sender")] string Sender,
-    [property: JsonPropertyName("recipient")] string Recipient,
-    [property: JsonPropertyName("rate_per_sec")] decimal RatePerSec,
-    [property: JsonPropertyName("deposited")] decimal Deposited,
-    [property: JsonPropertyName("withdrawn")] decimal Withdrawn,
+    [property: JsonPropertyName("payer")] string Payer,
+    [property: JsonPropertyName("payee")] string Payee,
+    [property: JsonPropertyName("rate_per_second")] decimal RatePerSecond,
+    [property: JsonPropertyName("max_duration")] long MaxDuration,
+    [property: JsonPropertyName("max_total")] decimal? MaxTotal,
+    [property: JsonPropertyName("total_streamed")] decimal TotalStreamed,
     [property: JsonPropertyName("status")] StreamStatus Status,
     [property: JsonPropertyName("started_at")] DateTimeOffset StartedAt,
-    [property: JsonPropertyName("ends_at")] DateTimeOffset? EndsAt
+    [property: JsonPropertyName("closed_at")] DateTimeOffset? ClosedAt
 );
 
 /// <summary>Bounty — a task with a USDC reward for completion.</summary>
@@ -143,8 +157,11 @@ public record Bounty(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("poster")] string Poster,
     [property: JsonPropertyName("amount")] decimal Amount,
-    [property: JsonPropertyName("task_description")] string TaskDescription,
+    [property: JsonPropertyName("task")] string Task,
     [property: JsonPropertyName("status")] BountyStatus Status,
+    [property: JsonPropertyName("validation")] string? Validation,
+    [property: JsonPropertyName("max_attempts")] int MaxAttempts,
+    [property: JsonPropertyName("submissions")] IReadOnlyList<BountySubmission>? Submissions,
     [property: JsonPropertyName("deadline")] string? Deadline,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
@@ -160,11 +177,11 @@ public record BountySubmission(
 /// <summary>Deposit — security deposit held as collateral.</summary>
 public record Deposit(
     [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("depositor")] string Depositor,
-    [property: JsonPropertyName("provider")] string Provider,
+    [property: JsonPropertyName("payer")] string Payer,
+    [property: JsonPropertyName("payee")] string Payee,
     [property: JsonPropertyName("amount")] decimal Amount,
     [property: JsonPropertyName("status")] DepositStatus Status,
-    [property: JsonPropertyName("expiry")] string? Expiry,
+    [property: JsonPropertyName("expires_at")] string? ExpiresAt,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
 

@@ -77,7 +77,7 @@ module Remitmd
         RC.each { |rc| keccak_round!(state, rc) }
       end
 
-      def keccak_round!(state, rc) # rubocop:disable Metrics/MethodLength
+      def keccak_round!(state, rc)
         # Theta
         c = Array.new(5) do |x|
           state[x] ^ state[x + 5] ^ state[x + 10] ^ state[x + 15] ^ state[x + 20]

@@ -193,8 +193,11 @@ defmodule RemitMd.Http do
         request(transport, method, path, req_body, attempt + 1, idempotency_key)
 
       status == 400 ->
-        code = Map.get(parsed, "code", Error.server_error())
-        raise Error.new(code, Map.get(parsed, "message", "Bad request"), context: parsed)
+        # Support both flat and nested error formats:
+        # Flat:   {"code": "...", "message": "..."}
+        # Nested: {"error": {"code": "...", "message": "..."}}
+        {code, msg} = extract_error_fields(parsed)
+        raise Error.new(code, msg, context: parsed)
 
       status == 401 ->
         raise Error.new(
@@ -203,10 +206,12 @@ defmodule RemitMd.Http do
         )
 
       status == 403 ->
-        raise Error.new(Error.forbidden(), Map.get(parsed, "message", "Forbidden"))
+        {_code, msg} = extract_error_fields(parsed)
+        raise Error.new(Error.forbidden(), msg || "Forbidden")
 
       status == 404 ->
-        raise Error.new(Error.not_found(), Map.get(parsed, "message", "Resource not found"))
+        {_code, msg} = extract_error_fields(parsed)
+        raise Error.new(Error.not_found(), msg || "Resource not found")
 
       status == 429 ->
         raise Error.new(Error.rate_limited(), "Rate limit exceeded — back off and retry")
@@ -217,6 +222,22 @@ defmodule RemitMd.Http do
       true ->
         raise Error.new(Error.server_error(), "Unexpected status #{status}")
     end
+  end
+
+  # Extract code and message from flat or nested error response.
+  # Flat:   %{"code" => "...", "message" => "..."}
+  # Nested: %{"error" => %{"code" => "...", "message" => "..."}}
+  defp extract_error_fields(%{"error" => %{"code" => code, "message" => msg}}) do
+    {code, msg}
+  end
+  defp extract_error_fields(%{"error" => %{"code" => code}}) do
+    {code, "Error: #{code}"}
+  end
+  defp extract_error_fields(%{"error" => %{"message" => msg}}) do
+    {Error.server_error(), msg}
+  end
+  defp extract_error_fields(parsed) do
+    {Map.get(parsed, "code", Error.server_error()), Map.get(parsed, "message", "Bad request")}
   end
 
   defp address_to_bytes32(nil), do: <<0::256>>

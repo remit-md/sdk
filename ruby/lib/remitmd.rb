@@ -7,6 +7,9 @@ require_relative "remitmd/signer"
 require_relative "remitmd/http"
 require_relative "remitmd/wallet"
 require_relative "remitmd/mock"
+require_relative "remitmd/a2a"
+require_relative "remitmd/x402_client"
+require_relative "remitmd/x402_paywall"
 
 # remit.md Ruby SDK — universal payment protocol for AI agents.
 #

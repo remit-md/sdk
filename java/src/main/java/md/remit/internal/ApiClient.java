@@ -65,7 +65,8 @@ public class ApiClient {
         byte[] nonce = generateNonce();
         String nonceHex = "0x" + HexFormat.of().formatHex(nonce);
         long timestamp = Instant.now().getEpochSecond();
-        String signature = signEip712("GET", path, timestamp, nonce);
+        String signPath = path.contains("?") ? path.substring(0, path.indexOf("?")) : path;
+        String signature = signEip712("GET", signPath, timestamp, nonce);
 
         HttpRequest req = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + path))
@@ -87,7 +88,8 @@ public class ApiClient {
         byte[] nonce = generateNonce();
         String nonceHex = "0x" + HexFormat.of().formatHex(nonce);
         long timestamp = Instant.now().getEpochSecond();
-        String signature = signEip712("POST", path, timestamp, nonce);
+        String signPath = path.contains("?") ? path.substring(0, path.indexOf("?")) : path;
+        String signature = signEip712("POST", signPath, timestamp, nonce);
 
         HttpRequest.Builder builder = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + path))
@@ -121,11 +123,16 @@ public class ApiClient {
             return MAPPER.readValue(resp.body(), responseType);
         }
 
-        // Parse error body
+        // Parse error body — supports both flat {"code":"...", "message":"..."}
+        // and nested {"error": {"code":"...", "message":"..."}} formats.
         String code = ErrorCodes.SERVER_ERROR;
         String message = "HTTP " + status;
         try {
             Map<?, ?> err = MAPPER.readValue(resp.body(), Map.class);
+            // Check for nested {"error": {...}} wrapper
+            if (err.containsKey("error") && err.get("error") instanceof Map) {
+                err = (Map<?, ?>) err.get("error");
+            }
             if (err.containsKey("code")) code = err.get("code").toString();
             if (err.containsKey("message")) message = err.get("message").toString();
         } catch (Exception ignored) {}

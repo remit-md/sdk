@@ -43,7 +43,7 @@ module Remitmd
     def request(method, path, body)
       attempt = 0
       # Generate idempotency key once per request (stable across retries).
-      idempotency_key = (method == :post || method == :put || method == :patch) ? SecureRandom.uuid : nil
+      idempotency_key = %i[post put patch].include?(method) ? SecureRandom.uuid : nil
       begin
         attempt += 1
         req  = build_request(method, path, body, idempotency_key)
@@ -74,9 +74,10 @@ module Remitmd
       nonce_hex   = "0x#{nonce_bytes.unpack1("H*")}"
       timestamp   = Time.now.to_i
 
-      # Compute EIP-712 hash and sign it.
+      # Strip query string before signing — only the path is included in EIP-712.
+      sign_path   = full_path.split("?").first
       http_method = method.to_s.upcase
-      digest      = eip712_hash(http_method, full_path, timestamp, nonce_bytes)
+      digest      = eip712_hash(http_method, sign_path, timestamp, nonce_bytes)
       signature   = @signer.sign(digest)
 
       req["Content-Type"]      = "application/json"
@@ -155,8 +156,10 @@ module Remitmd
       when 200..299
         parsed
       when 400
-        code = parsed["code"] || RemitError::SERVER_ERROR
-        raise RemitError.new(code, parsed["message"] || "Bad request", context: parsed)
+        # Support nested error format: { "error": { "code": "...", "message": "..." } }
+        err = parsed.is_a?(Hash) && parsed["error"].is_a?(Hash) ? parsed["error"] : parsed
+        code = err["code"] || RemitError::SERVER_ERROR
+        raise RemitError.new(code, err["message"] || "Bad request", context: parsed)
       when 401
         raise RemitError.new(RemitError::UNAUTHORIZED,
                              "Authentication failed — check your private key and chain ID")

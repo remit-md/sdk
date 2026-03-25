@@ -578,6 +578,14 @@ export class Wallet extends RemitClient {
     });
   }
 
+  listWebhooks(): Promise<Webhook[]> {
+    return this.#auth.get<Webhook[]>("/webhooks");
+  }
+
+  deleteWebhook(id: string): Promise<void> {
+    return this.#auth.delete<void>(`/webhooks/${id}`);
+  }
+
   // ─── One-time operator links ─────────────────────────────────────────────────
 
   /** Generate a one-time URL for the operator to fund this wallet.

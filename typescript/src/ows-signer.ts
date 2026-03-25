@@ -39,6 +39,8 @@ export interface OwsSignerOptions {
   chain?: string;
   /** OWS API key token (passed as passphrase to OWS signing calls). */
   owsApiKey?: string;
+  /** @internal Inject OWS module for testing — bypasses dynamic import. */
+  _owsModule?: unknown;
 }
 
 /**
@@ -76,16 +78,20 @@ export class OwsSigner implements Signer {
    */
   static async create(options: OwsSignerOptions): Promise<OwsSigner> {
     let owsModule: OwsModule;
-    try {
-      // Dynamic string prevents TypeScript from statically resolving this
-      // optional peer dependency at compile time.
-      const moduleName = "@open-wallet-standard/core";
-      owsModule = (await import(moduleName)) as unknown as OwsModule;
-    } catch {
-      throw new Error(
-        "OWS_WALLET_ID is set but @open-wallet-standard/core is not installed. " +
-          "Install it with: npm install @open-wallet-standard/core",
-      );
+    if (options._owsModule) {
+      owsModule = options._owsModule as OwsModule;
+    } else {
+      try {
+        // Dynamic string prevents TypeScript from statically resolving this
+        // optional peer dependency at compile time.
+        const moduleName = "@open-wallet-standard/core";
+        owsModule = (await import(moduleName)) as unknown as OwsModule;
+      } catch {
+        throw new Error(
+          "OWS_WALLET_ID is set but @open-wallet-standard/core is not installed. " +
+            "Install it with: npm install @open-wallet-standard/core",
+        );
+      }
     }
 
     const walletInfo = owsModule.getWallet(options.walletId);

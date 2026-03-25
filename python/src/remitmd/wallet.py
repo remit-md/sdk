@@ -460,7 +460,10 @@ class Wallet(RemitClient):
         permit: PermitSignature | None = None,
     ) -> Stream:
         if max_total is not None:
-            resolved = permit if permit is not None else await self._auto_permit("stream", max_total)
+            resolved = (
+                permit if permit is not None
+                else await self._auto_permit("stream", max_total)
+            )
         else:
             resolved = permit
         body: dict[str, Any] = {

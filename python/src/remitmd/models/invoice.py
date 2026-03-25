@@ -38,7 +38,9 @@ class Invoice(BaseModel):
     amount: float  # total in USD
     memo: str = ""
     chain: str = "base"
-    payment_type: str = Field(default="escrow", alias="payment_model")  # escrow | tab | stream | bounty | deposit | direct
+    payment_type: str = Field(
+        default="escrow", alias="payment_model",
+    )
     timeout: int = 86400  # seconds
     milestones: list[Milestone] | None = None
     splits: list[Split] | None = None

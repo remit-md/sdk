@@ -31,6 +31,7 @@ Repository = "https://github.com/remit-md/sdk"
 Documentation = "https://remit.md"
 
 [project.optional-dependencies]
+ows = ["open-wallet-standard>=1.0"]
 langchain = ["langchain>=0.2", "langchain-core>=0.2"]
 crewai = ["crewai>=0.30"]
 autogen = ["pyautogen>=0.2"]

@@ -39,7 +39,8 @@ class Invoice(BaseModel):
     memo: str = ""
     chain: str = "base"
     payment_type: str = Field(
-        default="escrow", alias="payment_model",
+        default="escrow",
+        alias="payment_model",
     )
     timeout: int = 86400  # seconds
     milestones: list[Milestone] | None = None

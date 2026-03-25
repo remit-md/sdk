@@ -193,3 +193,51 @@ func TestValidateAmount_Negative(t *testing.T) {
 		t.Fatal("expected error for negative amount")
 	}
 }
+
+func TestMockSpendingSummary(t *testing.T) {
+	mock := remitmd.NewMockRemit()
+	wallet := mock.Wallet()
+	ctx := context.Background()
+
+	summary, err := wallet.SpendingSummary(ctx, "month")
+	if err != nil {
+		t.Fatalf("SpendingSummary failed: %v", err)
+	}
+	if summary.Period != "month" {
+		t.Errorf("expected period month, got %s", summary.Period)
+	}
+}
+
+func TestMockRemainingBudget(t *testing.T) {
+	mock := remitmd.NewMockRemit()
+	wallet := mock.Wallet()
+	ctx := context.Background()
+
+	budget, err := wallet.RemainingBudget(ctx)
+	if err != nil {
+		t.Fatalf("RemainingBudget failed: %v", err)
+	}
+	if budget.DailyRemaining.IsZero() {
+		t.Error("expected non-zero daily remaining")
+	}
+}
+
+func TestMockGetEscrow(t *testing.T) {
+	mock := remitmd.NewMockRemit()
+	wallet := mock.Wallet()
+	ctx := context.Background()
+
+	payee := "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+	escrow, err := wallet.CreateEscrow(ctx, payee, decimal.NewFromFloat(10.00))
+	if err != nil {
+		t.Fatalf("CreateEscrow failed: %v", err)
+	}
+
+	fetched, err := wallet.GetEscrow(ctx, escrow.InvoiceID)
+	if err != nil {
+		t.Fatalf("GetEscrow failed: %v", err)
+	}
+	if fetched.InvoiceID != escrow.InvoiceID {
+		t.Errorf("expected ID %s, got %s", escrow.InvoiceID, fetched.InvoiceID)
+	}
+}

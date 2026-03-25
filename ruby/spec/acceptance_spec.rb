@@ -27,10 +27,11 @@ CHAIN_ID = 84532
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def fetch_contracts
-  @contracts_cache ||= begin
+  @fetch_contracts ||= begin
     uri = URI("#{API_URL}/api/v1/contracts")
     resp = Net::HTTP.get_response(uri)
     raise "GET /contracts: #{resp.code} #{resp.body}" unless resp.code == "200"
+
     JSON.parse(resp.body)
   end
 end
@@ -74,6 +75,7 @@ def wait_for_balance_change(address, before, timeout: 30)
   while Time.now < deadline
     current = get_usdc_balance(address)
     return current if (current - before).abs > 0.0001
+
     sleep 2
   end
   get_usdc_balance(address)
@@ -83,8 +85,8 @@ def assert_balance_change(label, before, after, expected)
   actual = after - before
   tolerance = [expected.abs * 0.001, 0.02].max
   expect((actual - expected).abs).to be <= tolerance,
-    "#{label}: expected delta #{expected}, got #{actual} " \
-    "(before=#{before}, after=#{after})"
+                                        "#{label}: expected delta #{expected}, got #{actual} " \
+                                        "(before=#{before}, after=#{after})"
 end
 
 def fund_wallet(tw, amount)

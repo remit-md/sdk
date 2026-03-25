@@ -235,10 +235,7 @@ impl A2AClient {
     }
 
     /// Convenience constructor from an [`AgentCard`] and a signer.
-    pub fn from_card(
-        card: &AgentCard,
-        signer: std::sync::Arc<dyn crate::signer::Signer>,
-    ) -> Self {
+    pub fn from_card(card: &AgentCard, signer: std::sync::Arc<dyn crate::signer::Signer>) -> Self {
         Self {
             endpoint: card.url.clone(),
             client: reqwest::Client::new(),
@@ -270,8 +267,12 @@ impl A2AClient {
             message["metadata"] = serde_json::json!({ "mandate": mandate });
         }
 
-        self.rpc("message/send", serde_json::json!({ "message": message }), &message_id)
-            .await
+        self.rpc(
+            "message/send",
+            serde_json::json!({ "message": message }),
+            &message_id,
+        )
+        .await
     }
 
     /// Fetch the current state of an A2A task by ID.

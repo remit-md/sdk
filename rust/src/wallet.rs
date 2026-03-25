@@ -297,8 +297,7 @@ impl Wallet {
 impl Wallet {
     /// Return the full wallet status including balance, volume, fee tier, and active counts.
     pub async fn status(&self) -> Result<WalletStatus, RemitError> {
-        self.get(&format!("/api/v1/status/{}", self.address))
-            .await
+        self.get(&format!("/api/v1/status/{}", self.address)).await
     }
 
     /// Return the current USDC balance of this wallet.
@@ -544,11 +543,8 @@ impl Wallet {
         if let Some(idx) = milestone_index {
             body["milestone_index"] = json!(idx);
         }
-        self.post(
-            &format!("/api/v1/escrows/{invoice_id}/evidence"),
-            body,
-        )
-        .await
+        self.post(&format!("/api/v1/escrows/{invoice_id}/evidence"), body)
+            .await
     }
 
     /// Release a specific milestone within an escrow.

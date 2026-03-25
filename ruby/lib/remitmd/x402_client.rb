@@ -16,7 +16,7 @@ module Remitmd
       @limit_usdc  = limit_usdc
       super(
         "ALLOWANCE_EXCEEDED",
-        "x402 payment #{"%.6f" % amount_usdc} USDC exceeds auto-pay limit #{"%.6f" % limit_usdc} USDC"
+        "x402 payment #{format("%.6f", amount_usdc)} USDC exceeds auto-pay limit #{format("%.6f", limit_usdc)} USDC"
       )
     end
   end
@@ -58,7 +58,7 @@ module Remitmd
       resp = make_request(uri, method, headers, body)
 
       if resp.code.to_i == 402
-        handle_402(uri, resp, method, headers, body)
+        handle402(uri, resp, method, headers, body)
       else
         resp
       end
@@ -84,7 +84,7 @@ module Remitmd
       http.request(req)
     end
 
-    def handle_402(uri, response, method, headers, body)
+    def handle402(uri, response, method, headers, body)
       # 1. Decode PAYMENT-REQUIRED header.
       raw = response["payment-required"] || response["PAYMENT-REQUIRED"]
       raise RemitError.new("SERVER_ERROR", "402 response missing PAYMENT-REQUIRED header") unless raw
@@ -168,7 +168,8 @@ module Remitmd
 
       # TransferWithAuthorization struct hash
       type_hash = keccak256(
-        "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
+        "TransferWithAuthorization(address from,address to,uint256 value," \
+        "uint256 validAfter,uint256 validBefore,bytes32 nonce)"
       )
       struct_data = type_hash +
                     abi_address(from) +

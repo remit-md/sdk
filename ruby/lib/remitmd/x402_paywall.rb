@@ -32,7 +32,7 @@ module Remitmd
     # @param resource [String, nil] V2 — URL or path of the resource being protected
     # @param description [String, nil] V2 — human-readable description
     # @param mime_type [String, nil] V2 — MIME type of the resource
-    def initialize(
+    def initialize( # rubocop:disable Metrics/ParameterLists
       wallet_address:,
       amount_usdc:,
       network:,
@@ -107,6 +107,7 @@ module Remitmd
         unless resp.is_a?(Net::HTTPSuccess)
           return { is_valid: false, invalid_reason: "FACILITATOR_ERROR" }
         end
+
         data = JSON.parse(resp.body)
       rescue StandardError
         return { is_valid: false, invalid_reason: "FACILITATOR_ERROR" }

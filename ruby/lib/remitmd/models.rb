@@ -97,12 +97,14 @@ module Remitmd
     def decimal(value)
       return value if value.is_a?(BigDecimal)
       return BigDecimal(value.to_s) if value
+
       nil
     end
 
     def parse_time(value)
       return value if value.is_a?(Time)
       return Time.parse(value) if value.is_a?(String)
+
       nil
     end
   end
@@ -140,7 +142,7 @@ module Remitmd
       @fee          = decimal(h["fee"] || "0")
       @memo         = h["memo"] || ""
       @chain_id     = h["chain_id"]&.to_i
-      @block_number = h["block_number"]&.to_i || 0
+      @block_number = h["block_number"].to_i
       @created_at   = parse_time(h["created_at"])
     end
 
@@ -168,10 +170,10 @@ module Remitmd
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
       @address           = h["address"]
-      @score             = h["score"]&.to_i || 0
+      @score             = h["score"].to_i
       @total_paid        = decimal(h["total_paid"])
       @total_received    = decimal(h["total_received"])
-      @transaction_count = h["transaction_count"]&.to_i || 0
+      @transaction_count = h["transaction_count"].to_i
       @member_since      = parse_time(h["member_since"])
     end
 
@@ -235,9 +237,9 @@ module Remitmd
       @tab_id     = h["tab_id"]
       @amount     = decimal(h["amount"])
       @cumulative = decimal(h["cumulative"])
-      @call_count = h["call_count"]&.to_i || 0
+      @call_count = h["call_count"].to_i
       @memo       = h["memo"] || ""
-      @sequence   = h["sequence"]&.to_i || 0
+      @sequence   = h["sequence"].to_i
       @signature  = h["signature"]
     end
 
@@ -389,7 +391,7 @@ module Remitmd
       @period         = h["period"]
       @total_spent    = decimal(h["total_spent"])
       @total_fees     = decimal(h["total_fees"])
-      @tx_count       = h["tx_count"]&.to_i || 0
+      @tx_count       = h["tx_count"].to_i
       @top_recipients = h["top_recipients"] || []
     end
 
@@ -435,9 +437,9 @@ module Remitmd
       h = attrs.transform_keys(&:to_s)
       items_raw = h["items"] || []
       @items    = items_raw.map { |tx| Transaction.new(tx) }
-      @total    = h["total"]&.to_i || 0
-      @page     = h["page"]&.to_i || 1
-      @per_page = h["per_page"]&.to_i || 50
+      @total    = h["total"].to_i
+      @page     = (h["page"] || 1).to_i
+      @per_page = (h["per_page"] || 50).to_i
       @has_more = h["has_more"] == true
     end
 

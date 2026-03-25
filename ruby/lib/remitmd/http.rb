@@ -43,7 +43,7 @@ module Remitmd
     def request(method, path, body)
       attempt = 0
       # Generate idempotency key once per request (stable across retries).
-      idempotency_key = (method == :post || method == :put || method == :patch) ? SecureRandom.uuid : nil
+      idempotency_key = %i[post put patch].include?(method) ? SecureRandom.uuid : nil
       begin
         attempt += 1
         req  = build_request(method, path, body, idempotency_key)

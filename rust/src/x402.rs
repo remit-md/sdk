@@ -142,14 +142,20 @@ impl X402Client {
             })?
             .to_str()
             .map_err(|_| {
-                RemitError::new(codes::SERVER_ERROR, "invalid PAYMENT-REQUIRED header encoding")
+                RemitError::new(
+                    codes::SERVER_ERROR,
+                    "invalid PAYMENT-REQUIRED header encoding",
+                )
             })?;
 
         use base64::Engine;
         let decoded = base64::engine::general_purpose::STANDARD
             .decode(raw)
             .map_err(|_| {
-                RemitError::new(codes::SERVER_ERROR, "PAYMENT-REQUIRED header is not valid base64")
+                RemitError::new(
+                    codes::SERVER_ERROR,
+                    "PAYMENT-REQUIRED header is not valid base64",
+                )
             })?;
 
         let required: PaymentRequired = serde_json::from_slice(&decoded).map_err(|e| {
@@ -204,10 +210,7 @@ impl X402Client {
         let nonce = format!("0x{}", hex::encode(nonce_bytes));
 
         // 6. Build EIP-712 typed data hash for TransferWithAuthorization.
-        let domain_separator = eip712_domain_separator(
-            chain_id,
-            &required.asset,
-        );
+        let domain_separator = eip712_domain_separator(chain_id, &required.asset);
         let struct_hash = eip3009_struct_hash(
             self.wallet.address(),
             &required.pay_to,
@@ -369,7 +372,12 @@ impl X402Paywall {
     pub async fn check(&self, payment_sig: Option<&str>) -> CheckResult {
         let sig = match payment_sig {
             Some(s) if !s.is_empty() => s,
-            _ => return CheckResult { is_valid: false, invalid_reason: None },
+            _ => {
+                return CheckResult {
+                    is_valid: false,
+                    invalid_reason: None,
+                }
+            }
         };
 
         use base64::Engine;
@@ -408,14 +416,20 @@ impl X402Paywall {
             .json(&body);
 
         if !self.facilitator_token.is_empty() {
-            req = req.header("Authorization", format!("Bearer {}", self.facilitator_token));
+            req = req.header(
+                "Authorization",
+                format!("Bearer {}", self.facilitator_token),
+            );
         }
 
         match req.send().await {
             Ok(resp) if resp.status().is_success() => {
                 match resp.json::<serde_json::Value>().await {
                     Ok(data) => CheckResult {
-                        is_valid: data.get("isValid").and_then(|v| v.as_bool()).unwrap_or(false),
+                        is_valid: data
+                            .get("isValid")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false),
                         invalid_reason: data
                             .get("invalidReason")
                             .and_then(|v| v.as_str())
@@ -515,7 +529,10 @@ fn eip712_digest(domain_separator: &[u8; 32], struct_hash: &[u8; 32]) -> [u8; 32
 }
 
 fn parse_address(addr: &str) -> [u8; 20] {
-    let hex_str = addr.strip_prefix("0x").or_else(|| addr.strip_prefix("0X")).unwrap_or(addr);
+    let hex_str = addr
+        .strip_prefix("0x")
+        .or_else(|| addr.strip_prefix("0X"))
+        .unwrap_or(addr);
     let mut out = [0u8; 20];
     if let Ok(bytes) = hex::decode(hex_str) {
         if bytes.len() == 20 {

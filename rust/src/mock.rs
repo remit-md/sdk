@@ -128,12 +128,10 @@ impl MockRemit {
     /// Return true if a payment of exactly `amount` USDC was sent to `recipient`.
     pub async fn was_paid(&self, recipient: &str, amount: Decimal) -> bool {
         let s = self.state.lock().await;
-        s.transactions
-            .iter()
-            .any(|tx| {
-                tx.to.as_deref().map(|s| s.to_lowercase()).as_deref() == Some(&recipient.to_lowercase())
-                    && tx.amount == Some(amount)
-            })
+        s.transactions.iter().any(|tx| {
+            tx.to.as_deref().map(|s| s.to_lowercase()).as_deref() == Some(&recipient.to_lowercase())
+                && tx.amount == Some(amount)
+        })
     }
 
     /// Return the sum of all USDC sent to `recipient`.
@@ -142,7 +140,8 @@ impl MockRemit {
         s.transactions
             .iter()
             .filter(|tx| {
-                tx.to.as_deref().map(|s| s.to_lowercase()).as_deref() == Some(&recipient.to_lowercase())
+                tx.to.as_deref().map(|s| s.to_lowercase()).as_deref()
+                    == Some(&recipient.to_lowercase())
             })
             .map(|tx| tx.amount.unwrap_or(Decimal::ZERO))
             .fold(Decimal::ZERO, |acc, a| acc + a)
@@ -574,7 +573,11 @@ impl MockTransport {
             // ─── Spending summary ─────────────────────────────────────────
             ("GET", path) if path.starts_with("/api/v1/wallet/spending") => {
                 let s = self.state.lock().await;
-                let total: Decimal = s.transactions.iter().map(|tx| tx.amount.unwrap_or(Decimal::ZERO)).sum();
+                let total: Decimal = s
+                    .transactions
+                    .iter()
+                    .map(|tx| tx.amount.unwrap_or(Decimal::ZERO))
+                    .sum();
                 let count = s.transactions.len() as u64;
                 Ok(json!({
                     "address": "0xMockWallet0000000000000000000000000001",

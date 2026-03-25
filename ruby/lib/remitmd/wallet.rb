@@ -52,7 +52,7 @@ module Remitmd
       @signer = signer || PrivateKeySigner.new(private_key)
       # Normalize chain key (underscore → hyphen). Full chain name is sent in API bodies.
       @chain_key = chain.tr("_", "-")
-      cfg     = CHAIN_CONFIG.fetch(chain) do
+      cfg = CHAIN_CONFIG.fetch(chain) do
         raise ArgumentError, "Unknown chain: #{chain}. Valid: #{CHAIN_CONFIG.keys.join(", ")}"
       end
       base_url       = api_url || cfg[:url]
@@ -98,7 +98,7 @@ module Remitmd
     # Get deployed contract addresses. Cached for the lifetime of this client.
     # @return [ContractAddresses]
     def get_contracts
-      @contracts_cache ||= ContractAddresses.new(@transport.get("/contracts"))
+      @get_contracts ||= ContractAddresses.new(@transport.get("/contracts"))
     end
 
     # ─── Balance & Analytics ─────────────────────────────────────────────────
@@ -633,6 +633,7 @@ module Remitmd
 
     def validate_address!(addr)
       return if addr.match?(ADDRESS_RE)
+
       raise RemitError.new(
         RemitError::INVALID_ADDRESS,
         "Invalid address #{addr.inspect}: expected 0x-prefixed 40-character hex string. " \
@@ -644,6 +645,7 @@ module Remitmd
     def validate_amount!(amount)
       d = BigDecimal(amount.to_s)
       return if d >= MIN_AMOUNT
+
       raise RemitError.new(
         RemitError::INVALID_AMOUNT,
         "Amount #{amount} is below the minimum of #{MIN_AMOUNT} USDC.",
@@ -677,7 +679,7 @@ module Remitmd
     # Fetch the EIP-2612 permit nonce from the API.
     # @param usdc_address [String] the USDC contract address
     # @return [Integer] current nonce
-    def fetch_permit_nonce(usdc_address)
+    def fetch_permit_nonce(_usdc_address)
       return 0 if @mock_mode
 
       data = @transport.get("/status/#{address}")

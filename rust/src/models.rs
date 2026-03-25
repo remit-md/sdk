@@ -143,9 +143,17 @@ pub struct Transaction {
     pub from: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::models::opt_decimal")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::models::opt_decimal"
+    )]
     pub amount: Option<Decimal>,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::models::opt_decimal")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::models::opt_decimal"
+    )]
     pub fee: Option<Decimal>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memo: Option<String>,

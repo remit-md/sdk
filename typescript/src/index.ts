@@ -38,6 +38,8 @@ export type {
 // Signers
 export { PrivateKeySigner } from "./signer.js";
 export type { Signer, TypedDataDomain, TypedDataTypes } from "./signer.js";
+export { OwsSigner } from "./ows-signer.js";
+export type { OwsSignerOptions } from "./ows-signer.js";
 
 // Errors
 export {

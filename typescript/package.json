@@ -22,6 +22,14 @@
   "dependencies": {
     "viem": "^2.0.0"
   },
+  "peerDependencies": {
+    "@open-wallet-standard/core": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@open-wallet-standard/core": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/node": "^20.0.0",

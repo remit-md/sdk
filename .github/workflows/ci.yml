@@ -51,6 +51,8 @@ jobs:
           cache-dependency-path: typescript/pnpm-lock.yaml
       - name: Install
         run: cd typescript && pnpm install --frozen-lockfile
+      - name: Install OWS (real FFI for integration tests)
+        run: cd typescript && pnpm add --save-dev @open-wallet-standard/core
       - name: Typecheck
         run: cd typescript && pnpm tsc --noEmit
       - name: Build

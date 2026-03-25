@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "md.remit"
-version = "0.1.6"
+version = "0.1.7"
 
 java {
     withSourcesJar()

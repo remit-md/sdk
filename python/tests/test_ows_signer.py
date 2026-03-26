@@ -118,8 +118,13 @@ class TestOwsSignerCreate:
             OwsSigner(MOCK_WALLET_ID, _ows_module=mock)
 
     def test_throws_when_ows_not_installed(self) -> None:
-        with pytest.raises(ImportError, match="open-wallet-standard is not installed"):
-            OwsSigner(MOCK_WALLET_ID)
+        import sys
+        from unittest.mock import patch
+
+        # Simulate OWS not installed by blocking the import via sys.modules.
+        with patch.dict(sys.modules, {"ows": None}):
+            with pytest.raises(ImportError, match="open-wallet-standard is not installed"):
+                OwsSigner(MOCK_WALLET_ID)
 
 
 # ─── signTypedData ────────────────────────────────────────────────────────────

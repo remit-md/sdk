@@ -232,7 +232,7 @@ class Wallet(RemitClient):
         message = {
             "owner": self.address,
             "spender": spender,
-            "value": str(value),
+            "value": value,
             "nonce": nonce,
             "deadline": deadline,
         }

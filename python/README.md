@@ -35,6 +35,81 @@ print(tx.tx_hash)
 
 That's it. USDC approval is handled automatically.
 
+## Secure Wallet with OWS
+
+The [Open Wallet Standard](https://openwallet.sh) replaces raw private keys with encrypted local storage and policy-gated signing. Keys never leave the vault — the SDK signs through OWS's FFI layer.
+
+### Setup
+
+```bash
+# Install OWS
+pip install open-wallet-standard
+# or: curl -fsSL https://docs.openwallet.sh/install.sh | bash
+
+# Create a wallet + policy + API key in one command
+ows wallet create --name remit-my-agent
+```
+
+Or use the Remit CLI which does all of this automatically:
+
+```bash
+remit init  # creates wallet, chain-lock policy, API key, prints MCP config
+```
+
+### Usage
+
+```python
+from remitmd import Wallet, OwsSigner
+
+# Option 1: Direct signer construction
+signer = OwsSigner(wallet_id="remit-my-agent", ows_api_key=os.environ.get("OWS_API_KEY"))
+wallet = Wallet(signer=signer, chain="base")
+
+# Option 2: Environment-based (set OWS_WALLET_ID + OWS_API_KEY)
+signer = OwsSigner(
+    wallet_id=os.environ["OWS_WALLET_ID"],
+    ows_api_key=os.environ.get("OWS_API_KEY"),
+)
+wallet = Wallet(signer=signer)
+```
+
+Everything works the same — payments, permits, x402:
+
+```python
+tx = await wallet.pay_direct("0xRecipient...", 1.50, memo="inference fee")
+```
+
+### Environment Variables
+
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `OWS_WALLET_ID` | OWS wallet name or UUID | Yes (for OWS path) |
+| `OWS_API_KEY` | API key token for headless signing | Recommended |
+| `REMITMD_CHAIN` | `"base"` or `"base-sepolia"` | No (defaults to `"base"`) |
+
+### Install with OWS support
+
+```bash
+pip install remitmd[ows]
+```
+
+### Custom Signer
+
+Implement the `Signer` ABC for custom signing backends:
+
+```python
+from remitmd import Signer, Wallet
+
+class MySigner(Signer):
+    def get_address(self) -> str:
+        return "0x..."
+
+    async def sign_typed_data(self, domain, types, value) -> str:
+        return "0x..."
+
+wallet = Wallet(signer=MySigner())
+```
+
 ## Payment Models
 
 ### Direct Payment

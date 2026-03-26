@@ -82,7 +82,12 @@ class Wallet(RemitClient):
             raise ValueError("Provide private_key OR signer, not both")
 
         chain_id, url = get_chain_config(chain, testnet, api_url)
-        self.chain = chain
+        # Store the resolved chain key so USDC address lookups match.
+        # e.g. chain="base", testnet=True -> self.chain = "base-sepolia"
+        if testnet and not chain.endswith("-sepolia") and chain != "localhost":
+            self.chain = f"{chain}-sepolia"
+        else:
+            self.chain = chain
         self.testnet = testnet
         self._chain_id = chain_id
 

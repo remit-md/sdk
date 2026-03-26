@@ -28,6 +28,73 @@ console.log(tx.txHash);
 
 That's it. USDC approval is handled automatically.
 
+## Secure Wallet with OWS
+
+The [Open Wallet Standard](https://openwallet.sh) replaces raw private keys with encrypted local storage and policy-gated signing. Keys never leave the vault — the SDK signs through OWS's FFI layer.
+
+### Setup
+
+```bash
+# Install OWS (or: curl -fsSL https://docs.openwallet.sh/install.sh | bash)
+npm install -g @open-wallet-standard/core
+
+# Create a wallet + policy + API key in one command
+ows wallet create --name remit-my-agent
+```
+
+Or use the Remit CLI which does all of this automatically:
+
+```bash
+remit init  # creates wallet, chain-lock policy, API key, prints MCP config
+```
+
+### Usage
+
+```typescript
+import { Wallet } from "@remitmd/sdk";
+
+// Auto-detects OWS_WALLET_ID, falls back to REMITMD_KEY
+const wallet = await Wallet.withOws();
+
+// Everything works the same — payments, permits, x402
+const tx = await wallet.payDirect("0xRecipient...", 1.50, "inference fee");
+```
+
+With explicit options:
+
+```typescript
+const wallet = await Wallet.withOws({
+  walletId: "remit-my-agent",   // OWS wallet name or UUID
+  owsApiKey: process.env.OWS_API_KEY,
+  chain: "base",
+});
+```
+
+### Environment Variables
+
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `OWS_WALLET_ID` | OWS wallet name or UUID | Yes (for OWS path) |
+| `OWS_API_KEY` | API key token for headless signing | Recommended |
+| `REMITMD_CHAIN` | `"base"` or `"base-sepolia"` | No (defaults to `"base"`) |
+
+Priority: explicit `signer` > explicit `privateKey` > `OWS_WALLET_ID` > `REMITMD_KEY`.
+
+### Custom Signer
+
+If you need a custom signing backend, implement the `Signer` interface:
+
+```typescript
+import type { Signer } from "@remitmd/sdk";
+
+const mySigner: Signer = {
+  getAddress: () => "0x...",
+  signTypedData: async (domain, types, value) => "0x...",
+};
+
+const wallet = new Wallet({ signer: mySigner });
+```
+
 ## Payment Models
 
 ### Direct Payment

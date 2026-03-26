@@ -11,7 +11,7 @@
  *   4. Verify the signature recovers to the wallet address (ecrecover)
  */
 
-import { describe, it, before } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { verifyTypedData } from "viem";
 

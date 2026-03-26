@@ -25,6 +25,11 @@ from remitmd.models.tab import Tab, TabCharge
 from remitmd.provider import X402Paywall
 from remitmd.signer import PrivateKeySigner, Signer
 from remitmd.wallet import PermitSignature, Wallet
+
+try:
+    from remitmd.ows_signer import OwsSigner
+except ImportError:
+    OwsSigner = None  # type: ignore[assignment,misc]
 from remitmd.x402 import AllowanceExceededError, X402Client
 
 __all__ = [
@@ -40,6 +45,7 @@ __all__ = [
     "PermitSignature",
     "Signer",
     "PrivateKeySigner",
+    "OwsSigner",
     "X402Client",
     "AllowanceExceededError",
     "X402Paywall",

@@ -79,6 +79,12 @@ if echo "$STAGED" | grep -q '^swift/'; then
     RAN_TESTS=1
 fi
 
+if echo "$STAGED" | grep -q '^ows-policy/'; then
+    echo "[SDK] OWS Policy: tsc + test..."
+    cd ows-policy && npx tsc --noEmit && node --import tsx --test tests/*.ts && cd ..
+    RAN_TESTS=1
+fi
+
 if echo "$STAGED" | grep -q '^elixir/'; then
     if command -v mix &>/dev/null; then
         echo "[SDK] Elixir: compile + test..."

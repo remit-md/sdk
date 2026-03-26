@@ -75,7 +75,8 @@ class Wallet(RemitClient):
             private_key = os.environ.get("REMITMD_KEY")
             if not private_key:
                 raise ValueError(
-                    "Provide private_key, signer, or set the REMITMD_KEY environment variable"
+                    "Provide private_key, signer, or set the REMITMD_KEY environment variable. "
+                    "For OWS wallet support, use: await Wallet.with_ows()"
                 )
         if private_key is not None and signer is not None:
             raise ValueError("Provide private_key OR signer, not both")
@@ -110,10 +111,70 @@ class Wallet(RemitClient):
         """Load wallet from REMITMD_KEY and REMITMD_CHAIN environment variables."""
         key = os.environ.get("REMITMD_KEY")
         if not key:
+            if os.environ.get("OWS_WALLET_ID"):
+                raise OSError(
+                    "OWS_WALLET_ID is set but from_env() only supports raw keys. "
+                    "Use: Wallet.with_ows()"
+                )
             raise OSError("REMITMD_KEY environment variable is not set")
         resolved_chain = chain or os.environ.get("REMITMD_CHAIN", "base")
         testnet = os.environ.get("REMITMD_TESTNET", "").lower() in ("1", "true", "yes")
         return cls(private_key=key, chain=resolved_chain, testnet=testnet)
+
+    @classmethod
+    def with_ows(
+        cls,
+        wallet_id: str | None = None,
+        ows_api_key: str | None = None,
+        chain: str | None = None,
+        testnet: bool = False,
+        api_url: str | None = None,
+        *,
+        _ows_module: object | None = None,
+    ) -> Wallet:
+        """Create a Wallet backed by the Open Wallet Standard.
+
+        Reads ``OWS_WALLET_ID``, ``OWS_API_KEY``, and ``REMITMD_CHAIN`` from
+        environment unless overridden.  Falls back to ``REMITMD_KEY`` if
+        ``OWS_WALLET_ID`` is not set.
+
+        Usage::
+
+            wallet = Wallet.with_ows()
+            # or with explicit options:
+            wallet = Wallet.with_ows(wallet_id="remit-my-agent")
+        """
+        import logging
+
+        logger = logging.getLogger("remitmd")
+
+        resolved_id = wallet_id or os.environ.get("OWS_WALLET_ID")
+        remit_key = os.environ.get("REMITMD_KEY")
+        resolved_chain = chain or os.environ.get("REMITMD_CHAIN", "base")
+
+        if resolved_id and remit_key:
+            logger.warning("Both OWS_WALLET_ID and REMITMD_KEY set. Using OWS.")
+
+        if resolved_id:
+            from remitmd.ows_signer import OwsSigner
+
+            signer = OwsSigner(
+                wallet_id=resolved_id,
+                chain=resolved_chain,
+                ows_api_key=ows_api_key or os.environ.get("OWS_API_KEY"),
+                _ows_module=_ows_module,
+            )
+            return cls(signer=signer, chain=resolved_chain, testnet=testnet, api_url=api_url)
+
+        if remit_key:
+            return cls(
+                private_key=remit_key, chain=resolved_chain, testnet=testnet, api_url=api_url
+            )
+
+        raise ValueError(
+            "Wallet.with_ows() requires OWS_WALLET_ID or REMITMD_KEY. "
+            "Install OWS: pip install open-wallet-standard"
+        )
 
     # ─── Address ──────────────────────────────────────────────────────────────
 

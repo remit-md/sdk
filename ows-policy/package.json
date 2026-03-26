@@ -1,0 +1,36 @@
+{
+  "name": "@remitmd/ows-policy",
+  "version": "0.1.0",
+  "description": "OWS policy executable for the Remit payment protocol — chain lock, contract allowlist, per-tx and daily spending caps",
+  "type": "module",
+  "main": "./dist/remit-policy.js",
+  "bin": {
+    "remit-policy": "./dist/remit-policy.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --import tsx --test tests/*.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "keywords": [
+    "remit",
+    "ows",
+    "open-wallet-standard",
+    "policy",
+    "usdc",
+    "base"
+  ]
+}

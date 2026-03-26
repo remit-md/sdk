@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@open-wallet-standard/core':
+        specifier: '>=1.0.0'
+        version: 1.1.0
       viem:
         specifier: ^2.0.0
         version: 2.47.0(typescript@5.9.3)
@@ -275,6 +278,30 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@open-wallet-standard/core-darwin-arm64@1.1.0':
+    resolution: {integrity: sha512-2w3lttvTcfhYVzXi1HaRPqJOWTQ5we5H9tSGeVNzgj5Q7P5r18BtRMVSEqaf3Uw5MrOLrN6Lb9iVdnGUqcCGJA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@open-wallet-standard/core-darwin-x64@1.1.0':
+    resolution: {integrity: sha512-HjRnZ9PwG/+NjdKDHAz6VByrb3RYKUx8kYSKclWzw5rgYkaNVDD9PvvCs0odNBOawS/iHbgVUe4dko2py23HDQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@open-wallet-standard/core-linux-arm64-gnu@1.1.0':
+    resolution: {integrity: sha512-q1RC4cbNZLfKbFacVwnudlMDxb0gFWnX+jztQYAFgvCplAO33QWADa+Ua6y2M+yFSJBgoJDkpGgGqmi9tIjbYg==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@open-wallet-standard/core-linux-x64-gnu@1.1.0':
+    resolution: {integrity: sha512-FerlsHMBjkFS/oP0bp6SVeJo29lpcbp5qkaRlN2OTx6AlF+mfKRb+pB32M+EiudylaWC9yG88XzxCe9YPoaOig==}
+    cpu: [x64]
+    os: [linux]
+
+  '@open-wallet-standard/core@1.1.0':
+    resolution: {integrity: sha512-tQOLBo9y5qHJTTMVFU8s85GRj2vzEH6UILHODxOYifsJlgNWwoU/h4pAVK0vugtR2uGfRsJjxE0VkGICT7b+7Q==}
+    hasBin: true
 
   '@scure/base@1.2.6':
     resolution: {integrity: sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg==}
@@ -953,6 +980,25 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
+
+  '@open-wallet-standard/core-darwin-arm64@1.1.0':
+    optional: true
+
+  '@open-wallet-standard/core-darwin-x64@1.1.0':
+    optional: true
+
+  '@open-wallet-standard/core-linux-arm64-gnu@1.1.0':
+    optional: true
+
+  '@open-wallet-standard/core-linux-x64-gnu@1.1.0':
+    optional: true
+
+  '@open-wallet-standard/core@1.1.0':
+    optionalDependencies:
+      '@open-wallet-standard/core-darwin-arm64': 1.1.0
+      '@open-wallet-standard/core-darwin-x64': 1.1.0
+      '@open-wallet-standard/core-linux-arm64-gnu': 1.1.0
+      '@open-wallet-standard/core-linux-x64-gnu': 1.1.0
 
   '@scure/base@1.2.6': {}
 

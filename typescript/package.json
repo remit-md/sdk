@@ -14,6 +14,7 @@
   "scripts": {
     "build": "tsc",
     "test": "node --import tsx --test tests/*.ts",
+    "test:ows": "node --import tsx --test tests/test_ows_integration.ts",
     "compliance": "node --import tsx --test tests/compliance/*.ts",
     "acceptance": "node --import tsx --test --test-concurrency=1 tests/acceptance/*.test.ts",
     "typecheck": "tsc --noEmit",
@@ -21,6 +22,14 @@
   },
   "dependencies": {
     "viem": "^2.0.0"
+  },
+  "peerDependencies": {
+    "@open-wallet-standard/core": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@open-wallet-standard/core": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

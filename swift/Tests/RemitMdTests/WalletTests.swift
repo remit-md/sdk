@@ -241,6 +241,31 @@ final class WalletTests: XCTestCase {
         XCTAssertFalse(mock.wasPaid(address: recipient))
     }
 
+    // MARK: - Custom signer injection (V24 C1)
+
+    func testInitWithCustomSigner() {
+        // MockSigner conforms to Signer protocol — verify it works with init(signer:)
+        let customSigner = MockSigner(address: "0x1111111111111111111111111111111111111111")
+        let customWallet = RemitWallet(signer: customSigner, chain: .baseSepolia)
+        XCTAssertEqual(customWallet.address, "0x1111111111111111111111111111111111111111")
+    }
+
+    func testInitWithPrivateKeySignerViaProtocol() throws {
+        // Verify PrivateKeySigner works via the new init(signer:) path too
+        let signer = try PrivateKeySigner(privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+        let customWallet = RemitWallet(signer: signer, chain: .baseSepolia)
+        XCTAssertEqual(customWallet.address, "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
+    }
+
+    func testExistingPrivateKeyInitStillWorks() throws {
+        // Ensure the original init(privateKey:) still functions
+        let wallet = try RemitWallet(
+            privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+            chain: .baseSepolia
+        )
+        XCTAssertEqual(wallet.address, "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
+    }
+
     // MARK: - Keccak256 known-answer test
 
     func testKeccak256KnownAnswer() {

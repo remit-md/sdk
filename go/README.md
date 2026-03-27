@@ -37,6 +37,26 @@ escrow, err := wallet.CreateEscrow(ctx, "0xPayee...", decimal.NewFromFloat(10.0)
 
 All payment methods (`Pay`, `CreateEscrow`, `CreateTab`, `CreateStream`, `CreateBounty`, `PlaceDeposit`) auto-sign an EIP-2612 permit when none is provided. No manual approval step needed.
 
+## Local Signer (Recommended)
+
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+
+```bash
+export REMIT_SIGNER_URL=http://127.0.0.1:7402
+export REMIT_SIGNER_TOKEN=rmit_sk_...
+```
+
+```go
+// Explicit
+signer, err := remitmd.NewHttpSigner("http://127.0.0.1:7402", "rmit_sk_...")
+wallet, err := remitmd.NewWalletWithSigner(signer)
+
+// Or auto-detect from env (recommended)
+wallet, err := remitmd.FromEnv() // detects REMIT_SIGNER_URL automatically
+```
+
+`FromEnv()` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `REMITMD_KEY`.
+
 ## Testing (Zero Network)
 
 ```go

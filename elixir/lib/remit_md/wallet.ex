@@ -18,7 +18,7 @@ defmodule RemitMd.Wallet do
   or log output.
   """
 
-  alias RemitMd.{Error, Http, MockRemit, MockSigner, PrivateKeySigner}
+  alias RemitMd.{Error, Http, HttpSigner, MockRemit, MockSigner, PrivateKeySigner}
   alias RemitMd.Models.{
     Balance, Bounty, BountySubmission, Budget, ContractAddresses, Deposit, Escrow,
     MintResponse, PermitSignature, Reputation, SpendingSummary, Stream, Tab, TabCharge,
@@ -99,26 +99,62 @@ defmodule RemitMd.Wallet do
   @doc """
   Build a wallet from environment variables.
 
-  Required: `REMITMD_PRIVATE_KEY`
+  Credential priority:
+    1. `REMIT_SIGNER_URL` + `REMIT_SIGNER_TOKEN` — HTTP signer server
+    2. `REMITMD_KEY` (or deprecated `REMITMD_PRIVATE_KEY`) — hex-encoded private key
+
   Optional: `REMITMD_CHAIN`, `REMITMD_API_URL`, `REMITMD_ROUTER_ADDRESS`
   """
   def from_env do
-    key = System.get_env("REMITMD_KEY") || System.get_env("REMITMD_PRIVATE_KEY")
-
-    if System.get_env("REMITMD_PRIVATE_KEY") && !System.get_env("REMITMD_KEY") do
-      IO.warn("REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead")
-    end
-
-    key || raise Error.new(Error.unauthorized(), "REMITMD_KEY not set")
-
     chain          = System.get_env("REMITMD_CHAIN", "base")
     api_url        = System.get_env("REMITMD_API_URL")
     router_address = System.get_env("REMITMD_ROUTER_ADDRESS")
-    opts = [private_key: key, chain: chain]
+
+    # Build the signer: priority 1 = HTTP signer, priority 2 = private key
+    signer_opts = resolve_signer_from_env()
+
+    opts = signer_opts ++ [chain: chain]
     opts = if api_url, do: Keyword.put(opts, :api_url, api_url), else: opts
     opts = if router_address, do: Keyword.put(opts, :router_address, router_address), else: opts
 
     new(opts)
+  end
+
+  defp resolve_signer_from_env do
+    signer_url = System.get_env("REMIT_SIGNER_URL")
+
+    cond do
+      # Priority 1: HTTP signer server
+      signer_url != nil ->
+        signer_token = System.get_env("REMIT_SIGNER_TOKEN")
+
+        unless signer_token do
+          raise Error.new(
+            Error.unauthorized(),
+            "REMIT_SIGNER_URL is set but REMIT_SIGNER_TOKEN is missing. Both are required."
+          )
+        end
+
+        signer = HttpSigner.new(signer_url, signer_token)
+        [signer: signer]
+
+      # Priority 2: Private key
+      true ->
+        key = System.get_env("REMITMD_KEY") || System.get_env("REMITMD_PRIVATE_KEY")
+
+        if System.get_env("REMITMD_PRIVATE_KEY") && !System.get_env("REMITMD_KEY") do
+          IO.warn("REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead")
+        end
+
+        unless key do
+          raise Error.new(
+            Error.unauthorized(),
+            "No signing credentials found. Set one of: REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY."
+          )
+        end
+
+        [private_key: key]
+    end
   end
 
   # ─── Balance & Analytics ──────────────────────────────────────────────────

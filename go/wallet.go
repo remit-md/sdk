@@ -127,20 +127,17 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 	}, nil
 }
 
-// FromEnv creates a Wallet from environment variables:
-//   - REMITMD_KEY — hex-encoded private key (required)
+// FromEnv creates a Wallet from environment variables.
+//
+// Credential priority:
+//  1. REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN — HTTP signer server
+//  2. REMITMD_KEY — hex-encoded private key
+//
+// Common env vars:
 //   - REMITMD_CHAIN — chain name (default: "base")
 //   - REMITMD_TESTNET — "1", "true", or "yes" to use testnet
 //   - REMITMD_ROUTER_ADDRESS — router contract address for EIP-712 domain
 func FromEnv(opts ...Option) (*Wallet, error) {
-	key := os.Getenv("REMITMD_KEY")
-	if key == "" {
-		return nil, remitErr(ErrCodeUnauthorized,
-			"REMITMD_KEY environment variable is not set. Set it to your hex-encoded private key.",
-			map[string]any{"hint": "export REMITMD_KEY=0x..."},
-		)
-	}
-
 	envOpts := []Option{}
 	if chain := os.Getenv("REMITMD_CHAIN"); chain != "" {
 		envOpts = append(envOpts, WithChain(chain))
@@ -151,6 +148,32 @@ func FromEnv(opts ...Option) (*Wallet, error) {
 	}
 	if routerAddr := os.Getenv("REMITMD_ROUTER_ADDRESS"); routerAddr != "" {
 		envOpts = append(envOpts, WithRouterAddress(routerAddr))
+	}
+
+	// Priority 1: HTTP signer server
+	if signerURL := os.Getenv("REMIT_SIGNER_URL"); signerURL != "" {
+		signerToken := os.Getenv("REMIT_SIGNER_TOKEN")
+		if signerToken == "" {
+			return nil, remitErr(ErrCodeUnauthorized,
+				"REMIT_SIGNER_URL is set but REMIT_SIGNER_TOKEN is missing. Both are required.",
+				map[string]any{"hint": "export REMIT_SIGNER_TOKEN=rmit_sk_..."},
+			)
+		}
+		signer, err := NewHttpSigner(signerURL, signerToken)
+		if err != nil {
+			return nil, err
+		}
+		// Caller opts take precedence over env opts
+		return NewWalletWithSigner(signer, append(envOpts, opts...)...)
+	}
+
+	// Priority 2: Raw private key
+	key := os.Getenv("REMITMD_KEY")
+	if key == "" {
+		return nil, remitErr(ErrCodeUnauthorized,
+			"No signing credentials found. Set one of: REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY.",
+			map[string]any{"hint": "export REMITMD_KEY=0x... or export REMIT_SIGNER_URL=http://127.0.0.1:7402"},
+		)
 	}
 
 	// Caller opts take precedence over env opts

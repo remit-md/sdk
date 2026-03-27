@@ -10,6 +10,7 @@ use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
 use crate::http::{
     chain_config, compute_permit_digest, fetch_permit_nonce, usdc_address, HttpTransport, Transport,
 };
+use crate::http_signer::HttpSigner;
 use crate::models::*;
 use crate::signer::{PrivateKeySigner, Signer};
 
@@ -92,21 +93,17 @@ impl Wallet {
         }
     }
 
-    /// Create a wallet from environment variables:
-    /// - `REMITMD_KEY` — hex-encoded private key (required)
+    /// Create a wallet from environment variables.
+    ///
+    /// Signer detection (first match wins):
+    /// 1. `REMIT_SIGNER_URL` + `REMIT_SIGNER_TOKEN` — HTTP signer server
+    /// 2. `REMITMD_KEY` — hex-encoded private key
+    ///
+    /// Common options:
     /// - `REMITMD_CHAIN` — chain name (default: `"base"`)
     /// - `REMITMD_TESTNET` — `"1"`, `"true"`, or `"yes"` for testnet
     /// - `REMITMD_ROUTER_ADDRESS` — EIP-712 verifying contract address
     pub fn from_env() -> Result<Self, RemitError> {
-        let key = env::var("REMITMD_KEY").map_err(|_| {
-            remit_err_ctx(
-                codes::UNAUTHORIZED,
-                "REMITMD_KEY environment variable is not set. Set it to your hex-encoded private key.",
-                "hint",
-                "export REMITMD_KEY=0x...",
-            )
-        })?;
-
         let chain = env::var("REMITMD_CHAIN").unwrap_or_else(|_| "base".to_string());
         let testnet = matches!(
             env::var("REMITMD_TESTNET").as_deref(),
@@ -114,14 +111,45 @@ impl Wallet {
         );
         let router_address = env::var("REMITMD_ROUTER_ADDRESS").unwrap_or_default();
 
-        let mut builder = Self::new(&key).chain(&chain);
-        if testnet {
-            builder = builder.testnet();
+        // 1. HTTP signer server (REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN)
+        if let Ok(signer_url) = env::var("REMIT_SIGNER_URL") {
+            let token = env::var("REMIT_SIGNER_TOKEN").map_err(|_| {
+                remit_err_ctx(
+                    codes::UNAUTHORIZED,
+                    "REMIT_SIGNER_URL is set but REMIT_SIGNER_TOKEN is missing. Both are required for HTTP signer mode.",
+                    "hint",
+                    "export REMIT_SIGNER_TOKEN=rmit_sk_...",
+                )
+            })?;
+            let signer = HttpSigner::new(&signer_url, &token)?;
+            let mut builder = Self::with_signer(signer).chain(&chain);
+            if testnet {
+                builder = builder.testnet();
+            }
+            if !router_address.is_empty() {
+                builder = builder.router_address(&router_address);
+            }
+            return builder.build();
         }
-        if !router_address.is_empty() {
-            builder = builder.router_address(&router_address);
+
+        // 2. Private key (REMITMD_KEY)
+        if let Ok(key) = env::var("REMITMD_KEY") {
+            let mut builder = Self::new(&key).chain(&chain);
+            if testnet {
+                builder = builder.testnet();
+            }
+            if !router_address.is_empty() {
+                builder = builder.router_address(&router_address);
+            }
+            return builder.build();
         }
-        builder.build()
+
+        Err(remit_err_ctx(
+            codes::UNAUTHORIZED,
+            "No signer configured. Set REMIT_SIGNER_URL+REMIT_SIGNER_TOKEN for HTTP signer, or REMITMD_KEY for a private key.",
+            "hint",
+            "export REMITMD_KEY=0x... OR export REMIT_SIGNER_URL=http://127.0.0.1:7402 REMIT_SIGNER_TOKEN=rmit_sk_...",
+        ))
     }
 
     /// Ethereum address of this wallet (checksummed `0x`-prefixed hex).

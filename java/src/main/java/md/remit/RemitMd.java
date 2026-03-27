@@ -1,6 +1,7 @@
 package md.remit;
 
 import md.remit.internal.ApiClient;
+import md.remit.signer.HttpSigner;
 import md.remit.signer.PrivateKeySigner;
 import md.remit.signer.Signer;
 
@@ -46,25 +47,48 @@ public final class RemitMd {
     /**
      * Creates a Wallet from environment variables.
      *
+     * <p>Signing credential priority:
+     * <ol>
+     *   <li>{@code REMIT_SIGNER_URL} + {@code REMIT_SIGNER_TOKEN} — HTTP signer server</li>
+     *   <li>{@code REMITMD_KEY} — hex-encoded private key</li>
+     * </ol>
+     *
+     * <p>Additional options:
      * <ul>
-     *   <li>{@code REMITMD_KEY} — hex-encoded private key (required)</li>
      *   <li>{@code REMITMD_CHAIN} — chain name, default "base" (only "base" supported)</li>
      *   <li>{@code REMITMD_TESTNET} — "1", "true", or "yes" for testnet</li>
      *   <li>{@code REMITMD_ROUTER_ADDRESS} — EIP-712 verifying contract address</li>
      * </ul>
      *
-     * @throws RemitError if REMITMD_KEY is not set or is malformed
+     * @throws RemitError if no signing credentials are set or are malformed
      */
     public static Wallet fromEnv() {
-        String key = System.getenv("REMITMD_KEY");
-        if (key == null || key.isBlank()) {
-            throw new RemitError(ErrorCodes.UNAUTHORIZED,
-                "REMITMD_KEY environment variable is not set. " +
-                "Set it to your hex-encoded Ethereum private key.",
-                Map.of("hint", "export REMITMD_KEY=0x...")
-            );
+        Builder b;
+
+        // Priority: REMIT_SIGNER_URL > REMITMD_KEY > error
+        String signerUrl = System.getenv("REMIT_SIGNER_URL");
+        if (signerUrl != null && !signerUrl.isBlank()) {
+            String signerToken = System.getenv("REMIT_SIGNER_TOKEN");
+            if (signerToken == null || signerToken.isBlank()) {
+                throw new RemitError(ErrorCodes.UNAUTHORIZED,
+                    "REMIT_SIGNER_URL is set but REMIT_SIGNER_TOKEN is missing. " +
+                    "Both are required for HTTP signer mode.",
+                    Map.of("hint", "export REMIT_SIGNER_TOKEN=rmit_sk_...")
+                );
+            }
+            b = withSigner(new HttpSigner(signerUrl, signerToken));
+        } else {
+            String key = System.getenv("REMITMD_KEY");
+            if (key == null || key.isBlank()) {
+                throw new RemitError(ErrorCodes.UNAUTHORIZED,
+                    "No signing credentials found. Set one of: " +
+                    "REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY.",
+                    Map.of("hint", "export REMITMD_KEY=0x... or export REMIT_SIGNER_URL=http://...")
+                );
+            }
+            b = withKey(key);
         }
-        Builder b = withKey(key);
+
         String chain = System.getenv("REMITMD_CHAIN");
         if (chain != null && !chain.isBlank()) b = b.chain(chain);
         String testnet = System.getenv("REMITMD_TESTNET");

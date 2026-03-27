@@ -95,7 +95,12 @@ export class CliSigner implements Signer {
   ): Promise<string> {
     const input = JSON.stringify(
       { domain, types, message: value },
-      (_key, v) => (typeof v === "bigint" ? v.toString() : (v as unknown)),
+      (_key, v) =>
+        typeof v === "bigint"
+          ? v <= Number.MAX_SAFE_INTEGER
+            ? Number(v)
+            : v.toString()
+          : (v as unknown),
     );
 
     let result: { stdout: string; stderr: string };

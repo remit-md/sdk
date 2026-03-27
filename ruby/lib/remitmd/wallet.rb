@@ -28,7 +28,7 @@ module Remitmd
 
     # @param private_key [String, nil] 0x-prefixed hex private key
     # @param signer [Signer, nil]      custom signer (pass instead of private_key)
-    # @param chain [String]            chain name — "base", "base_sepolia"
+    # @param chain [String]            chain name - "base", "base_sepolia"
     # @param api_url [String, nil]     override API base URL
     # @param transport [Object, nil]   inject mock transport (used by MockRemit)
     def initialize(private_key: nil, signer: nil, chain: "base", api_url: nil, router_address: nil, transport: nil)
@@ -157,7 +157,7 @@ module Remitmd
     # @param to [String] recipient 0x-prefixed address
     # @param amount [Numeric, BigDecimal] amount in USDC (e.g. 1.50)
     # @param memo [String, nil] optional note
-    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
+    # @param permit [PermitSignature, nil] EIP-2612 permit - auto-signed if nil
     # @return [Transaction]
     def pay(to, amount, memo: nil, permit: nil)
       validate_address!(to)
@@ -176,7 +176,7 @@ module Remitmd
     # @param amount [Numeric] amount in USDC
     # @param memo [String, nil] optional note
     # @param expires_in_secs [Integer, nil] optional expiry in seconds from now
-    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
+    # @param permit [PermitSignature, nil] EIP-2612 permit - auto-signed if nil
     # @return [Escrow]
     def create_escrow(payee, amount, memo: nil, expires_in_secs: nil, permit: nil)
       validate_address!(payee)
@@ -237,7 +237,7 @@ module Remitmd
     # @param limit_amount [Numeric] maximum tab credit in USDC
     # @param per_unit [Numeric] USDC per API call
     # @param expires_in_secs [Integer] optional expiry duration in seconds (default: 86400)
-    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
+    # @param permit [PermitSignature, nil] EIP-2612 permit - auto-signed if nil
     # @return [Tab]
     def create_tab(provider, limit_amount, per_unit = 0.0, expires_in_secs: 86_400, permit: nil)
       validate_address!(provider)
@@ -430,7 +430,7 @@ module Remitmd
     # @param payee [String] 0x-prefixed address of the stream recipient
     # @param rate_per_second [Numeric] USDC per second
     # @param max_total [Numeric] maximum total USDC for the stream
-    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
+    # @param permit [PermitSignature, nil] EIP-2612 permit - auto-signed if nil
     # @return [Stream]
     def create_stream(payee, rate_per_second, max_total, permit: nil)
       validate_address!(payee)
@@ -468,7 +468,7 @@ module Remitmd
     # @param task_description [String] task description
     # @param deadline [Integer] deadline as Unix timestamp
     # @param max_attempts [Integer] maximum submission attempts (default: 10)
-    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
+    # @param permit [PermitSignature, nil] EIP-2612 permit - auto-signed if nil
     # @return [Bounty]
     def create_bounty(amount, task_description, deadline, max_attempts: 10, permit: nil)
       validate_amount!(amount)
@@ -522,7 +522,7 @@ module Remitmd
     # @param provider [String] 0x-prefixed provider address
     # @param amount [Numeric] amount in USDC
     # @param expires_in_secs [Integer] expiry duration in seconds (default: 3600)
-    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
+    # @param permit [PermitSignature, nil] EIP-2612 permit - auto-signed if nil
     # @return [Deposit]
     def place_deposit(provider, amount, expires_in_secs: 3600, permit: nil)
       validate_address!(provider)
@@ -556,7 +556,7 @@ module Remitmd
     # Propose a payment intent for counterpart approval before execution.
     # @param to [String] 0x-prefixed address
     # @param amount [Numeric] amount in USDC
-    # @param type [String] payment type — "direct", "escrow", "tab"
+    # @param type [String] payment type - "direct", "escrow", "tab"
     # @return [Intent]
     def propose_intent(to, amount, type: "direct")
       validate_address!(to)
@@ -583,7 +583,7 @@ module Remitmd
     # Generate a one-time URL for the operator to fund this wallet.
     # @param messages [Array<Hash>, nil] chat-style messages (each with :role and :text)
     # @param agent_name [String, nil] agent display name shown on the funding page
-    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
+    # @param permit [PermitSignature, nil] EIP-2612 permit - auto-signed if nil
     # @return [LinkResponse]
     def create_fund_link(messages: nil, agent_name: nil, permit: nil)
       body = {}
@@ -601,7 +601,7 @@ module Remitmd
     # Generate a one-time URL for the operator to withdraw funds.
     # @param messages [Array<Hash>, nil] chat-style messages (each with :role and :text)
     # @param agent_name [String, nil] agent display name shown on the withdraw page
-    # @param permit [PermitSignature, nil] EIP-2612 permit — auto-signed if nil
+    # @param permit [PermitSignature, nil] EIP-2612 permit - auto-signed if nil
     # @return [LinkResponse]
     def create_withdraw_link(messages: nil, agent_name: nil, permit: nil)
       body = {}
@@ -710,7 +710,7 @@ module Remitmd
 
     # Auto-sign a permit for the given contract type and amount.
     # Returns nil on failure instead of raising, so callers can proceed without a permit.
-    # @param contract [String] contract key — "router", "escrow", "tab", etc.
+    # @param contract [String] contract key - "router", "escrow", "tab", etc.
     # @param amount [Numeric] amount in USDC
     # @return [PermitSignature, nil]
     def auto_permit(contract, amount)

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Remitmd
-  # Pure-Ruby Keccak-256 (Ethereum variant — NOT SHA-3).
+  # Pure-Ruby Keccak-256 (Ethereum variant - NOT SHA-3).
   #
   # SHA-3 uses different padding (0x06 instead of 0x01).
   # This implementation matches Ethereum's keccak256.

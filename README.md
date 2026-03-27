@@ -3,11 +3,11 @@
 > [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
 
 SDKs in 9 languages (Python, TypeScript, Go, C#, Java, Rust, Ruby, Swift, Elixir) for the [remit.md](https://remit.md) payment protocol.
-Let AI agents pay for tools, data, and services — one env var, no crypto experience required.
+Let AI agents pay for tools, data, and services - one env var, no crypto experience required.
 
 ## Quickstart (3 steps)
 
-### Step 1 — Get your agent key
+### Step 1 - Get your agent key
 
 The SDK generates a wallet keypair automatically. Set it as an environment variable:
 
@@ -21,7 +21,7 @@ Or in a `.env` file:
 REMITMD_KEY=0xYourAgentKey
 ```
 
-### Step 2 — Install the SDK and pay
+### Step 2 - Install the SDK and pay
 
 #### Python
 
@@ -232,7 +232,7 @@ except RemitError as e:
 | `BELOW_MINIMUM` | Amount below $0.01 | Increase the payment amount |
 | `SELF_PAYMENT` | Payer = payee | Use a different recipient address |
 | `INVALID_KEY` | Key format invalid | Ensure key starts with `0x` and is 66 hex characters |
-| `RATE_LIMITED` | Too many requests | Back off and retry — the SDK handles this automatically |
+| `RATE_LIMITED` | Too many requests | Back off and retry - the SDK handles this automatically |
 
 ---
 
@@ -240,7 +240,7 @@ except RemitError as e:
 
 | Environment Variable | Required | Default | Description |
 |---------------------|----------|---------|-------------|
-| `REMITMD_KEY` | Yes | — | Agent wallet private key (auto-generated or from registration) |
+| `REMITMD_KEY` | Yes | - | Agent wallet private key (auto-generated or from registration) |
 | `REMITMD_API_URL` | No | `https://remit.md/api/v1` | API server URL |
 | `REMITMD_CHAIN` | No | `base` | Chain name (`base` or `base-sepolia` for testnet) |
 | `REMITMD_TESTNET` | No | `false` | Set to `true` to use testnet |
@@ -249,11 +249,11 @@ except RemitError as e:
 
 ## Examples
 
-- **`examples/demo-agent/`** — Python AI agent demonstrating tab, escrow, stream, and bounty lifecycles
-- **`examples/demo-services/`** — TypeScript microservices accepting remit.md payments (LLM API, Data API, Code Review)
+- **`examples/demo-agent/`** - Python AI agent demonstrating tab, escrow, stream, and bounty lifecycles
+- **`examples/demo-services/`** - TypeScript microservices accepting remit.md payments (LLM API, Data API, Code Review)
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).

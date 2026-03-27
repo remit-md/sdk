@@ -52,12 +52,12 @@ defmodule RemitMd.Wallet do
 
   ## Options
 
-  - `:private_key` — 0x-prefixed 32-byte secp256k1 private key (required unless `:signer` given)
-  - `:signer` — custom `RemitMd.Signer` implementation
-  - `:chain` — `"base"` | `"base_sepolia"` (default: `"base"`)
-  - `:api_url` — override API base URL
-  - `:mock` — pid of a running `RemitMd.MockRemit` (disables real HTTP)
-  - `:address` — address to use when in mock mode (optional, defaults to MockSigner address)
+  - `:private_key` - 0x-prefixed 32-byte secp256k1 private key (required unless `:signer` given)
+  - `:signer` - custom `RemitMd.Signer` implementation
+  - `:chain` - `"base"` | `"base_sepolia"` (default: `"base"`)
+  - `:api_url` - override API base URL
+  - `:mock` - pid of a running `RemitMd.MockRemit` (disables real HTTP)
+  - `:address` - address to use when in mock mode (optional, defaults to MockSigner address)
   """
   def new(opts) when is_list(opts) do
     mock_pid = Keyword.get(opts, :mock)
@@ -100,8 +100,8 @@ defmodule RemitMd.Wallet do
   Build a wallet from environment variables.
 
   Credential priority:
-    1. `REMIT_SIGNER_URL` + `REMIT_SIGNER_TOKEN` — HTTP signer server
-    2. `REMITMD_KEY` (or deprecated `REMITMD_PRIVATE_KEY`) — hex-encoded private key
+    1. `REMIT_SIGNER_URL` + `REMIT_SIGNER_TOKEN` - HTTP signer server
+    2. `REMITMD_KEY` (or deprecated `REMITMD_PRIVATE_KEY`) - hex-encoded private key
 
   Optional: `REMITMD_CHAIN`, `REMITMD_API_URL`, `REMITMD_ROUTER_ADDRESS`
   """
@@ -238,7 +238,7 @@ defmodule RemitMd.Wallet do
   @doc """
   Fetch spending summary analytics.
 
-  Options: `:limit` — number of days to include (default 30).
+  Options: `:limit` - number of days to include (default 30).
   """
   def spending(%__MODULE__{} = w, opts \\ []) do
     limit = Keyword.get(opts, :limit, 30)
@@ -259,13 +259,13 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `to` — 0x-prefixed recipient address
-  - `amount_usdc` — amount as a string, e.g. `"1.50"`
+  - `to` - 0x-prefixed recipient address
+  - `amount_usdc` - amount as a string, e.g. `"1.50"`
 
   ## Options
 
-  - `:description` — human-readable memo
-  - `:metadata` — map of arbitrary key-value pairs
+  - `:description` - human-readable memo
+  - `:metadata` - map of arbitrary key-value pairs
 
   ## Example
 
@@ -305,8 +305,8 @@ defmodule RemitMd.Wallet do
 
   ## Options
 
-  - `:description` — task description (sent as `task`)
-  - `:escrow_timeout` — seconds until escrow expires (default: 7 days)
+  - `:description` - task description (sent as `task`)
+  - `:escrow_timeout` - seconds until escrow expires (default: 7 days)
 
   ## Example
 
@@ -396,9 +396,9 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `invoice_id` — escrow invoice ID
-  - `evidence_uri` — URI pointing to the evidence
-  - `milestone_index` — milestone index (default: 0)
+  - `invoice_id` - escrow invoice ID
+  - `evidence_uri` - URI pointing to the evidence
+  - `milestone_index` - milestone index (default: 0)
   """
   def submit_evidence(%__MODULE__{} = w, invoice_id, evidence_uri, milestone_index \\ 0) do
     body = %{evidence_uri: evidence_uri, milestone_index: milestone_index}
@@ -423,14 +423,14 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `provider` — 0x-prefixed provider address
-  - `limit_amount` — maximum tab limit (string USDC, e.g. `"10.00"`)
-  - `per_unit` — cost per unit/call (string USDC, e.g. `"0.10"`)
+  - `provider` - 0x-prefixed provider address
+  - `limit_amount` - maximum tab limit (string USDC, e.g. `"10.00"`)
+  - `per_unit` - cost per unit/call (string USDC, e.g. `"0.10"`)
 
   ## Options
 
-  - `:expires_in` — seconds from now until tab expires (default: 1 day)
-  - `:permit` — `%PermitSignature{}` for gasless approval
+  - `:expires_in` - seconds from now until tab expires (default: 1 day)
+  - `:permit` - `%PermitSignature{}` for gasless approval
 
   ## Example
 
@@ -463,11 +463,11 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `tab_id` — tab UUID
-  - `amount` — charge amount (number)
-  - `cumulative` — cumulative total charged so far (number)
-  - `call_count` — total number of charges (integer)
-  - `provider_sig` — EIP-712 TabCharge signature from `sign_tab_charge/4`
+  - `tab_id` - tab UUID
+  - `amount` - charge amount (number)
+  - `cumulative` - cumulative total charged so far (number)
+  - `call_count` - total number of charges (integer)
+  - `provider_sig` - EIP-712 TabCharge signature from `sign_tab_charge/4`
   """
   def charge_tab(%__MODULE__{} = w, tab_id, amount, cumulative, call_count, provider_sig) do
     body = %{
@@ -487,8 +487,8 @@ defmodule RemitMd.Wallet do
 
   ## Options
 
-  - `:final_amount` — final settlement amount (number, default 0)
-  - `:provider_sig` — provider's EIP-712 signature (default "0x")
+  - `:final_amount` - final settlement amount (number, default 0)
+  - `:provider_sig` - provider's EIP-712 signature (default "0x")
   """
   def close_tab(%__MODULE__{} = w, tab_id, opts \\ []) do
     final_amount = Keyword.get(opts, :final_amount, 0)
@@ -506,10 +506,10 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `tab_contract` — Tab contract address (verifyingContract for the domain)
-  - `tab_id` — UUID of the tab (will be encoded as bytes32)
-  - `total_charged` — cumulative charged amount in USDC base units (integer, uint96)
-  - `call_count` — number of charges made (integer, uint32)
+  - `tab_contract` - Tab contract address (verifyingContract for the domain)
+  - `tab_id` - UUID of the tab (will be encoded as bytes32)
+  - `total_charged` - cumulative charged amount in USDC base units (integer, uint96)
+  - `call_count` - number of charges made (integer, uint32)
 
   Returns a 0x-prefixed hex signature.
   """
@@ -557,14 +557,14 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `spender` — contract address that will be approved as spender
-  - `value` — amount in USDC base units (6 decimals, integer)
-  - `deadline` — permit deadline (Unix timestamp)
+  - `spender` - contract address that will be approved as spender
+  - `value` - amount in USDC base units (6 decimals, integer)
+  - `deadline` - permit deadline (Unix timestamp)
 
   ## Options
 
-  - `:nonce` — current permit nonce for this wallet (default: 0)
-  - `:usdc_address` — override the USDC contract address
+  - `:nonce` - current permit nonce for this wallet (default: 0)
+  - `:usdc_address` - override the USDC contract address
 
   Returns `%PermitSignature{}`.
   """
@@ -620,12 +620,12 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `spender` — contract address to approve (e.g. router, escrow)
-  - `amount` — amount in USDC (string, e.g. `"5.00"`)
+  - `spender` - contract address to approve (e.g. router, escrow)
+  - `amount` - amount in USDC (string, e.g. `"5.00"`)
 
   ## Options
 
-  - `:deadline` — optional Unix timestamp; defaults to 1 hour from now
+  - `:deadline` - optional Unix timestamp; defaults to 1 hour from now
 
   Returns `%PermitSignature{}`.
   """
@@ -643,13 +643,13 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `payee` — 0x-prefixed recipient address
-  - `rate_per_second` — USDC per second (string, e.g. `"0.01"`)
-  - `max_total` — maximum total USDC for the stream (string, e.g. `"5.00"`)
+  - `payee` - 0x-prefixed recipient address
+  - `rate_per_second` - USDC per second (string, e.g. `"0.01"`)
+  - `max_total` - maximum total USDC for the stream (string, e.g. `"5.00"`)
 
   ## Options
 
-  - `:permit` — `%PermitSignature{}` for gasless approval
+  - `:permit` - `%PermitSignature{}` for gasless approval
 
   ## Example
 
@@ -680,18 +680,18 @@ defmodule RemitMd.Wallet do
   end
 
   @doc """
-  Create a bounty — any agent that completes the task earns the reward.
+  Create a bounty - any agent that completes the task earns the reward.
 
   ## Parameters
 
-  - `amount` — reward amount (string USDC, e.g. `"5.00"`)
-  - `task_description` — description of the task
-  - `deadline` — unix timestamp when the bounty expires
+  - `amount` - reward amount (string USDC, e.g. `"5.00"`)
+  - `task_description` - description of the task
+  - `deadline` - unix timestamp when the bounty expires
 
   ## Options
 
-  - `:max_attempts` — maximum number of submissions (default: 10)
-  - `:permit` — `%PermitSignature{}` for gasless approval
+  - `:max_attempts` - maximum number of submissions (default: 10)
+  - `:permit` - `%PermitSignature{}` for gasless approval
 
   ## Example
 
@@ -722,8 +722,8 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `bounty_id` — bounty UUID
-  - `evidence_hash` — 0x-prefixed keccak256 hash of the evidence
+  - `bounty_id` - bounty UUID
+  - `evidence_hash` - 0x-prefixed keccak256 hash of the evidence
 
   Returns `{:ok, %BountySubmission{}}`.
   """
@@ -740,8 +740,8 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `bounty_id` — bounty UUID
-  - `submission_id` — integer ID of the winning submission
+  - `bounty_id` - bounty UUID
+  - `submission_id` - integer ID of the winning submission
   """
   def award_bounty(%__MODULE__{} = w, bounty_id, submission_id) when is_integer(submission_id) do
     body = %{submission_id: submission_id}
@@ -756,10 +756,10 @@ defmodule RemitMd.Wallet do
 
   ## Options
 
-  - `:status` — filter by status (open, claimed, awarded, expired). Default: `"open"`.
-  - `:poster` — filter by poster wallet address.
-  - `:submitter` — filter by submitter wallet address.
-  - `:limit` — max results (default 20, max 100).
+  - `:status` - filter by status (open, claimed, awarded, expired). Default: `"open"`.
+  - `:poster` - filter by poster wallet address.
+  - `:submitter` - filter by submitter wallet address.
+  - `:limit` - max results (default 20, max 100).
   """
   def list_bounties(%__MODULE__{} = w, opts \\ []) do
     status    = Keyword.get(opts, :status, "open")
@@ -785,12 +785,12 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `url` — the HTTPS endpoint that will receive POST notifications
-  - `events` — list of event types to subscribe to (e.g. `["payment.sent", "escrow.funded"]`)
+  - `url` - the HTTPS endpoint that will receive POST notifications
+  - `events` - list of event types to subscribe to (e.g. `["payment.sent", "escrow.funded"]`)
 
   ## Options
 
-  - `:chains` — list of chain names to filter by (e.g. `["base"]`). Omit for all chains.
+  - `:chains` - list of chain names to filter by (e.g. `["base"]`). Omit for all chains.
 
   ## Example
 
@@ -812,9 +812,9 @@ defmodule RemitMd.Wallet do
 
   ## Options
 
-  - `:messages` — list of maps with `:role` ("agent"/"system") and `:text`
-  - `:agent_name` — agent display name shown on the funding page
-  - `:permit` — `%PermitSignature{}` for gasless approval (auto-signed if omitted)
+  - `:messages` - list of maps with `:role` ("agent"/"system") and `:text`
+  - `:agent_name` - agent display name shown on the funding page
+  - `:permit` - `%PermitSignature{}` for gasless approval (auto-signed if omitted)
 
   Returns `{:ok, %RemitMd.Models.LinkResponse{}}` or `{:error, %RemitMd.Error{}}`.
   """
@@ -832,9 +832,9 @@ defmodule RemitMd.Wallet do
 
   ## Options
 
-  - `:messages` — list of maps with `:role` ("agent"/"system") and `:text`
-  - `:agent_name` — agent display name shown on the withdraw page
-  - `:permit` — `%PermitSignature{}` for gasless approval (auto-signed if omitted)
+  - `:messages` - list of maps with `:role` ("agent"/"system") and `:text`
+  - `:agent_name` - agent display name shown on the withdraw page
+  - `:permit` - `%PermitSignature{}` for gasless approval (auto-signed if omitted)
 
   Returns `{:ok, %RemitMd.Models.LinkResponse{}}` or `{:error, %RemitMd.Error{}}`.
   """
@@ -854,13 +854,13 @@ defmodule RemitMd.Wallet do
 
   ## Parameters
 
-  - `provider` — 0x-prefixed provider address
-  - `amount` — deposit amount (string USDC, e.g. `"5.00"`)
+  - `provider` - 0x-prefixed provider address
+  - `amount` - deposit amount (string USDC, e.g. `"5.00"`)
 
   ## Options
 
-  - `:expires_in` — seconds from now until deposit expires (default: 1 hour)
-  - `:permit` — `%PermitSignature{}` for gasless approval
+  - `:expires_in` - seconds from now until deposit expires (default: 1 hour)
+  - `:permit` - `%PermitSignature{}` for gasless approval
 
   ## Example
 
@@ -989,7 +989,7 @@ defmodule RemitMd.Wallet do
   end
 
   defp do_call(%__MODULE__{mock_pid: _pid}, _method, _path, _body) do
-    {:ok, %{}}  # Unimplemented mock endpoint — return empty map
+    {:ok, %{}}  # Unimplemented mock endpoint - return empty map
   end
 
   defp do_http_get(%__MODULE__{transport: t}, path) do

@@ -119,7 +119,7 @@ func TestGoldenVectorsHash(t *testing.T) {
 // TestGoldenVectorsSignature verifies that PrivateKeySigner produces the same
 // ECDSA signature as the server for every canonical test vector.
 func TestGoldenVectorsSignature(t *testing.T) {
-	// Anvil test wallet #0 — same key used by gen_vectors in remit-server.
+	// Anvil test wallet #0 - same key used by gen_vectors in remit-server.
 	const testPrivKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	signer, err := NewPrivateKeySigner(testPrivKey)
 	if err != nil {

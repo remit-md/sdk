@@ -1,4 +1,4 @@
-"""MockRemit — in-memory mock for fast (<1ms) unit tests.
+"""MockRemit - in-memory mock for fast (<1ms) unit tests.
 
 Does not require a running API server, chain, or database.
 Simulates the full state machine so agents can be tested without infrastructure.

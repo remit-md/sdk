@@ -10,11 +10,11 @@ import { Wallet } from "../src/wallet.js";
 const MOCK_ADDRESS = "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD50";
 const MOCK_WALLET_ID = "remit-test-agent";
 
-/** r||s (128 hex chars, no v) — OWS returns this when recoveryId is separate. */
+/** r||s (128 hex chars, no v) - OWS returns this when recoveryId is separate. */
 const MOCK_SIG_RS =
   "a".repeat(64) + "b".repeat(64); // 128 hex
 
-/** r||s||v (130 hex chars) — OWS returns this when v is already appended. */
+/** r||s||v (130 hex chars) - OWS returns this when v is already appended. */
 const MOCK_SIG_RSV =
   "a".repeat(64) + "b".repeat(64) + "1b"; // 130 hex
 
@@ -111,7 +111,7 @@ describe("OwsSigner.create()", () => {
   });
 
   it("throws when OWS module is not installed (no _owsModule)", async (t) => {
-    // In CI, OWS is installed via peerDependencies — skip this test.
+    // In CI, OWS is installed via peerDependencies - skip this test.
     // The error path is structurally validated: try/catch around dynamic import.
     try {
       const m = "@open-wallet-standard/core";
@@ -119,7 +119,7 @@ describe("OwsSigner.create()", () => {
       t.skip("OWS is installed in this environment");
       return;
     } catch {
-      // OWS not available — test the error path
+      // OWS not available - test the error path
     }
     await assert.rejects(
       () => OwsSigner.create({ walletId: MOCK_WALLET_ID }),

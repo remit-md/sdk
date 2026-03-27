@@ -11,7 +11,7 @@ defmodule RemitMd.Error do
 
   @base_doc "https://remit.md/docs/errors"
 
-  # ─── Error codes (match TS SDK errors.ts — all 28 canonical codes) ────────
+  # ─── Error codes (match TS SDK errors.ts - all 28 canonical codes) ────────
 
   # Auth errors
   @doc "EIP-712 signature verification failed."
@@ -216,6 +216,6 @@ defmodule RemitMd.Error do
 
   @impl true
   def message(%__MODULE__{code: code, message: msg, doc_url: url}) do
-    "[#{code}] #{msg} — #{url}"
+    "[#{code}] #{msg} - #{url}"
   end
 end

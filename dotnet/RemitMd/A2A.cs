@@ -159,7 +159,7 @@ public sealed class A2AClientOptions
 }
 
 /// <summary>
-/// A2A JSON-RPC client — send payments and manage tasks via the A2A protocol.
+/// A2A JSON-RPC client - send payments and manage tasks via the A2A protocol.
 /// </summary>
 public sealed class A2AClient : IDisposable
 {

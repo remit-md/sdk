@@ -49,16 +49,16 @@ defmodule RemitMd.X402Client do
 
   ## Parameters
 
-  - `signer` — a signer struct implementing `RemitMd.Signer` behaviour
-  - `address` — checksummed payer address matching the signer
-  - `url` — the URL to fetch
+  - `signer` - a signer struct implementing `RemitMd.Signer` behaviour
+  - `address` - checksummed payer address matching the signer
+  - `url` - the URL to fetch
 
   ## Options
 
-  - `:max_auto_pay_usdc` — maximum USDC amount to auto-pay per request (default: 0.10)
-  - `:method` — HTTP method (default: `:get`)
-  - `:body` — request body (for POST requests)
-  - `:headers` — additional request headers (list of `{key, value}` charlists)
+  - `:max_auto_pay_usdc` - maximum USDC amount to auto-pay per request (default: 0.10)
+  - `:method` - HTTP method (default: `:get`)
+  - `:body` - request body (for POST requests)
+  - `:headers` - additional request headers (list of `{key, value}` charlists)
 
   Returns `{:ok, {status_code, response_headers, response_body}}` or `{:error, reason}`.
   """

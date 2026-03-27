@@ -19,7 +19,7 @@ type RemitError struct {
 }
 
 func (e *RemitError) Error() string {
-	return fmt.Sprintf("remitmd: %s — %s (see: %s)", e.Code, e.Message, e.DocURL)
+	return fmt.Sprintf("remitmd: %s - %s (see: %s)", e.Code, e.Message, e.DocURL)
 }
 
 func remitErr(code, message string, ctx map[string]any) *RemitError {
@@ -31,7 +31,7 @@ func remitErr(code, message string, ctx map[string]any) *RemitError {
 	}
 }
 
-// Sentinel error codes — stable across SDK versions.
+// Sentinel error codes - stable across SDK versions.
 const (
 	ErrCodeInvalidAddress  = "INVALID_ADDRESS"
 	ErrCodeInvalidAmount   = "INVALID_AMOUNT"

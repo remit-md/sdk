@@ -1,4 +1,4 @@
-"""AutoGen integration — remit.md tools as registerable async functions.
+"""AutoGen integration - remit.md tools as registerable async functions.
 
 Usage:
     import autogen

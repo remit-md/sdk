@@ -1,5 +1,5 @@
 /**
- * A2A / AP2 — agent card discovery and A2A JSON-RPC task client.
+ * A2A / AP2 - agent card discovery and A2A JSON-RPC task client.
  *
  * Spec: https://google.github.io/A2A/specification/
  * AP2:  https://ap2-protocol.org/
@@ -141,7 +141,7 @@ export interface SendOptions {
 // ─── A2A client ───────────────────────────────────────────────────────────────
 
 /**
- * A2A JSON-RPC client — send payments and manage tasks via the A2A protocol.
+ * A2A JSON-RPC client - send payments and manage tasks via the A2A protocol.
  *
  * @example
  * ```ts

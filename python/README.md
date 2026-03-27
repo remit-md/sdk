@@ -2,7 +2,7 @@
 
 > [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
 
-Universal payment protocol for AI agents — Python client library.
+Universal payment protocol for AI agents - Python client library.
 
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/remitmd)](https://pypi.org/project/remitmd/)
@@ -37,7 +37,7 @@ That's it. USDC approval is handled automatically.
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -57,7 +57,7 @@ wallet = await Wallet.with_signer()  # reads REMIT_SIGNER_URL + REMIT_SIGNER_TOK
 
 ## Secure Wallet with OWS
 
-The [Open Wallet Standard](https://openwallet.sh) replaces raw private keys with encrypted local storage and policy-gated signing. Keys never leave the vault — the SDK signs through OWS's FFI layer.
+The [Open Wallet Standard](https://openwallet.sh) replaces raw private keys with encrypted local storage and policy-gated signing. Keys never leave the vault - the SDK signs through OWS's FFI layer.
 
 ### Setup
 
@@ -93,7 +93,7 @@ signer = OwsSigner(
 wallet = Wallet(signer=signer)
 ```
 
-Everything works the same — payments, permits, x402:
+Everything works the same - payments, permits, x402:
 
 ```python
 tx = await wallet.pay_direct("0xRecipient...", 1.50, memo="inference fee")
@@ -157,7 +157,7 @@ await wallet.cancel_escrow(escrow.id)    # refund yourself
 ```python
 tab = await wallet.open_tab("0xProvider...", limit=50.0, per_unit=0.003)
 
-# Hundreds of off-chain debits — zero gas, instant
+# Hundreds of off-chain debits - zero gas, instant
 # (provider calls debit on their side)
 
 # One on-chain settlement when done
@@ -324,6 +324,6 @@ permit = await wallet.sign_usdc_permit(
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT - see [LICENSE](LICENSE)
 
 [Documentation](https://remit.md/docs) · [Protocol Spec](https://remit.md) · [GitHub](https://github.com/remit-md/sdk)

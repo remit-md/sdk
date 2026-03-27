@@ -6,7 +6,7 @@ require "json"
 require "base64"
 
 module Remitmd
-  # x402 paywall for service providers — gate HTTP endpoints behind payments.
+  # x402 paywall for service providers - gate HTTP endpoints behind payments.
   #
   # Providers use this class to:
   # - Return HTTP 402 responses with properly formatted PAYMENT-REQUIRED headers
@@ -29,9 +29,9 @@ module Remitmd
     # @param facilitator_url [String] base URL of the remit.md facilitator
     # @param facilitator_token [String] bearer JWT for authenticating calls to /api/v1/x402/verify
     # @param max_timeout_seconds [Integer] how long the payment authorization remains valid
-    # @param resource [String, nil] V2 — URL or path of the resource being protected
-    # @param description [String, nil] V2 — human-readable description
-    # @param mime_type [String, nil] V2 — MIME type of the resource
+    # @param resource [String, nil] V2 - URL or path of the resource being protected
+    # @param description [String, nil] V2 - human-readable description
+    # @param mime_type [String, nil] V2 - MIME type of the resource
     def initialize( # rubocop:disable Metrics/ParameterLists
       wallet_address:,
       amount_usdc:,

@@ -93,7 +93,7 @@ def test_payment_required_header_v2_fields_absent_by_default() -> None:
     assert "mimeType" not in payload
 
 
-# ─── check — no signature ─────────────────────────────────────────────────────
+# ─── check - no signature ─────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -112,7 +112,7 @@ async def test_check_returns_false_for_empty_string() -> None:
     assert reason is None
 
 
-# ─── check — malformed payload ────────────────────────────────────────────────
+# ─── check - malformed payload ────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -123,7 +123,7 @@ async def test_check_returns_false_for_non_base64() -> None:
     assert reason == "INVALID_PAYLOAD"
 
 
-# ─── check — facilitator call ─────────────────────────────────────────────────
+# ─── check - facilitator call ─────────────────────────────────────────────────
 
 
 def _make_dummy_payment_sig() -> str:

@@ -15,7 +15,7 @@ module Remitmd
   #     puts e.doc_url  # => "https://remit.md/docs/api-reference/error-codes#invalid_address"
   #   end
   class RemitError < StandardError
-    # Error code constants — matches TS SDK (28 codes)
+    # Error code constants - matches TS SDK (28 codes)
     # Auth errors
     INVALID_SIGNATURE       = "INVALID_SIGNATURE"
     NONCE_REUSED            = "NONCE_REUSED"
@@ -80,7 +80,7 @@ module Remitmd
       @code    = code
       @doc_url = "https://remit.md/docs/api-reference/error-codes##{code.downcase}"
       @context = context
-      super("[#{code}] #{message} — #{@doc_url}")
+      super("[#{code}] #{message} - #{@doc_url}")
     end
   end
 end

@@ -79,7 +79,7 @@ class X402Client:
 
     def __init__(
         self,
-        wallet: Any,  # remitmd.wallet.Wallet — avoid circular import
+        wallet: Any,  # remitmd.wallet.Wallet - avoid circular import
         max_auto_pay_usdc: float = 0.10,
         timeout: float = 30.0,
     ) -> None:

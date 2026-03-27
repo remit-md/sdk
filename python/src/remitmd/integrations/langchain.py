@@ -1,4 +1,4 @@
-"""LangChain integration — RemitToolkit providing payment tools as BaseTool instances.
+"""LangChain integration - RemitToolkit providing payment tools as BaseTool instances.
 
 Usage:
     from langchain_openai import ChatOpenAI
@@ -47,7 +47,7 @@ def _run_async(coro: Any) -> Any:
     if loop is None:
         return asyncio.run(coro)
 
-    # Already inside a running loop — cannot use asyncio.run().
+    # Already inside a running loop - cannot use asyncio.run().
     import concurrent.futures
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
@@ -57,7 +57,7 @@ def _run_async(coro: Any) -> Any:
 class RemitToolkit(BaseToolkit):
     """LangChain toolkit providing remit.md payment tools."""
 
-    wallet: Any  # Wallet — can't annotate directly to avoid circular import
+    wallet: Any  # Wallet - can't annotate directly to avoid circular import
 
     class Config:
         arbitrary_types_allowed = True

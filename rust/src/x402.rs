@@ -3,8 +3,8 @@
 //! x402 is an open payment standard where resource servers return HTTP 402 with
 //! a `PAYMENT-REQUIRED` header describing the cost. This module provides:
 //!
-//! - [`X402Client`] — a `fetch` wrapper that auto-pays 402 responses
-//! - [`X402Paywall`] — server-side middleware for gating endpoints behind payments
+//! - [`X402Client`] - a `fetch` wrapper that auto-pays 402 responses
+//! - [`X402Paywall`] - server-side middleware for gating endpoints behind payments
 //!
 //! # Client usage
 //!
@@ -52,13 +52,13 @@ pub struct PaymentRequired {
     pub pay_to: String,
     #[serde(default)]
     pub max_timeout_seconds: Option<u64>,
-    /// V2 — URL or path of the resource being protected.
+    /// V2 - URL or path of the resource being protected.
     #[serde(default)]
     pub resource: Option<String>,
-    /// V2 — Human-readable description of what the payment is for.
+    /// V2 - Human-readable description of what the payment is for.
     #[serde(default)]
     pub description: Option<String>,
-    /// V2 — MIME type of the resource.
+    /// V2 - MIME type of the resource.
     #[serde(default)]
     pub mime_type: Option<String>,
 }
@@ -90,8 +90,8 @@ impl X402Client {
     /// Create a new X402 client.
     ///
     /// # Arguments
-    /// - `wallet` — the wallet used for signing payment authorizations
-    /// - `max_auto_pay_usdc` — maximum USDC per request to auto-pay (default: 0.10)
+    /// - `wallet` - the wallet used for signing payment authorizations
+    /// - `max_auto_pay_usdc` - maximum USDC per request to auto-pay (default: 0.10)
     pub fn new(wallet: crate::Wallet, max_auto_pay_usdc: f64) -> Self {
         Self {
             wallet,
@@ -292,11 +292,11 @@ pub struct PaywallOptions {
     pub facilitator_token: Option<String>,
     /// How long the payment authorization remains valid (default: 60).
     pub max_timeout_seconds: Option<u64>,
-    /// V2 — URL or path of the resource being protected.
+    /// V2 - URL or path of the resource being protected.
     pub resource: Option<String>,
-    /// V2 — Human-readable description of what the payment is for.
+    /// V2 - Human-readable description of what the payment is for.
     pub description: Option<String>,
-    /// V2 — MIME type of the resource.
+    /// V2 - MIME type of the resource.
     pub mime_type: Option<String>,
 }
 
@@ -308,7 +308,7 @@ pub struct CheckResult {
     pub invalid_reason: Option<String>,
 }
 
-/// x402 paywall for service providers — returns 402 when payment is absent/invalid.
+/// x402 paywall for service providers - returns 402 when payment is absent/invalid.
 pub struct X402Paywall {
     wallet_address: String,
     amount_base_units: String,

@@ -23,10 +23,10 @@ from eth_account.messages import encode_typed_data
 # Vectors live in test-vectors/ at the sdk repo root.
 _VECTORS_PATH = Path(__file__).parent.parent.parent / "test-vectors" / "eip712.json"
 
-# Anvil test wallet #0 — same key used by gen_vectors in remit-server.
+# Anvil test wallet #0 - same key used by gen_vectors in remit-server.
 _TEST_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
-# EIP-712 typed struct — must match server's auth.rs exactly.
+# EIP-712 typed struct - must match server's auth.rs exactly.
 _AUTH_TYPES = {
     "APIRequest": [
         {"name": "method", "type": "string"},

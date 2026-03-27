@@ -244,7 +244,7 @@ final class WalletTests: XCTestCase {
     // MARK: - Custom signer injection (V24 C1)
 
     func testInitWithCustomSigner() {
-        // MockSigner conforms to Signer protocol — verify it works with init(signer:)
+        // MockSigner conforms to Signer protocol - verify it works with init(signer:)
         let customSigner = MockSigner(address: "0x1111111111111111111111111111111111111111")
         let customWallet = RemitWallet(signer: customSigner, chain: .baseSepolia)
         XCTAssertEqual(customWallet.address, "0x1111111111111111111111111111111111111111")

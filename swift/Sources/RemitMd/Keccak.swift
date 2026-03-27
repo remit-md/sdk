@@ -1,6 +1,6 @@
 import Foundation
 
-/// Pure Swift Keccak-256 (Ethereum variant — NOT SHA-3).
+/// Pure Swift Keccak-256 (Ethereum variant - NOT SHA-3).
 /// Used for Ethereum address derivation from secp256k1 public keys.
 ///
 /// Reference: https://keccak.team/keccak_specs_summary.html
@@ -9,7 +9,7 @@ internal func keccak256(_ data: Data) -> Data {
     var msg = [UInt8](data)
     let rateBytes = 136 // (1600 - 512) / 8
 
-    // Keccak padding (0x01 then 0x00... then 0x80) — differs from SHA-3 (0x06)
+    // Keccak padding (0x01 then 0x00... then 0x80) - differs from SHA-3 (0x06)
     let q = rateBytes - (msg.count % rateBytes)
     if q == 1 {
         msg.append(0x81)
@@ -64,7 +64,7 @@ private let keccakRho: [Int] = [
     39, 61, 20, 44,
 ]
 
-// π permutation indices — PIL[i] is the destination lane for step i
+// π permutation indices - PIL[i] is the destination lane for step i
 // (lane index = x + 5*y)
 private let keccakPi: [Int] = [
     10,  7, 11, 17, 18,  3,  5, 16,  8, 21,

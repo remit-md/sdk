@@ -123,7 +123,7 @@ defmodule RemitMd.ComplianceTest do
     else
       wallet = get_shared_payer()
 
-      # reputation/2 makes an authenticated GET to /api/v1/reputation/{address} —
+      # reputation/2 makes an authenticated GET to /api/v1/reputation/{address} -
       # this endpoint exists for all registered addresses and returns 401 if auth fails.
       {:ok, rep} = Wallet.reputation(wallet, wallet.address)
       assert rep != nil

@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 @DisplayName("Golden vector tests: EIP-712 hash and signature")
 class GoldenVectorTest {
 
-    // Anvil test wallet #0 — same key used by gen_vectors in remit-server.
+    // Anvil test wallet #0 - same key used by gen_vectors in remit-server.
     private static final String TEST_PRIV_KEY =
         "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
@@ -53,7 +53,7 @@ class GoldenVectorTest {
     @BeforeAll
     static void loadVectors() throws Exception {
         File f = Paths.get("../test-vectors/eip712.json").toFile();
-        assertThat(f).as("test-vectors/eip712.json — run `cargo run --bin gen_vectors` first")
+        assertThat(f).as("test-vectors/eip712.json - run `cargo run --bin gen_vectors` first")
             .exists();
         JsonNode root = new ObjectMapper().readTree(f);
         JsonNode arr = root.get("vectors");

@@ -2,7 +2,7 @@
 
 > [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
 
-Universal payment protocol for AI agents — TypeScript/Node.js client library.
+Universal payment protocol for AI agents - TypeScript/Node.js client library.
 
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@remitmd/sdk)](https://www.npmjs.com/package/@remitmd/sdk)
@@ -30,7 +30,7 @@ That's it. USDC approval is handled automatically.
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -50,7 +50,7 @@ const wallet = await Wallet.withSigner(); // reads REMIT_SIGNER_URL + REMIT_SIGN
 
 ## Secure Wallet with OWS
 
-The [Open Wallet Standard](https://openwallet.sh) replaces raw private keys with encrypted local storage and policy-gated signing. Keys never leave the vault — the SDK signs through OWS's FFI layer.
+The [Open Wallet Standard](https://openwallet.sh) replaces raw private keys with encrypted local storage and policy-gated signing. Keys never leave the vault - the SDK signs through OWS's FFI layer.
 
 ### Setup
 
@@ -76,7 +76,7 @@ import { Wallet } from "@remitmd/sdk";
 // Auto-detects OWS_WALLET_ID, falls back to REMITMD_KEY
 const wallet = await Wallet.withOws();
 
-// Everything works the same — payments, permits, x402
+// Everything works the same - payments, permits, x402
 const tx = await wallet.payDirect("0xRecipient...", 1.50, "inference fee");
 ```
 
@@ -147,7 +147,7 @@ const tab = await wallet.openTab({
   perUnit: 0.003,
 });
 
-// Provider debits the tab for each API call — zero gas, instant
+// Provider debits the tab for each API call - zero gas, instant
 
 // One on-chain settlement when done
 await wallet.closeTab(tab.id);
@@ -325,6 +325,6 @@ const permit = await wallet.signUsdcPermit({
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT - see [LICENSE](LICENSE)
 
 [Documentation](https://remit.md/docs) · [Protocol Spec](https://remit.md) · [GitHub](https://github.com/remit-md/sdk)

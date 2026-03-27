@@ -188,7 +188,7 @@ defmodule RemitMdTest do
 
   test "Keccak.hex/1 differs from SHA3-256" do
     # SHA3-256("abc") = 3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532
-    # Keccak-256("abc") is different — confirms we implement the Ethereum variant
+    # Keccak-256("abc") is different - confirms we implement the Ethereum variant
     sha3 = :crypto.hash(:sha3_256, "abc") |> Base.encode16(case: :lower)
     keccak = RemitMd.Keccak.hex("abc")
     assert sha3 != keccak

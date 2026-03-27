@@ -3,8 +3,8 @@
 //! Run: cargo test --test acceptance -- --include-ignored --nocapture
 //!
 //! Env vars (all optional):
-//!   ACCEPTANCE_API_URL  — default: https://remit.md
-//!   ACCEPTANCE_RPC_URL  — default: https://sepolia.base.org
+//!   ACCEPTANCE_API_URL  - default: https://remit.md
+//!   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 use k256::ecdsa::SigningKey;
 use remitmd::{PermitSignature, Wallet};
@@ -801,7 +801,7 @@ async fn acceptance_x402() {
         }
     });
 
-    // 2. Make an unauthenticated request — should get 402
+    // 2. Make an unauthenticated request - should get 402
     let client = reqwest::Client::new();
     let resp = client
         .get(&format!("{server_url}/test-resource"))

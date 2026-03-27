@@ -123,7 +123,7 @@ public class ApiClient {
             return MAPPER.readValue(resp.body(), responseType);
         }
 
-        // Parse error body — supports both flat {"code":"...", "message":"..."}
+        // Parse error body - supports both flat {"code":"...", "message":"..."}
         // and nested {"error": {"code":"...", "message":"..."}} formats.
         String code = ErrorCodes.SERVER_ERROR;
         String message = "HTTP " + status;
@@ -216,7 +216,7 @@ public class ApiClient {
         BigInteger unsigned = new BigInteger(Long.toUnsignedString(value));
         byte[] b = unsigned.toByteArray();
         byte[] result = new byte[32];
-        // BigInteger.toByteArray() may include a leading 0 sign byte — strip it.
+        // BigInteger.toByteArray() may include a leading 0 sign byte - strip it.
         int start = (b.length > 1 && b[0] == 0) ? 1 : 0;
         int len = b.length - start;
         System.arraycopy(b, start, result, 32 - len, len);
@@ -266,7 +266,7 @@ public class ApiClient {
                 return action.get();
             } catch (RemitError e) {
                 lastError = e;
-                // Don't retry client errors (4xx) — only server errors (5xx)
+                // Don't retry client errors (4xx) - only server errors (5xx)
                 if (e.getHttpStatus() > 0 && e.getHttpStatus() < 500) {
                     throw e;
                 }

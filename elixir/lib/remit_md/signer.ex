@@ -36,7 +36,7 @@ end
 
 defmodule RemitMd.MockSigner do
   @moduledoc """
-  A signer that returns a fixed fake signature. Used by `RemitMd.MockRemit` —
+  A signer that returns a fixed fake signature. Used by `RemitMd.MockRemit` -
   the mock API server does not verify signatures.
   """
 

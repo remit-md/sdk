@@ -4,12 +4,12 @@ require "openssl"
 require "securerandom"
 
 module Remitmd
-  # secp256k1 field prime p (constant — never changes)
+  # secp256k1 field prime p (constant - never changes)
   SECP256K1_P = OpenSSL::BN.new(
     "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16
   ).freeze
 
-  # Precomputed (p + 1) / 4 — the modular square root exponent for p ≡ 3 (mod 4).
+  # Precomputed (p + 1) / 4 - the modular square root exponent for p ≡ 3 (mod 4).
   # Avoids BN division at runtime (which returns Integer on some OpenSSL versions).
   SECP256K1_SQRT_EXP = OpenSSL::BN.new(
     "3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBFFFFF0C", 16
@@ -66,7 +66,7 @@ module Remitmd
       group = @key.group
       n     = group.order
 
-      # ECDSA sign — dsa_sign_asn1 uses the input directly as the hash (no pre-hashing)
+      # ECDSA sign - dsa_sign_asn1 uses the input directly as the hash (no pre-hashing)
       der  = @key.dsa_sign_asn1(digest_bytes)
       asn1 = OpenSSL::ASN1.decode(der)
       bn_r = asn1.value[0].value
@@ -104,7 +104,7 @@ module Remitmd
           break
         end
       end
-      raise "Could not determine recovery ID — key or hash may be invalid" if v.nil?
+      raise "Could not determine recovery ID - key or hash may be invalid" if v.nil?
 
       # Build 65-byte Ethereum signature: r (32) || s (32) || v (1)
       r_bytes = [bn_r.to_s(16).rjust(64, "0")].pack("H*")
@@ -129,13 +129,13 @@ module Remitmd
     def recover_r_point(group, bn_r, parity)
       p = SECP256K1_P
       x = bn_r
-      # y² = x³ + 7 (mod p)  — secp256k1 curve equation
+      # y² = x³ + 7 (mod p)  - secp256k1 curve equation
       x3  = x.mod_exp(OpenSSL::BN.new("3"), p)
       rhs = x3 + OpenSSL::BN.new("7")
       y_squared = rhs % p
       # Tonelli–Shanks: since p ≡ 3 mod 4, sqrt = y²^((p+1)/4) mod p
       y = y_squared.mod_exp(SECP256K1_SQRT_EXP, p)
-      # Verify that y² ≡ y_squared (mod p) — i.e., a square root exists
+      # Verify that y² ≡ y_squared (mod p) - i.e., a square root exists
       return nil unless y.mod_mul(y, p) == y_squared
 
       y = p - y if (y.to_i & 1) != parity
@@ -148,7 +148,7 @@ module Remitmd
     end
 
     def derive_address(public_key)
-      # Uncompressed public key: 04 || x (32) || y (32) — skip the 0x04 prefix
+      # Uncompressed public key: 04 || x (32) || y (32) - skip the 0x04 prefix
       pub_bytes = [public_key.to_octet_string(:uncompressed).unpack1("H*")[2..]].pack("H*")
       keccak    = keccak256_hex(pub_bytes)
       "0x#{keccak[-40..]}"

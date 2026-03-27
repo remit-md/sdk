@@ -17,7 +17,7 @@ import time
 import pytest
 from eth_account.messages import encode_typed_data
 
-# Try to load OWS — skip all tests if unavailable.
+# Try to load OWS - skip all tests if unavailable.
 try:
     import ows  # type: ignore[import-untyped]
 

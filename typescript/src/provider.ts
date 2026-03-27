@@ -55,11 +55,11 @@ export interface PaywallOptions {
   facilitatorToken?: string;
   /** How long the payment authorization remains valid in seconds (default: 60). */
   maxTimeoutSeconds?: number;
-  /** V2 — URL or path of the resource being protected (e.g. `"/v1/data"`). */
+  /** V2 - URL or path of the resource being protected (e.g. `"/v1/data"`). */
   resource?: string;
-  /** V2 — Human-readable description of what the payment is for. */
+  /** V2 - Human-readable description of what the payment is for. */
   description?: string;
-  /** V2 — MIME type of the resource (e.g. `"application/json"`). */
+  /** V2 - MIME type of the resource (e.g. `"application/json"`). */
   mimeType?: string;
 }
 

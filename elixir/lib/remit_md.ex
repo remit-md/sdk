@@ -1,6 +1,6 @@
 defmodule RemitMd do
   @moduledoc """
-  remit.md — universal payment protocol for AI agents.
+  remit.md - universal payment protocol for AI agents.
 
   The primary entry points are `RemitMd.Wallet` (production client) and
   `RemitMd.MockRemit` (in-memory test double).
@@ -30,10 +30,10 @@ defmodule RemitMd do
 
   Environment variables:
 
-  - `REMITMD_KEY` — secp256k1 private key (required for production)
-  - `REMITMD_PRIVATE_KEY` — deprecated alias for `REMITMD_KEY`
-  - `REMITMD_CHAIN` — chain name, default `"base"`. Options: `"base-sepolia"`
-  - `REMITMD_API_URL` — override the API base URL (useful for self-hosted instances)
+  - `REMITMD_KEY` - secp256k1 private key (required for production)
+  - `REMITMD_PRIVATE_KEY` - deprecated alias for `REMITMD_KEY`
+  - `REMITMD_CHAIN` - chain name, default `"base"`. Options: `"base-sepolia"`
+  - `REMITMD_API_URL` - override the API base URL (useful for self-hosted instances)
 
   ## Installation
 

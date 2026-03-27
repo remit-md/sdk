@@ -24,7 +24,7 @@ if echo "$STAGED" | grep -q '^go/'; then
         echo "[SDK] Go: vet + test..."
         cd go && go vet ./... && go test ./... -v -count=1 && cd ..
     else
-        echo "[SDK] Go: go binary not found — CI will run tests"
+        echo "[SDK] Go: go binary not found - CI will run tests"
     fi
     RAN_TESTS=1
 fi
@@ -34,7 +34,7 @@ if echo "$STAGED" | grep -q '^rust/'; then
         echo "[SDK] Rust: fmt + clippy + test..."
         cd rust && cargo fmt --check && cargo clippy -- -D warnings && cargo test && cd ..
     else
-        echo "[SDK] Rust: cargo not found — CI will run tests"
+        echo "[SDK] Rust: cargo not found - CI will run tests"
     fi
     RAN_TESTS=1
 fi
@@ -44,7 +44,7 @@ if echo "$STAGED" | grep -q '^dotnet/'; then
         echo "[SDK] .NET: build + test..."
         cd dotnet && dotnet build --no-restore -c Release && dotnet test --no-build -c Release && cd ..
     else
-        echo "[SDK] .NET: dotnet not found — CI will run tests"
+        echo "[SDK] .NET: dotnet not found - CI will run tests"
     fi
     RAN_TESTS=1
 fi
@@ -54,7 +54,7 @@ if echo "$STAGED" | grep -q '^java/'; then
         echo "[SDK] Java: build + test..."
         cd java && gradle test --no-daemon && cd ..
     else
-        echo "[SDK] Java: gradle not found — CI will run tests"
+        echo "[SDK] Java: gradle not found - CI will run tests"
     fi
     RAN_TESTS=1
 fi
@@ -64,7 +64,7 @@ if echo "$STAGED" | grep -q '^ruby/'; then
         echo "[SDK] Ruby: rubocop + rspec..."
         cd ruby && bundle exec rubocop --no-color && bundle exec rspec && cd ..
     else
-        echo "[SDK] Ruby: bundle not found — CI will run tests"
+        echo "[SDK] Ruby: bundle not found - CI will run tests"
     fi
     RAN_TESTS=1
 fi
@@ -74,7 +74,7 @@ if echo "$STAGED" | grep -q '^swift/'; then
         echo "[SDK] Swift: build + test..."
         cd swift && swift build && swift test && cd ..
     else
-        echo "[SDK] Swift: swift not found — CI will run tests"
+        echo "[SDK] Swift: swift not found - CI will run tests"
     fi
     RAN_TESTS=1
 fi
@@ -90,7 +90,7 @@ if echo "$STAGED" | grep -q '^elixir/'; then
         echo "[SDK] Elixir: compile + test..."
         cd elixir && mix deps.get && mix compile --warnings-as-errors && mix test && cd ..
     else
-        echo "[SDK] Elixir: mix not found — CI will run tests"
+        echo "[SDK] Elixir: mix not found - CI will run tests"
     fi
     RAN_TESTS=1
 fi
@@ -102,7 +102,7 @@ FAIL=0
 CODE_STAGED=$(echo "$STAGED" | grep -v '^\.githooks/\|^\.github/' | grep -v '^$' || true)
 
 if [ -z "$CODE_STAGED" ]; then
-    echo "[QA] Only config files staged — skipping anti-shortcut scan."
+    echo "[QA] Only config files staged - skipping anti-shortcut scan."
     echo "=== Pre-commit passed ==="
     exit 0
 fi
@@ -130,7 +130,7 @@ if [ "$FAIL" -eq 1 ]; then
 fi
 
 if [ "$RAN_TESTS" -eq 0 ]; then
-    echo "No SDK directories changed — skipping tests."
+    echo "No SDK directories changed - skipping tests."
 fi
 
 echo "=== Pre-commit passed ==="

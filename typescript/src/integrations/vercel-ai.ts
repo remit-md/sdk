@@ -16,7 +16,7 @@
  *   });
  *
  * Note: This module exports plain tool descriptors compatible with the AI SDK tool()
- * format. Import `tool` from "ai" and `z` from "zod" in your application — we don't
+ * format. Import `tool` from "ai" and `z` from "zod" in your application - we don't
  * bundle them to avoid version conflicts.
  */
 
@@ -29,7 +29,7 @@ interface ToolParam {
   optional?: boolean;
 }
 
-/** Lightweight tool descriptor — compatible with Vercel AI SDK `tool()` format. */
+/** Lightweight tool descriptor - compatible with Vercel AI SDK `tool()` format. */
 export interface RemitToolDescriptor {
   description: string;
   parameters: Record<string, ToolParam>;
@@ -41,7 +41,7 @@ export interface RemitToolDescriptor {
  * Pass the result directly as the `tools` parameter to `generateText` / `streamText`.
  *
  * Compatible with Vercel AI SDK v3+. Each entry is a plain object with
- * `description`, `parameters`, and `execute` — wrap with `tool()` from "ai" if needed.
+ * `description`, `parameters`, and `execute` - wrap with `tool()` from "ai" if needed.
  */
 export function remitTools(wallet: Wallet): Record<string, RemitToolDescriptor> {
   return {

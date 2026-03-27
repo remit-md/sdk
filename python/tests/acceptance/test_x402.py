@@ -57,7 +57,7 @@ class PaywallHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Payment Required")
             return
 
-        # Second request: has PAYMENT-SIGNATURE — validate structure
+        # Second request: has PAYMENT-SIGNATURE - validate structure
         try:
             decoded = json.loads(base64.b64decode(payment_sig))
 
@@ -151,7 +151,7 @@ async def test_x402_rejects_above_limit() -> None:
     thread.start()
 
     try:
-        # The paywall asks for $0.10 but we set limit to $0.01 — should reject
+        # The paywall asks for $0.10 but we set limit to $0.01 - should reject
         from remitmd.x402 import AllowanceExceededError
 
         with pytest.raises(AllowanceExceededError):

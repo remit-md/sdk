@@ -1,4 +1,4 @@
-// remit.md MockRemit example — test payments without spending real USDC.
+// remit.md MockRemit example - test payments without spending real USDC.
 using RemitMd;
 
 const string Agent = "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";

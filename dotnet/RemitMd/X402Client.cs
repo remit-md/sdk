@@ -64,7 +64,7 @@ public sealed class X402Client : IDisposable
     /// Creates an X402Client.
     /// </summary>
     /// <param name="signer">Signer used for EIP-3009 authorization signatures.</param>
-    /// <param name="address">Checksummed payer address — must match the signer's public key.</param>
+    /// <param name="address">Checksummed payer address - must match the signer's public key.</param>
     /// <param name="maxAutoPayUsdc">Maximum USDC amount to auto-pay per request (default: 0.10).</param>
     public X402Client(IRemitSigner signer, string? address = null, decimal maxAutoPayUsdc = 0.10m)
     {

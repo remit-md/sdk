@@ -123,7 +123,7 @@ final class ComplianceTests: XCTestCase {
         let (pk, _) = try Self.generateWallet()
         let wallet = try Self.makeWallet(privateKey: pk)
 
-        // balance() makes an authenticated GET — will throw on 401.
+        // balance() makes an authenticated GET - will throw on 401.
         let balance = try await wallet.balance()
         XCTAssertNotNil(balance)
     }
@@ -168,7 +168,7 @@ final class ComplianceTests: XCTestCase {
             _ = try await payer.pay(to: payeeAddr, amount: 0.0001)
             XCTFail("pay() with amount below minimum must throw an error")
         } catch {
-            // Expected — any error is acceptable.
+            // Expected - any error is acceptable.
         }
     }
 }

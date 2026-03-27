@@ -1,4 +1,4 @@
-# remitmd — Rust SDK
+# remitmd - Rust SDK
 
 > [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
 
@@ -53,7 +53,7 @@ All payment methods (`pay`, `create_escrow`, `create_tab`, `create_stream`, `cre
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -109,7 +109,7 @@ let tab = wallet.create_tab("0xService...", dec!(10.00), dec!(0.003)).await?;
 // Provider charges the tab (with EIP-712 signature)
 wallet.charge_tab(&tab.id, 0.003, 0.009, 3, &provider_sig).await?;
 
-// Close when done — unused funds return
+// Close when done - unused funds return
 wallet.close_tab(&tab.id, 0.009, &provider_sig).await?;
 ```
 
@@ -256,4 +256,4 @@ Manual permit variants: `pay_with_permit`, `create_escrow_with_permit`, `create_
 
 ## License
 
-MIT — [remit.md](https://remit.md)
+MIT - [remit.md](https://remit.md)

@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 
-Universal payment protocol for AI agents — Swift 5.7+, macOS 12+, iOS 15+.
+Universal payment protocol for AI agents - Swift 5.7+, macOS 12+, iOS 15+.
 
 ## Installation
 
@@ -40,7 +40,7 @@ let wallet = try RemitWallet.fromEnvironment()
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -84,15 +84,15 @@ All payment methods auto-sign EIP-2612 permits when no explicit permit is provid
 The wallet fetches the on-chain nonce, signs the permit, and includes it in the request automatically.
 
 ```swift
-// Auto-permit (recommended) — just call the method, permit is handled internally
+// Auto-permit (recommended) - just call the method, permit is handled internally
 let tx = try await wallet.pay(to: "0xRecipient...", amount: 5.0)
 
-// Manual permit — sign yourself if you need control over deadline/nonce
+// Manual permit - sign yourself if you need control over deadline/nonce
 let contracts = try await wallet.getContracts()
 let permit = try await wallet.signPermit(spender: contracts.router, amount: 5.0)
 let tx = try await wallet.pay(to: "0xRecipient...", amount: 5.0, permit: permit)
 
-// Low-level permit — full control over all parameters
+// Low-level permit - full control over all parameters
 let permit = try wallet.signUsdcPermit(
     spender: contracts.router,
     value: 5_000_000,    // base units (6 decimals)
@@ -203,4 +203,4 @@ do {
 
 ## License
 
-MIT — see [LICENSE](../../LICENSE)
+MIT - see [LICENSE](../../LICENSE)

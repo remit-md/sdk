@@ -1,5 +1,5 @@
 /**
- * Wallet — read + write operations, requires a private key (or custom Signer).
+ * Wallet - read + write operations, requires a private key (or custom Signer).
  */
 
 import { randomBytes } from "node:crypto";
@@ -23,7 +23,7 @@ import type { Deposit } from "./models/deposit.js";
 export interface WalletOptions extends RemitClientOptions {
   privateKey?: string;
   signer?: Signer;
-  /** Router contract address for EIP-712 domain — must match server's ROUTER_ADDRESS. */
+  /** Router contract address for EIP-712 domain - must match server's ROUTER_ADDRESS. */
   routerAddress?: string;
 }
 
@@ -132,7 +132,7 @@ export class Wallet extends RemitClient {
 
     super(clientOptions);
 
-    // Router contract address for EIP-712 domain — falls back to env var.
+    // Router contract address for EIP-712 domain - falls back to env var.
     const verifyingContract =
       routerAddress ?? process.env["REMITMD_ROUTER_ADDRESS"] ?? "";
 
@@ -163,7 +163,7 @@ export class Wallet extends RemitClient {
     // Check for signer URL first (async creation needed)
     if (process.env["REMIT_SIGNER_URL"]) {
       throw new Error(
-        "REMIT_SIGNER_URL is set — use: await Wallet.withSigner()"
+        "REMIT_SIGNER_URL is set - use: await Wallet.withSigner()"
       );
     }
 
@@ -402,7 +402,7 @@ export class Wallet extends RemitClient {
       return s.permitNonce;
     }
     throw new Error(
-      "Server returned null permit_nonce — RPC may be unavailable server-side. " +
+      "Server returned null permit_nonce - RPC may be unavailable server-side. " +
       "Cannot sign permit without a valid nonce.",
     );
   }
@@ -595,12 +595,12 @@ export class Wallet extends RemitClient {
 
   // ─── Authenticated reads (override unauthenticated base class versions) ──────
 
-  /** GET /escrows/{id} — authenticated; server requires auth to access escrow details. */
+  /** GET /escrows/{id} - authenticated; server requires auth to access escrow details. */
   override getEscrow(invoiceId: string): Promise<Escrow> {
     return this.#auth.get<Escrow>(`/escrows/${invoiceId}`);
   }
 
-  /** GET /tabs/{id} — authenticated; server requires auth to access tab details. */
+  /** GET /tabs/{id} - authenticated; server requires auth to access tab details. */
   override getTab(tabId: string): Promise<Tab> {
     return this.#auth.get<Tab>(`/tabs/${tabId}`);
   }

@@ -28,7 +28,7 @@ class Milestone(BaseModel):
 
 class Invoice(BaseModel):
     """
-    Payment invoice — the core data structure passed to wallet.pay().
+    Payment invoice - the core data structure passed to wallet.pay().
 
     Represents the full payment intent before it hits the chain.
     """

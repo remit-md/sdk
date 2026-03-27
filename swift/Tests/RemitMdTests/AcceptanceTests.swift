@@ -3,8 +3,8 @@
 // Run: swift test --filter AcceptanceTests
 //
 // Env vars (all optional):
-//   ACCEPTANCE_API_URL  — default: https://remit.md
-//   ACCEPTANCE_RPC_URL  — default: https://sepolia.base.org
+//   ACCEPTANCE_API_URL  - default: https://remit.md
+//   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 import XCTest
 @testable import RemitMd

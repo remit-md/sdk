@@ -9,7 +9,7 @@ defmodule RemitMd.HttpSigner do
   - Bearer token is stored privately, never exposed via `inspect/1` or `to_string/1`.
   - Address is cached at construction time (`GET /address`).
   - `sign/2` POSTs the raw 32-byte digest to `POST /sign/digest`.
-  - All errors are explicit — no silent fallbacks.
+  - All errors are explicit - no silent fallbacks.
 
   ## Usage
 

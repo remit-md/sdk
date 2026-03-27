@@ -139,7 +139,7 @@ describe("A2AClient", () => {
   it("fromCard creates client with correct path", () => {
     const signer = new PrivateKeySigner(TEST_KEY);
     const client = A2AClient.fromCard(CARD_DATA, signer);
-    // Access internal path (private field — test via behavior or cast)
+    // Access internal path (private field - test via behavior or cast)
     assert.ok(client instanceof A2AClient);
   });
 

@@ -25,7 +25,7 @@ public interface Signer {
 
     /**
      * Returns the Ethereum address (0x-prefixed, checksummed) corresponding to this signer's key.
-     * Default implementation returns a placeholder — override if address is needed for display.
+     * Default implementation returns a placeholder - override if address is needed for display.
      */
     default String address() {
         return "0x0000000000000000000000000000000000000000";

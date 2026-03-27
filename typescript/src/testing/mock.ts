@@ -1,5 +1,5 @@
 /**
- * MockRemit — in-memory test double. No network, no chain. <1ms per operation.
+ * MockRemit - in-memory test double. No network, no chain. <1ms per operation.
  *
  * Usage:
  *   const mock = new MockRemit();
@@ -369,7 +369,7 @@ export class MockRemit {
 }
 
 /**
- * MockWallet — a Wallet backed by MockRemit instead of the real API.
+ * MockWallet - a Wallet backed by MockRemit instead of the real API.
  * Overrides all write methods to use the in-memory state machine.
  */
 export class MockWallet extends Wallet {

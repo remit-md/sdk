@@ -2,7 +2,7 @@
  * SDK acceptance test harness.
  *
  * Uses SDK Wallet to interact with the live Base Sepolia API.
- * No raw HTTP — everything goes through SDK methods.
+ * No raw HTTP - everything goes through SDK methods.
  */
 
 import { Wallet } from "../../src/wallet.js";

@@ -35,25 +35,24 @@ print(tx.tx_hash)
 
 That's it. USDC approval is handled automatically.
 
-## Local Signer (Recommended)
+## CLI Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
+The CLI signer delegates key management to the `remit` CLI, which holds your encrypted keystore at `~/.remit/keys/`. No private key in the environment.
 
 ```bash
-export REMIT_SIGNER_URL=http://127.0.0.1:7402
-export REMIT_SIGNER_TOKEN=rmit_sk_...
+export REMIT_KEY_PASSWORD=your-keystore-password
 ```
 
 ```python
 # Explicit
-signer = await HttpSigner.create(url, token)
+signer = await CliSigner.create()
 wallet = Wallet(signer=signer)
 
 # Or auto-detect from env (recommended)
-wallet = await Wallet.with_signer()  # reads REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN
+wallet = await Wallet.from_env()  # detects remit CLI automatically
 ```
 
-`await Wallet.with_signer()` for local signer, `Wallet.from_env()` for raw key. Priority: `REMIT_SIGNER_URL` > `OWS_WALLET_ID` > `REMITMD_KEY`.
+`Wallet.from_env()` detects signing credentials automatically. Priority: CLI signer > `OWS_WALLET_ID` > `REMITMD_KEY`.
 
 ## Secure Wallet with OWS
 

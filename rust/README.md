@@ -51,25 +51,24 @@ let wallet = Wallet::with_signer(my_kms_signer)
 
 All payment methods (`pay`, `create_escrow`, `create_tab`, `create_stream`, `create_bounty`, `lock_deposit`) automatically sign an EIP-2612 permit for gasless USDC approval. No manual permit handling needed.
 
-## Local Signer (Recommended)
+## CLI Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
+The CLI signer delegates key management to the `remit` CLI, which holds your encrypted keystore at `~/.remit/keys/`. No private key in the environment.
 
 ```bash
-export REMIT_SIGNER_URL=http://127.0.0.1:7402
-export REMIT_SIGNER_TOKEN=rmit_sk_...
+export REMIT_KEY_PASSWORD=your-keystore-password
 ```
 
 ```rust
 // Explicit
-let signer = HttpSigner::new("http://127.0.0.1:7402", "rmit_sk_...")?;
+let signer = CliSigner::new("remit")?;
 let wallet = Wallet::with_signer(signer).build()?;
 
 // Or auto-detect from env (recommended)
-let wallet = Wallet::from_env()?; // detects REMIT_SIGNER_URL automatically
+let wallet = Wallet::from_env()?; // detects remit CLI automatically
 ```
 
-`Wallet::from_env()` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `REMITMD_KEY`.
+`Wallet::from_env()` detects signing credentials automatically. Priority: CLI signer > `REMITMD_KEY`.
 
 ## Payment Models
 

@@ -101,10 +101,7 @@ impl CliSigner {
         }
 
         // Check 3: Password available
-        match std::env::var("REMIT_KEY_PASSWORD") {
-            Ok(val) if !val.is_empty() => true,
-            _ => false,
-        }
+        matches!(std::env::var("REMIT_KEY_PASSWORD"), Ok(val) if !val.is_empty())
     }
 }
 

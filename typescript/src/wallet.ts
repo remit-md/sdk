@@ -151,20 +151,72 @@ export class Wallet extends RemitClient {
     return new Wallet({ ...options, privateKey: key });
   }
 
-  /** Load from REMITMD_KEY and REMITMD_CHAIN environment variables. */
+  /** Load from environment variables.
+   *
+   * Priority: REMIT_SIGNER_URL > OWS_WALLET_ID > REMITMD_KEY > error.
+   * For REMIT_SIGNER_URL and OWS_WALLET_ID, use the async factories
+   * `withSigner()` and `withOws()` respectively.
+   */
   static fromEnv(overrides?: RemitClientOptions): Wallet {
-    const key = process.env["REMITMD_KEY"];
     const chain = process.env["REMITMD_CHAIN"] ?? "base";
+
+    // Check for signer URL first (async creation needed)
+    if (process.env["REMIT_SIGNER_URL"]) {
+      throw new Error(
+        "REMIT_SIGNER_URL is set — use: await Wallet.withSigner()"
+      );
+    }
+
+    // Check for OWS wallet (async creation needed)
+    if (process.env["OWS_WALLET_ID"] && !process.env["REMITMD_KEY"]) {
+      throw new Error(
+        "OWS_WALLET_ID is set but fromEnv() only supports raw keys. " +
+        "Use: await Wallet.withOws()"
+      );
+    }
+
+    const key = process.env["REMITMD_KEY"];
     if (!key) {
-      if (process.env["OWS_WALLET_ID"]) {
-        throw new Error(
-          "OWS_WALLET_ID is set but fromEnv() only supports raw keys. " +
-          "Use: await Wallet.withOws()"
-        );
-      }
-      throw new Error("REMITMD_KEY environment variable is not set.");
+      throw new Error(
+        "No signing credentials found. Set one of: " +
+        "REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, OWS_WALLET_ID, or REMITMD_KEY."
+      );
     }
     return new Wallet({ chain, ...overrides, privateKey: key });
+  }
+
+  /**
+   * Create a Wallet backed by the local HTTP signer server.
+   *
+   * Reads REMIT_SIGNER_URL and REMIT_SIGNER_TOKEN from env unless overridden.
+   *
+   * @example
+   * ```typescript
+   * const wallet = await Wallet.withSigner();
+   * // or with explicit options:
+   * const wallet = await Wallet.withSigner({ url: "http://127.0.0.1:7402", token: "rmit_sk_..." });
+   * ```
+   */
+  static async withSigner(
+    options?: RemitClientOptions & {
+      url?: string;
+      token?: string;
+    },
+  ): Promise<Wallet> {
+    const url = options?.url ?? process.env["REMIT_SIGNER_URL"];
+    const token = options?.token ?? process.env["REMIT_SIGNER_TOKEN"];
+
+    if (!url) {
+      throw new Error("REMIT_SIGNER_URL is required for withSigner()");
+    }
+    if (!token) {
+      throw new Error("REMIT_SIGNER_TOKEN is required for withSigner()");
+    }
+
+    const { HttpSigner } = await import("./http-signer.js");
+    const signer = await HttpSigner.create({ url, token });
+    const chain = options?.chain ?? process.env["REMITMD_CHAIN"] ?? "base";
+    return new Wallet({ chain, ...options, signer });
   }
 
   /**

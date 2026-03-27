@@ -37,6 +37,25 @@ public final class RemitWallet: @unchecked Sendable {
         self.isMock = false
     }
 
+    /// Initialize with a custom signer (any type conforming to `Signer`).
+    ///
+    /// Use this to inject an `HttpSigner` (for the local signer server),
+    /// a `PrivateKeySigner`, or any custom signer implementation.
+    public init(signer: any Signer, chain: RemitChain = .base, baseURL: String? = nil, routerAddress: String? = nil) {
+        let envURL = ProcessInfo.processInfo.environment["REMITMD_API_URL"]
+        self.transport = HttpTransport(
+            baseURL: baseURL ?? envURL ?? chain.baseURL,
+            chainId: UInt64(chain.rawValue),
+            routerAddress: routerAddress ?? "",
+            signer: signer
+        )
+        self.signer = signer
+        self.signerAddress = signer.address
+        self.chain = chain
+        self.chainName = chain.chainName
+        self.isMock = false
+    }
+
     public init(mock: MockRemit) {
         self.transport = MockTransport(mock: mock)
         self.signer = nil
@@ -48,6 +67,21 @@ public final class RemitWallet: @unchecked Sendable {
 
     public static func fromEnvironment() throws -> RemitWallet {
         let env = ProcessInfo.processInfo.environment
+        let chainStr = env["REMITMD_CHAIN"] ?? "base"
+        let chain: RemitChain = chainStr == "base" ? .base : .baseSepolia
+        let routerAddress = env["REMITMD_ROUTER_ADDRESS"]
+
+        // Priority: REMIT_SIGNER_URL > REMITMD_KEY > REMITMD_PRIVATE_KEY > error
+        if let signerURL = env["REMIT_SIGNER_URL"] {
+            guard let _ = env["REMIT_SIGNER_TOKEN"] else {
+                throw RemitError(RemitError.unauthorized, "REMIT_SIGNER_TOKEN is required when REMIT_SIGNER_URL is set")
+            }
+            // HttpSigner will be implemented in V24 C4.4. For now, error with guidance.
+            throw RemitError(RemitError.unauthorized,
+                "REMIT_SIGNER_URL is set (\(signerURL)) but HttpSigner is not yet available in the Swift SDK. " +
+                "Use REMITMD_KEY for now, or use the TypeScript/Python SDK which support HttpSigner.")
+        }
+
         let key: String
         if let k = env["REMITMD_KEY"] {
             key = k
@@ -55,11 +89,9 @@ public final class RemitWallet: @unchecked Sendable {
             print("[remitmd] Warning: REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead")
             key = k
         } else {
-            throw RemitError(RemitError.unauthorized, "REMITMD_KEY environment variable not set")
+            throw RemitError(RemitError.unauthorized,
+                "No signing credentials found. Set one of: REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY")
         }
-        let chainStr = env["REMITMD_CHAIN"] ?? "base"
-        let chain: RemitChain = chainStr == "base" ? .base : .baseSepolia
-        let routerAddress = env["REMITMD_ROUTER_ADDRESS"]
         return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress)
     }
 

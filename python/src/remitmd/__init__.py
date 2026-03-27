@@ -2,6 +2,7 @@
 
 from remitmd.a2a import A2AClient, A2ATask, AgentCard, IntentMandate
 from remitmd.client import ContractAddresses, RemitClient
+from remitmd.http_signer import HttpSigner
 from remitmd.models.bounty import Bounty, BountySubmission
 from remitmd.models.common import (
     BountyStatus,
@@ -45,6 +46,7 @@ __all__ = [
     "PermitSignature",
     "Signer",
     "PrivateKeySigner",
+    "HttpSigner",
     "OwsSigner",
     "X402Client",
     "AllowanceExceededError",

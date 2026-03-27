@@ -10,8 +10,8 @@ use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
 use crate::http::{
     chain_config, compute_permit_digest, fetch_permit_nonce, usdc_address, HttpTransport, Transport,
 };
-use crate::models::*;
 use crate::http_signer::HttpSigner;
+use crate::models::*;
 use crate::signer::{PrivateKeySigner, Signer};
 
 /// Primary remit.md client for AI agents that send and receive payments.

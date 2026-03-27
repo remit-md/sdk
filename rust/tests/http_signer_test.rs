@@ -34,11 +34,7 @@ fn mock_server(
             let path = parts.get(1).copied().unwrap_or("/");
 
             // Extract body (after blank line).
-            let body = raw
-                .split("\r\n\r\n")
-                .nth(1)
-                .unwrap_or("")
-                .to_string();
+            let body = raw.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
 
             let (status, resp_body) = handler(method, path, &body);
             let status_text = match status {

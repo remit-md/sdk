@@ -4,6 +4,7 @@ require "spec_helper"
 require "stringio"
 require "webrick"
 
+# rubocop:disable Metrics/BlockLength
 RSpec.describe Remitmd::HttpSigner do
   MOCK_ADDRESS   = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
   MOCK_SIGNATURE = "0x#{"ab" * 32}#{"cd" * 32}1b"
@@ -273,3 +274,4 @@ RSpec.describe Remitmd::HttpSigner do
     end
   end
 end
+# rubocop:enable Metrics/BlockLength

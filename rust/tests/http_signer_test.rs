@@ -107,9 +107,8 @@ fn server_unreachable() {
 
 #[test]
 fn unauthorized_on_address() {
-    let (url, _handle) = mock_server(|_method, _path, _body| {
-        (401, r#"{"error":"invalid token"}"#.to_string())
-    });
+    let (url, _handle) =
+        mock_server(|_method, _path, _body| (401, r#"{"error":"invalid token"}"#.to_string()));
 
     let err = HttpSigner::new(&url, "secret_bearer_12345").unwrap_err();
     assert_eq!(err.code, codes::UNAUTHORIZED);
@@ -191,9 +190,7 @@ fn server_error_on_sign() {
 
 #[test]
 fn malformed_address_response() {
-    let (url, _handle) = mock_server(|_method, _path, _body| {
-        (200, "this is not json".to_string())
-    });
+    let (url, _handle) = mock_server(|_method, _path, _body| (200, "this is not json".to_string()));
 
     let err = HttpSigner::new(&url, "token").unwrap_err();
     assert_eq!(err.code, codes::SERVER_ERROR);
@@ -266,8 +263,7 @@ fn unauthorized_on_sign() {
         _ => (404, r#"{"error":"not found"}"#.to_string()),
     });
 
-    let signer =
-        HttpSigner::new(&url, "super_secret_bearer_value").expect("create HttpSigner");
+    let signer = HttpSigner::new(&url, "super_secret_bearer_value").expect("create HttpSigner");
     let err = signer.sign(&[0u8; 32]).unwrap_err();
     assert_eq!(err.code, codes::UNAUTHORIZED);
     assert!(
@@ -287,9 +283,8 @@ fn unauthorized_on_sign() {
 
 #[test]
 fn empty_address_response() {
-    let (url, _handle) = mock_server(|_method, _path, _body| {
-        (200, r#"{"address":""}"#.to_string())
-    });
+    let (url, _handle) =
+        mock_server(|_method, _path, _body| (200, r#"{"address":""}"#.to_string()));
 
     let err = HttpSigner::new(&url, "token").unwrap_err();
     assert_eq!(err.code, codes::SERVER_ERROR);

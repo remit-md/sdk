@@ -7,18 +7,19 @@ Let AI agents pay for tools, data, and services - one env var, no crypto experie
 
 ## Quickstart (3 steps)
 
-### Step 1 - Get your agent key
+### Step 1 - Set up signing
 
-The SDK generates a wallet keypair automatically. Set it as an environment variable:
+**Option A: CLI signer (recommended)** — encrypted keystore, no raw key in env:
+
+```bash
+remit signer init            # creates encrypted keystore at ~/.remit/keys/
+export REMIT_KEY_PASSWORD=your-password
+```
+
+**Option B: Raw key** — for quick testing:
 
 ```bash
 export REMITMD_KEY=0xYourAgentKey
-```
-
-Or in a `.env` file:
-
-```
-REMITMD_KEY=0xYourAgentKey
 ```
 
 ### Step 2 - Install the SDK and pay
@@ -65,7 +66,8 @@ console.log('Paid:', tx.id);
       "command": "npx",
       "args": ["@remitmd/mcp"],
       "env": {
-        "REMITMD_KEY": "0xYourAgentKey"
+        "REMIT_KEY_PASSWORD": "your-password",
+        "REMIT_CLI_PATH": "/usr/local/bin/remit"
       }
     }
   }

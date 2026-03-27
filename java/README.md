@@ -50,6 +50,26 @@ val wallet = RemitMd.fromEnv()
 wallet.pay("0xRecipient...", 1.50.usdc)
 ```
 
+## Local Signer (Recommended)
+
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+
+```bash
+export REMIT_SIGNER_URL=http://127.0.0.1:7402
+export REMIT_SIGNER_TOKEN=rmit_sk_...
+```
+
+```java
+// Explicit
+HttpSigner signer = new HttpSigner("http://127.0.0.1:7402", "rmit_sk_...");
+Wallet wallet = RemitMd.withSigner(signer).build();
+
+// Or auto-detect from env (recommended)
+Wallet wallet = RemitMd.fromEnv(); // detects REMIT_SIGNER_URL automatically
+```
+
+`RemitMd.fromEnv()` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `REMITMD_KEY`.
+
 ---
 
 ## Configuration

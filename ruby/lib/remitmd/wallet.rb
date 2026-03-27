@@ -67,18 +67,31 @@ module Remitmd
     end
 
     # Build a RemitWallet from environment variables.
-    # Reads: REMITMD_KEY (primary) or REMITMD_PRIVATE_KEY (deprecated fallback),
-    # REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS.
+    # Reads: REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN (preferred, uses HttpSigner),
+    # or REMITMD_KEY (primary) / REMITMD_PRIVATE_KEY (deprecated fallback).
+    # Also reads: REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS.
     def self.from_env
+      chain          = ENV.fetch("REMITMD_CHAIN", "base")
+      api_url        = ENV["REMITMD_API_URL"]
+      router_address = ENV["REMITMD_ROUTER_ADDRESS"]
+
+      # Priority 1: HTTP signer server
+      signer_url = ENV["REMIT_SIGNER_URL"]
+      if signer_url
+        signer_token = ENV["REMIT_SIGNER_TOKEN"]
+        raise ArgumentError, "REMIT_SIGNER_TOKEN must be set when REMIT_SIGNER_URL is set" unless signer_token
+
+        signer = HttpSigner.new(url: signer_url, token: signer_token)
+        return new(signer: signer, chain: chain, api_url: api_url, router_address: router_address)
+      end
+
+      # Priority 2: raw private key
       key = ENV["REMITMD_KEY"] || ENV["REMITMD_PRIVATE_KEY"]
       if ENV["REMITMD_PRIVATE_KEY"] && !ENV["REMITMD_KEY"]
         warn "[remitmd] REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead"
       end
-      raise ArgumentError, "REMITMD_KEY not set" unless key
+      raise ArgumentError, "REMITMD_KEY not set (or set REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN)" unless key
 
-      chain          = ENV.fetch("REMITMD_CHAIN", "base")
-      api_url        = ENV["REMITMD_API_URL"]
-      router_address = ENV["REMITMD_ROUTER_ADDRESS"]
       new(private_key: key, chain: chain, api_url: api_url, router_address: router_address)
     end
 

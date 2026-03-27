@@ -24,7 +24,7 @@ gem install remitmd
 ```ruby
 require "remitmd"
 
-wallet = Remitmd::RemitWallet.new(private_key: ENV["REMITMD_PRIVATE_KEY"])
+wallet = Remitmd::RemitWallet.new(private_key: ENV["REMITMD_KEY"])
 
 # Direct payment
 tx = wallet.pay("0xRecipient0000000000000000000000000000001", 1.50)
@@ -39,11 +39,31 @@ Or from environment variables:
 
 ```ruby
 wallet = Remitmd::RemitWallet.from_env
-# Requires: REMITMD_PRIVATE_KEY
+# Requires: REMITMD_KEY (or REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN)
 # Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL
 ```
 
 Permits are auto-signed. Every payment method fetches the on-chain USDC nonce, signs an EIP-2612 permit, and includes it automatically.
+
+## Local Signer (Recommended)
+
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+
+```bash
+export REMIT_SIGNER_URL=http://127.0.0.1:7402
+export REMIT_SIGNER_TOKEN=rmit_sk_...
+```
+
+```ruby
+# Explicit
+signer = Remitmd::HttpSigner.new(url: "http://127.0.0.1:7402", token: "rmit_sk_...")
+wallet = Remitmd::RemitWallet.new(signer: signer)
+
+# Or auto-detect from env (recommended)
+wallet = Remitmd::RemitWallet.from_env # detects REMIT_SIGNER_URL automatically
+```
+
+`RemitWallet.from_env` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `REMITMD_KEY`.
 
 ## Payment Models
 

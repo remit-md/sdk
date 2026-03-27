@@ -116,9 +116,7 @@ class Wallet(RemitClient):
         """
         # Signer URL requires async creation
         if os.environ.get("REMIT_SIGNER_URL"):
-            raise OSError(
-                "REMIT_SIGNER_URL is set — use: await Wallet.with_signer()"
-            )
+            raise OSError("REMIT_SIGNER_URL is set — use: await Wallet.with_signer()")
 
         key = os.environ.get("REMITMD_KEY")
         if not key:

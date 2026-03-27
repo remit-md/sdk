@@ -46,17 +46,13 @@ class HttpSigner(Signer):
                     timeout=10.0,
                 )
         except httpx.ConnectError as e:
-            raise ConnectionError(
-                f"HttpSigner: cannot reach signer server at {url}: {e}"
-            ) from e
+            raise ConnectionError(f"HttpSigner: cannot reach signer server at {url}: {e}") from e
 
         if resp.status_code == 401:
             raise PermissionError("HttpSigner: unauthorized — check your REMIT_SIGNER_TOKEN")
 
         if not resp.is_success:
-            raise RuntimeError(
-                f"HttpSigner: GET /address failed ({resp.status_code}): {resp.text}"
-            )
+            raise RuntimeError(f"HttpSigner: GET /address failed ({resp.status_code}): {resp.text}")
 
         data = resp.json()
         if "address" not in data:
@@ -88,9 +84,7 @@ class HttpSigner(Signer):
                     timeout=10.0,
                 )
         except httpx.ConnectError as e:
-            raise ConnectionError(
-                f"HttpSigner: cannot reach signer server: {e}"
-            ) from e
+            raise ConnectionError(f"HttpSigner: cannot reach signer server: {e}") from e
 
         if resp.status_code == 401:
             raise PermissionError("HttpSigner: unauthorized — check your REMIT_SIGNER_TOKEN")
@@ -109,9 +103,7 @@ class HttpSigner(Signer):
                 detail = data.get("reason") or data.get("error") or resp.text
             except Exception:
                 detail = resp.text
-            raise RuntimeError(
-                f"HttpSigner: sign failed ({resp.status_code}): {detail}"
-            )
+            raise RuntimeError(f"HttpSigner: sign failed ({resp.status_code}): {detail}")
 
         data = resp.json()
         sig = data.get("signature")

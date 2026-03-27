@@ -2,6 +2,7 @@
 
 from remitmd.a2a import A2AClient, A2ATask, AgentCard, IntentMandate
 from remitmd.client import ContractAddresses, RemitClient
+from remitmd.http_signer import HttpSigner
 from remitmd.models.bounty import Bounty, BountySubmission
 from remitmd.models.common import (
     BountyStatus,
@@ -24,7 +25,6 @@ from remitmd.models.stream import Stream
 from remitmd.models.tab import Tab, TabCharge
 from remitmd.provider import X402Paywall
 from remitmd.signer import PrivateKeySigner, Signer
-from remitmd.http_signer import HttpSigner
 from remitmd.wallet import PermitSignature, Wallet
 
 try:

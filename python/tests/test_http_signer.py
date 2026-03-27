@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import ClassVar
 
 import pytest

@@ -50,25 +50,17 @@ class CliSigner(Signer):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=_CLI_TIMEOUT
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=_CLI_TIMEOUT)
         if proc.returncode != 0:
-            raise RuntimeError(
-                f"CliSigner: failed to get address: {stderr.decode().strip()}"
-            )
+            raise RuntimeError(f"CliSigner: failed to get address: {stderr.decode().strip()}")
         signer._address = stdout.decode().strip()
         if not signer._address.startswith("0x") or len(signer._address) != 42:
-            raise RuntimeError(
-                f"CliSigner: invalid address from CLI: {signer._address}"
-            )
+            raise RuntimeError(f"CliSigner: invalid address from CLI: {signer._address}")
         return signer
 
     def get_address(self) -> str:
         if not self._address:
-            raise RuntimeError(
-                "CliSigner not initialized. Use: signer = await CliSigner.create()"
-            )
+            raise RuntimeError("CliSigner not initialized. Use: signer = await CliSigner.create()")
         return self._address
 
     async def sign_typed_data(
@@ -90,9 +82,7 @@ class CliSigner(Signer):
             proc.communicate(payload.encode()), timeout=_CLI_TIMEOUT
         )
         if proc.returncode != 0:
-            raise RuntimeError(
-                f"CliSigner: signing failed: {stderr.decode().strip()}"
-            )
+            raise RuntimeError(f"CliSigner: signing failed: {stderr.decode().strip()}")
         sig = stdout.decode().strip()
         if not sig.startswith("0x") or len(sig) != 132:
             raise RuntimeError(f"CliSigner: invalid signature from CLI: {sig}")

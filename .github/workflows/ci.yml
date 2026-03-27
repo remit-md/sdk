@@ -34,7 +34,7 @@ jobs:
       - name: Type check
         run: cd python && mypy src/
       # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
-      # Exclude acceptance tests (live Base Sepolia) — they have their own manual workflow.
+      # Exclude acceptance tests (live Base Sepolia) - they have their own manual workflow.
       - name: Test with coverage gate
         run: cd python && pytest -v --cov=remitmd --cov-fail-under=40 --cov-report=term-missing --ignore=tests/acceptance --ignore=tests/compliance
 
@@ -154,7 +154,7 @@ jobs:
         run: cd ruby && bundle exec rubocop -A --no-color && bundle exec rubocop --no-color
       # Coverage gate: target 50% (MASTER.md); gate 40% via SimpleCov in spec_helper.rb.
       # SimpleCov minimum_coverage is enforced only when CI=true (set by GitHub Actions).
-      # Exclude acceptance tests (live Base Sepolia) — they have their own manual workflow.
+      # Exclude acceptance tests (live Base Sepolia) - they have their own manual workflow.
       - name: Test with coverage gate
         run: cd ruby && bundle exec rspec --exclude-pattern "**/acceptance_spec.rb"
 

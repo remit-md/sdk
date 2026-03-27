@@ -1,4 +1,4 @@
-//! # remitmd — Rust SDK for the remit.md universal AI payment protocol
+//! # remitmd - Rust SDK for the remit.md universal AI payment protocol
 //!
 //! remit.md enables AI agents to send and receive USDC payments on Base (EVM L2)
 //! with support for direct payments, escrow, streaming, payment channels (tabs),
@@ -29,7 +29,7 @@
 //!
 //! ## Testing
 //!
-//! Use `MockRemit` for unit tests — zero network, zero latency, deterministic:
+//! Use `MockRemit` for unit tests - zero network, zero latency, deterministic:
 //!
 //! ```rust
 //! use remitmd::MockRemit;

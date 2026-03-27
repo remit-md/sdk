@@ -141,7 +141,7 @@ defmodule RemitMd.Models do
   end
 
   defmodule Tab do
-    @moduledoc "An off-chain payment tab — batch transactions, settle periodically."
+    @moduledoc "An off-chain payment tab - batch transactions, settle periodically."
     @enforce_keys [:status]
     defstruct [:id, :payer, :payee, :limit, :per_unit, :spent, :chain,
                :status, :created_at, :expires_at,
@@ -172,7 +172,7 @@ defmodule RemitMd.Models do
   end
 
   defmodule Stream do
-    @moduledoc "A payment stream — continuous USDC flow per second."
+    @moduledoc "A payment stream - continuous USDC flow per second."
     @enforce_keys [:status]
     defstruct [:id, :payer, :payee, :rate_per_second, :max_duration, :max_total,
                :total_streamed, :chain, :status, :started_at, :closed_at,
@@ -207,7 +207,7 @@ defmodule RemitMd.Models do
   end
 
   defmodule Bounty do
-    @moduledoc "A bounty — pay any agent that completes the task."
+    @moduledoc "A bounty - pay any agent that completes the task."
     @enforce_keys [:status]
     defstruct [:id, :poster, :amount, :task, :chain, :status,
                :validation, :max_attempts, :submissions, :winner,

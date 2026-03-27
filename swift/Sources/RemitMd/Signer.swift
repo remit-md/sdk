@@ -97,7 +97,7 @@ private func decompressY(x: [UInt8], evenY: Bool) -> [UInt8]? {
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
         0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF, 0xFC, 0x2F,
     ]
-    // (p + 1) / 4 — the square root exponent for p ≡ 3 (mod 4)
+    // (p + 1) / 4 - the square root exponent for p ≡ 3 (mod 4)
     let sqrtExp: [UInt8] = [
         0x3F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -124,7 +124,7 @@ private func decompressY(x: [UInt8], evenY: Bool) -> [UInt8]? {
 
 // MARK: - 256-bit modular arithmetic (big-endian byte arrays)
 
-/// (a + b) mod m — assumes a,b < m
+/// (a + b) mod m - assumes a,b < m
 private func addmod(_ a: [UInt8], _ b: [UInt8], _ m: [UInt8]) -> [UInt8] {
     var result = [UInt8](repeating: 0, count: 32)
     var carry: UInt16 = 0
@@ -136,12 +136,12 @@ private func addmod(_ a: [UInt8], _ b: [UInt8], _ m: [UInt8]) -> [UInt8] {
     return (carry != 0 || cmp256(result, m) >= 0) ? sub256(result, m) : result
 }
 
-/// (a - b) mod m — assumes a,b < m
+/// (a - b) mod m - assumes a,b < m
 private func submod(_ a: [UInt8], _ b: [UInt8], _ m: [UInt8]) -> [UInt8] {
     return cmp256(a, b) >= 0 ? sub256(a, b) : sub256(add256(a, m), b)
 }
 
-/// (a * b) mod m — double-and-add scanning bits of b from MSB
+/// (a * b) mod m - double-and-add scanning bits of b from MSB
 private func mulmod(_ a: [UInt8], _ b: [UInt8], _ m: [UInt8]) -> [UInt8] {
     var r = [UInt8](repeating: 0, count: 32)
     for i in 0..<32 {
@@ -155,7 +155,7 @@ private func mulmod(_ a: [UInt8], _ b: [UInt8], _ m: [UInt8]) -> [UInt8] {
     return r
 }
 
-/// (base^exp) mod m — square-and-multiply scanning bits of exp from MSB
+/// (base^exp) mod m - square-and-multiply scanning bits of exp from MSB
 private func powmod(_ base: [UInt8], _ exp: [UInt8], _ m: [UInt8]) -> [UInt8] {
     var r = [UInt8](repeating: 0, count: 31) + [1] // r = 1
     for i in 0..<32 {
@@ -193,7 +193,7 @@ private func sub256(_ a: [UInt8], _ b: [UInt8]) -> [UInt8] {
     return result
 }
 
-/// Lexicographic compare — returns -1, 0, or 1.
+/// Lexicographic compare - returns -1, 0, or 1.
 private func cmp256(_ a: [UInt8], _ b: [UInt8]) -> Int {
     for i in 0..<32 {
         if a[i] < b[i] { return -1 }
@@ -204,7 +204,7 @@ private func cmp256(_ a: [UInt8], _ b: [UInt8]) -> Int {
 
 // MARK: - MockSigner (for tests)
 
-/// Deterministic mock signer — returns a fixed address and zero-filled signature.
+/// Deterministic mock signer - returns a fixed address and zero-filled signature.
 /// Safe to use in tests without any cryptographic setup.
 public final class MockSigner: Signer, @unchecked Sendable {
     public let address: String
@@ -214,7 +214,7 @@ public final class MockSigner: Signer, @unchecked Sendable {
     }
 
     public func sign(digest _: Data) throws -> String {
-        // 65-byte zero signature — accepted by MockTransport, rejected by real contracts
+        // 65-byte zero signature - accepted by MockTransport, rejected by real contracts
         return "0x" + String(repeating: "00", count: 130)
     }
 }

@@ -35,11 +35,11 @@ interface OwsModule {
 export interface OwsSignerOptions {
   /** OWS wallet name or UUID (e.g. "remit-my-agent"). */
   walletId: string;
-  /** Remit chain name — only used for logging, not passed to OWS. Default: "base". */
+  /** Remit chain name - only used for logging, not passed to OWS. Default: "base". */
   chain?: string;
   /** OWS API key token (passed as passphrase to OWS signing calls). */
   owsApiKey?: string;
-  /** @internal Inject OWS module for testing — bypasses dynamic import. */
+  /** @internal Inject OWS module for testing - bypasses dynamic import. */
   _owsModule?: unknown;
 }
 
@@ -48,7 +48,7 @@ export interface OwsSignerOptions {
  *
  * - Keys live in OWS's encrypted vault (~/.ows/wallets/), never in env vars.
  * - Signing calls go through OWS FFI, which evaluates policy rules before signing.
- * - Use the static {@link create} factory — the constructor is private because
+ * - Use the static {@link create} factory - the constructor is private because
  *   address resolution requires a synchronous FFI call that must happen before
  *   getAddress() can work.
  */
@@ -149,7 +149,7 @@ export class OwsSigner implements Signer {
       message: value,
     };
 
-    // 4. Serialize — handle BigInt values (G4).
+    // 4. Serialize - handle BigInt values (G4).
     const json = JSON.stringify(fullTypedData, (_key, v) =>
       typeof v === "bigint" ? v.toString() : (v as unknown),
     );

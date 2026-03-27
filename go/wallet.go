@@ -130,13 +130,13 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 // FromEnv creates a Wallet from environment variables.
 //
 // Credential priority:
-//  1. REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN — HTTP signer server
-//  2. REMITMD_KEY — hex-encoded private key
+//  1. REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN - HTTP signer server
+//  2. REMITMD_KEY - hex-encoded private key
 //
 // Common env vars:
-//   - REMITMD_CHAIN — chain name (default: "base")
-//   - REMITMD_TESTNET — "1", "true", or "yes" to use testnet
-//   - REMITMD_ROUTER_ADDRESS — router contract address for EIP-712 domain
+//   - REMITMD_CHAIN - chain name (default: "base")
+//   - REMITMD_TESTNET - "1", "true", or "yes" to use testnet
+//   - REMITMD_ROUTER_ADDRESS - router contract address for EIP-712 domain
 func FromEnv(opts ...Option) (*Wallet, error) {
 	envOpts := []Option{}
 	if chain := os.Getenv("REMITMD_CHAIN"); chain != "" {
@@ -935,7 +935,7 @@ func (w *Wallet) Mint(ctx context.Context, amount float64) (*MintResponse, error
 	case *httpClient:
 		baseURL = t.baseURL
 	default:
-		// Mock or custom transport — delegate normally.
+		// Mock or custom transport - delegate normally.
 		var resp MintResponse
 		if err := w.http.post(ctx, "/api/v1/mint", map[string]any{
 			"wallet": w.Address(),

@@ -4,8 +4,8 @@
 // Run: dotnet test --filter "FullyQualifiedName~AcceptanceTests" --no-build
 //
 // Env vars (all optional):
-//   ACCEPTANCE_API_URL  — default: https://remit.md
-//   ACCEPTANCE_RPC_URL  — default: https://sepolia.base.org
+//   ACCEPTANCE_API_URL  - default: https://remit.md
+//   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 using System.Net;
 using System.Net.Http.Json;
@@ -276,7 +276,7 @@ public class AcceptanceTests
         // Wait for on-chain confirmation + indexer to pick up the tab event
         await WaitForBalanceChange(agent.Wallet.Address, agentBefore);
 
-        // 2. Charge tab — PROVIDER signs AND submits (server scopes by auth wallet)
+        // 2. Charge tab - PROVIDER signs AND submits (server scopes by auth wallet)
         var sig1 = provider.Wallet.SignTabCharge(tabAddr, tab.Id, 500_000, 1);
         var charge1 = await provider.Wallet.ChargeTabAsync(tab.Id, 0.50m, 0.50m, 1, sig1);
         Assert.Equal(tab.Id, charge1.TabId);
@@ -352,7 +352,7 @@ public class AcceptanceTests
         Assert.NotEmpty(bounty.Id);
         Assert.Equal(BountyStatus.Open, bounty.Status);
 
-        // 2. Submit evidence (by submitter) — must be 32 bytes (64 hex chars)
+        // 2. Submit evidence (by submitter) - must be 32 bytes (64 hex chars)
         var evidenceHash = "0x" + string.Concat(Enumerable.Repeat("ab", 32));
         var submission = await submitter.Wallet.SubmitBountyAsync(bounty.Id, evidenceHash);
         Assert.True(submission.Id > 0);

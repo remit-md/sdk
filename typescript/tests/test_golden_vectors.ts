@@ -22,11 +22,11 @@ import { privateKeyToAccount } from "viem/accounts";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VECTORS_PATH = join(__dirname, "../../test-vectors/eip712.json");
 
-// Anvil test wallet #0 — same key used by gen_vectors in remit-server.
+// Anvil test wallet #0 - same key used by gen_vectors in remit-server.
 const TEST_PRIVATE_KEY =
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as const;
 
-// EIP-712 typed struct — must match server's auth.rs exactly.
+// EIP-712 typed struct - must match server's auth.rs exactly.
 const EIP712_TYPES = {
   APIRequest: [
     { name: "method", type: "string" },
@@ -67,7 +67,7 @@ interface VectorFile {
 }
 
 interface VectorWithBigint extends Vector {
-  /** Timestamp as BigInt — JSON.parse loses precision for u64::MAX in JS. */
+  /** Timestamp as BigInt - JSON.parse loses precision for u64::MAX in JS. */
   timestampBigint: bigint;
 }
 

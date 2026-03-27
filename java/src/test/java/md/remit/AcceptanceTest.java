@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Run: ./gradlew acceptanceTest
  *
  * <p>Env vars (all optional):
- *   ACCEPTANCE_API_URL  — default: https://remit.md
- *   ACCEPTANCE_RPC_URL  — default: https://sepolia.base.org
+ *   ACCEPTANCE_API_URL  - default: https://remit.md
+ *   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
  */
 @Tag("acceptance")
 class AcceptanceTest {
@@ -197,7 +197,7 @@ class AcceptanceTest {
         System.arraycopy(structHash, 0, finalData, 34, 32);
         byte[] digest = Hash.sha3(finalData);
 
-        // Sign (needToHash=false — digest is already the final hash)
+        // Sign (needToHash=false - digest is already the final hash)
         Sign.SignatureData sig = Sign.signMessage(digest, keyPair, false);
 
         int v = sig.getV()[0] & 0xFF;

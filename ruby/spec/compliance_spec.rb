@@ -89,7 +89,7 @@ RSpec.describe "Ruby SDK compliance" do
     it "authenticated request returns balance, not 401" do
       pk, _addr = register_and_get_key
       wallet = make_wallet(pk)
-      # reputation() makes an authenticated GET to /api/v1/reputation/{address} —
+      # reputation() makes an authenticated GET to /api/v1/reputation/{address} -
       # this endpoint exists for all registered addresses and returns 401 if auth fails.
       rep = wallet.reputation(wallet.address)
       expect(rep).not_to be_nil

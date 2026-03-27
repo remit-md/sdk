@@ -27,7 +27,7 @@ describe("SDK: Direct Payment", { timeout: 120_000 }, () => {
     await fundWallet(agent, 100);
   });
 
-  it("payDirect with signPermit — correct balances", async () => {
+  it("payDirect with signPermit - correct balances", async () => {
     const amount = 1.0;
     const fee = 0.01;
     const providerReceives = amount - fee;

@@ -15,7 +15,7 @@ import (
 )
 
 // MockRemit is an in-memory mock for testing agents that use remit.md.
-// Zero network, zero latency, deterministic — ideal for unit tests.
+// Zero network, zero latency, deterministic - ideal for unit tests.
 //
 //	mock := remitmd.NewMockRemit()
 //	wallet := mock.Wallet()

@@ -1,4 +1,4 @@
-# remitmd-go — Go SDK for remit.md
+# remitmd-go - Go SDK for remit.md
 
 > [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
 
@@ -27,10 +27,10 @@ wallet, err := remitmd.FromEnv()
 // Or with explicit key
 wallet, err := remitmd.NewWallet(os.Getenv("REMITMD_KEY"), remitmd.WithChain("base"))
 
-// Send 1.50 USDC — permit is signed automatically
+// Send 1.50 USDC - permit is signed automatically
 tx, err := wallet.Pay(ctx, "0xRecipient...", decimal.NewFromFloat(1.50))
 
-// Create an escrow — one call, no permit boilerplate
+// Create an escrow - one call, no permit boilerplate
 escrow, err := wallet.CreateEscrow(ctx, "0xPayee...", decimal.NewFromFloat(10.0),
     remitmd.WithEscrowMemo("design work"))
 ```
@@ -39,7 +39,7 @@ All payment methods (`Pay`, `CreateEscrow`, `CreateTab`, `CreateStream`, `Create
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -85,7 +85,7 @@ for _, tool := range tools {
 // Contract discovery (cached per session)
 wallet.GetContracts(ctx)                                    // *ContractAddresses
 
-// Permits (auto-signed when omitted — see Advanced section)
+// Permits (auto-signed when omitted - see Advanced section)
 wallet.SignPermit(ctx, spender, amount, deadline...)        // *PermitSignature
 
 // Payments (auto-permit built in)
@@ -169,7 +169,7 @@ the result via the `With*Permit` option:
 deadline := time.Now().Unix() + 7200
 permit, err := wallet.SignPermit(ctx, routerAddress, 5.0, deadline)
 
-// Pass it explicitly — skips auto-permit
+// Pass it explicitly - skips auto-permit
 tx, err := wallet.Pay(ctx, "0xRecipient...", decimal.NewFromFloat(5.0),
     remitmd.WithPayPermit(permit))
 ```

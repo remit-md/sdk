@@ -1,4 +1,4 @@
-"""A2A/AP2 client — agent card discovery and A2A JSON-RPC task interface."""
+"""A2A/AP2 client - agent card discovery and A2A JSON-RPC task interface."""
 
 from __future__ import annotations
 
@@ -115,7 +115,7 @@ class AgentCard:
 @dataclass
 class IntentMandate:
     """
-    AP2 IntentMandate — pre-authorizes a payment on behalf of an issuer.
+    AP2 IntentMandate - pre-authorizes a payment on behalf of an issuer.
 
     Pass to :meth:`A2AClient.send` to include the mandate in the request metadata.
     """
@@ -160,7 +160,7 @@ class A2AClient:
     """
     A2A JSON-RPC client for sending and managing tasks.
 
-    Authenticates every request with EIP-712 signed headers — requires a
+    Authenticates every request with EIP-712 signed headers - requires a
     :class:`~remitmd.signer.Signer` (or a :class:`~remitmd.wallet.Wallet`).
 
     Usage::

@@ -113,7 +113,7 @@ func (c *httpClient) do(ctx context.Context, method, path string, body any, dst 
 			}
 			return lastErr // 4xx errors are not retryable
 		}
-		// Network error — retry
+		// Network error - retry
 	}
 	return lastErr
 }
@@ -217,7 +217,7 @@ func (c *httpClient) parseAPIError(statusCode int, body []byte) *RemitError {
 
 		// Fallback for non-standard error responses
 		if statusCode == 429 {
-			return remitErr(ErrCodeRateLimited, "rate limit exceeded — reduce request frequency", nil)
+			return remitErr(ErrCodeRateLimited, "rate limit exceeded - reduce request frequency", nil)
 		}
 		if statusCode >= 500 {
 			return remitErr(ErrCodeServerError, fmt.Sprintf("server error (HTTP %d)", statusCode), nil)

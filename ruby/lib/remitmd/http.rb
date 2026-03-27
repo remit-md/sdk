@@ -74,7 +74,7 @@ module Remitmd
       nonce_hex   = "0x#{nonce_bytes.unpack1("H*")}"
       timestamp   = Time.now.to_i
 
-      # Strip query string before signing — only the path is included in EIP-712.
+      # Strip query string before signing - only the path is included in EIP-712.
       sign_path   = full_path.split("?").first
       http_method = method.to_s.upcase
       digest      = eip712_hash(http_method, sign_path, timestamp, nonce_bytes)
@@ -100,7 +100,7 @@ module Remitmd
     # Domain: name="remit.md", version="0.1", chainId, verifyingContract
     # Struct: APIRequest(string method, string path, uint256 timestamp, bytes32 nonce)
     def eip712_hash(method, path, timestamp, nonce_bytes)
-      # Type hashes (string constants — keccak256 of the type string)
+      # Type hashes (string constants - keccak256 of the type string)
       domain_type_hash  = keccak256_bytes(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
       )
@@ -162,7 +162,7 @@ module Remitmd
         raise RemitError.new(code, err["message"] || "Bad request", context: parsed)
       when 401
         raise RemitError.new(RemitError::UNAUTHORIZED,
-                             "Authentication failed — check your private key and chain ID")
+                             "Authentication failed - check your private key and chain ID")
       when 429
         raise RemitError.new(RemitError::RATE_LIMITED,
                              "Rate limit exceeded. See https://remit.md/docs/api-reference/rate-limits")

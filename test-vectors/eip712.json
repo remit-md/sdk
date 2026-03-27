@@ -5,7 +5,7 @@
   "request_type_string": "APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)",
   "vectors": [
     {
-      "description": "POST to escrows — standard happy-path vector",
+      "description": "POST to escrows - standard happy-path vector",
       "domain": {
         "name": "remit.md",
         "version": "0.1",
@@ -25,7 +25,7 @@
       "expected_signature": "0x8ea3f9c1036f0fd89807f0382cd083d5ea441bb72fe19d26373ef6bfde10fdfc76509dc4525bdb21b42e9e8bbd6c417e227d1cf6cbb3deabbaf8beaa1db5a9901c"
     },
     {
-      "description": "GET request — method hash must differ from POST",
+      "description": "GET request - method hash must differ from POST",
       "domain": {
         "name": "remit.md",
         "version": "0.1",
@@ -45,7 +45,7 @@
       "expected_signature": "0x17658ad135d9ebbc81781e3a59007eabca7061451ba5b62d2046b83fe7432c66724c02918798d0a3d1c11c5982bee8b844fdd6d9e5e95239e2a9ac9104c607a31b"
     },
     {
-      "description": "GET health — short path outside /api/v1/*",
+      "description": "GET health - short path outside /api/v1/*",
       "domain": {
         "name": "remit.md",
         "version": "0.1",
@@ -65,7 +65,7 @@
       "expected_signature": "0x0ad249e82347d15d19bb1c80a47bf0dcd3ee5099e6da3e3dbeb9fe81281d4be52bd1454c6902bb782594c2d48d3ff678da776588e053bab14a5da3bbcd9324001c"
     },
     {
-      "description": "POST direct payment — path with sub-resource",
+      "description": "POST direct payment - path with sub-resource",
       "domain": {
         "name": "remit.md",
         "version": "0.1",
@@ -85,7 +85,7 @@
       "expected_signature": "0x6377676ebde0f3a58606d33380f7fc10917741accd2cdf19ae29764dc1bc0a656f618beb7a1a45567eb7b816d95964749a99ba01a2d30921469759f072477d1f1b"
     },
     {
-      "description": "DELETE with UUID path segment — longer path",
+      "description": "DELETE with UUID path segment - longer path",
       "domain": {
         "name": "remit.md",
         "version": "0.1",
@@ -105,7 +105,7 @@
       "expected_signature": "0x069868e968c5f98cbc7241f26dee2f775badc18ca6e7a04425b904941a6a94dd221ef47b7732e9ec52ac27cc1b5fb7c145f9fe8128ef41d89d756378642957111b"
     },
     {
-      "description": "Max timestamp (u64::MAX) — tests overflow safety in SDKs",
+      "description": "Max timestamp (u64::MAX) - tests overflow safety in SDKs",
       "domain": {
         "name": "remit.md",
         "version": "0.1",
@@ -125,7 +125,7 @@
       "expected_signature": "0x6654df460d18c1c3a56e5fd090137b9980bcf7515483399090817c6bc97d849b7758106eff77b97da5d2a0e66907ceff27519b25d5e054621711cc3046d9ca791b"
     },
     {
-      "description": "Nonce with leading zero bytes — must encode as full 32-byte value",
+      "description": "Nonce with leading zero bytes - must encode as full 32-byte value",
       "domain": {
         "name": "remit.md",
         "version": "0.1",

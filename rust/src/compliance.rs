@@ -46,7 +46,7 @@ mod compliance_tests {
     }
 
     /// Generate a random private key and derive the wallet address.
-    /// No server registration needed — the new auth model uses EIP-712 signatures.
+    /// No server registration needed - the new auth model uses EIP-712 signatures.
     fn generate_wallet() -> (String, String) {
         use rand_core::{OsRng, RngCore};
         let mut key_bytes = [0u8; 32];
@@ -94,7 +94,7 @@ mod compliance_tests {
         } else {
             let (pk, addr) = generate_wallet();
             fund_wallet(client, &addr).await;
-            // OnceLock::set returns Err if already set — that's fine, another task beat us.
+            // OnceLock::set returns Err if already set - that's fine, another task beat us.
             let _ = SHARED_PAYER_KEY.set(pk.clone());
             let _ = SHARED_PAYER_ADDR.set(addr);
             pk
@@ -114,7 +114,7 @@ mod compliance_tests {
         let client = reqwest::Client::new();
         let wallet = get_shared_payer(&client).await;
 
-        // reputation() makes an authenticated GET to /api/v1/reputation/{address} —
+        // reputation() makes an authenticated GET to /api/v1/reputation/{address} -
         // this endpoint exists for all registered addresses and fails with 401 if
         // auth headers are wrong.
         let rep = wallet

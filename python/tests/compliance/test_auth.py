@@ -1,6 +1,6 @@
 """Compliance: EIP-712 authentication against a real server.
 
-Proves that the Python SDK can authenticate — 200 responses, not 401s.
+Proves that the Python SDK can authenticate - 200 responses, not 401s.
 """
 
 from __future__ import annotations

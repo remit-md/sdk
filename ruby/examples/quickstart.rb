@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 #
-# remit.md Ruby SDK — Quickstart
+# remit.md Ruby SDK - Quickstart
 #
 # All examples use MockRemit, so no API key or network connection is needed.
 # To use a real wallet, replace MockRemit.new / mock.wallet with:

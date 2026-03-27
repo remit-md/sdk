@@ -13,12 +13,12 @@ require "json"
 
 VECTORS_PATH = File.expand_path("../../test-vectors/eip712.json", __dir__)
 
-# Anvil test wallet #0 — same key used by gen_vectors in remit-server.
+# Anvil test wallet #0 - same key used by gen_vectors in remit-server.
 TEST_PRIV_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 def load_vectors
   unless File.exist?(VECTORS_PATH)
-    skip "test-vectors/eip712.json not found — run gen_vectors"
+    skip "test-vectors/eip712.json not found - run gen_vectors"
   end
 
   file = JSON.parse(File.read(VECTORS_PATH))
@@ -56,7 +56,7 @@ RSpec.describe "Golden vectors: EIP-712 hash matches server" do
       nonce_bytes = [nonce_hex.delete_prefix("0x")].pack("H*")
       expect(nonce_bytes.bytesize).to eq(32), "nonce must be 32 bytes for: #{v["description"]}"
 
-      # Parse timestamp carefully — must preserve u64::MAX without float precision loss.
+      # Parse timestamp carefully - must preserve u64::MAX without float precision loss.
       timestamp = Integer(v.dig("message", "timestamp").to_s)
 
       chain_id = v.dig("domain", "chain_id")
@@ -94,7 +94,7 @@ RSpec.describe "Golden vectors: signature matches server" do
 
     # OpenSSL's ECDSA may use different RFC 6979 k derivation than Rust's k256,
     # so exact signatures may differ. Verify structure and validity instead.
-    # sign() internally recovers v via ecrecover — raises if the signature
+    # sign() internally recovers v via ecrecover - raises if the signature
     # doesn't match the signer's address, so a successful return = valid.
     vectors.each do |v|
       nonce_hex   = v.dig("message", "nonce")

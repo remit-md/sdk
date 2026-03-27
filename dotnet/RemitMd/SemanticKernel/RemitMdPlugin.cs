@@ -93,7 +93,7 @@ public sealed class RemitMdPlugin
     /// <summary>Releases escrow funds to the payee after approving the work.</summary>
     [KernelFunction("release_escrow")]
     [Description("Release escrow funds to the payee after verifying the work was completed. " +
-                 "This is irreversible — verify the deliverable before releasing.")]
+                 "This is irreversible - verify the deliverable before releasing.")]
     public async Task<string> ReleaseEscrowAsync(
         [Description("Escrow ID to release")] string escrowId,
         CancellationToken cancellationToken = default)
@@ -142,7 +142,7 @@ public sealed class RemitMdPlugin
         return $"Tab {tabId} charged {amount:F6} USDC. Memo: \"{debit.Memo}\".";
     }
 
-    /// <summary>Posts a bounty — a task with a USDC reward for completion.</summary>
+    /// <summary>Posts a bounty - a task with a USDC reward for completion.</summary>
     [KernelFunction("post_bounty")]
     [Description("Post a bounty offering a USDC reward to any agent that completes a task.")]
     public async Task<string> PostBountyAsync(

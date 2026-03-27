@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 
-Java and Kotlin SDK for [remit.md](https://remit.md) — the universal USDC payment protocol for AI agents.
+Java and Kotlin SDK for [remit.md](https://remit.md) - the universal USDC payment protocol for AI agents.
 
 ## Installation
 
@@ -39,7 +39,7 @@ Requires **Java 11+**.
 
 ### Java
 ```java
-// 2-line integration — permits are handled automatically
+// 2-line integration - permits are handled automatically
 Wallet wallet = RemitMd.fromEnv();  // reads REMITMD_KEY env var
 wallet.pay("0xRecipient...", new BigDecimal("1.50"));
 ```
@@ -52,7 +52,7 @@ wallet.pay("0xRecipient...", 1.50.usdc)
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -77,9 +77,9 @@ Wallet wallet = RemitMd.fromEnv(); // detects REMIT_SIGNER_URL automatically
 ```java
 // From environment variables (recommended)
 Wallet wallet = RemitMd.fromEnv();
-// REMITMD_KEY   — hex-encoded private key (required)
-// REMITMD_CHAIN — chain name: "base" (default: "base")
-// REMITMD_TESTNET — "1" or "true" for testnet
+// REMITMD_KEY   - hex-encoded private key (required)
+// REMITMD_CHAIN - chain name: "base" (default: "base")
+// REMITMD_TESTNET - "1" or "true" for testnet
 
 // Explicit configuration
 Wallet wallet = RemitMd.withKey("0x...")
@@ -125,7 +125,7 @@ ContractAddresses contracts = wallet.getContracts();
 String sig = wallet.signTabCharge(contracts.tab, tab.id, 3000000L, 1);
 wallet.chargeTab(tab.id, new BigDecimal("0.003"), new BigDecimal("0.003"), 1, sig);
 
-// Close when done — unused funds return
+// Close when done - unused funds return
 wallet.closeTab(tab.id, new BigDecimal("0.003"), sig);
 ```
 
@@ -152,7 +152,7 @@ wallet.withdrawStream(stream.id);
 
 ## Testing with MockRemit
 
-MockRemit provides a zero-network, zero-latency in-memory mock — no private key or API access needed.
+MockRemit provides a zero-network, zero-latency in-memory mock - no private key or API access needed.
 
 ```java
 // JUnit 5 example
@@ -313,4 +313,4 @@ PermitSignature permit = wallet.signUsdcPermit(
 
 ## License
 
-MIT — see [LICENSE](../../LICENSE)
+MIT - see [LICENSE](../../LICENSE)

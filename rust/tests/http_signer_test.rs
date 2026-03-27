@@ -1,4 +1,4 @@
-//! Tests for HttpSigner — uses a simple TcpListener mock server.
+//! Tests for HttpSigner - uses a simple TcpListener mock server.
 
 use remitmd::error::codes;
 use remitmd::HttpSigner;

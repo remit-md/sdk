@@ -183,7 +183,7 @@ public final class A2A {
     // ─── A2A JSON-RPC client ────────────────────────────────────────────────
 
     /**
-     * A2A JSON-RPC client — send payments and manage tasks via the A2A protocol.
+     * A2A JSON-RPC client - send payments and manage tasks via the A2A protocol.
      *
      * <pre>{@code
      * AgentCard card = AgentCard.discover("https://remit.md").join();

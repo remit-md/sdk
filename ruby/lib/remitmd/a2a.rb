@@ -135,7 +135,7 @@ module Remitmd
 
   # ─── A2A JSON-RPC client ────────────────────────────────────────────────────
 
-  # A2A JSON-RPC client — send payments and manage tasks via the A2A protocol.
+  # A2A JSON-RPC client - send payments and manage tasks via the A2A protocol.
   #
   # @example
   #   card   = Remitmd::AgentCard.discover("https://remit.md")

@@ -42,7 +42,7 @@ interface SignerErrorResponse {
  * - Bearer token is held in a private field, never serialized.
  * - Address is cached at construction time (GET /address).
  * - signTypedData() POSTs structured EIP-712 data to /sign/typed-data.
- * - All errors are explicit — no silent fallbacks, no default values.
+ * - All errors are explicit - no silent fallbacks, no default values.
  */
 export class HttpSigner implements Signer {
   readonly #url: string;
@@ -109,13 +109,13 @@ export class HttpSigner implements Signer {
     });
 
     if (res.status === 401) {
-      throw new Error("HttpSigner: unauthorized — check your REMIT_SIGNER_TOKEN");
+      throw new Error("HttpSigner: unauthorized - check your REMIT_SIGNER_TOKEN");
     }
 
     if (res.status === 403) {
       const body = (await res.json().catch(() => ({}))) as SignerErrorResponse;
       throw new Error(
-        `HttpSigner: policy denied — ${body.reason ?? "unknown reason"}`,
+        `HttpSigner: policy denied - ${body.reason ?? "unknown reason"}`,
       );
     }
 

@@ -62,16 +62,16 @@ defmodule RemitMd.X402Paywall do
 
   ## Options
 
-  - `:wallet_address` — provider's checksummed Ethereum address (required)
-  - `:amount_usdc` — price per request in USDC, e.g. `0.001` (required)
-  - `:network` — CAIP-2 network string, e.g. `"eip155:84532"` (required)
-  - `:asset` — USDC contract address on the target network (required)
-  - `:facilitator_url` — base URL of the remit.md facilitator (default: `"https://remit.md"`)
-  - `:facilitator_token` — bearer JWT for `/api/v1/x402/verify` (default: `""`)
-  - `:max_timeout_seconds` — payment authorization validity in seconds (default: 60)
-  - `:resource` — URL or path of the resource being protected
-  - `:description` — human-readable description of what the payment is for
-  - `:mime_type` — MIME type of the resource
+  - `:wallet_address` - provider's checksummed Ethereum address (required)
+  - `:amount_usdc` - price per request in USDC, e.g. `0.001` (required)
+  - `:network` - CAIP-2 network string, e.g. `"eip155:84532"` (required)
+  - `:asset` - USDC contract address on the target network (required)
+  - `:facilitator_url` - base URL of the remit.md facilitator (default: `"https://remit.md"`)
+  - `:facilitator_token` - bearer JWT for `/api/v1/x402/verify` (default: `""`)
+  - `:max_timeout_seconds` - payment authorization validity in seconds (default: 60)
+  - `:resource` - URL or path of the resource being protected
+  - `:description` - human-readable description of what the payment is for
+  - `:mime_type` - MIME type of the resource
   """
   @spec new(keyword()) :: t()
   def new(opts) do

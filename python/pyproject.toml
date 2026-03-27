@@ -61,7 +61,7 @@ ignore_missing_imports = true
 warn_unused_ignores = false
 
 # Integration modules depend on optional packages (langchain, crewai, etc.)
-# that aren't installed in dev — disable strict subclassing / decorator checks.
+# that aren't installed in dev - disable strict subclassing / decorator checks.
 [[tool.mypy.overrides]]
 module = "remitmd.integrations.*"
 disallow_subclassing_any = false

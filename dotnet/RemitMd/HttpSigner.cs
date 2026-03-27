@@ -60,7 +60,7 @@ public sealed class HttpSigner : IRemitSigner, IDisposable
     }
 
     /// <summary>
-    /// Internal constructor for testing — accepts an HttpClient to allow mock handlers.
+    /// Internal constructor for testing - accepts an HttpClient to allow mock handlers.
     /// </summary>
     internal HttpSigner(string url, string token, HttpClient httpClient)
     {
@@ -107,13 +107,13 @@ public sealed class HttpSigner : IRemitSigner, IDisposable
 
         if ((int)response.StatusCode == 401)
             throw new RemitError(ErrorCodes.Unauthorized,
-                "HttpSigner: unauthorized — check your REMIT_SIGNER_TOKEN");
+                "HttpSigner: unauthorized - check your REMIT_SIGNER_TOKEN");
 
         if ((int)response.StatusCode == 403)
         {
             var reason = ReadErrorReason(response, "unknown reason");
             throw new RemitError(ErrorCodes.Unauthorized,
-                $"HttpSigner: policy denied — {reason}");
+                $"HttpSigner: policy denied - {reason}");
         }
 
         if (!response.IsSuccessStatusCode)
@@ -161,7 +161,7 @@ public sealed class HttpSigner : IRemitSigner, IDisposable
 
         if ((int)response.StatusCode == 401)
             throw new RemitError(ErrorCodes.Unauthorized,
-                "HttpSigner: unauthorized — check your REMIT_SIGNER_TOKEN");
+                "HttpSigner: unauthorized - check your REMIT_SIGNER_TOKEN");
 
         if (!response.IsSuccessStatusCode)
         {

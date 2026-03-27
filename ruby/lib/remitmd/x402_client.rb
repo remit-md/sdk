@@ -21,7 +21,7 @@ module Remitmd
     end
   end
 
-  # x402 client — fetch wrapper that auto-pays HTTP 402 Payment Required responses.
+  # x402 client - fetch wrapper that auto-pays HTTP 402 Payment Required responses.
   #
   # On receiving a 402, the client:
   # 1. Decodes the PAYMENT-REQUIRED header (base64 JSON)

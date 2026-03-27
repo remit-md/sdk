@@ -1,4 +1,4 @@
-"""OpenAI Agents SDK integration — remit.md tools for use with function_tool().
+"""OpenAI Agents SDK integration - remit.md tools for use with function_tool().
 
 Usage:
     from agents import Agent, Runner

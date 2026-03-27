@@ -101,7 +101,7 @@ public record Split(
     [property: JsonPropertyName("basis_points")] int BasisPoints
 );
 
-/// <summary>Escrow — holds funds until work is delivered and approved.</summary>
+/// <summary>Escrow - holds funds until work is delivered and approved.</summary>
 public record Escrow(
     [property: JsonPropertyName("invoice_id")] string Id,
     [property: JsonPropertyName("payer")] string Payer,
@@ -116,7 +116,7 @@ public record Escrow(
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
 
-/// <summary>Tab — off-chain payment channel for batched micro-payments.</summary>
+/// <summary>Tab - off-chain payment channel for batched micro-payments.</summary>
 public record Tab(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("payer")] string Payer,
@@ -138,7 +138,7 @@ public record TabCharge(
     [property: JsonPropertyName("provider_sig")] string ProviderSig
 );
 
-/// <summary>Stream — time-based payment flow (pay-per-second).</summary>
+/// <summary>Stream - time-based payment flow (pay-per-second).</summary>
 public record Stream(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("payer")] string Payer,
@@ -152,7 +152,7 @@ public record Stream(
     [property: JsonPropertyName("closed_at")] DateTimeOffset? ClosedAt
 );
 
-/// <summary>Bounty — a task with a USDC reward for completion.</summary>
+/// <summary>Bounty - a task with a USDC reward for completion.</summary>
 public record Bounty(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("poster")] string Poster,
@@ -174,7 +174,7 @@ public record BountySubmission(
     [property: JsonPropertyName("evidence_hash")] string EvidenceHash
 );
 
-/// <summary>Deposit — security deposit held as collateral.</summary>
+/// <summary>Deposit - security deposit held as collateral.</summary>
 public record Deposit(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("payer")] string Payer,
@@ -185,7 +185,7 @@ public record Deposit(
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
 
-/// <summary>Intent — a proposed payment awaiting negotiation.</summary>
+/// <summary>Intent - a proposed payment awaiting negotiation.</summary>
 public record Intent(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("from")] string From,

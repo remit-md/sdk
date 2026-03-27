@@ -1,4 +1,4 @@
-"""Tests for framework integrations — exercise the tool logic against MockWallet."""
+"""Tests for framework integrations - exercise the tool logic against MockWallet."""
 
 from __future__ import annotations
 

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { PrivateKeySigner } from "../src/signer.js";
 import { AllowanceExceededError, X402Client } from "../src/x402.js";
 
-// Anvil account #0 — well-known test key.
+// Anvil account #0 - well-known test key.
 const TEST_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const TEST_ADDR = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 const PROVIDER = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
@@ -87,7 +87,7 @@ describe("AllowanceExceededError", () => {
 
 // ─── fetch passthrough ─────────────────────────────────────────────────────────
 
-describe("X402Client.fetch — non-402 passthrough", () => {
+describe("X402Client.fetch - non-402 passthrough", () => {
   it("returns 200 response unchanged", async () => {
     const signer = new PrivateKeySigner(TEST_KEY);
     const { fetchFn } = makeMockFetch([{ status: 200 }]);
@@ -107,7 +107,7 @@ describe("X402Client.fetch — non-402 passthrough", () => {
 
 // ─── 402 handling ─────────────────────────────────────────────────────────────
 
-describe("X402Client.fetch — 402 handling", () => {
+describe("X402Client.fetch - 402 handling", () => {
   it("throws when PAYMENT-REQUIRED header is absent", async () => {
     const signer = new PrivateKeySigner(TEST_KEY);
     const { fetchFn } = makeMockFetch([{ status: 402 }]);

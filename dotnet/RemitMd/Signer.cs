@@ -97,7 +97,7 @@ internal static class Eip712
     private static readonly byte[] DomainTypeHash = Keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
-    // APIRequest type hash — must match server's auth.rs exactly
+    // APIRequest type hash - must match server's auth.rs exactly
     private static readonly byte[] RequestTypeHash = Keccak256(
         "APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)");
 
@@ -147,7 +147,7 @@ internal static class Eip712
         var methodHash = Keccak256(method);
         var pathHash   = Keccak256(path);
 
-        // nonce is bytes32 — use directly (must be exactly 32 bytes)
+        // nonce is bytes32 - use directly (must be exactly 32 bytes)
         var paddedNonce = new byte[32];
         Buffer.BlockCopy(nonce, 0, paddedNonce, 0, Math.Min(nonce.Length, 32));
 

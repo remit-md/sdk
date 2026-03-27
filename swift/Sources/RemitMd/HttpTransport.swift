@@ -109,12 +109,12 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
                 return try Self.decoder.decode(T.self, from: data)
             }
             if http.statusCode == 204 {
-                // Empty response — try decoding an empty JSON object
+                // Empty response - try decoding an empty JSON object
                 let emptyJSON = Data("{}".utf8)
                 return try Self.decoder.decode(T.self, from: emptyJSON)
             }
 
-            // Parse error body — check nested error.code first (TS parity)
+            // Parse error body - check nested error.code first (TS parity)
             let errCode: String
             let errMessage: String
             if let parsed = try? JSONDecoder().decode(ApiErrorBody.self, from: data) {
@@ -129,7 +129,7 @@ internal final class HttpTransport: Transport, @unchecked Sendable {
         }
     }
 
-    /// Retryable HTTP status codes — matches TS SDK's RETRYABLE set.
+    /// Retryable HTTP status codes - matches TS SDK's RETRYABLE set.
     private static let retryableStatuses: Set<Int> = [429, 500, 502, 503, 504]
     /// Exponential-ish backoff delays in nanoseconds (200ms, 600ms, 1800ms).
     private static let delayNs: [UInt64] = [200_000_000, 600_000_000, 1_800_000_000]
@@ -254,7 +254,7 @@ private func encodeAddress(_ address: String) -> Data {
 
 // MARK: - Mock transport
 
-/// In-memory transport for unit tests — no network required.
+/// In-memory transport for unit tests - no network required.
 internal final class MockTransport: Transport, @unchecked Sendable {
     private let mock: MockRemit
 

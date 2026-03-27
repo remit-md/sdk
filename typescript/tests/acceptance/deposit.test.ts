@@ -65,7 +65,7 @@ describe("SDK: Deposit Lifecycle", { timeout: 180_000 }, () => {
     const providerAfter = await getUsdcBalance(provider.address);
     const feeAfter = await getFeeWalletBalance();
 
-    // Agent: full refund — net change ≈ $0
+    // Agent: full refund - net change ≈ $0
     assertBalanceChange("agent net", agentBefore, agentAfter, 0);
     // Provider: unchanged
     assertBalanceChange("provider", providerBefore, providerAfter, 0);

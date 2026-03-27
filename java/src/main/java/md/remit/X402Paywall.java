@@ -15,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * x402 paywall for service providers — gate HTTP endpoints behind USDC payments.
+ * x402 paywall for service providers - gate HTTP endpoints behind USDC payments.
  *
  * <p>Providers use this class to:
  * <ul>

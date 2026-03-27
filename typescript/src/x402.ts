@@ -56,7 +56,7 @@ export class AllowanceExceededError extends Error {
 export interface X402ClientOptions {
   /** Signer used for EIP-3009 authorization signatures. */
   signer: Signer;
-  /** Checksummed payer address — must match the signer's public key. */
+  /** Checksummed payer address - must match the signer's public key. */
   address: string;
   /** Maximum USDC amount to auto-pay per request (default: 0.10). */
   maxAutoPayUsdc?: number;
@@ -70,7 +70,7 @@ export interface PaymentRequired {
   asset: string;
   payTo: string;
   maxTimeoutSeconds?: number;
-  // V2 optional fields — informational metadata about the resource being paid for.
+  // V2 optional fields - informational metadata about the resource being paid for.
   /** URL or path of the resource being protected (e.g. "/api/v1/data"). */
   resource?: string;
   /** Human-readable description of what the payment is for. */

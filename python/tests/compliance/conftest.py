@@ -62,7 +62,7 @@ async def http() -> httpx.AsyncClient:
 def _generate_wallet() -> tuple[str, str]:
     """Generate a random private key and derive the wallet address.
 
-    No server registration needed — the new auth model uses EIP-712 signatures.
+    No server registration needed - the new auth model uses EIP-712 signatures.
     """
     from remitmd.wallet import Wallet
 

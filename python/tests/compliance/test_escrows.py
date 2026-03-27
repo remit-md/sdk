@@ -22,7 +22,7 @@ async def test_escrow_create_returns_funded_invoice(wallet_pair):
     assert tx.invoice_id is not None
     assert tx.tx_hash is not None
 
-    # Retrieve escrow — must be in funded state immediately after creation
+    # Retrieve escrow - must be in funded state immediately after creation
     escrow = await payer.get_escrow(tx.invoice_id)
     assert escrow.invoice_id == tx.invoice_id
     assert escrow.status == EscrowStatus.funded

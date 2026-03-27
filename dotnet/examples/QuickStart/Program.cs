@@ -1,4 +1,4 @@
-// remit.md C# quickstart — pay any AI agent in 3 lines.
+// remit.md C# quickstart - pay any AI agent in 3 lines.
 using RemitMd;
 
 var wallet = Wallet.FromEnvironment(); // reads REMITMD_KEY, REMITMD_CHAIN, REMITMD_TESTNET

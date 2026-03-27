@@ -4,10 +4,10 @@ OWS policy executable for the [Remit](https://remit.md) payment protocol.
 
 Evaluates signing requests against 4 configurable rules before allowing an agent's OWS wallet to sign:
 
-1. **Chain lock** — restrict signing to specific EVM chains (CAIP-2 IDs)
-2. **Contract allowlist** — restrict which contracts the agent can interact with
-3. **Per-transaction cap** — limit the USDC amount in a single transaction
-4. **Daily cap** — limit cumulative daily USDC spending
+1. **Chain lock** - restrict signing to specific EVM chains (CAIP-2 IDs)
+2. **Contract allowlist** - restrict which contracts the agent can interact with
+3. **Per-transaction cap** - limit the USDC amount in a single transaction
+4. **Daily cap** - limit cumulative daily USDC spending
 
 ## Install
 
@@ -55,7 +55,7 @@ ows key create --name my-agent --wallet remit-agent --policy remit-base-mainnet
 
 ### 3. Use with Remit MCP/SDK
 
-Set `OWS_WALLET_ID` and `OWS_API_KEY` in your environment — the Remit SDK and MCP server auto-detect OWS.
+Set `OWS_WALLET_ID` and `OWS_API_KEY` in your environment - the Remit SDK and MCP server auto-detect OWS.
 
 ## Configuration
 
@@ -83,18 +83,18 @@ The policy is **fail-closed**: any error, malformed input, or exception results 
 
 Three example policy files are included:
 
-- `examples/chain-lock-only.json` — Base-only chain lock, no spending limits (default for `remit init`)
-- `examples/base-mainnet.json` — Full policy with contract allowlist + spending caps
-- `examples/base-sepolia.json` — Testnet policy with contract allowlist, no spending caps
+- `examples/chain-lock-only.json` - Base-only chain lock, no spending limits (default for `remit init`)
+- `examples/base-mainnet.json` - Full policy with contract allowlist + spending caps
+- `examples/base-sepolia.json` - Testnet policy with contract allowlist, no spending caps
 
 ## ERC-20 Amount Decoding
 
 The per-tx and daily cap rules decode USDC amounts from ERC-20 calldata:
 
-- `transfer(address,uint256)` — decoded
-- `approve(address,uint256)` — decoded
-- `transferFrom(address,address,uint256)` — decoded
-- Unknown selectors — skipped (contract allowlist is the guard)
+- `transfer(address,uint256)` - decoded
+- `approve(address,uint256)` - decoded
+- `transferFrom(address,address,uint256)` - decoded
+- Unknown selectors - skipped (contract allowlist is the guard)
 
 ## License
 

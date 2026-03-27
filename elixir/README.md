@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 
-Universal payment protocol for AI agents — Elixir client.
+Universal payment protocol for AI agents - Elixir client.
 
 ## Installation
 
@@ -16,7 +16,7 @@ Universal payment protocol for AI agents — Elixir client.
 ## Quickstart
 
 ```elixir
-# Testing — no keys, no network
+# Testing - no keys, no network
 {:ok, mock} = RemitMd.MockRemit.start_link()
 RemitMd.MockRemit.set_balance(mock, "0xYourAgent", "500.00")
 
@@ -26,7 +26,7 @@ IO.puts("Sent! status: #{tx.status}")
 ```
 
 ```elixir
-# Production — set REMITMD_KEY environment variable
+# Production - set REMITMD_KEY environment variable
 wallet = RemitMd.Wallet.from_env()
 {:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "1.50")
 IO.puts("tx_hash: #{tx.tx_hash}")
@@ -34,7 +34,7 @@ IO.puts("tx_hash: #{tx.tx_hash}")
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -58,15 +58,15 @@ All payment methods auto-sign EIP-2612 permits when no explicit permit is provid
 The wallet fetches the on-chain nonce, signs the permit, and includes it in the request automatically.
 
 ```elixir
-# Auto-permit (recommended) — just call the method, permit is handled internally
+# Auto-permit (recommended) - just call the method, permit is handled internally
 {:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "5.00")
 
-# Manual permit — sign yourself if you need control over deadline/nonce
+# Manual permit - sign yourself if you need control over deadline/nonce
 {:ok, contracts} = RemitMd.Wallet.get_contracts(wallet)
 permit = RemitMd.Wallet.sign_permit(wallet, contracts.router, "5.00")
 {:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "5.00", permit: permit)
 
-# Low-level permit — full control over all parameters
+# Low-level permit - full control over all parameters
 permit = RemitMd.Wallet.sign_usdc_permit(wallet, contracts.router,
   5_000_000,          # base units (6 decimals)
   :os.system_time(:second) + 3600,  # deadline
@@ -90,7 +90,7 @@ Auto-permit works on: `pay`, `create_escrow`, `create_tab`, `create_stream`, `cr
 ## Testing with MockRemit
 
 `MockRemit` is an OTP `GenServer` that implements the full payment API
-in-memory. Tests complete in microseconds — no network, no blockchain.
+in-memory. Tests complete in microseconds - no network, no blockchain.
 
 ```elixir
 defmodule MyAgentTest do
@@ -131,7 +131,7 @@ wallet = RemitMd.Wallet.from_env()
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `REMITMD_KEY` | — | secp256k1 private key (required unless using local signer) |
+| `REMITMD_KEY` | - | secp256k1 private key (required unless using local signer) |
 | `REMITMD_CHAIN` | `"base"` | Chain: `base`, `base_sepolia` |
 | `REMITMD_API_URL` | _(chain default)_ | Override API base URL |
 

@@ -71,9 +71,9 @@ async def test_deposit_lifecycle() -> None:
     provider_after = await get_usdc_balance(provider.address)
     fee_after = await get_fee_wallet_balance()
 
-    # Agent: full refund — net change ≈ $0
+    # Agent: full refund - net change ≈ $0
     assert_balance_change("agent net", agent_before, agent_after, 0)
     # Provider: unchanged
     assert_balance_change("provider", provider_before, provider_after, 0)
-    # Fee wallet: unchanged (deposits have no fee) — use tolerant check for shared wallet
+    # Fee wallet: unchanged (deposits have no fee) - use tolerant check for shared wallet
     assert_fee_increase("fee wallet", fee_before, fee_after, 0)

@@ -106,14 +106,14 @@ public class ComplianceTests
     {
         if (!await ServerAvailable.Value)
         {
-            // Server not reachable — pass vacuously (CI job only runs when server is up).
+            // Server not reachable - pass vacuously (CI job only runs when server is up).
             return;
         }
 
         var (pk, _) = GenerateWallet();
         var wallet = MakeWallet(pk);
 
-        // BalanceAsync() makes an authenticated GET — will throw on 401.
+        // BalanceAsync() makes an authenticated GET - will throw on 401.
         var balance = await wallet.BalanceAsync();
         Assert.NotNull(balance);
     }

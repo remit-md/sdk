@@ -64,7 +64,7 @@ public class PrivateKeySigner implements Signer {
         }
         if (recId == -1) {
             throw new RuntimeException(
-                "Could not recover public key from signature — private key or hash may be invalid");
+                "Could not recover public key from signature - private key or hash may be invalid");
         }
 
         byte[] result = new byte[65];

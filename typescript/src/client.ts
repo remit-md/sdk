@@ -1,5 +1,5 @@
 /**
- * RemitClient — read-only operations, no private key required.
+ * RemitClient - read-only operations, no private key required.
  */
 
 import type { WalletStatus, Reputation, ContractAddresses } from "./models/index.js";

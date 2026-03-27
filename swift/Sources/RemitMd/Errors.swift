@@ -13,7 +13,7 @@
 /// }
 /// ```
 public struct RemitError: Error, CustomStringConvertible {
-    // MARK: - Error code constants (canonical — matches TS SDK)
+    // MARK: - Error code constants (canonical - matches TS SDK)
 
     // Auth errors
     public static let invalidSignature      = "INVALID_SIGNATURE"
@@ -79,7 +79,7 @@ public struct RemitError: Error, CustomStringConvertible {
     public static let usdcTransferFailed    = "USDC_TRANSFER_FAILED"
     public static let chainUnavailable      = "CHAIN_UNAVAILABLE"
 
-    // Removed aliases — old names that mapped to wrong codes
+    // Removed aliases - old names that mapped to wrong codes
     @available(*, deprecated, renamed: "invalidSignature")
     public static let signatureInvalid      = "INVALID_SIGNATURE"
     @available(*, deprecated, renamed: "insufficientBalance")
@@ -96,7 +96,7 @@ public struct RemitError: Error, CustomStringConvertible {
 
     public init(_ code: String, _ message: String, context: [String: String] = [:]) {
         self.code = code
-        self.message = "[\(code)] \(message) — https://remit.md/docs/api-reference/error-codes#\(code.lowercased())"
+        self.message = "[\(code)] \(message) - https://remit.md/docs/api-reference/error-codes#\(code.lowercased())"
         self.docURL = "https://remit.md/docs/api-reference/error-codes#\(code.lowercased())"
         self.context = context
     }

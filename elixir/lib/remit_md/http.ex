@@ -2,7 +2,7 @@ defmodule RemitMd.Http do
   @moduledoc false
   # HTTP transport layer. Signs each request with EIP-712 headers and
   # retries transient failures with exponential backoff.
-  # Uses Erlang's built-in :httpc (via :inets) — no external HTTP deps.
+  # Uses Erlang's built-in :httpc (via :inets) - no external HTTP deps.
 
   alias RemitMd.Error
 
@@ -102,7 +102,7 @@ defmodule RemitMd.Http do
     # the same string the server sees when it receives the request.
     full_path = URI.parse(url).path
 
-    # EIP-712 hash and signature — sign the full path (including /api/v1 prefix).
+    # EIP-712 hash and signature - sign the full path (including /api/v1 prefix).
     digest =
       eip712_hash(
         transport.chain_id,
@@ -202,7 +202,7 @@ defmodule RemitMd.Http do
       status == 401 ->
         raise Error.new(
           Error.unauthorized(),
-          "Authentication failed — check private key and chain ID"
+          "Authentication failed - check private key and chain ID"
         )
 
       status == 403 ->
@@ -214,7 +214,7 @@ defmodule RemitMd.Http do
         raise Error.new(Error.not_found(), msg || "Resource not found")
 
       status == 429 ->
-        raise Error.new(Error.rate_limited(), "Rate limit exceeded — back off and retry")
+        raise Error.new(Error.rate_limited(), "Rate limit exceeded - back off and retry")
 
       status in 500..599 ->
         raise Error.new(Error.server_error(), "Server error #{status}")

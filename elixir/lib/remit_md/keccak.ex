@@ -1,7 +1,7 @@
 defmodule RemitMd.Keccak do
   @moduledoc false
   import Bitwise
-  # Pure Elixir Keccak-256 (Ethereum variant — NOT SHA-3).
+  # Pure Elixir Keccak-256 (Ethereum variant - NOT SHA-3).
   # Used for Ethereum address derivation from secp256k1 public keys.
   #
   # Reference: https://keccak.team/keccak_specs_summary.html

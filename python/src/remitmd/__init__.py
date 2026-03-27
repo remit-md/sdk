@@ -1,8 +1,8 @@
 """remitmd - Python SDK for the remit.md universal AI payment protocol."""
 
 from remitmd.a2a import A2AClient, A2ATask, AgentCard, IntentMandate
+from remitmd.cli_signer import CliSigner
 from remitmd.client import ContractAddresses, RemitClient
-from remitmd.http_signer import HttpSigner
 from remitmd.models.bounty import Bounty, BountySubmission
 from remitmd.models.common import (
     BountyStatus,
@@ -46,7 +46,7 @@ __all__ = [
     "PermitSignature",
     "Signer",
     "PrivateKeySigner",
-    "HttpSigner",
+    "CliSigner",
     "OwsSigner",
     "X402Client",
     "AllowanceExceededError",

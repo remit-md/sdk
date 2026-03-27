@@ -108,15 +108,20 @@ class Wallet(RemitClient):
 
     @classmethod
     def from_env(cls, chain: str | None = None) -> Wallet:
-        """Load wallet from environment variables.
+        """Load wallet from environment variables (sync — raw key only).
 
-        Priority: REMIT_SIGNER_URL > OWS_WALLET_ID > REMITMD_KEY > error.
-        For REMIT_SIGNER_URL, use the async ``with_signer()`` factory.
-        For OWS_WALLET_ID, use the sync ``with_ows()`` factory.
+        Priority: CliSigner (async) > OWS (sync) > REMITMD_KEY > error.
+        For CLI signer, use ``from_environment()`` or ``with_cli()``.
+        For OWS, use ``with_ows()``.
         """
-        # Signer URL requires async creation
-        if os.environ.get("REMIT_SIGNER_URL"):
-            raise OSError("REMIT_SIGNER_URL is set - use: await Wallet.with_signer()")
+        from remitmd.cli_signer import CliSigner
+
+        # Check for CLI signer (async creation needed)
+        if CliSigner.is_available():
+            raise OSError(
+                "Remit CLI signer detected — use: await Wallet.from_environment() "
+                "or await Wallet.with_cli()"
+            )
 
         key = os.environ.get("REMITMD_KEY")
         if not key:
@@ -126,38 +131,85 @@ class Wallet(RemitClient):
                     "Use: Wallet.with_ows()"
                 )
             raise OSError(
-                "No signing credentials found. Set one of: "
-                "REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, OWS_WALLET_ID, or REMITMD_KEY."
+                "No signing credentials found. Set one of:\n"
+                "  1. Install Remit CLI + set REMIT_KEY_PASSWORD (recommended)\n"
+                "  2. Set OWS_WALLET_ID for OWS wallet\n"
+                "  3. Set REMITMD_KEY for raw private key"
             )
         resolved_chain = chain or os.environ.get("REMITMD_CHAIN", "base")
         testnet = os.environ.get("REMITMD_TESTNET", "").lower() in ("1", "true", "yes")
         return cls(private_key=key, chain=resolved_chain, testnet=testnet)
 
     @classmethod
-    async def with_signer(
+    async def from_environment(
         cls,
-        url: str | None = None,
-        token: str | None = None,
         chain: str | None = None,
         testnet: bool = False,
         api_url: str | None = None,
     ) -> Wallet:
-        """Create a Wallet backed by the local HTTP signer server.
+        """Create a Wallet from the environment, trying all signing methods.
 
-        Reads ``REMIT_SIGNER_URL`` and ``REMIT_SIGNER_TOKEN`` from env
-        unless overridden.
+        Priority:
+          1. CLI signer (remit on PATH + keystore + REMIT_KEY_PASSWORD)
+          2. OWS wallet (OWS_WALLET_ID)
+          3. Raw private key (REMITMD_KEY)
+          4. Error with install instructions
         """
-        from remitmd.http_signer import HttpSigner
+        from remitmd.cli_signer import CliSigner
 
-        resolved_url = url or os.environ.get("REMIT_SIGNER_URL")
-        resolved_token = token or os.environ.get("REMIT_SIGNER_TOKEN")
+        resolved_chain = chain or os.environ.get("REMITMD_CHAIN", "base")
 
-        if not resolved_url:
-            raise ValueError("REMIT_SIGNER_URL is required for with_signer()")
-        if not resolved_token:
-            raise ValueError("REMIT_SIGNER_TOKEN is required for with_signer()")
+        # Priority 1: CLI signer
+        if CliSigner.is_available():
+            try:
+                signer = await CliSigner.create()
+                return cls(
+                    signer=signer,
+                    chain=resolved_chain,
+                    testnet=testnet,
+                    api_url=api_url,
+                )
+            except Exception:  # noqa: S110 — intentional fallthrough to next signer
+                pass
 
-        signer = await HttpSigner.create(resolved_url, resolved_token)
+        # Priority 2: OWS wallet
+        if os.environ.get("OWS_WALLET_ID"):
+            return cls.with_ows(chain=resolved_chain, testnet=testnet, api_url=api_url)
+
+        # Priority 3: Raw private key
+        key = os.environ.get("REMITMD_KEY")
+        if key:
+            return cls(
+                private_key=key,
+                chain=resolved_chain,
+                testnet=testnet,
+                api_url=api_url,
+            )
+
+        raise OSError(
+            "No signing method available.\n"
+            "  1. Install Remit CLI + set REMIT_KEY_PASSWORD (recommended)\n"
+            "     Install: https://remit.md/install\n"
+            "  2. Set OWS_WALLET_ID for OWS wallet\n"
+            "  3. Set REMITMD_KEY for raw private key"
+        )
+
+    @classmethod
+    async def with_cli(
+        cls,
+        cli_path: str = "remit",
+        chain: str | None = None,
+        testnet: bool = False,
+        api_url: str | None = None,
+    ) -> Wallet:
+        """Create a Wallet backed by the Remit CLI signer.
+
+        The CLI binary must be on PATH (or specify cli_path) and
+        REMIT_KEY_PASSWORD must be set.
+        """
+        from remitmd.cli_signer import CliSigner
+
+        signer = await CliSigner.create(cli_path)
         resolved_chain = chain or os.environ.get("REMITMD_CHAIN", "base")
         return cls(
             signer=signer,

@@ -77,7 +77,7 @@ public sealed class Wallet
     /// <summary>
     /// Creates a Wallet from the standard environment variables.
     ///
-    /// Priority: <c>REMIT_SIGNER_URL</c> + <c>REMIT_SIGNER_TOKEN</c> (HttpSigner) &gt;
+    /// Priority: <c>remit</c> CLI (CliSigner) &gt;
     /// <c>REMITMD_KEY</c> (PrivateKeySigner) &gt; error.
     ///
     /// Common env vars: <c>REMITMD_CHAIN</c> (optional), <c>REMITMD_TESTNET</c> (optional),
@@ -89,16 +89,9 @@ public sealed class Wallet
         var testnet       = Environment.GetEnvironmentVariable("REMITMD_TESTNET") is "1" or "true";
         var routerAddress = Environment.GetEnvironmentVariable("REMITMD_ROUTER_ADDRESS");
 
-        // Priority 1: HTTP signer server
-        var signerUrl = Environment.GetEnvironmentVariable("REMIT_SIGNER_URL");
-        if (!string.IsNullOrEmpty(signerUrl))
-        {
-            var signerToken = Environment.GetEnvironmentVariable("REMIT_SIGNER_TOKEN")
-                ?? throw new RemitError(ErrorCodes.Unauthorized,
-                    "REMIT_SIGNER_TOKEN is required when REMIT_SIGNER_URL is set.");
-
-            return new Wallet(new HttpSigner(signerUrl, signerToken), chain, testnet, null, routerAddress);
-        }
+        // Priority 1: CLI signer (remit sign --digest)
+        if (CliSigner.IsAvailable())
+            return new Wallet(CliSigner.Create(), chain, testnet, null, routerAddress);
 
         // Priority 2: Raw private key
         var key = Environment.GetEnvironmentVariable("REMITMD_KEY");
@@ -106,8 +99,11 @@ public sealed class Wallet
             return new Wallet(new PrivateKeySigner(key), chain, testnet, null, routerAddress);
 
         throw new RemitError(ErrorCodes.InvalidPrivateKey,
-            "No signing credentials found. Set one of: " +
-            "REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY.");
+            "No signing credentials found. Install the remit CLI " +
+            "(macOS: brew install remit-md/tap/remit, " +
+            "Windows: winget install remit-md.remit, " +
+            "Linux: curl -fsSL https://remit.md/install.sh | sh) " +
+            "or set REMITMD_KEY.");
     }
 
     /// <summary>The agent's Ethereum address (derived from the private key).</summary>

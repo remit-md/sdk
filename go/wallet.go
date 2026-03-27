@@ -130,7 +130,7 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 // FromEnv creates a Wallet from environment variables.
 //
 // Credential priority:
-//  1. REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN - HTTP signer server
+//  1. CLI signer - remit CLI on PATH + keystore exists + REMIT_KEY_PASSWORD set
 //  2. REMITMD_KEY - hex-encoded private key
 //
 // Common env vars:
@@ -150,20 +150,12 @@ func FromEnv(opts ...Option) (*Wallet, error) {
 		envOpts = append(envOpts, WithRouterAddress(routerAddr))
 	}
 
-	// Priority 1: HTTP signer server
-	if signerURL := os.Getenv("REMIT_SIGNER_URL"); signerURL != "" {
-		signerToken := os.Getenv("REMIT_SIGNER_TOKEN")
-		if signerToken == "" {
-			return nil, remitErr(ErrCodeUnauthorized,
-				"REMIT_SIGNER_URL is set but REMIT_SIGNER_TOKEN is missing. Both are required.",
-				map[string]any{"hint": "export REMIT_SIGNER_TOKEN=rmit_sk_..."},
-			)
-		}
-		signer, err := NewHttpSigner(signerURL, signerToken)
+	// Priority 1: CLI signer (encrypted keystore — most secure)
+	if IsCliSignerAvailable() {
+		signer, err := NewCliSigner()
 		if err != nil {
 			return nil, err
 		}
-		// Caller opts take precedence over env opts
 		return NewWalletWithSigner(signer, append(envOpts, opts...)...)
 	}
 
@@ -171,8 +163,9 @@ func FromEnv(opts ...Option) (*Wallet, error) {
 	key := os.Getenv("REMITMD_KEY")
 	if key == "" {
 		return nil, remitErr(ErrCodeUnauthorized,
-			"No signing credentials found. Set one of: REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY.",
-			map[string]any{"hint": "export REMITMD_KEY=0x... or export REMIT_SIGNER_URL=http://127.0.0.1:7402"},
+			"No signing credentials found. Install the Remit CLI and set REMIT_KEY_PASSWORD, or set REMITMD_KEY.\n"+
+				"Install CLI: "+cliInstallHint(),
+			map[string]any{"hint": "export REMITMD_KEY=0x... or install remit CLI"},
 		)
 	}
 

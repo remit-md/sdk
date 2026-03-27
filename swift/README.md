@@ -38,25 +38,30 @@ print(tx.id, tx.status) // "tx_...", "confirmed"
 let wallet = try RemitWallet.fromEnvironment()
 ```
 
-## Local Signer (Recommended)
+## CLI Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
+The CLI signer delegates key management to the `remit` CLI binary, which holds your encrypted keystore at `~/.remit/keys/`. No private key in the environment -- just the CLI on PATH and `REMIT_KEY_PASSWORD` set.
 
 ```bash
-export REMIT_SIGNER_URL=http://127.0.0.1:7402
-export REMIT_SIGNER_TOKEN=rmit_sk_...
+# macOS
+brew install remit-md/tap/remit
+
+# Linux
+curl -fsSL https://remit.md/install.sh | sh
+
+export REMIT_KEY_PASSWORD=...
 ```
 
 ```swift
 // Explicit
-let signer = try HttpSigner(url: "http://127.0.0.1:7402", token: "rmit_sk_...")
+let signer = try CliSigner()  // uses `remit` CLI on PATH
 let wallet = RemitWallet(signer: signer, chain: .base)
 
 // Or auto-detect from env (recommended)
-let wallet = try RemitWallet.fromEnvironment() // detects REMIT_SIGNER_URL automatically
+let wallet = try RemitWallet.fromEnvironment() // detects CLI automatically
 ```
 
-`RemitWallet.fromEnvironment()` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `REMITMD_KEY`.
+`RemitWallet.fromEnvironment()` detects signer credentials automatically. Priority: `CliSigner` (if available) > `REMITMD_KEY`.
 
 ## Testing (zero network calls)
 

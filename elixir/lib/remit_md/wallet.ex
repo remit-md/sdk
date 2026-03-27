@@ -18,7 +18,7 @@ defmodule RemitMd.Wallet do
   or log output.
   """
 
-  alias RemitMd.{Error, Http, HttpSigner, MockRemit, MockSigner, PrivateKeySigner}
+  alias RemitMd.{CliSigner, Error, Http, MockRemit, MockSigner, PrivateKeySigner}
   alias RemitMd.Models.{
     Balance, Bounty, BountySubmission, Budget, ContractAddresses, Deposit, Escrow,
     MintResponse, PermitSignature, Reputation, SpendingSummary, Stream, Tab, TabCharge,
@@ -100,7 +100,7 @@ defmodule RemitMd.Wallet do
   Build a wallet from environment variables.
 
   Credential priority:
-    1. `REMIT_SIGNER_URL` + `REMIT_SIGNER_TOKEN` - HTTP signer server
+    1. `remit` CLI available (binary on PATH, keystore exists, REMIT_KEY_PASSWORD set)
     2. `REMITMD_KEY` (or deprecated `REMITMD_PRIVATE_KEY`) - hex-encoded private key
 
   Optional: `REMITMD_CHAIN`, `REMITMD_API_URL`, `REMITMD_ROUTER_ADDRESS`
@@ -110,7 +110,7 @@ defmodule RemitMd.Wallet do
     api_url        = System.get_env("REMITMD_API_URL")
     router_address = System.get_env("REMITMD_ROUTER_ADDRESS")
 
-    # Build the signer: priority 1 = HTTP signer, priority 2 = private key
+    # Build the signer: priority 1 = CLI signer, priority 2 = private key
     signer_opts = resolve_signer_from_env()
 
     opts = signer_opts ++ [chain: chain]
@@ -121,22 +121,19 @@ defmodule RemitMd.Wallet do
   end
 
   defp resolve_signer_from_env do
-    signer_url = System.get_env("REMIT_SIGNER_URL")
-
     cond do
-      # Priority 1: HTTP signer server
-      signer_url != nil ->
-        signer_token = System.get_env("REMIT_SIGNER_TOKEN")
+      # Priority 1: CLI signer (remit binary + keystore + password)
+      CliSigner.available?() ->
+        case CliSigner.new() do
+          {:ok, signer} ->
+            [signer: signer]
 
-        unless signer_token do
-          raise Error.new(
-            Error.unauthorized(),
-            "REMIT_SIGNER_URL is set but REMIT_SIGNER_TOKEN is missing. Both are required."
-          )
+          {:error, reason} ->
+            raise Error.new(
+              Error.server_error(),
+              "remit CLI is available but failed to initialize: #{reason}"
+            )
         end
-
-        signer = HttpSigner.new(signer_url, signer_token)
-        [signer: signer]
 
       # Priority 2: Private key
       true ->
@@ -149,7 +146,11 @@ defmodule RemitMd.Wallet do
         unless key do
           raise Error.new(
             Error.unauthorized(),
-            "No signing credentials found. Set one of: REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY."
+            "No signing credentials found. Install the remit CLI " <>
+              "(macOS: brew install remit-md/tap/remit, " <>
+              "Linux: curl -fsSL https://remit.md/install.sh | sh, " <>
+              "Windows: winget install remit-md.remit) " <>
+              "or set REMITMD_KEY."
           )
         end
 

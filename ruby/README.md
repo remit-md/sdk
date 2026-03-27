@@ -39,31 +39,35 @@ Or from environment variables:
 
 ```ruby
 wallet = Remitmd::RemitWallet.from_env
-# Requires: REMITMD_KEY (or REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN)
+# Auto-detects: CliSigner (remit CLI) > REMITMD_KEY
 # Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL
 ```
 
 Permits are auto-signed. Every payment method fetches the on-chain USDC nonce, signs an EIP-2612 permit, and includes it automatically.
 
-## Local Signer (Recommended)
+## CLI Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
+The CLI signer delegates key management to the `remit` CLI binary, which holds your encrypted keystore at `~/.remit/keys/`. No private key in your environment -- just install the CLI and set a password.
 
 ```bash
-export REMIT_SIGNER_URL=http://127.0.0.1:7402
-export REMIT_SIGNER_TOKEN=rmit_sk_...
+# Install the CLI
+# macOS:   brew install remit-md/tap/remit
+# Windows: winget install remit-md.remit
+# Linux:   curl -fsSL https://remit.md/install.sh | sh
+
+export REMIT_KEY_PASSWORD=your-keystore-password
 ```
 
 ```ruby
 # Explicit
-signer = Remitmd::HttpSigner.new(url: "http://127.0.0.1:7402", token: "rmit_sk_...")
+signer = Remitmd::CliSigner.new
 wallet = Remitmd::RemitWallet.new(signer: signer)
 
 # Or auto-detect from env (recommended)
-wallet = Remitmd::RemitWallet.from_env # detects REMIT_SIGNER_URL automatically
+wallet = Remitmd::RemitWallet.from_env # detects remit CLI automatically
 ```
 
-`RemitWallet.from_env` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `REMITMD_KEY`.
+`RemitWallet.from_env` detects signing methods automatically. Priority: `CliSigner` (CLI + keystore + password) > `REMITMD_KEY`.
 
 ## Payment Models
 

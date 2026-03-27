@@ -24,7 +24,7 @@ gem install remitmd
 ```ruby
 require "remitmd"
 
-wallet = Remitmd::RemitWallet.new(private_key: ENV["REMITMD_PRIVATE_KEY"])
+wallet = Remitmd::RemitWallet.new(private_key: ENV["REMITMD_KEY"])
 
 # Direct payment
 tx = wallet.pay("0xRecipient0000000000000000000000000000001", 1.50)
@@ -39,7 +39,7 @@ Or from environment variables:
 
 ```ruby
 wallet = Remitmd::RemitWallet.from_env
-# Requires: REMITMD_PRIVATE_KEY
+# Requires: REMITMD_KEY (or REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN)
 # Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL
 ```
 

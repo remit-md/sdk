@@ -26,7 +26,7 @@ IO.puts("Sent! status: #{tx.status}")
 ```
 
 ```elixir
-# Production — set REMITMD_PRIVATE_KEY environment variable
+# Production — set REMITMD_KEY environment variable
 wallet = RemitMd.Wallet.from_env()
 {:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "1.50")
 IO.puts("tx_hash: #{tx.tx_hash}")
@@ -131,7 +131,7 @@ wallet = RemitMd.Wallet.from_env()
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `REMITMD_PRIVATE_KEY` | — | secp256k1 private key (required for production) |
+| `REMITMD_KEY` | — | secp256k1 private key (required unless using local signer) |
 | `REMITMD_CHAIN` | `"base"` | Chain: `base`, `base_sepolia` |
 | `REMITMD_API_URL` | _(chain default)_ | Override API base URL |
 

@@ -53,7 +53,7 @@ wallet = Wallet(signer=signer)
 wallet = await Wallet.with_signer()  # reads REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN
 ```
 
-`Wallet.from_env()` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `OWS_WALLET_ID` > `REMITMD_KEY`.
+`await Wallet.with_signer()` for local signer, `Wallet.from_env()` for raw key. Priority: `REMIT_SIGNER_URL` > `OWS_WALLET_ID` > `REMITMD_KEY`.
 
 ## Secure Wallet with OWS
 

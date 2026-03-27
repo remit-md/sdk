@@ -28,13 +28,13 @@ import RemitMd
 
 // Production
 let wallet = try RemitWallet(
-    privateKey: ProcessInfo.processInfo.environment["REMITMD_PRIVATE_KEY"]!,
+    privateKey: ProcessInfo.processInfo.environment["REMITMD_KEY"]!,
     chain: .base
 )
 let tx = try await wallet.pay(to: "0xAgent...", amount: 1.00)
 print(tx.id, tx.status) // "tx_...", "confirmed"
 
-// Environment-based (reads REMITMD_PRIVATE_KEY + REMIT_CHAIN)
+// Environment-based (reads REMITMD_KEY + REMITMD_CHAIN)
 let wallet = try RemitWallet.fromEnvironment()
 ```
 

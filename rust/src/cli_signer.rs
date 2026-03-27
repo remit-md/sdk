@@ -58,10 +58,7 @@ impl CliSigner {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(remit_err(
                 codes::UNAUTHORIZED,
-                format!(
-                    "CliSigner: `{cli_path} address` failed: {}",
-                    stderr.trim()
-                ),
+                format!("CliSigner: `{cli_path} address` failed: {}", stderr.trim()),
             ));
         }
 

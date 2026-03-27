@@ -50,7 +50,7 @@ pub(crate) fn chain_config(chain_key: &str) -> Option<ChainConfig> {
     }
 }
 
-/// Internal transport trait — real HTTP or mock.
+/// Internal transport trait - real HTTP or mock.
 #[async_trait]
 pub(crate) trait Transport: Send + Sync {
     async fn post(&self, path: &str, body: Option<Value>) -> Result<Value, RemitError>;
@@ -383,7 +383,7 @@ pub(crate) fn compute_permit_digest(
         spender_padded[12..].copy_from_slice(&spender_bytes);
     }
 
-    // uint256 encoding: value, nonce, deadline — each as 32-byte big-endian.
+    // uint256 encoding: value, nonce, deadline - each as 32-byte big-endian.
     let mut value_padded = [0u8; 32];
     value_padded[24..].copy_from_slice(&value.to_be_bytes());
 
@@ -450,7 +450,7 @@ fn parse_api_error(status: u16, body: &[u8]) -> RemitError {
     if status == 429 {
         return remit_err(
             codes::RATE_LIMITED,
-            "rate limit exceeded — reduce request frequency",
+            "rate limit exceeded - reduce request frequency",
         );
     }
     if status >= 500 {
@@ -509,7 +509,7 @@ mod tests {
 
     fn load_vectors() -> Vec<GvVector> {
         let data = std::fs::read_to_string("../test-vectors/eip712.json")
-            .expect("read ../test-vectors/eip712.json — run `cargo run --bin gen_vectors` first");
+            .expect("read ../test-vectors/eip712.json - run `cargo run --bin gen_vectors` first");
         let f: GvFile = serde_json::from_str(&data).expect("parse test vectors");
         assert!(!f.vectors.is_empty(), "vectors array must not be empty");
         f.vectors
@@ -547,7 +547,7 @@ mod tests {
 
     #[test]
     fn golden_vectors_signature() {
-        // Anvil test wallet #0 — same key used by gen_vectors in remit-server.
+        // Anvil test wallet #0 - same key used by gen_vectors in remit-server.
         const TEST_PRIV_KEY: &str =
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
         let signer = PrivateKeySigner::new(TEST_PRIV_KEY).expect("create signer");

@@ -5,8 +5,8 @@
 // Run: go test -tags acceptance -timeout 600s -v -count=1
 //
 // Env vars (all optional):
-//   ACCEPTANCE_API_URL  — default: https://remit.md
-//   ACCEPTANCE_RPC_URL  — default: https://sepolia.base.org
+//   ACCEPTANCE_API_URL  - default: https://remit.md
+//   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 package remitmd_test
 
@@ -570,7 +570,7 @@ func TestTabLifecycle(t *testing.T) {
 	payerAfter := waitForBalanceChange(t, payer.Address(), payerBefore)
 	feeAfter := getFeeBalance(t)
 
-	// Payer should lose at most limit ($10) — depends on contract settlement
+	// Payer should lose at most limit ($10) - depends on contract settlement
 	payerDelta := payerAfter - payerBefore
 	if payerDelta > 0 {
 		t.Fatalf("payer should not have gained funds, delta=%.6f", payerDelta)
@@ -624,7 +624,7 @@ func TestStreamLifecycle(t *testing.T) {
 	t.Log("Waiting 10 seconds for stream accrual + indexer lag...")
 	time.Sleep(10 * time.Second)
 
-	// 3. Close stream (retry for Ponder indexer lag — may take 30-90s)
+	// 3. Close stream (retry for Ponder indexer lag - may take 30-90s)
 	var closed *remitmd.Stream
 	for attempt := 0; attempt < 20; attempt++ {
 		closed, err = payer.CloseStream(ctx, stream.ID)
@@ -840,7 +840,7 @@ func TestX402AutoPay(t *testing.T) {
 
 	t.Logf("X402 test server at %s", serverURL)
 
-	// 2. Make a request without payment — should get 402
+	// 2. Make a request without payment - should get 402
 	resp, err := http.Get(serverURL + "/v1/data")
 	if err != nil {
 		t.Fatalf("GET /v1/data: %v", err)

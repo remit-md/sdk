@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "RemitMd", targets: ["RemitMd"]),
     ],
     dependencies: [
-        // secp256k1 ECDSA signing — lightweight C wrapper, no other dependencies
+        // secp256k1 ECDSA signing - lightweight C wrapper, no other dependencies
         .package(url: "https://github.com/GigaBitcoin/secp256k1.swift.git", "0.16.0"..<"0.20.0"),
     ],
     targets: [

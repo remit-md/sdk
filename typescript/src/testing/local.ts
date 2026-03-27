@@ -1,5 +1,5 @@
 /**
- * LocalChain — wraps a local Anvil instance for integration testing.
+ * LocalChain - wraps a local Anvil instance for integration testing.
  * Real EVM, <100ms per operation (requires Anvil in PATH).
  */
 

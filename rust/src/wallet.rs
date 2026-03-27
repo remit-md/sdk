@@ -36,7 +36,7 @@ use crate::signer::{PrivateKeySigner, Signer};
 ///
 /// # Testing
 ///
-/// Use `MockRemit` for unit tests — zero network, deterministic:
+/// Use `MockRemit` for unit tests - zero network, deterministic:
 ///
 /// ```rust
 /// use remitmd::MockRemit;
@@ -66,11 +66,11 @@ impl Wallet {
     /// Create a wallet from a hex-encoded private key.
     ///
     /// # Arguments
-    /// - `private_key` — 32-byte private key as hex (with or without `0x` prefix)
+    /// - `private_key` - 32-byte private key as hex (with or without `0x` prefix)
     ///
     /// # Options
-    /// - `.testnet()` — use testnet
-    /// - `.base_url("http://localhost:3000")` — override API URL
+    /// - `.testnet()` - use testnet
+    /// - `.base_url("http://localhost:3000")` - override API URL
     #[allow(clippy::new_ret_no_self)]
     pub fn new(private_key: &str) -> WalletBuilder<WithKey> {
         WalletBuilder {
@@ -96,13 +96,13 @@ impl Wallet {
     /// Create a wallet from environment variables.
     ///
     /// Signer detection (first match wins):
-    /// 1. `REMIT_SIGNER_URL` + `REMIT_SIGNER_TOKEN` — HTTP signer server
-    /// 2. `REMITMD_KEY` — hex-encoded private key
+    /// 1. `REMIT_SIGNER_URL` + `REMIT_SIGNER_TOKEN` - HTTP signer server
+    /// 2. `REMITMD_KEY` - hex-encoded private key
     ///
     /// Common options:
-    /// - `REMITMD_CHAIN` — chain name (default: `"base"`)
-    /// - `REMITMD_TESTNET` — `"1"`, `"true"`, or `"yes"` for testnet
-    /// - `REMITMD_ROUTER_ADDRESS` — EIP-712 verifying contract address
+    /// - `REMITMD_CHAIN` - chain name (default: `"base"`)
+    /// - `REMITMD_TESTNET` - `"1"`, `"true"`, or `"yes"` for testnet
+    /// - `REMITMD_ROUTER_ADDRESS` - EIP-712 verifying contract address
     pub fn from_env() -> Result<Self, RemitError> {
         let chain = env::var("REMITMD_CHAIN").unwrap_or_else(|_| "base".to_string());
         let testnet = matches!(
@@ -197,9 +197,9 @@ impl Wallet {
     /// Auto-fetches the on-chain nonce and sets a default deadline of 1 hour from now.
     ///
     /// # Arguments
-    /// - `spender` — contract address that will call `transferFrom` (e.g. Router, Escrow)
-    /// - `amount` — USDC amount (e.g. 1.50 for $1.50)
-    /// - `deadline` — optional Unix timestamp; defaults to 1 hour from now
+    /// - `spender` - contract address that will call `transferFrom` (e.g. Router, Escrow)
+    /// - `amount` - USDC amount (e.g. 1.50 for $1.50)
+    /// - `deadline` - optional Unix timestamp; defaults to 1 hour from now
     pub async fn sign_permit(
         &self,
         spender: &str,
@@ -348,8 +348,8 @@ impl Wallet {
     /// For reversible payments, use `create_escrow`.
     ///
     /// # Arguments
-    /// - `to` — recipient Ethereum address
-    /// - `amount` — USDC amount (minimum: 0.000001, maximum: 1,000,000)
+    /// - `to` - recipient Ethereum address
+    /// - `amount` - USDC amount (minimum: 0.000001, maximum: 1,000,000)
     ///
     /// # Example
     /// ```rust,ignore
@@ -413,8 +413,8 @@ impl Wallet {
     /// Return paginated transaction history.
     ///
     /// # Arguments
-    /// - `page` — 1-indexed page number (default: 1)
-    /// - `per_page` — results per page (default: 20, max: 100)
+    /// - `page` - 1-indexed page number (default: 1)
+    /// - `per_page` - results per page (default: 20, max: 100)
     pub async fn history(&self, page: u32, per_page: u32) -> Result<TransactionList, RemitError> {
         let per_page = per_page.clamp(1, 100);
         let path = format!("/api/v1/wallet/history?page={page}&per_page={per_page}");
@@ -430,7 +430,7 @@ impl Wallet {
     /// Return spending analytics for this wallet.
     ///
     /// # Arguments
-    /// - `period` — `"day"`, `"week"`, `"month"`, or `"all"`
+    /// - `period` - `"day"`, `"week"`, `"month"`, or `"all"`
     pub async fn spending_summary(&self, period: &str) -> Result<SpendingSummary, RemitError> {
         self.get(&format!("/api/v1/wallet/spending?period={period}"))
             .await
@@ -450,8 +450,8 @@ impl Wallet {
     /// payment.
     ///
     /// # Arguments
-    /// - `payee` — the agent that will receive funds on release
-    /// - `amount` — total USDC to lock
+    /// - `payee` - the agent that will receive funds on release
+    /// - `amount` - total USDC to lock
     pub async fn create_escrow(&self, payee: &str, amount: Decimal) -> Result<Escrow, RemitError> {
         let permit = self.try_auto_permit("escrow", amount).await;
         self.create_escrow_full(payee, amount, "", &[], &[], None, permit)
@@ -558,9 +558,9 @@ impl Wallet {
     /// Submit evidence for an escrow milestone.
     ///
     /// # Arguments
-    /// - `invoice_id` — the escrow invoice ID
-    /// - `evidence_uri` — URI pointing to the evidence (e.g. IPFS hash)
-    /// - `milestone_index` — optional milestone index (0-based)
+    /// - `invoice_id` - the escrow invoice ID
+    /// - `evidence_uri` - URI pointing to the evidence (e.g. IPFS hash)
+    /// - `milestone_index` - optional milestone index (0-based)
     pub async fn submit_evidence(
         &self,
         invoice_id: &str,
@@ -578,8 +578,8 @@ impl Wallet {
     /// Release a specific milestone within an escrow.
     ///
     /// # Arguments
-    /// - `invoice_id` — the escrow invoice ID
-    /// - `milestone_index` — the milestone index to release (0-based)
+    /// - `invoice_id` - the escrow invoice ID
+    /// - `milestone_index` - the milestone index to release (0-based)
     pub async fn release_milestone(
         &self,
         invoice_id: &str,
@@ -600,9 +600,9 @@ impl Wallet {
     /// billing, per-query data APIs). Charges are provider-signed; settlement is on-chain.
     ///
     /// # Arguments
-    /// - `provider` — the agent receiving payments
-    /// - `limit_amount` — maximum USDC pre-deposited into the channel
-    /// - `per_unit` — USDC per unit/call
+    /// - `provider` - the agent receiving payments
+    /// - `limit_amount` - maximum USDC pre-deposited into the channel
+    /// - `per_unit` - USDC per unit/call
     pub async fn create_tab(
         &self,
         provider: &str,
@@ -672,11 +672,11 @@ impl Wallet {
     /// Charge a tab (called by the provider with an EIP-712 signature).
     ///
     /// # Arguments
-    /// - `tab_id` — the tab to charge
-    /// - `amount` — this individual charge amount in USDC
-    /// - `cumulative` — total cumulative amount charged so far (including this charge)
-    /// - `call_count` — total number of charges so far (including this one)
-    /// - `provider_sig` — EIP-712 TabCharge signature from the provider
+    /// - `tab_id` - the tab to charge
+    /// - `amount` - this individual charge amount in USDC
+    /// - `cumulative` - total cumulative amount charged so far (including this charge)
+    /// - `call_count` - total number of charges so far (including this one)
+    /// - `provider_sig` - EIP-712 TabCharge signature from the provider
     pub async fn charge_tab(
         &self,
         tab_id: &str,
@@ -700,9 +700,9 @@ impl Wallet {
     /// Close the tab with a final settlement amount and provider signature.
     ///
     /// # Arguments
-    /// - `tab_id` — the tab to close
-    /// - `final_amount` — final settled USDC amount
-    /// - `provider_sig` — EIP-712 TabCharge signature from the provider
+    /// - `tab_id` - the tab to close
+    /// - `final_amount` - final settled USDC amount
+    /// - `provider_sig` - EIP-712 TabCharge signature from the provider
     pub async fn close_tab(
         &self,
         tab_id: &str,
@@ -758,9 +758,9 @@ impl Wallet {
     /// provides ongoing value (compute time, uptime guarantees, etc.).
     ///
     /// # Arguments
-    /// - `payee` — the agent receiving the stream
-    /// - `rate_per_second` — USDC per second
-    /// - `max_total` — total USDC pre-deposited (determines stream duration)
+    /// - `payee` - the agent receiving the stream
+    /// - `rate_per_second` - USDC per second
+    /// - `max_total` - total USDC pre-deposited (determines stream duration)
     pub async fn create_stream(
         &self,
         payee: &str,
@@ -813,9 +813,9 @@ impl Wallet {
     /// Any agent can submit work; the poster awards the bounty to the winner.
     ///
     /// # Arguments
-    /// - `amount` — USDC prize for the winner
-    /// - `task_description` — task description (agent-readable)
-    /// - `deadline` — unix timestamp when the bounty expires
+    /// - `amount` - USDC prize for the winner
+    /// - `task_description` - task description (agent-readable)
+    /// - `deadline` - unix timestamp when the bounty expires
     pub async fn create_bounty(
         &self,
         amount: Decimal,
@@ -894,10 +894,10 @@ impl Wallet {
     /// List bounties with optional filters.
     ///
     /// # Arguments
-    /// - `status` — filter by status (open, claimed, awarded, expired)
-    /// - `poster` — filter by poster wallet address
-    /// - `submitter` — filter by submitter wallet address
-    /// - `limit` — max results (default 20, max 100)
+    /// - `status` - filter by status (open, claimed, awarded, expired)
+    /// - `poster` - filter by poster wallet address
+    /// - `submitter` - filter by submitter wallet address
+    /// - `limit` - max results (default 20, max 100)
     pub async fn list_bounties(
         &self,
         status: Option<&str>,
@@ -940,9 +940,9 @@ impl Wallet {
     /// the depositor requests return (after the lock period), or the deposit expires.
     ///
     /// # Arguments
-    /// - `provider` — address that can forfeit the deposit
-    /// - `amount` — USDC to lock
-    /// - `expiry` — unix timestamp when the deposit expires
+    /// - `provider` - address that can forfeit the deposit
+    /// - `amount` - USDC to lock
+    /// - `expiry` - unix timestamp when the deposit expires
     pub async fn lock_deposit(
         &self,
         provider: &str,
@@ -1022,9 +1022,9 @@ impl Wallet {
     /// Register a webhook endpoint to receive event notifications.
     ///
     /// # Arguments
-    /// - `url` — the HTTPS endpoint that will receive POST notifications
-    /// - `events` — event types to subscribe to (e.g. `["payment.sent", "escrow.funded"]`)
-    /// - `chains` — optional list of chain names to filter by (e.g. `["base"]`)
+    /// - `url` - the HTTPS endpoint that will receive POST notifications
+    /// - `events` - event types to subscribe to (e.g. `["payment.sent", "escrow.funded"]`)
+    /// - `chains` - optional list of chain names to filter by (e.g. `["base"]`)
     pub async fn register_webhook(
         &self,
         url: &str,
@@ -1140,7 +1140,7 @@ impl Wallet {
     /// Only available on testnet deployments. Production calls will return an error.
     ///
     /// # Arguments
-    /// - `amount` — USDC amount to mint
+    /// - `amount` - USDC amount to mint
     pub async fn mint(&self, amount: f64) -> Result<MintResponse, RemitError> {
         self.post(
             "/api/v1/mint",
@@ -1294,7 +1294,7 @@ pub(crate) fn validate_address(addr: &str) -> Result<(), RemitError> {
 
 /// Convert a `Decimal` USDC amount to `f64` for permit signing and API serialization.
 ///
-/// Returns an error instead of silently defaulting to zero — financial amounts
+/// Returns an error instead of silently defaulting to zero - financial amounts
 /// must never be quietly zeroed out.
 fn decimal_to_f64(d: Decimal) -> Result<f64, RemitError> {
     d.to_string().parse::<f64>().map_err(|e| {

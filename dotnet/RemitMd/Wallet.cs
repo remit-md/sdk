@@ -262,7 +262,7 @@ public sealed class Wallet
 
     // ─── Tab (micro-payment channel) ──────────────────────────────────────────
 
-    /// <summary>Opens a Tab — an off-chain payment channel for micro-payments.</summary>
+    /// <summary>Opens a Tab - an off-chain payment channel for micro-payments.</summary>
     /// <param name="provider">Address of the service provider accepting Tab charges.</param>
     /// <param name="limitAmount">Maximum USDC spend limit for this Tab.</param>
     /// <param name="perUnit">Cost per unit/call in USDC.</param>
@@ -377,7 +377,7 @@ public sealed class Wallet
     // ─── Stream (time-based payments) ─────────────────────────────────────────
 
     /// <summary>
-    /// Creates a payment stream — funds flow per-second to the payee.
+    /// Creates a payment stream - funds flow per-second to the payee.
     /// Ideal for API usage billing, subscriptions, and real-time service fees.
     /// </summary>
     /// <param name="payee">Address receiving the stream.</param>
@@ -413,7 +413,7 @@ public sealed class Wallet
 
     // ─── Bounty ───────────────────────────────────────────────────────────────
 
-    /// <summary>Posts a bounty — a task with a USDC reward for completion.</summary>
+    /// <summary>Posts a bounty - a task with a USDC reward for completion.</summary>
     /// <param name="amount">USDC reward amount.</param>
     /// <param name="taskDescription">Human (and agent) readable task description.</param>
     /// <param name="deadlineSecs">Seconds until bounty deadline (default: 86400 = 24h).</param>

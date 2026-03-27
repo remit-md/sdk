@@ -1,7 +1,7 @@
 name: Cross-SDK Golden Vectors
 
 # Every SDK must reproduce identical EIP-712 hashes from test-vectors/eip712.json.
-# This workflow runs only the vector tests — no mocks, no integration — so a
+# This workflow runs only the vector tests - no mocks, no integration - so a
 # single mismatch is immediately obvious without wading through unrelated failures.
 #
 # Rule: ALL jobs must be green. Any failure blocks the SDK repo.

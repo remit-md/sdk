@@ -110,7 +110,7 @@ class OwsSigner(Signer):
         typed_data_json = json.dumps(full_typed_data)
 
         # 5. Call OWS FFI.  Chain is always "evm" for EVM signing (G2).
-        #    OWS Python SDK is synchronous — no await needed.
+        #    OWS Python SDK is synchronous - no await needed.
         result: dict[str, Any] = self._ows.sign_typed_data(
             self._wallet_id,
             "evm",

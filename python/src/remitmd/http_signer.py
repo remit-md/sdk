@@ -23,7 +23,7 @@ class HttpSigner(Signer):
     - Bearer token is stored privately, never in repr/str.
     - Address is cached at construction time (GET /address).
     - sign_typed_data() POSTs structured EIP-712 data to /sign/typed-data.
-    - All errors are explicit — no silent fallbacks.
+    - All errors are explicit - no silent fallbacks.
     """
 
     def __init__(self, url: str, token: str) -> None:
@@ -49,7 +49,7 @@ class HttpSigner(Signer):
             raise ConnectionError(f"HttpSigner: cannot reach signer server at {url}: {e}") from e
 
         if resp.status_code == 401:
-            raise PermissionError("HttpSigner: unauthorized — check your REMIT_SIGNER_TOKEN")
+            raise PermissionError("HttpSigner: unauthorized - check your REMIT_SIGNER_TOKEN")
 
         if not resp.is_success:
             raise RuntimeError(f"HttpSigner: GET /address failed ({resp.status_code}): {resp.text}")
@@ -87,7 +87,7 @@ class HttpSigner(Signer):
             raise ConnectionError(f"HttpSigner: cannot reach signer server: {e}") from e
 
         if resp.status_code == 401:
-            raise PermissionError("HttpSigner: unauthorized — check your REMIT_SIGNER_TOKEN")
+            raise PermissionError("HttpSigner: unauthorized - check your REMIT_SIGNER_TOKEN")
 
         if resp.status_code == 403:
             try:
@@ -95,7 +95,7 @@ class HttpSigner(Signer):
                 reason = data.get("reason", "unknown")
             except Exception:
                 reason = resp.text
-            raise PermissionError(f"HttpSigner: policy denied — {reason}")
+            raise PermissionError(f"HttpSigner: policy denied - {reason}")
 
         if not resp.is_success:
             try:

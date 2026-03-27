@@ -9,7 +9,7 @@ import md.remit.models.Transaction;
 import java.math.BigDecimal;
 
 /**
- * Quick start example — run with MockRemit (no credentials required).
+ * Quick start example - run with MockRemit (no credentials required).
  *
  * To use the live API, replace mock.wallet() with:
  *   Wallet wallet = RemitMd.fromEnv();  // set REMITMD_KEY env var

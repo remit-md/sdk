@@ -510,12 +510,12 @@ public final class RemitWallet: @unchecked Sendable {
         usdcAddress: String? = nil
     ) throws -> PermitSignature {
         guard let signer = self.signer else {
-            throw RemitError(RemitError.invalidSignature, "Cannot sign permits in mock mode — no signer available")
+            throw RemitError(RemitError.invalidSignature, "Cannot sign permits in mock mode - no signer available")
         }
 
         let usdcAddr = usdcAddress ?? RemitWallet.usdcAddresses[chain.chainName]
         guard let usdcAddr, !usdcAddr.isEmpty else {
-            throw RemitError(RemitError.chainUnavailable, "No USDC address known for chain '\(chain.chainName)' — provide usdcAddress explicitly")
+            throw RemitError(RemitError.chainUnavailable, "No USDC address known for chain '\(chain.chainName)' - provide usdcAddress explicitly")
         }
 
         // Domain separator for USDC (EIP-2612)

@@ -1,4 +1,4 @@
-"""CrewAI integration — remit.md payment tools as CrewAI BaseTool subclasses.
+"""CrewAI integration - remit.md payment tools as CrewAI BaseTool subclasses.
 
 Usage:
     from crewai import Agent, Task, Crew
@@ -48,7 +48,7 @@ def _run_async(coro: Any) -> Any:
     if loop is None:
         return asyncio.run(coro)
 
-    # Already inside a running loop — cannot use asyncio.run().
+    # Already inside a running loop - cannot use asyncio.run().
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(asyncio.run, coro).result()
 

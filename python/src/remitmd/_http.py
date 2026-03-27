@@ -30,7 +30,7 @@ import httpx
 
 from remitmd.errors import RateLimitExceeded, RemitError, from_error_code
 
-# EIP-712 typed struct definition — must match server's auth.rs exactly.
+# EIP-712 typed struct definition - must match server's auth.rs exactly.
 _AUTH_TYPES = {
     "APIRequest": [
         {"name": "method", "type": "string"},

@@ -1,6 +1,6 @@
 package remitmd_test
 
-// Go compliance tests — run against a real server started by docker-compose.compliance.yml.
+// Go compliance tests - run against a real server started by docker-compose.compliance.yml.
 // Each test calls skipIfNoServer(t) and is individually skipped when the server is unreachable.
 //
 // Environment variables:
@@ -60,7 +60,7 @@ func isServerReachable() bool {
 func skipIfNoServer(t *testing.T) {
 	t.Helper()
 	if !isServerReachable() {
-		t.Skipf("compliance server not reachable at %s — skipping", compServerURL)
+		t.Skipf("compliance server not reachable at %s - skipping", compServerURL)
 	}
 }
 
@@ -92,7 +92,7 @@ func doJSONC(t *testing.T, method, url string, body any, token string) map[strin
 
 func registerAndGetWalletC(t *testing.T) (privateKey string, walletAddress string) {
 	t.Helper()
-	// Generate random 32-byte private key — no server registration needed.
+	// Generate random 32-byte private key - no server registration needed.
 	keyBytes := make([]byte, 32)
 	if _, err := rand.Read(keyBytes); err != nil {
 		t.Fatalf("generate random key: %v", err)
@@ -149,7 +149,7 @@ func getSharedPayer(t *testing.T) *remitmd.Wallet {
 	t.Helper()
 	oncePayer.Do(func() {
 		pk, addr := registerAndGetWalletC(t)
-		// Fund with 1000 USDC via direct HTTP — mint is public (no EIP-712 auth required).
+		// Fund with 1000 USDC via direct HTTP - mint is public (no EIP-712 auth required).
 		resp := doJSONC(t, "POST", compServerURL+"/api/v1/mint", map[string]any{
 			"wallet": addr,
 			"amount": 1000,
@@ -232,7 +232,7 @@ func TestCompliancePayDirect_BelowMinimumReturnsError(t *testing.T) {
 
 func TestCompliancePayDirect_SelfPaymentReturnsError(t *testing.T) {
 	skipIfNoServer(t)
-	// Reuse shared payer — self-payment should be rejected by the server.
+	// Reuse shared payer - self-payment should be rejected by the server.
 	wallet := getSharedPayer(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

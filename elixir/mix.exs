@@ -8,7 +8,7 @@ defmodule RemitMd.MixProject do
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      description: "remit.md SDK for Elixir — universal payment protocol for AI agents",
+      description: "remit.md SDK for Elixir - universal payment protocol for AI agents",
       package: package(),
       source_url: "https://github.com/remit-md/sdk",
       docs: [main: "RemitMd", extras: ["README.md"]],

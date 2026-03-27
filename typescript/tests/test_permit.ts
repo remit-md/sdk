@@ -150,7 +150,7 @@ describe("signUsdcPermit", () => {
       },
     });
 
-    // Just verify the hash is deterministic — domain is correct if recovery works
+    // Just verify the hash is deterministic - domain is correct if recovery works
     assert.match(expectedHash, /^0x[0-9a-f]{64}$/i);
 
     const permit = await wallet.signUsdcPermit({

@@ -192,7 +192,7 @@ internal sealed class ApiClient : IDisposable
 }
 
 /// <summary>
-/// Internal transport abstraction — allows MockRemit to replace the HTTP layer.
+/// Internal transport abstraction - allows MockRemit to replace the HTTP layer.
 /// </summary>
 internal interface IRemitTransport
 {

@@ -23,7 +23,7 @@ import java.util.OptionalLong;
  * }</pre>
  *
  * <p>All methods throw {@link RemitError} with actionable messages on failure.
- * Use {@link MockRemit} for unit tests — zero network, zero latency.
+ * Use {@link MockRemit} for unit tests - zero network, zero latency.
  */
 public class Wallet {
 
@@ -82,7 +82,7 @@ public class Wallet {
     // ─── Direct Payment ───────────────────────────────────────────────────────
 
     /**
-     * Sends a direct USDC payment. No escrow — one-way transfer.
+     * Sends a direct USDC payment. No escrow - one-way transfer.
      *
      * @param to     recipient Ethereum address (0x-prefixed, 42 chars)
      * @param amount USDC amount, minimum 0.000001
@@ -486,9 +486,9 @@ public class Wallet {
     /**
      * Lists bounties, optionally filtering by status, poster, or submitter.
      *
-     * @param status    filter by status (open, claimed, awarded, expired) — may be null
-     * @param poster    filter by poster wallet address — may be null
-     * @param submitter filter by submitter wallet address — may be null
+     * @param status    filter by status (open, claimed, awarded, expired) - may be null
+     * @param poster    filter by poster wallet address - may be null
+     * @param submitter filter by submitter wallet address - may be null
      * @param limit     max results (default 20, max 100)
      */
     public java.util.List<Bounty> listBounties(String status, String poster, String submitter, int limit) {
@@ -604,7 +604,7 @@ public class Wallet {
      *
      * @param url    the HTTPS endpoint that will receive POST notifications
      * @param events event types to subscribe to (e.g. "payment.sent", "escrow.funded")
-     * @param chains optional chain names to filter by — pass null for all chains
+     * @param chains optional chain names to filter by - pass null for all chains
      */
     public Webhook registerWebhook(String url, List<String> events, List<String> chains) {
         Map<String, Object> body = new java.util.HashMap<>();
@@ -828,7 +828,7 @@ public class Wallet {
             return signPermit(spender, amount);
         } catch (Exception e) {
             // Permit signing unavailable (mock context, API error, etc.)
-            // Fall through — server will handle approval via other means
+            // Fall through - server will handle approval via other means
             System.err.println("[remitmd] auto-permit failed for " + contractField + ": " + e.getMessage());
             return null;
         }

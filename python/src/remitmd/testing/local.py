@@ -1,4 +1,4 @@
-"""LocalChain — wraps a local Anvil instance for real-EVM testing (<100ms per op).
+"""LocalChain - wraps a local Anvil instance for real-EVM testing (<100ms per op).
 
 Requires:
 - `anvil` in PATH (install Foundry: https://getfoundry.sh)

@@ -71,7 +71,7 @@ pub mod codes {
 /// }
 /// ```
 #[derive(Debug, Clone, Error)]
-#[error("remitmd: {code} — {message} (see: {doc_url})")]
+#[error("remitmd: {code} - {message} (see: {doc_url})")]
 pub struct RemitError {
     /// Stable machine-readable code (e.g., `"INVALID_ADDRESS"`).
     pub code: String,

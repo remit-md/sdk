@@ -10,7 +10,7 @@ import { randomBytes } from "node:crypto";
 import { fromErrorCode, NetworkError, RateLimitedError } from "./errors.js";
 import type { Signer } from "./signer.js";
 
-// EIP-712 typed struct definition — must match server's auth.rs exactly.
+// EIP-712 typed struct definition - must match server's auth.rs exactly.
 // Struct name: APIRequest (not Request)
 // Timestamp type: uint256 (not uint64 or uint32)
 // Nonce type: bytes32 (not string)
@@ -29,7 +29,7 @@ interface ApiErrorBody {
   message?: string;
 }
 
-/** 32-byte hex nonce with 0x prefix — required for bytes32 EIP-712 field. */
+/** 32-byte hex nonce with 0x prefix - required for bytes32 EIP-712 field. */
 function newNonce(): `0x${string}` {
   return `0x${randomBytes(32).toString("hex")}`;
 }
@@ -122,7 +122,7 @@ export class AuthenticatedClient {
     const pathOnly = path.split("?")[0];
     const signedPath = `${this.#signPathPrefix}${pathOnly}`;
 
-    // Sign the request metadata (never body — body may be large)
+    // Sign the request metadata (never body - body may be large)
     const signature = await this.#signer.signTypedData(
       domain,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

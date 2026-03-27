@@ -59,7 +59,7 @@ describe("SDK: x402 Auto-Payment", { timeout: 120_000 }, () => {
         return;
       }
 
-      // Second request: has PAYMENT-SIGNATURE — validate structure then return 200
+      // Second request: has PAYMENT-SIGNATURE - validate structure then return 200
       try {
         const decoded = JSON.parse(
           Buffer.from(paymentSig as string, "base64").toString("utf8"),
@@ -127,7 +127,7 @@ describe("SDK: x402 Auto-Payment", { timeout: 120_000 }, () => {
   });
 
   it("x402Fetch rejects payment above maxAutoPayUsdc", async () => {
-    // The default limit is $0.10, and the paywall asks for $0.10 — right at the edge.
+    // The default limit is $0.10, and the paywall asks for $0.10 - right at the edge.
     // Test with a lower limit ($0.01) to verify rejection.
     await assert.rejects(
       () => agent.x402Fetch(`${serverUrl}/test-resource`, 0.01),

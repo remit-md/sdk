@@ -1,4 +1,4 @@
-"""Tests for OwsSigner — OWS adapter with mocked FFI module."""
+"""Tests for OwsSigner - OWS adapter with mocked FFI module."""
 
 from __future__ import annotations
 
@@ -14,10 +14,10 @@ from remitmd.wallet import Wallet
 MOCK_ADDRESS = "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD50"
 MOCK_WALLET_ID = "remit-test-agent"
 
-# r||s (128 hex chars, no v) — OWS returns this when recovery_id is separate.
+# r||s (128 hex chars, no v) - OWS returns this when recovery_id is separate.
 MOCK_SIG_RS = "a" * 64 + "b" * 64  # 128 hex
 
-# r||s||v (130 hex chars) — OWS returns this when v is already appended.
+# r||s||v (130 hex chars) - OWS returns this when v is already appended.
 MOCK_SIG_RSV = "a" * 64 + "b" * 64 + "1b"  # 130 hex
 
 

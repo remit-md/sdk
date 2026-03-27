@@ -1,6 +1,6 @@
 defmodule RemitMd.A2A do
   @moduledoc """
-  A2A / AP2 — agent card discovery and A2A JSON-RPC task client.
+  A2A / AP2 - agent card discovery and A2A JSON-RPC task client.
 
   ## Example
 
@@ -261,7 +261,7 @@ end
 
 defmodule RemitMd.A2A.Client do
   @moduledoc """
-  A2A JSON-RPC client — send payments and manage tasks via the A2A protocol.
+  A2A JSON-RPC client - send payments and manage tasks via the A2A protocol.
 
   ## Example
 
@@ -293,10 +293,10 @@ defmodule RemitMd.A2A.Client do
 
   ## Options
 
-  - `:endpoint` — full A2A endpoint URL (required)
-  - `:signer` — signer struct (required)
-  - `:chain_id` — numeric chain ID (required)
-  - `:verifying_contract` — router contract address (default: `""`)
+  - `:endpoint` - full A2A endpoint URL (required)
+  - `:signer` - signer struct (required)
+  - `:chain_id` - numeric chain ID (required)
+  - `:verifying_contract` - router contract address (default: `""`)
   """
   @spec new(keyword()) :: t()
   def new(opts) do
@@ -327,8 +327,8 @@ defmodule RemitMd.A2A.Client do
 
   ## Options
 
-  - `:chain` — chain name (default: `"base"`)
-  - `:verifying_contract` — router contract address (default: `""`)
+  - `:chain` - chain name (default: `"base"`)
+  - `:verifying_contract` - router contract address (default: `""`)
   """
   @spec from_card(map(), term(), keyword()) :: t()
   def from_card(card, signer, opts \\ []) do
@@ -348,10 +348,10 @@ defmodule RemitMd.A2A.Client do
 
   ## Options
 
-  - `:to` — recipient address (required)
-  - `:amount` — USDC amount (required)
-  - `:memo` — payment memo (default: `""`)
-  - `:mandate` — `%RemitMd.A2A.IntentMandate{}` (optional)
+  - `:to` - recipient address (required)
+  - `:amount` - USDC amount (required)
+  - `:memo` - payment memo (default: `""`)
+  - `:mandate` - `%RemitMd.A2A.IntentMandate{}` (optional)
 
   Returns `{:ok, %RemitMd.A2A.Task{}}` or `{:error, reason}`.
   """

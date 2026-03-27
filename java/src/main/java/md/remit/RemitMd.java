@@ -49,15 +49,15 @@ public final class RemitMd {
      *
      * <p>Signing credential priority:
      * <ol>
-     *   <li>{@code REMIT_SIGNER_URL} + {@code REMIT_SIGNER_TOKEN} — HTTP signer server</li>
-     *   <li>{@code REMITMD_KEY} — hex-encoded private key</li>
+     *   <li>{@code REMIT_SIGNER_URL} + {@code REMIT_SIGNER_TOKEN} - HTTP signer server</li>
+     *   <li>{@code REMITMD_KEY} - hex-encoded private key</li>
      * </ol>
      *
      * <p>Additional options:
      * <ul>
-     *   <li>{@code REMITMD_CHAIN} — chain name, default "base" (only "base" supported)</li>
-     *   <li>{@code REMITMD_TESTNET} — "1", "true", or "yes" for testnet</li>
-     *   <li>{@code REMITMD_ROUTER_ADDRESS} — EIP-712 verifying contract address</li>
+     *   <li>{@code REMITMD_CHAIN} - chain name, default "base" (only "base" supported)</li>
+     *   <li>{@code REMITMD_TESTNET} - "1", "true", or "yes" for testnet</li>
+     *   <li>{@code REMITMD_ROUTER_ADDRESS} - EIP-712 verifying contract address</li>
      * </ul>
      *
      * @throws RemitError if no signing credentials are set or are malformed

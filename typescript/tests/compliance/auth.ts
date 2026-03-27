@@ -1,7 +1,7 @@
 /**
  * Compliance: EIP-712 authentication against a real server.
  *
- * Proves the TypeScript SDK can authenticate — 200 responses, not 401s.
+ * Proves the TypeScript SDK can authenticate - 200 responses, not 401s.
  * Requires the compliance server to be running (docker-compose.compliance.yml).
  */
 
@@ -31,7 +31,7 @@ describe("TypeScript compliance: authentication", () => {
     if (skip) return t.skip("server not available");
 
     const wallet = makeWallet();
-    // status() uses #auth.get — if EIP-712 is wrong this returns 401 not 200.
+    // status() uses #auth.get - if EIP-712 is wrong this returns 401 not 200.
     // Server returns { wallet, tier, monthlyVolume, feeRateBps, ... } (camelized by SDK).
     const status = await wallet.status();
     // Server uses "wallet" key (not "address"), cast to access it.

@@ -1,7 +1,7 @@
 defmodule RemitMd.MockRemit do
   @moduledoc """
   In-memory mock of the remit.md API for testing. Implements the full
-  payment API without network or blockchain — completes in microseconds.
+  payment API without network or blockchain - completes in microseconds.
 
   `MockRemit` is an OTP `GenServer`. Start it under a supervisor or with
   `start_link/1` in a test. Pass the pid to `RemitMd.Wallet.new/1`.

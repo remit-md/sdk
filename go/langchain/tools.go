@@ -142,7 +142,7 @@ func (t *CreateEscrowTool) Name() string { return "remitmd_create_escrow" }
 
 func (t *CreateEscrowTool) Description() string {
 	return "Create a USDC escrow payment that locks funds until you verify work is complete. " +
-		"Use this when hiring another agent for a task — the funds are held securely until you " +
+		"Use this when hiring another agent for a task - the funds are held securely until you " +
 		"call remitmd_release_escrow. If the work is unsatisfactory, call remitmd_cancel_escrow " +
 		"to recover your funds."
 }

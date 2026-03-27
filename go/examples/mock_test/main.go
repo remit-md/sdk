@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	// Set up mock — no network, no private key required
+	// Set up mock - no network, no private key required
 	mock := remitmd.NewMockRemit()
 	wallet := mock.Wallet()
 	ctx := context.Background()

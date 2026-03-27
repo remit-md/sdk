@@ -44,10 +44,10 @@ class ComplianceTest {
         .connectTimeout(Duration.ofSeconds(5))
         .build();
 
-    /** Set to false when the server health-check fails — all tests skip. */
+    /** Set to false when the server health-check fails - all tests skip. */
     private static boolean serverAvailable = false;
 
-    /** Shared funded payer wallet — only one mint per test run. */
+    /** Shared funded payer wallet - only one mint per test run. */
     private static final AtomicReference<Wallet> SHARED_PAYER = new AtomicReference<>();
     private static final AtomicReference<String> SHARED_PAYER_ADDR = new AtomicReference<>();
 
@@ -163,7 +163,7 @@ class ComplianceTest {
             .routerAddress(ROUTER_ADDRESS)
             .build();
 
-        // reputation() makes an authenticated GET to /api/v1/reputation/{address} —
+        // reputation() makes an authenticated GET to /api/v1/reputation/{address} -
         // this endpoint exists for all registered addresses and returns 401 if auth fails.
         var rep = wallet.reputation(wallet.address());
         assertThat(rep).as("reputation() must not throw 401").isNotNull();

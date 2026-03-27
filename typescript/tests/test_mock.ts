@@ -58,7 +58,7 @@ describe("MockRemit", () => {
     assert.equal(await payee.balance(), 100);
   });
 
-  it("escrow: fund, cancel — refunds payer", async () => {
+  it("escrow: fund, cancel - refunds payer", async () => {
     const payer = mock.createWallet(200);
     const payee = mock.createWallet(0);
 
@@ -79,7 +79,7 @@ describe("MockRemit", () => {
     assert.equal(await payee.balance(), 0);
   });
 
-  it("tab: open, close — refunds unspent", async () => {
+  it("tab: open, close - refunds unspent", async () => {
     const payer = mock.createWallet(100);
     const payee = mock.createWallet(0);
 
@@ -89,7 +89,7 @@ describe("MockRemit", () => {
 
     const closeTx = await payer.closeTab(tab.id);
     assert.equal(closeTx.status, "confirmed");
-    // No charges — full refund
+    // No charges - full refund
     assert.equal(await payer.balance(), 100);
     assert.equal(await payee.balance(), 0);
   });
@@ -99,7 +99,7 @@ describe("MockRemit", () => {
     await assert.rejects(() => payer.closeTab("nonexistent"), /TAB_NOT_FOUND|Tab not found/);
   });
 
-  it("stream: open, close after time advance — correct accounting", async () => {
+  it("stream: open, close after time advance - correct accounting", async () => {
     const payer = mock.createWallet(1000);
     const payee = mock.createWallet(0);
 

@@ -1,7 +1,7 @@
 {
   "name": "@remitmd/ows-policy",
   "version": "0.1.0",
-  "description": "OWS policy executable for the Remit payment protocol — chain lock, contract allowlist, per-tx and daily spending caps",
+  "description": "OWS policy executable for the Remit payment protocol - chain lock, contract allowlist, per-tx and daily spending caps",
   "type": "module",
   "main": "./dist/remit-policy.js",
   "bin": {

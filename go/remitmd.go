@@ -18,7 +18,7 @@
 //
 // # Testing
 //
-// Use MockRemit for unit tests — zero network, zero latency, deterministic:
+// Use MockRemit for unit tests - zero network, zero latency, deterministic:
 //
 //	mock := remitmd.NewMockRemit()
 //	wallet := mock.Wallet()

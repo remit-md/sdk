@@ -1,4 +1,4 @@
-# remit.md — C#/.NET SDK
+# remit.md - C#/.NET SDK
 
 > [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
 
@@ -20,7 +20,7 @@ dotnet add package RemitMd
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -54,7 +54,7 @@ var wallet = new Wallet("0xYourPrivateKey");
 
 ## Payment Primitives
 
-Permits are **automatic** — the SDK signs an EIP-2612 USDC permit before every
+Permits are **automatic** - the SDK signs an EIP-2612 USDC permit before every
 payment, so you never need to deal with `approve()` transactions.
 
 ### Direct Payment
@@ -81,7 +81,7 @@ var tab = await wallet.CreateTabAsync("0xAPIProvider...", 5m, 0.001m);
 var sig = wallet.SignTabCharge(contracts.Tab, tab.Id, 1000000L, 1);
 await wallet.ChargeTabAsync(tab.Id, 0.001m, 0.001m, 1, sig);
 
-// Close when done — unused funds return
+// Close when done - unused funds return
 await wallet.CloseTabAsync(tab.Id);
 ```
 
@@ -174,10 +174,10 @@ catch (RemitError ex)
 ```
 
 All errors include:
-- `Code` — machine-readable constant from `ErrorCodes`
-- `Message` — human-readable description with actual numbers (e.g. "have $5.00, need $100.00")
-- `Context` — structured data (e.g. `required`, `available`, `required_units`, `available_units`)
-- `HttpStatus` — HTTP status code (null for client-side validation errors)
+- `Code` - machine-readable constant from `ErrorCodes`
+- `Message` - human-readable description with actual numbers (e.g. "have $5.00, need $100.00")
+- `Context` - structured data (e.g. `required`, `available`, `required_units`, `available_units`)
+- `HttpStatus` - HTTP status code (null for client-side validation errors)
 
 ## Additional Methods
 
@@ -238,4 +238,4 @@ var permit = wallet.SignUsdcPermit(
 
 ## License
 
-MIT — see [LICENSE](../../LICENSE)
+MIT - see [LICENSE](../../LICENSE)

@@ -15,7 +15,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { verifyTypedData } from "viem";
 
-// Try to load OWS — skip all tests if unavailable.
+// Try to load OWS - skip all tests if unavailable.
 let ows: {
   createWallet: (name: string) => { id: string; name: string; accounts: Array<{ chainId: string; address: string; derivationPath: string }>; createdAt: string };
   deleteWallet: (nameOrId: string) => void;
@@ -27,7 +27,7 @@ try {
   ows = (await import(moduleName)) as unknown as typeof ows;
   owsAvailable = true;
 } catch {
-  // OWS not installed — tests will be skipped
+  // OWS not installed - tests will be skipped
 }
 
 describe("OwsSigner integration (real OWS)", { skip: !owsAvailable && "OWS not installed" }, () => {

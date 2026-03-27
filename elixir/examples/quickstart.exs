@@ -1,12 +1,12 @@
 #!/usr/bin/env elixir
-# remit.md Elixir SDK — Quickstart
+# remit.md Elixir SDK - Quickstart
 # Run: mix run examples/quickstart.exs
 
 alias RemitMd.{MockRemit, Wallet}
 
 IO.puts("=== remit.md Elixir SDK Quickstart ===\n")
 
-# All examples use MockRemit — no keys, no network required.
+# All examples use MockRemit - no keys, no network required.
 {:ok, mock} = MockRemit.start_link()
 MockRemit.set_balance(mock, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "1000.00")
 
@@ -60,6 +60,6 @@ IO.puts("   total_paid_to(payee):    #{MockRemit.total_paid_to(mock, payee)} USD
 IO.puts("   transaction_count:       #{MockRemit.transaction_count(mock)}")
 
 MockRemit.reset(mock)
-IO.puts("   After reset — count:     #{MockRemit.transaction_count(mock)}\n")
+IO.puts("   After reset - count:     #{MockRemit.transaction_count(mock)}\n")
 
 IO.puts("All examples completed successfully!")

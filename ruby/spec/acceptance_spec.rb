@@ -5,8 +5,8 @@
 # Run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance
 #
 # Env vars (all optional):
-#   ACCEPTANCE_API_URL  — default: https://remit.md
-#   ACCEPTANCE_RPC_URL  — default: https://sepolia.base.org
+#   ACCEPTANCE_API_URL  - default: https://remit.md
+#   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 require "remitmd"
 require "net/http"
@@ -453,12 +453,12 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
 
       server.mount_proc "/v1/data" do |req, res|
         if req["X-PAYMENT"]
-          # Payment provided — return 200
+          # Payment provided - return 200
           res.status = 200
           res["Content-Type"] = "application/json"
           res.body = '{"status":"ok","data":"secret"}'
         else
-          # No payment — return 402
+          # No payment - return 402
           res.status = 402
           res["PAYMENT-REQUIRED"] = encoded_header
           res["Content-Type"] = "application/json"
@@ -469,7 +469,7 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       thread = Thread.new { server.start }
 
       begin
-        # 2. Make a request without payment — should get 402
+        # 2. Make a request without payment - should get 402
         uri = URI("#{server_url}/v1/data")
         resp = Net::HTTP.get_response(uri)
         expect(resp.code).to eq("402")
@@ -485,7 +485,7 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
         expect(decoded["description"]).to eq("Test data endpoint")
         expect(decoded["mimeType"]).to eq("application/json")
 
-        # 4. Make a request WITH a payment header — should get 200
+        # 4. Make a request WITH a payment header - should get 200
         req = Net::HTTP::Get.new(uri)
         req["X-PAYMENT"] = "test-payment-token"
         http = Net::HTTP.new(uri.host, uri.port)

@@ -17,7 +17,7 @@ const MOCK_WALLET: &str = "0xMockWallet0000000000000000000000000001";
 
 /// In-memory mock for testing agents that use remit.md.
 ///
-/// Zero network, zero latency, deterministic — the ideal test double.
+/// Zero network, zero latency, deterministic - the ideal test double.
 /// Backed by `Arc<Mutex<>>` so it's safe to share across async tasks.
 ///
 /// # Example

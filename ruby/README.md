@@ -2,7 +2,7 @@
 
 > [Skill MD](https://remit.md) · [Docs](https://remit.md/docs) · [Agent Spec](https://remit.md/agent.md)
 
-Universal payment protocol for AI agents — Ruby client library.
+Universal payment protocol for AI agents - Ruby client library.
 
 [![CI](https://github.com/remit-md/sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/remit-md/sdk/actions/workflows/ci.yml)
 [![Gem Version](https://badge.fury.io/rb/remitmd.svg)](https://badge.fury.io/rb/remitmd)
@@ -47,7 +47,7 @@ Permits are auto-signed. Every payment method fetches the on-chain USDC nonce, s
 
 ## Local Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
 
 ```bash
 export REMIT_SIGNER_URL=http://127.0.0.1:7402
@@ -93,7 +93,7 @@ contracts = wallet.get_contracts
 sig = wallet.sign_tab_charge(contracts.tab, tab.id, 3_000_000, 1)
 wallet.charge_tab(tab.id, 0.003, 0.003, 1, sig)
 
-# Close when done — unused funds return
+# Close when done - unused funds return
 wallet.close_tab(tab.id)
 ```
 
@@ -156,9 +156,9 @@ end
 
 ```ruby
 mock.was_paid?(address, amount)   # true/false
-mock.total_paid_to(address)       # BigDecimal — sum of all payments to address
+mock.total_paid_to(address)       # BigDecimal - sum of all payments to address
 mock.transaction_count            # Integer
-mock.balance                      # BigDecimal — current balance
+mock.balance                      # BigDecimal - current balance
 mock.transactions                 # Array<Transaction>
 mock.set_balance(amount)          # Override starting balance
 mock.reset                        # Clear all state
@@ -274,11 +274,11 @@ Remitmd::RemitWallet.new(private_key: key, chain: "base_sepolia")  # Base Sepoli
 Permits are auto-signed by default. If you need manual control (custom deadline, pre-signed permits, or offline signing), pass a `PermitSignature` explicitly:
 
 ```ruby
-# sign_permit: convenience — auto-fetches nonce, converts amount to base units
+# sign_permit: convenience - auto-fetches nonce, converts amount to base units
 permit = wallet.sign_permit("0xRouterAddress...", 5.00, deadline: Time.now.to_i + 7200)
 tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
 
-# sign_usdc_permit: full control — raw base units, explicit nonce
+# sign_usdc_permit: full control - raw base units, explicit nonce
 permit = wallet.sign_usdc_permit(
   "0xRouterAddress...",   # spender
   5_000_000,              # value in base units (6 decimals)
@@ -291,6 +291,6 @@ tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT - see [LICENSE](LICENSE)
 
 [Documentation](https://remit.md/docs) · [Protocol Spec](https://remit.md) · [GitHub](https://github.com/remit-md/sdk)

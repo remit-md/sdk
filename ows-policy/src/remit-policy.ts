@@ -4,19 +4,19 @@
  * Remit OWS Policy Executable
  *
  * Evaluates 4 rules against a PolicyContext received on stdin:
- *   1. Chain lock — chain_id must be in policy_config.chain_ids
- *   2. Contract allowlist — transaction.to must be in policy_config.allowed_contracts
- *   3. Per-tx USDC cap — decoded USDC amount must be <= policy_config.max_tx_usdc
- *   4. Daily USDC cap — cumulative daily + this tx must be <= policy_config.daily_limit_usdc
+ *   1. Chain lock - chain_id must be in policy_config.chain_ids
+ *   2. Contract allowlist - transaction.to must be in policy_config.allowed_contracts
+ *   3. Per-tx USDC cap - decoded USDC amount must be <= policy_config.max_tx_usdc
+ *   4. Daily USDC cap - cumulative daily + this tx must be <= policy_config.daily_limit_usdc
  *
  * Protocol:
  *   - stdout: { "allow": true } or { "allow": false, "reason": "..." }
  *   - exit 0 = use result, non-zero = deny, timeout (5s) = deny, bad JSON = deny
  *
  * Design: fail-closed. Any error, exception, or malformed input results in denial.
- * This is financial infrastructure — a false allow means funds move wrong.
+ * This is financial infrastructure - a false allow means funds move wrong.
  *
- * @see https://docs.openwallet.sh/ — OWS Policy Engine spec
+ * @see https://docs.openwallet.sh/ - OWS Policy Engine spec
  */
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ const SELECTOR_TRANSFER_FROM = "23b872dd"; // transferFrom(address,address,uint2
  * Decode USDC amount from ERC-20 calldata.
  *
  * Supports transfer, approve, and transferFrom. Returns null for unknown
- * selectors — the contract allowlist is the primary guard for those.
+ * selectors - the contract allowlist is the primary guard for those.
  */
 function decodeUsdcAmount(data: string): bigint | null {
   if (!data || data === "0x" || data.length < 10) return null;
@@ -155,7 +155,7 @@ function checkPerTx(ctx: PolicyContext): PolicyResult | null {
   }
 
   const amount = decodeUsdcAmount(ctx.transaction?.data ?? "");
-  if (amount === null) return null; // Unknown selector — contract allowlist is the guard
+  if (amount === null) return null; // Unknown selector - contract allowlist is the guard
 
   // USDC has 6 decimals: base units ÷ 1e6 = dollars
   const amountUsdc = Number(amount) / 1e6;
@@ -181,7 +181,7 @@ function checkDaily(ctx: PolicyContext): PolicyResult | null {
   try {
     dailyTotal = BigInt(ctx.spending?.daily_total ?? "0");
   } catch {
-    return deny("Invalid spending.daily_total — not a valid integer");
+    return deny("Invalid spending.daily_total - not a valid integer");
   }
 
   const txAmount = decodeUsdcAmount(ctx.transaction?.data ?? "") ?? 0n;
@@ -201,7 +201,7 @@ function checkDaily(ctx: PolicyContext): PolicyResult | null {
 
 const RULES = [checkChain, checkContracts, checkPerTx, checkDaily];
 
-/** Exported for testing — evaluates all rules against the given context. */
+/** Exported for testing - evaluates all rules against the given context. */
 export function evaluate(ctx: PolicyContext): PolicyResult {
   for (const rule of RULES) {
     const result = rule(ctx);

@@ -1,4 +1,4 @@
-"""RemitClient — read-only API client (no private key required)."""
+"""RemitClient - read-only API client (no private key required)."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ class ContractAddresses(TypedDict):
     deposit: str
     fee_calculator: str
     key_registry: str
-    # relayer: str — optional, accessed via .get() in _auto_permit
+    # relayer: str - optional, accessed via .get() in _auto_permit
 
 
 class RemitClient:

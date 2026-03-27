@@ -74,7 +74,7 @@ defmodule RemitMd.EIP712VectorTest do
 
         # OTP's ECDSA uses different RFC 6979 k derivation than Rust's k256,
         # so exact signatures differ. Verify structure and validity instead.
-        # sign/2 internally recovers v via ecrecover — raises if the signature
+        # sign/2 internally recovers v via ecrecover - raises if the signature
         # doesn't match the signer's address, so a successful return = valid.
         sig = RemitMd.PrivateKeySigner.sign(signer, digest)
         sig_hex = String.trim_leading(sig, "0x")

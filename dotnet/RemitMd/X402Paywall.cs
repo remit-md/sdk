@@ -51,9 +51,9 @@ public sealed class X402Paywall : IDisposable
     /// <param name="facilitatorUrl">Base URL of the remit.md facilitator (default: "https://remit.md").</param>
     /// <param name="facilitatorToken">Bearer JWT for authenticating calls to /api/v1/x402/verify.</param>
     /// <param name="maxTimeoutSeconds">How long the payment authorization remains valid (default: 60).</param>
-    /// <param name="resource">V2 — URL or path of the resource being protected.</param>
-    /// <param name="description">V2 — Human-readable description of what the payment is for.</param>
-    /// <param name="mimeType">V2 — MIME type of the resource (e.g. "application/json").</param>
+    /// <param name="resource">V2 - URL or path of the resource being protected.</param>
+    /// <param name="description">V2 - Human-readable description of what the payment is for.</param>
+    /// <param name="mimeType">V2 - MIME type of the resource (e.g. "application/json").</param>
     public X402Paywall(
         string walletAddress,
         decimal amountUsdc,

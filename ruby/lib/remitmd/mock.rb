@@ -175,7 +175,7 @@ module Remitmd
         @state[:pending_invoices][id] = b
         { "id" => id, "status" => "pending" }
 
-      # Escrow create (step 2 — fund with invoice_id)
+      # Escrow create (step 2 - fund with invoice_id)
       in ["POST", "/escrows"]
         invoice_id = fetch!(b, :invoice_id)
         inv = @state[:pending_invoices].delete(invoice_id)

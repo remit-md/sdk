@@ -3,8 +3,8 @@
 # Run: mix test test/acceptance_test.exs --include acceptance
 #
 # Env vars (all optional):
-#   ACCEPTANCE_API_URL  — default: https://remit.md
-#   ACCEPTANCE_RPC_URL  — default: https://sepolia.base.org
+#   ACCEPTANCE_API_URL  - default: https://remit.md
+#   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 defmodule RemitMd.AcceptanceTest do
   use ExUnit.Case, async: false
@@ -444,7 +444,7 @@ defmodule RemitMd.AcceptanceTest do
     server_pid = spawn_link(fn -> accept_loop(listen_socket, encoded_header) end)
 
     try do
-      # 1. Make a request without payment — should get 402
+      # 1. Make a request without payment - should get 402
       :inets.start()
       :ssl.start()
       {:ok, {{_, status, _}, resp_headers, _body}} =
@@ -461,7 +461,7 @@ defmodule RemitMd.AcceptanceTest do
       assert decoded["description"] == "Test data endpoint"
       assert decoded["mimeType"] == "application/json"
 
-      # 3. Make a request WITH a payment header — should get 200
+      # 3. Make a request WITH a payment header - should get 200
       {:ok, {{_, status2, _}, _, resp_body2}} =
         :httpc.request(:get,
           {String.to_charlist("#{server_url}/v1/data"),

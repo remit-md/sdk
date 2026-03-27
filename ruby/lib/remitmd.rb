@@ -12,7 +12,7 @@ require_relative "remitmd/a2a"
 require_relative "remitmd/x402_client"
 require_relative "remitmd/x402_paywall"
 
-# remit.md Ruby SDK — universal payment protocol for AI agents.
+# remit.md Ruby SDK - universal payment protocol for AI agents.
 #
 # @example Direct payment
 #   wallet = Remitmd::RemitWallet.new(private_key: ENV["REMITMD_PRIVATE_KEY"])

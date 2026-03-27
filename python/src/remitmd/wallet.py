@@ -1,4 +1,4 @@
-"""Wallet — read + write client (requires a private key or custom Signer)."""
+"""Wallet - read + write client (requires a private key or custom Signer)."""
 
 from __future__ import annotations
 
@@ -86,7 +86,7 @@ class Wallet(RemitClient):
         self.testnet = testnet
         self._chain_id = chain_id
 
-        # Router contract address for EIP-712 domain — must match server's ROUTER_ADDRESS.
+        # Router contract address for EIP-712 domain - must match server's ROUTER_ADDRESS.
         verifying_contract = router_address or os.environ.get("REMITMD_ROUTER_ADDRESS", "")
 
         self._signer: Signer = signer if signer is not None else PrivateKeySigner(private_key)  # type: ignore[arg-type]
@@ -116,7 +116,7 @@ class Wallet(RemitClient):
         """
         # Signer URL requires async creation
         if os.environ.get("REMIT_SIGNER_URL"):
-            raise OSError("REMIT_SIGNER_URL is set — use: await Wallet.with_signer()")
+            raise OSError("REMIT_SIGNER_URL is set - use: await Wallet.with_signer()")
 
         key = os.environ.get("REMITMD_KEY")
         if not key:
@@ -753,7 +753,7 @@ class Wallet(RemitClient):
         if not self.testnet:
             raise ValueError("request_testnet_funds() is only available on testnet")
         data = await self._http.post("/api/v1/faucet", {"wallet": self.address})
-        # Server returns FaucetResponse {tx_hash, amount, recipient} — not a full Transaction.
+        # Server returns FaucetResponse {tx_hash, amount, recipient} - not a full Transaction.
         return Transaction(
             tx_hash=data.get("tx_hash"),
             chain=self.chain,
@@ -765,7 +765,7 @@ class Wallet(RemitClient):
         """Mint testnet USDC. Returns ``{"tx_hash": "0x…", "balance": "…"}``."""
         import httpx  # noqa: PLC0415
 
-        # Mint is a public endpoint — use raw HTTP without auth.
+        # Mint is a public endpoint - use raw HTTP without auth.
         base = self._http._base_url.rstrip("/")
         url = f"{base}/api/v1/mint" if "/api/v1" not in base else f"{base}/mint"
 

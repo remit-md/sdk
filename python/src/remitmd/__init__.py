@@ -1,4 +1,4 @@
-"""remitmd — Python SDK for the remit.md universal AI payment protocol."""
+"""remitmd - Python SDK for the remit.md universal AI payment protocol."""
 
 from remitmd.a2a import A2AClient, A2ATask, AgentCard, IntentMandate
 from remitmd.client import ContractAddresses, RemitClient

@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * In-memory mock for testing agents that use remit.md.
- * Zero network, zero latency, deterministic — ideal for unit tests.
+ * Zero network, zero latency, deterministic - ideal for unit tests.
  *
  * <pre>{@code
  * MockRemit mock = new MockRemit();

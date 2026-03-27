@@ -184,7 +184,7 @@ public class HttpSigner implements Signer {
         if (status == 401) {
             throw new RemitError(
                 ErrorCodes.UNAUTHORIZED,
-                "HttpSigner: unauthorized — check your REMIT_SIGNER_TOKEN.",
+                "HttpSigner: unauthorized - check your REMIT_SIGNER_TOKEN.",
                 Map.of("endpoint", endpoint),
                 401
             );
@@ -197,7 +197,7 @@ public class HttpSigner implements Signer {
             }
             throw new RemitError(
                 ErrorCodes.FORBIDDEN,
-                "HttpSigner: policy denied — " + reason,
+                "HttpSigner: policy denied - " + reason,
                 Map.of("endpoint", endpoint),
                 403
             );

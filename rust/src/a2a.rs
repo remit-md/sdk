@@ -1,4 +1,4 @@
-//! A2A / AP2 — agent card discovery and A2A JSON-RPC task client.
+//! A2A / AP2 - agent card discovery and A2A JSON-RPC task client.
 //!
 //! Spec: <https://google.github.io/A2A/specification/>
 //! AP2:  <https://ap2-protocol.org/>
@@ -78,7 +78,7 @@ impl AgentCard {
     ///
     /// ```ignore
     /// let card = remitmd::a2a::AgentCard::discover("https://remit.md").await?;
-    /// println!("{} — {}", card.name, card.url);
+    /// println!("{} - {}", card.name, card.url);
     /// ```
     pub async fn discover(base_url: &str) -> Result<Self, crate::error::RemitError> {
         let url = format!(

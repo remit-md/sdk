@@ -6,11 +6,11 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 
+use crate::cli_signer::{cli_install_hint, CliSigner};
 use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
 use crate::http::{
     chain_config, compute_permit_digest, fetch_permit_nonce, usdc_address, HttpTransport, Transport,
 };
-use crate::cli_signer::{cli_install_hint, CliSigner};
 use crate::models::*;
 use crate::signer::{PrivateKeySigner, Signer};
 

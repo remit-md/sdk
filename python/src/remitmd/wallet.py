@@ -108,7 +108,18 @@ class Wallet(RemitClient):
 
     @classmethod
     def from_env(cls, chain: str | None = None) -> Wallet:
-        """Load wallet from REMITMD_KEY and REMITMD_CHAIN environment variables."""
+        """Load wallet from environment variables.
+
+        Priority: REMIT_SIGNER_URL > OWS_WALLET_ID > REMITMD_KEY > error.
+        For REMIT_SIGNER_URL, use the async ``with_signer()`` factory.
+        For OWS_WALLET_ID, use the sync ``with_ows()`` factory.
+        """
+        # Signer URL requires async creation
+        if os.environ.get("REMIT_SIGNER_URL"):
+            raise OSError(
+                "REMIT_SIGNER_URL is set — use: await Wallet.with_signer()"
+            )
+
         key = os.environ.get("REMITMD_KEY")
         if not key:
             if os.environ.get("OWS_WALLET_ID"):
@@ -116,10 +127,46 @@ class Wallet(RemitClient):
                     "OWS_WALLET_ID is set but from_env() only supports raw keys. "
                     "Use: Wallet.with_ows()"
                 )
-            raise OSError("REMITMD_KEY environment variable is not set")
+            raise OSError(
+                "No signing credentials found. Set one of: "
+                "REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, OWS_WALLET_ID, or REMITMD_KEY."
+            )
         resolved_chain = chain or os.environ.get("REMITMD_CHAIN", "base")
         testnet = os.environ.get("REMITMD_TESTNET", "").lower() in ("1", "true", "yes")
         return cls(private_key=key, chain=resolved_chain, testnet=testnet)
+
+    @classmethod
+    async def with_signer(
+        cls,
+        url: str | None = None,
+        token: str | None = None,
+        chain: str | None = None,
+        testnet: bool = False,
+        api_url: str | None = None,
+    ) -> Wallet:
+        """Create a Wallet backed by the local HTTP signer server.
+
+        Reads ``REMIT_SIGNER_URL`` and ``REMIT_SIGNER_TOKEN`` from env
+        unless overridden.
+        """
+        from remitmd.http_signer import HttpSigner
+
+        resolved_url = url or os.environ.get("REMIT_SIGNER_URL")
+        resolved_token = token or os.environ.get("REMIT_SIGNER_TOKEN")
+
+        if not resolved_url:
+            raise ValueError("REMIT_SIGNER_URL is required for with_signer()")
+        if not resolved_token:
+            raise ValueError("REMIT_SIGNER_TOKEN is required for with_signer()")
+
+        signer = await HttpSigner.create(resolved_url, resolved_token)
+        resolved_chain = chain or os.environ.get("REMITMD_CHAIN", "base")
+        return cls(
+            signer=signer,
+            chain=resolved_chain,
+            testnet=testnet,
+            api_url=api_url,
+        )
 
     @classmethod
     def with_ows(

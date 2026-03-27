@@ -24,6 +24,7 @@ from remitmd.models.stream import Stream
 from remitmd.models.tab import Tab, TabCharge
 from remitmd.provider import X402Paywall
 from remitmd.signer import PrivateKeySigner, Signer
+from remitmd.http_signer import HttpSigner
 from remitmd.wallet import PermitSignature, Wallet
 
 try:
@@ -45,6 +46,7 @@ __all__ = [
     "PermitSignature",
     "Signer",
     "PrivateKeySigner",
+    "HttpSigner",
     "OwsSigner",
     "X402Client",
     "AllowanceExceededError",

@@ -73,13 +73,11 @@ public final class RemitWallet: @unchecked Sendable {
 
         // Priority: REMIT_SIGNER_URL > REMITMD_KEY > REMITMD_PRIVATE_KEY > error
         if let signerURL = env["REMIT_SIGNER_URL"] {
-            guard let _ = env["REMIT_SIGNER_TOKEN"] else {
+            guard let token = env["REMIT_SIGNER_TOKEN"] else {
                 throw RemitError(RemitError.unauthorized, "REMIT_SIGNER_TOKEN is required when REMIT_SIGNER_URL is set")
             }
-            // HttpSigner will be implemented in V24 C4.4. For now, error with guidance.
-            throw RemitError(RemitError.unauthorized,
-                "REMIT_SIGNER_URL is set (\(signerURL)) but HttpSigner is not yet available in the Swift SDK. " +
-                "Use REMITMD_KEY for now, or use the TypeScript/Python SDK which support HttpSigner.")
+            let signer = try HttpSigner(url: signerURL, token: token)
+            return RemitWallet(signer: signer, chain: chain, routerAddress: routerAddress)
         }
 
         let key: String

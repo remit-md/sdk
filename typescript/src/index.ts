@@ -40,8 +40,7 @@ export { PrivateKeySigner } from "./signer.js";
 export type { Signer, TypedDataDomain, TypedDataTypes } from "./signer.js";
 export { OwsSigner } from "./ows-signer.js";
 export type { OwsSignerOptions } from "./ows-signer.js";
-export { HttpSigner } from "./http-signer.js";
-export type { HttpSignerOptions } from "./http-signer.js";
+export { CliSigner } from "./cli-signer.js";
 
 // Errors
 export {

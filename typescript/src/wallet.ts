@@ -7,6 +7,7 @@ import { generatePrivateKey } from "viem/accounts";
 import { RemitClient, type RemitClientOptions } from "./client.js";
 import { AuthenticatedClient } from "./http.js";
 import { PrivateKeySigner, type Signer } from "./signer.js";
+import { CliSigner } from "./cli-signer.js";
 import { X402Client, type PaymentRequired } from "./x402.js";
 import type {
   Transaction,
@@ -151,19 +152,19 @@ export class Wallet extends RemitClient {
     return new Wallet({ ...options, privateKey: key });
   }
 
-  /** Load from environment variables.
+  /** Load from environment variables (sync — raw key only).
    *
-   * Priority: REMIT_SIGNER_URL > OWS_WALLET_ID > REMITMD_KEY > error.
-   * For REMIT_SIGNER_URL and OWS_WALLET_ID, use the async factories
-   * `withSigner()` and `withOws()` respectively.
+   * Priority: CliSigner (async) > OWS (async) > REMITMD_KEY > error.
+   * For CLI signer or OWS, use the async factories
+   * `fromEnvironment()`, `withCli()`, or `withOws()` respectively.
    */
   static fromEnv(overrides?: RemitClientOptions): Wallet {
     const chain = process.env["REMITMD_CHAIN"] ?? "base";
 
-    // Check for signer URL first (async creation needed)
-    if (process.env["REMIT_SIGNER_URL"]) {
+    // Check for CLI signer (async creation needed)
+    if (CliSigner.isAvailable()) {
       throw new Error(
-        "REMIT_SIGNER_URL is set - use: await Wallet.withSigner()"
+        "Remit CLI signer detected - use: await Wallet.withCli() or await Wallet.fromEnvironment()"
       );
     }
 
@@ -178,43 +179,76 @@ export class Wallet extends RemitClient {
     const key = process.env["REMITMD_KEY"];
     if (!key) {
       throw new Error(
-        "No signing credentials found. Set one of: " +
-        "REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, OWS_WALLET_ID, or REMITMD_KEY."
+        "No signing credentials found. Set one of:\n" +
+        "  1. Install Remit CLI + set REMIT_KEY_PASSWORD (recommended)\n" +
+        "  2. Set OWS_WALLET_ID for OWS wallet\n" +
+        "  3. Set REMITMD_KEY for raw private key"
       );
     }
     return new Wallet({ chain, ...overrides, privateKey: key });
   }
 
   /**
-   * Create a Wallet backed by the local HTTP signer server.
+   * Create a Wallet from the environment, trying all signing methods.
    *
-   * Reads REMIT_SIGNER_URL and REMIT_SIGNER_TOKEN from env unless overridden.
+   * Priority:
+   *   1. CLI signer (remit on PATH + keystore + REMIT_KEY_PASSWORD)
+   *   2. OWS wallet (OWS_WALLET_ID)
+   *   3. Raw private key (REMITMD_KEY)
+   *   4. Error with install instructions
+   */
+  static async fromEnvironment(overrides?: RemitClientOptions): Promise<Wallet> {
+    const chain = overrides?.chain ?? process.env["REMITMD_CHAIN"] ?? "base";
+
+    // Priority 1: CLI signer
+    if (CliSigner.isAvailable()) {
+      try {
+        const signer = await CliSigner.create();
+        return new Wallet({ chain, ...overrides, signer });
+      } catch {
+        // CLI detection passed but create failed — fall through
+      }
+    }
+
+    // Priority 2: OWS wallet
+    if (process.env["OWS_WALLET_ID"]) {
+      return Wallet.withOws({ chain, ...overrides });
+    }
+
+    // Priority 3: Raw private key
+    const key = process.env["REMITMD_KEY"];
+    if (key) {
+      return new Wallet({ chain, ...overrides, privateKey: key });
+    }
+
+    // No signing method available
+    throw new Error(
+      "No signing method available.\n" +
+      "  1. Install Remit CLI + set REMIT_KEY_PASSWORD (recommended)\n" +
+      "     Install: https://remit.md/install\n" +
+      "  2. Set OWS_WALLET_ID for OWS wallet\n" +
+      "  3. Set REMITMD_KEY for raw private key"
+    );
+  }
+
+  /**
+   * Create a Wallet backed by the Remit CLI signer.
+   *
+   * The CLI binary must be on PATH (or specify cliPath) and
+   * REMIT_KEY_PASSWORD must be set. The encrypted keystore at
+   * ~/.remit/keys/default.enc is used for signing.
    *
    * @example
    * ```typescript
-   * const wallet = await Wallet.withSigner();
-   * // or with explicit options:
-   * const wallet = await Wallet.withSigner({ url: "http://127.0.0.1:7402", token: "rmit_sk_..." });
+   * const wallet = await Wallet.withCli();
+   * // or with custom CLI path:
+   * const wallet = await Wallet.withCli({ cliPath: "/usr/local/bin/remit" });
    * ```
    */
-  static async withSigner(
-    options?: RemitClientOptions & {
-      url?: string;
-      token?: string;
-    },
+  static async withCli(
+    options?: RemitClientOptions & { cliPath?: string },
   ): Promise<Wallet> {
-    const url = options?.url ?? process.env["REMIT_SIGNER_URL"];
-    const token = options?.token ?? process.env["REMIT_SIGNER_TOKEN"];
-
-    if (!url) {
-      throw new Error("REMIT_SIGNER_URL is required for withSigner()");
-    }
-    if (!token) {
-      throw new Error("REMIT_SIGNER_TOKEN is required for withSigner()");
-    }
-
-    const { HttpSigner } = await import("./http-signer.js");
-    const signer = await HttpSigner.create({ url, token });
+    const signer = await CliSigner.create(options?.cliPath);
     const chain = options?.chain ?? process.env["REMITMD_CHAIN"] ?? "base";
     return new Wallet({ chain, ...options, signer });
   }

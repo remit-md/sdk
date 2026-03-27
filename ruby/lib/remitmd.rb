@@ -26,5 +26,5 @@ require_relative "remitmd/x402_paywall"
 #   mock.was_paid?("0x0000000000000000000000000000000000000001", 1.00) # => true
 #
 module Remitmd
-  VERSION = "0.1.9"
+  VERSION = "0.2.1"
 end

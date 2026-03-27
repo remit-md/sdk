@@ -38,6 +38,26 @@ print(tx.id, tx.status) // "tx_...", "confirmed"
 let wallet = try RemitWallet.fromEnvironment()
 ```
 
+## Local Signer (Recommended)
+
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+
+```bash
+export REMIT_SIGNER_URL=http://127.0.0.1:7402
+export REMIT_SIGNER_TOKEN=rmit_sk_...
+```
+
+```swift
+// Explicit
+let signer = try HttpSigner(url: "http://127.0.0.1:7402", token: "rmit_sk_...")
+let wallet = RemitWallet(signer: signer, chain: .base)
+
+// Or auto-detect from env (recommended)
+let wallet = try RemitWallet.fromEnvironment() // detects REMIT_SIGNER_URL automatically
+```
+
+`RemitWallet.fromEnvironment()` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `REMITMD_KEY`.
+
 ## Testing (zero network calls)
 
 ```swift

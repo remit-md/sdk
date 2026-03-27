@@ -28,6 +28,26 @@ console.log(tx.txHash);
 
 That's it. USDC approval is handled automatically.
 
+## Local Signer (Recommended)
+
+The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token — no private key in the environment.
+
+```bash
+export REMIT_SIGNER_URL=http://127.0.0.1:7402
+export REMIT_SIGNER_TOKEN=rmit_sk_...
+```
+
+```typescript
+// Explicit
+const signer = await HttpSigner.create({ url, token });
+const wallet = new Wallet({ signer });
+
+// Or auto-detect from env (recommended)
+const wallet = await Wallet.withSigner(); // reads REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN
+```
+
+`Wallet.fromEnv()` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `OWS_WALLET_ID` > `REMITMD_KEY`.
+
 ## Secure Wallet with OWS
 
 The [Open Wallet Standard](https://openwallet.sh) replaces raw private keys with encrypted local storage and policy-gated signing. Keys never leave the vault — the SDK signs through OWS's FFI layer.

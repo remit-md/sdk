@@ -33,7 +33,7 @@ class TestCliSignerCreate:
 
     @pytest.mark.asyncio
     async def test_create_fails_when_cli_not_found(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises((FileNotFoundError, RuntimeError)):
             await CliSigner.create("nonexistent-remit-binary-xyz")
 
     def test_get_address_fails_when_not_initialized(self) -> None:

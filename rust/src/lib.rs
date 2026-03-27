@@ -72,7 +72,7 @@ pub mod a2a;
 mod compliance;
 pub mod error;
 mod http;
-pub mod http_signer;
+pub mod cli_signer;
 mod mock;
 mod models;
 mod signer;
@@ -82,7 +82,7 @@ pub mod x402;
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 pub use error::RemitError;
-pub use http_signer::HttpSigner;
+pub use cli_signer::CliSigner;
 pub use mock::MockRemit;
 pub use models::{
     Balance, Bounty, BountyStatus, BountySubmission, Budget, ChainId, ContractAddresses, Deposit,

@@ -1,7 +1,7 @@
 package md.remit;
 
 import md.remit.internal.ApiClient;
-import md.remit.signer.HttpSigner;
+import md.remit.signer.CliSigner;
 import md.remit.signer.PrivateKeySigner;
 import md.remit.signer.Signer;
 
@@ -49,7 +49,7 @@ public final class RemitMd {
      *
      * <p>Signing credential priority:
      * <ol>
-     *   <li>{@code REMIT_SIGNER_URL} + {@code REMIT_SIGNER_TOKEN} - HTTP signer server</li>
+     *   <li>{@code remit} CLI (CliSigner) - if CLI on PATH, keystore exists, password set</li>
      *   <li>{@code REMITMD_KEY} - hex-encoded private key</li>
      * </ol>
      *
@@ -65,25 +65,24 @@ public final class RemitMd {
     public static Wallet fromEnv() {
         Builder b;
 
-        // Priority: REMIT_SIGNER_URL > REMITMD_KEY > error
-        String signerUrl = System.getenv("REMIT_SIGNER_URL");
-        if (signerUrl != null && !signerUrl.isBlank()) {
-            String signerToken = System.getenv("REMIT_SIGNER_TOKEN");
-            if (signerToken == null || signerToken.isBlank()) {
-                throw new RemitError(ErrorCodes.UNAUTHORIZED,
-                    "REMIT_SIGNER_URL is set but REMIT_SIGNER_TOKEN is missing. " +
-                    "Both are required for HTTP signer mode.",
-                    Map.of("hint", "export REMIT_SIGNER_TOKEN=rmit_sk_...")
-                );
-            }
-            b = withSigner(new HttpSigner(signerUrl, signerToken));
+        // Priority: CliSigner > REMITMD_KEY > error
+        if (CliSigner.isAvailable()) {
+            b = withSigner(CliSigner.create());
         } else {
             String key = System.getenv("REMITMD_KEY");
             if (key == null || key.isBlank()) {
+                String os = System.getProperty("os.name", "").toLowerCase();
+                String installCmd;
+                if (os.contains("mac")) {
+                    installCmd = "brew install remit-md/tap/remit";
+                } else if (os.contains("win")) {
+                    installCmd = "winget install remit-md.remit";
+                } else {
+                    installCmd = "curl -fsSL https://remit.md/install.sh | sh";
+                }
                 throw new RemitError(ErrorCodes.UNAUTHORIZED,
-                    "No signing credentials found. Set one of: " +
-                    "REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY.",
-                    Map.of("hint", "export REMITMD_KEY=0x... or export REMIT_SIGNER_URL=http://...")
+                    "No signing credentials found. Install the remit CLI or set REMITMD_KEY.",
+                    Map.of("hint", installCmd)
                 );
             }
             b = withKey(key);

@@ -10,7 +10,7 @@ use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
 use crate::http::{
     chain_config, compute_permit_digest, fetch_permit_nonce, usdc_address, HttpTransport, Transport,
 };
-use crate::http_signer::HttpSigner;
+use crate::cli_signer::{cli_install_hint, CliSigner};
 use crate::models::*;
 use crate::signer::{PrivateKeySigner, Signer};
 
@@ -96,8 +96,8 @@ impl Wallet {
     /// Create a wallet from environment variables.
     ///
     /// Signer detection (first match wins):
-    /// 1. `REMIT_SIGNER_URL` + `REMIT_SIGNER_TOKEN` - HTTP signer server
-    /// 2. `REMITMD_KEY` - hex-encoded private key
+    /// 1. CLI signer — `remit` on PATH + keystore exists + `REMIT_KEY_PASSWORD` set
+    /// 2. `REMITMD_KEY` — hex-encoded private key
     ///
     /// Common options:
     /// - `REMITMD_CHAIN` - chain name (default: `"base"`)
@@ -111,17 +111,9 @@ impl Wallet {
         );
         let router_address = env::var("REMITMD_ROUTER_ADDRESS").unwrap_or_default();
 
-        // 1. HTTP signer server (REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN)
-        if let Ok(signer_url) = env::var("REMIT_SIGNER_URL") {
-            let token = env::var("REMIT_SIGNER_TOKEN").map_err(|_| {
-                remit_err_ctx(
-                    codes::UNAUTHORIZED,
-                    "REMIT_SIGNER_URL is set but REMIT_SIGNER_TOKEN is missing. Both are required for HTTP signer mode.",
-                    "hint",
-                    "export REMIT_SIGNER_TOKEN=rmit_sk_...",
-                )
-            })?;
-            let signer = HttpSigner::new(&signer_url, &token)?;
+        // 1. CLI signer (encrypted keystore — most secure)
+        if CliSigner::is_available() {
+            let signer = CliSigner::new()?;
             let mut builder = Self::with_signer(signer).chain(&chain);
             if testnet {
                 builder = builder.testnet();
@@ -146,9 +138,12 @@ impl Wallet {
 
         Err(remit_err_ctx(
             codes::UNAUTHORIZED,
-            "No signer configured. Set REMIT_SIGNER_URL+REMIT_SIGNER_TOKEN for HTTP signer, or REMITMD_KEY for a private key.",
+            format!(
+                "No signing credentials found. Install the Remit CLI and set REMIT_KEY_PASSWORD, or set REMITMD_KEY.\nInstall CLI: {}",
+                cli_install_hint()
+            ),
             "hint",
-            "export REMITMD_KEY=0x... OR export REMIT_SIGNER_URL=http://127.0.0.1:7402 REMIT_SIGNER_TOKEN=rmit_sk_...",
+            "export REMITMD_KEY=0x... or install remit CLI",
         ))
     }
 

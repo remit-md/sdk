@@ -39,7 +39,7 @@ public final class RemitWallet: @unchecked Sendable {
 
     /// Initialize with a custom signer (any type conforming to `Signer`).
     ///
-    /// Use this to inject an `HttpSigner` (for the local signer server),
+    /// Use this to inject a `CliSigner` (for the CLI signer),
     /// a `PrivateKeySigner`, or any custom signer implementation.
     public init(signer: any Signer, chain: RemitChain = .base, baseURL: String? = nil, routerAddress: String? = nil) {
         let envURL = ProcessInfo.processInfo.environment["REMITMD_API_URL"]
@@ -71,12 +71,9 @@ public final class RemitWallet: @unchecked Sendable {
         let chain: RemitChain = chainStr == "base" ? .base : .baseSepolia
         let routerAddress = env["REMITMD_ROUTER_ADDRESS"]
 
-        // Priority: REMIT_SIGNER_URL > REMITMD_KEY > REMITMD_PRIVATE_KEY > error
-        if let signerURL = env["REMIT_SIGNER_URL"] {
-            guard let token = env["REMIT_SIGNER_TOKEN"] else {
-                throw RemitError(RemitError.unauthorized, "REMIT_SIGNER_TOKEN is required when REMIT_SIGNER_URL is set")
-            }
-            let signer = try HttpSigner(url: signerURL, token: token)
+        // Priority: CliSigner > REMITMD_KEY > REMITMD_PRIVATE_KEY > error
+        if CliSigner.isAvailable() {
+            let signer = try CliSigner()
             return RemitWallet(signer: signer, chain: chain, routerAddress: routerAddress)
         }
 
@@ -87,8 +84,15 @@ public final class RemitWallet: @unchecked Sendable {
             print("[remitmd] Warning: REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead")
             key = k
         } else {
+            #if os(macOS)
+            let installHint = "brew install remit-md/tap/remit"
+            #elseif os(Linux)
+            let installHint = "curl -fsSL https://remit.md/install.sh | sh"
+            #else
+            let installHint = "see https://remit.md for install instructions"
+            #endif
             throw RemitError(RemitError.unauthorized,
-                "No signing credentials found. Set one of: REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN, or REMITMD_KEY")
+                "No signing credentials found. Install the remit CLI (\(installHint)) or set REMITMD_KEY")
         }
         return try RemitWallet(privateKey: key, chain: chain, routerAddress: routerAddress)
     }

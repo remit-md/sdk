@@ -67,21 +67,16 @@ module Remitmd
     end
 
     # Build a RemitWallet from environment variables.
-    # Reads: REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN (preferred, uses HttpSigner),
-    # or REMITMD_KEY (primary) / REMITMD_PRIVATE_KEY (deprecated fallback).
+    # Priority: CliSigner (if available) > REMITMD_KEY / REMITMD_PRIVATE_KEY.
     # Also reads: REMITMD_CHAIN, REMITMD_API_URL, REMITMD_ROUTER_ADDRESS.
     def self.from_env
       chain          = ENV.fetch("REMITMD_CHAIN", "base")
       api_url        = ENV["REMITMD_API_URL"]
       router_address = ENV["REMITMD_ROUTER_ADDRESS"]
 
-      # Priority 1: HTTP signer server
-      signer_url = ENV["REMIT_SIGNER_URL"]
-      if signer_url
-        signer_token = ENV["REMIT_SIGNER_TOKEN"]
-        raise ArgumentError, "REMIT_SIGNER_TOKEN must be set when REMIT_SIGNER_URL is set" unless signer_token
-
-        signer = HttpSigner.new(url: signer_url, token: signer_token)
+      # Priority 1: CLI signer (remit binary + keystore + password)
+      if CliSigner.available?
+        signer = CliSigner.new
         return new(signer: signer, chain: chain, api_url: api_url, router_address: router_address)
       end
 
@@ -90,7 +85,16 @@ module Remitmd
       if ENV["REMITMD_PRIVATE_KEY"] && !ENV["REMITMD_KEY"]
         warn "[remitmd] REMITMD_PRIVATE_KEY is deprecated, use REMITMD_KEY instead"
       end
-      raise ArgumentError, "REMITMD_KEY not set (or set REMIT_SIGNER_URL + REMIT_SIGNER_TOKEN)" unless key
+
+      unless key
+        raise ArgumentError,
+          "No signing method available. Either:\n" \
+          "  1. Install the remit CLI and set REMIT_KEY_PASSWORD:\n" \
+          "     macOS:   brew install remit-md/tap/remit\n" \
+          "     Windows: winget install remit-md.remit\n" \
+          "     Linux:   curl -fsSL https://remit.md/install.sh | sh\n" \
+          "  2. Set REMITMD_KEY to a raw private key (hex)"
+      end
 
       new(private_key: key, chain: chain, api_url: api_url, router_address: router_address)
     end

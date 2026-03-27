@@ -18,25 +18,24 @@ Console.WriteLine($"Paid! TX: {tx.TxHash}");
 dotnet add package RemitMd
 ```
 
-## Local Signer (Recommended)
+## CLI Signer (Recommended)
 
-The local signer delegates key management to `remit signer`, a localhost HTTP server that holds your encrypted key. Your agent only needs a URL and token - no private key in the environment.
+The CLI signer delegates key management to the `remit` CLI, which holds your encrypted keystore at `~/.remit/keys/`. No private key in the environment.
 
 ```bash
-export REMIT_SIGNER_URL=http://127.0.0.1:7402
-export REMIT_SIGNER_TOKEN=rmit_sk_...
+export REMIT_KEY_PASSWORD=your-keystore-password
 ```
 
 ```csharp
 // Explicit
-var signer = new HttpSigner("http://127.0.0.1:7402", "rmit_sk_...");
+var signer = CliSigner.Create();
 var wallet = new Wallet(signer);
 
 // Or auto-detect from env (recommended)
-var wallet = Wallet.FromEnvironment(); // detects REMIT_SIGNER_URL automatically
+var wallet = Wallet.FromEnvironment(); // detects remit CLI automatically
 ```
 
-`Wallet.FromEnvironment()` detects signer credentials automatically. Priority: `REMIT_SIGNER_URL` > `REMITMD_KEY`.
+`Wallet.FromEnvironment()` detects signing credentials automatically. Priority: CLI signer > `REMITMD_KEY`.
 
 ## Setup
 

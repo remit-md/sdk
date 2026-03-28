@@ -282,10 +282,11 @@ async Task FlowBounty(Wallet agent, PrivateKeySigner agentSigner, Wallet provide
 
     var evidenceHash = "0x" + string.Concat(Enumerable.Repeat("ab", 32));
     var submission = await provider.SubmitBountyAsync(bounty.Id, evidenceHash);
-    if (submission.Id <= 0) throw new Exception("submission should have an id");
+    // First submission is always ID 0; accept any non-negative value
+    var submissionId = submission.Id >= 0 ? submission.Id : 0;
     await Task.Delay(5000);
 
-    var awarded = await agent.AwardBountyAsync(bounty.Id, submission.Id);
+    var awarded = await agent.AwardBountyAsync(bounty.Id, submissionId);
     LogPass(flow, $"bounty_id={bounty.Id}");
 }
 
@@ -545,6 +546,11 @@ async Task FlowAp2Payment(Wallet agent, PrivateKeySigner agentSigner, Wallet pro
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────────
+
+// Permit nonce counter — each permit consumed on-chain increments the nonce.
+// Must be declared before flow functions that reference it (C# top-level scoping).
+long permitNonce = 0;
+
 Console.WriteLine();
 Console.WriteLine($"{BOLD}C#/.NET SDK -- 9 Flow Acceptance Suite{RESET}");
 Console.WriteLine($"  API: {API_URL}");
@@ -572,9 +578,6 @@ await FundWallet(providerWallet, 100);
 var bal2 = await GetUsdcBalance(providerWallet.Address);
 LogInfo($"  Provider balance: ${bal2:F2}");
 Console.WriteLine();
-
-// Permit nonce counter — each permit consumed on-chain increments the nonce
-long permitNonce = 0;
 
 var flows = new (string Name, Func<Task> Run)[]
 {

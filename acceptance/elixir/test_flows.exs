@@ -445,12 +445,46 @@ flow7 = fn ->
       }
     })
 
+    # Build EIP-712 auth headers for settle endpoint
+    auth_router = contracts["router"]
+    auth_timestamp = :os.system_time(:second)
+    auth_nonce_bytes = :crypto.strong_rand_bytes(32)
+    auth_nonce_hex = "0x" <> Base.encode16(auth_nonce_bytes, case: :lower)
+
+    # Domain separator: remit.md / 0.1
+    auth_domain_type_hash =
+      keccak.("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+    auth_name_hash = keccak.("remit.md")
+    auth_version_hash = keccak.("0.1")
+
+    auth_domain_sep = keccak.(
+      auth_domain_type_hash <> auth_name_hash <> auth_version_hash <>
+      <<parsed_chain_id::unsigned-big-integer-size(256)>> <> pad_addr.(auth_router)
+    )
+
+    # APIRequest struct — string fields are keccak256-hashed in EIP-712
+    auth_struct_type_hash =
+      keccak.("APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)")
+    method_hash = keccak.("POST")
+    path_hash_auth = keccak.("/api/v1/x402/settle")
+    auth_struct_hash = keccak.(
+      auth_struct_type_hash <> method_hash <> path_hash_auth <>
+      <<auth_timestamp::unsigned-big-integer-size(256)>> <> auth_nonce_bytes
+    )
+
+    auth_digest = keccak.(<<0x19, 0x01>> <> auth_domain_sep <> auth_struct_hash)
+    auth_signature = RemitMd.PrivateKeySigner.sign(signer, auth_digest)
+
     settle_url = String.to_charlist("#{api_base}/x402/settle")
     {:ok, {{_, settle_status, _}, _, settle_resp_body}} =
       :httpc.request(
         :post,
         {settle_url,
-         [{~c"content-type", ~c"application/json"}],
+         [{~c"content-type", ~c"application/json"},
+          {~c"x-remit-signature", String.to_charlist(auth_signature)},
+          {~c"x-remit-agent", String.to_charlist(agent.wallet.address)},
+          {~c"x-remit-timestamp", String.to_charlist(to_string(auth_timestamp))},
+          {~c"x-remit-nonce", String.to_charlist(auth_nonce_hex)}],
          ~c"application/json",
          String.to_charlist(settle_body)},
         [{:timeout, 30_000}],

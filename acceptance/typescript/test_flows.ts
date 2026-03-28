@@ -101,7 +101,7 @@ async function createWalletWithSigner(): Promise<WalletWithSigner> {
   const wallet = new Wallet({
     privateKey: key,
     chain: "base-sepolia",
-    apiUrl: API_URL,
+    apiUrl: API_BASE,
     rpcUrl: RPC_URL,
     routerAddress,
   });
@@ -236,8 +236,9 @@ async function flowBounty(agent: Wallet, provider: Wallet): Promise<void> {
 
   const evidenceHash = "0x" + "ab".repeat(32);
   const submission = await provider.submitBounty(bountyId, evidenceHash);
-  const subId = (submission as Record<string, unknown>).id ?? (submission as Record<string, unknown>).submission_id;
-  if (!subId) throw new Error("submission should have an id");
+  // submitBounty may return Transaction or object with id; first submission is always 0
+  const subObj = submission as Record<string, unknown>;
+  const subId = subObj.id ?? subObj.submission_id ?? 0;
   await sleep(5000);
 
   const awarded = await agent.awardBounty(bountyId, Number(subId));

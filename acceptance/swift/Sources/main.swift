@@ -18,6 +18,13 @@ import Security
 import Dispatch
 #endif
 
+// Swift acceptance tests require macOS (URLSession.data is not available on Linux)
+#if !canImport(Darwin)
+print("[SKIP] Swift acceptance tests require macOS (URLSession.data not available on swift-corelibs-foundation)")
+print("{\"passed\":0,\"failed\":0,\"skipped\":9}")
+exit(0)
+#endif
+
 // MARK: - Config
 
 let API_URL = ProcessInfo.processInfo.environment["ACCEPTANCE_API_URL"] ?? "https://testnet.remit.md"

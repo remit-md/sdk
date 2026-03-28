@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 fn api_url() -> String {
-    env::var("ACCEPTANCE_API_URL").unwrap_or_else(|_| "https://remit.md".to_string())
+    env::var("ACCEPTANCE_API_URL").unwrap_or_else(|_| "https://testnet.remit.md".to_string())
 }
 
 fn rpc_url() -> String {

@@ -2,7 +2,7 @@ name: Acceptance Tests
 
 # Manual-only. Tests hit live Base Sepolia via the testnet API.
 # Trigger after merging SDK changes to verify all payment flows work end-to-end.
-# Jobs run sequentially to avoid Alchemy RPC rate limiting and relayer nonce contention.
+# All SDKs run in parallel — each creates fresh wallets, no shared state.
 on:
   workflow_dispatch:
     inputs:
@@ -53,8 +53,7 @@ jobs:
 
   typescript:
     name: TS SDK Acceptance
-    needs: [python]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'typescript') }}
+    if: inputs.sdk == 'all' || inputs.sdk == 'typescript'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -89,8 +88,7 @@ jobs:
 
   go:
     name: Go SDK Acceptance
-    needs: [typescript]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'go') }}
+    if: inputs.sdk == 'all' || inputs.sdk == 'go'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -115,8 +113,7 @@ jobs:
 
   rust:
     name: Rust SDK Acceptance
-    needs: [go]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'rust') }}
+    if: inputs.sdk == 'all' || inputs.sdk == 'rust'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -140,8 +137,7 @@ jobs:
 
   java:
     name: Java SDK Acceptance
-    needs: [rust]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'java') }}
+    if: inputs.sdk == 'all' || inputs.sdk == 'java'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -172,8 +168,7 @@ jobs:
 
   ruby:
     name: Ruby SDK Acceptance
-    needs: [java]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'ruby') }}
+    if: inputs.sdk == 'all' || inputs.sdk == 'ruby'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -200,8 +195,7 @@ jobs:
 
   swift:
     name: Swift SDK Acceptance
-    needs: [ruby]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'swift') }}
+    if: inputs.sdk == 'all' || inputs.sdk == 'swift'
     runs-on: macos-latest
     timeout-minutes: 15
 
@@ -221,8 +215,7 @@ jobs:
 
   dotnet:
     name: .NET SDK Acceptance
-    needs: [swift]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'dotnet') }}
+    if: inputs.sdk == 'all' || inputs.sdk == 'dotnet'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -253,8 +246,7 @@ jobs:
 
   elixir:
     name: Elixir SDK Acceptance
-    needs: [dotnet]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'elixir') }}
+    if: inputs.sdk == 'all' || inputs.sdk == 'elixir'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

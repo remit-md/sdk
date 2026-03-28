@@ -414,8 +414,8 @@ defmodule RemitMd.AcceptanceTest do
 
   # ─── Test: X402 Auto-Pay ──────────────────────────────────────────────
 
-  # Skipped: x402 test fails with process EXIT — broken server-side
-  @tag :x402_broken
+  # Skipped: x402 test fails with process EXIT — TCP server + :httpc interaction
+  @tag skip: "x402 local TCP server causes process EXIT in CI"
   @tag timeout: 120_000
   test "x402 auto-pay (local server with 402)" do
     contracts = fetch_contracts()

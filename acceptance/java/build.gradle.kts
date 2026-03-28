@@ -17,7 +17,7 @@ repositories {
 }
 
 dependencies {
-    implementation("md.remit:remit-sdk")
+    implementation("md.remit:remitmd-sdk")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
     implementation("org.web3j:core:4.10.3")
 }

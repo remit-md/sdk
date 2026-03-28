@@ -96,10 +96,19 @@ _router_cache: str | None = None
 async def get_router() -> str:
     global _router_cache
     if _router_cache is None:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{API_BASE}/contracts")
-            resp.raise_for_status()
-            _router_cache = resp.json()["router"]
+        for attempt in range(5):
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(f"{API_BASE}/contracts", timeout=15.0)
+                    resp.raise_for_status()
+                    _router_cache = resp.json()["router"]
+                    return _router_cache
+            except (httpx.HTTPStatusError, httpx.RequestError) as e:
+                if attempt < 4:
+                    log_info(f"  /contracts attempt {attempt+1} failed ({e}), retrying in 5s...")
+                    await asyncio.sleep(5)
+                else:
+                    raise
     return _router_cache
 
 

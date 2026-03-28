@@ -2,7 +2,7 @@
 
 Delegates EIP-712 signing to the ``remit sign`` subprocess. The CLI
 holds the encrypted keystore; this adapter only needs the binary on
-PATH and the REMIT_KEY_PASSWORD env var set.
+PATH and the REMIT_SIGNER_KEY env var set.
 
 Usage::
 
@@ -94,7 +94,8 @@ class CliSigner(Signer):
 
         1. CLI binary found on PATH
         2. ~/.remit/keys/default.meta exists (keychain, no password needed), OR
-        3. ~/.remit/keys/default.enc exists AND REMIT_KEY_PASSWORD env var is set
+        3. ~/.remit/keys/default.enc exists AND REMIT_SIGNER_KEY
+           (or REMIT_KEY_PASSWORD) env var is set
         """
         if not shutil.which(cli_path):
             return False
@@ -106,7 +107,7 @@ class CliSigner(Signer):
         keystore = Path.home() / ".remit" / "keys" / "default.enc"
         if not keystore.exists():
             return False
-        if not os.environ.get("REMIT_KEY_PASSWORD"):
+        if not (os.environ.get("REMIT_SIGNER_KEY") or os.environ.get("REMIT_KEY_PASSWORD")):
             return False
         return True
 

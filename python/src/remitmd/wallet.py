@@ -134,7 +134,7 @@ class Wallet(RemitClient):
                 )
             raise OSError(
                 "No signing credentials found. Set one of:\n"
-                "  1. Install Remit CLI + set REMIT_KEY_PASSWORD (recommended)\n"
+                "  1. Install Remit CLI + set REMIT_SIGNER_KEY (recommended)\n"
                 "  2. Set OWS_WALLET_ID for OWS wallet\n"
                 "  3. Set REMITMD_KEY for raw private key"
             )
@@ -152,7 +152,7 @@ class Wallet(RemitClient):
         """Create a Wallet from the environment, trying all signing methods.
 
         Priority:
-          1. CLI signer (remit on PATH + keystore + REMIT_KEY_PASSWORD)
+          1. CLI signer (remit on PATH + keystore + REMIT_SIGNER_KEY)
           2. OWS wallet (OWS_WALLET_ID)
           3. Raw private key (REMITMD_KEY)
           4. Error with install instructions
@@ -190,7 +190,7 @@ class Wallet(RemitClient):
 
         raise OSError(
             "No signing method available.\n"
-            "  1. Install Remit CLI + set REMIT_KEY_PASSWORD (recommended)\n"
+            "  1. Install Remit CLI + set REMIT_SIGNER_KEY (recommended)\n"
             "     Install: https://remit.md/install\n"
             "  2. Set OWS_WALLET_ID for OWS wallet\n"
             "  3. Set REMITMD_KEY for raw private key"
@@ -207,7 +207,7 @@ class Wallet(RemitClient):
         """Create a Wallet backed by the Remit CLI signer.
 
         The CLI binary must be on PATH (or specify cli_path) and
-        REMIT_KEY_PASSWORD must be set.
+        REMIT_SIGNER_KEY must be set.
         """
         from remitmd.cli_signer import CliSigner
 

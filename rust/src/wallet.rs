@@ -96,7 +96,7 @@ impl Wallet {
     /// Create a wallet from environment variables.
     ///
     /// Signer detection (first match wins):
-    /// 1. CLI signer — `remit` on PATH + keystore exists + `REMIT_KEY_PASSWORD` set
+    /// 1. CLI signer — `remit` on PATH + keystore exists + `REMIT_SIGNER_KEY` set
     /// 2. `REMITMD_KEY` — hex-encoded private key
     ///
     /// Common options:
@@ -139,7 +139,7 @@ impl Wallet {
         Err(remit_err_ctx(
             codes::UNAUTHORIZED,
             format!(
-                "No signing credentials found. Install the Remit CLI and set REMIT_KEY_PASSWORD, or set REMITMD_KEY.\nInstall CLI: {}",
+                "No signing credentials found. Install the Remit CLI and set REMIT_SIGNER_KEY, or set REMITMD_KEY.\nInstall CLI: {}",
                 cli_install_hint()
             ),
             "hint",

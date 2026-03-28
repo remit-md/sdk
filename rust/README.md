@@ -56,7 +56,7 @@ All payment methods (`pay`, `create_escrow`, `create_tab`, `create_stream`, `cre
 The CLI signer delegates key management to the `remit` CLI, which holds your encrypted keystore at `~/.remit/keys/`. No private key in the environment.
 
 ```bash
-export REMIT_KEY_PASSWORD=your-keystore-password
+export REMIT_SIGNER_KEY=your-keystore-password
 ```
 
 ```rust

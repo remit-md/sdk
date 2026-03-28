@@ -21,16 +21,19 @@ public sealed class CliSignerTests
     [Fact]
     public void IsAvailable_NoPassword_ReturnsFalse()
     {
-        // Temporarily unset REMIT_KEY_PASSWORD
-        var old = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
+        // Temporarily unset REMIT_SIGNER_KEY and REMIT_KEY_PASSWORD
+        var oldNew = Environment.GetEnvironmentVariable("REMIT_SIGNER_KEY");
+        var oldLegacy = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
         try
         {
+            Environment.SetEnvironmentVariable("REMIT_SIGNER_KEY", null);
             Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", null);
             Assert.False(CliSigner.IsAvailable());
         }
         finally
         {
-            Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", old);
+            Environment.SetEnvironmentVariable("REMIT_SIGNER_KEY", oldNew);
+            Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", oldLegacy);
         }
     }
 
@@ -44,15 +47,18 @@ public sealed class CliSignerTests
 
         if (!File.Exists(keystore))
         {
-            var old = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
+            var oldNew = Environment.GetEnvironmentVariable("REMIT_SIGNER_KEY");
+            var oldLegacy = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
             try
             {
-                Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", "test-password");
+                Environment.SetEnvironmentVariable("REMIT_SIGNER_KEY", "test-password");
+                Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", null);
                 Assert.False(CliSigner.IsAvailable());
             }
             finally
             {
-                Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", old);
+                Environment.SetEnvironmentVariable("REMIT_SIGNER_KEY", oldNew);
+                Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", oldLegacy);
             }
         }
         // If keystore exists in test env, this test is a no-op (acceptable)
@@ -109,16 +115,19 @@ public sealed class CliSignerTests
             return;
         }
 
-        var old = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
+        var oldNew = Environment.GetEnvironmentVariable("REMIT_SIGNER_KEY");
+        var oldLegacy = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
         try
         {
-            Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", "some-password");
+            Environment.SetEnvironmentVariable("REMIT_SIGNER_KEY", "some-password");
+            Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", null);
             // Even with password set, no keystore = not available
             Assert.False(CliSigner.IsAvailable());
         }
         finally
         {
-            Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", old);
+            Environment.SetEnvironmentVariable("REMIT_SIGNER_KEY", oldNew);
+            Environment.SetEnvironmentVariable("REMIT_KEY_PASSWORD", oldLegacy);
         }
     }
 }

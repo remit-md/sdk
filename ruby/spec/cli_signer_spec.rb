@@ -163,7 +163,7 @@ RSpec.describe Remitmd::CliSigner do
       allow(File).to receive(:exist?).with(meta_path).and_return(false)
       allow(File).to receive(:exist?).with(enc_path).and_return(true)
       allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("REMIT_KEY_PASSWORD").and_return("secret")
+      allow(ENV).to receive(:[]).with("REMIT_SIGNER_KEY").and_return("secret")
 
       expect(described_class.available?).to be true
     end
@@ -188,7 +188,7 @@ RSpec.describe Remitmd::CliSigner do
       expect(described_class.available?).to be false
     end
 
-    it "returns false when .enc exists but REMIT_KEY_PASSWORD is not set" do
+    it "returns false when .enc exists but REMIT_SIGNER_KEY is not set" do
       success = instance_double(Process::Status, success?: true)
       allow(Open3).to receive(:capture3).with(which_cmd, "remit").and_return(
         ["/usr/local/bin/remit\n", "", success]
@@ -196,7 +196,7 @@ RSpec.describe Remitmd::CliSigner do
       allow(File).to receive(:exist?).with(meta_path).and_return(false)
       allow(File).to receive(:exist?).with(enc_path).and_return(true)
       allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("REMIT_KEY_PASSWORD").and_return(nil)
+      allow(ENV).to receive(:[]).with("REMIT_SIGNER_KEY").and_return(nil)
 
       expect(described_class.available?).to be false
     end

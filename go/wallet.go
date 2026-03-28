@@ -130,7 +130,7 @@ func newWalletWithSigner(signer Signer, opts ...Option) (*Wallet, error) {
 // FromEnv creates a Wallet from environment variables.
 //
 // Credential priority:
-//  1. CLI signer - remit CLI on PATH + keystore exists + REMIT_KEY_PASSWORD set
+//  1. CLI signer - remit CLI on PATH + keystore exists + REMIT_SIGNER_KEY set
 //  2. REMITMD_KEY - hex-encoded private key
 //
 // Common env vars:
@@ -163,7 +163,7 @@ func FromEnv(opts ...Option) (*Wallet, error) {
 	key := os.Getenv("REMITMD_KEY")
 	if key == "" {
 		return nil, remitErr(ErrCodeUnauthorized,
-			"No signing credentials found. Install the Remit CLI and set REMIT_KEY_PASSWORD, or set REMITMD_KEY.\n"+
+			"No signing credentials found. Install the Remit CLI and set REMIT_SIGNER_KEY, or set REMITMD_KEY.\n"+
 				"Install CLI: "+cliInstallHint(),
 			map[string]any{"hint": "export REMITMD_KEY=0x... or install remit CLI"},
 		)

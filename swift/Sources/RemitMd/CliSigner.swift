@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Delegates EIP-712 signing to a `remit sign --digest` subprocess. The CLI
 /// holds the encrypted keystore; this adapter only needs the binary on PATH
-/// and the `REMIT_KEY_PASSWORD` env var set.
+/// and the `REMIT_SIGNER_KEY` env var set.
 ///
 /// - No key material in this process -- signing happens in a subprocess.
 /// - Address is cached at construction time via `remit address`.
@@ -87,7 +87,7 @@ public final class CliSigner: Signer, @unchecked Sendable {
     /// Check conditions for CliSigner activation:
     /// 1. CLI binary found (runs `remit --version` successfully)
     /// 2. Meta file at `~/.remit/keys/default.meta` (keychain -- no password needed), OR
-    /// 3. Keystore file at `~/.remit/keys/default.enc` AND `REMIT_KEY_PASSWORD` env var set
+    /// 3. Keystore file at `~/.remit/keys/default.enc` AND `REMIT_SIGNER_KEY` env var set
     ///
     /// - Parameter cliPath: Path to the `remit` binary (default: `"remit"`).
     /// - Returns: `true` if CLI exists and either keychain meta or encrypted keystore + password are available.
@@ -108,7 +108,7 @@ public final class CliSigner: Signer, @unchecked Sendable {
         // 3. Encrypted keystore + password
         guard fm.fileExists(atPath: keysDir + "/default.enc") else { return false }
 
-        guard let password = ProcessInfo.processInfo.environment["REMIT_KEY_PASSWORD"],
+        guard let password = ProcessInfo.processInfo.environment["REMIT_SIGNER_KEY"] ?? ProcessInfo.processInfo.environment["REMIT_KEY_PASSWORD"],
               !password.isEmpty else {
             return false
         }

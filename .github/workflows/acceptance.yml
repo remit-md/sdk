@@ -57,7 +57,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md/api/v1
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: pnpm run acceptance
 
@@ -81,7 +81,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd python && python -m pytest tests/acceptance/ -v -s --timeout=180
 
@@ -106,7 +106,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd go && go test -tags acceptance -timeout 600s -v -count=1
 
@@ -130,7 +130,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture
 
@@ -161,7 +161,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: gradle acceptanceTest --no-daemon
 
@@ -188,7 +188,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance -f documentation
 
@@ -208,7 +208,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: swift test --filter AcceptanceTests
 
@@ -239,7 +239,7 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: dotnet test --no-build -c Release --filter "Category=Acceptance" --verbosity normal
 
@@ -268,6 +268,6 @@ jobs:
 
       - name: Run acceptance tests
         env:
-          ACCEPTANCE_API_URL: https://remit.md
+          ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: mix test test/acceptance_test.exs --include acceptance

@@ -147,12 +147,24 @@ public struct Reputation: Codable, Sendable {
     public let escrowRate: Double
 
     enum CodingKeys: String, CodingKey {
-        case address, score
+        case address, wallet, score
         case totalVolume = "total_volume"
         case transactionCount = "transaction_count"
         case counterpartyCount = "counterparty_count"
         case agedays = "age_days"
         case escrowRate = "escrow_rate"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.address = (try? container.decode(String.self, forKey: .wallet))
+            ?? (try container.decode(String.self, forKey: .address))
+        self.score = try container.decode(Double.self, forKey: .score)
+        self.totalVolume = try container.decode(Double.self, forKey: .totalVolume)
+        self.transactionCount = try container.decode(Int.self, forKey: .transactionCount)
+        self.counterpartyCount = try container.decode(Int.self, forKey: .counterpartyCount)
+        self.agedays = try container.decode(Int.self, forKey: .agedays)
+        self.escrowRate = try container.decode(Double.self, forKey: .escrowRate)
     }
 }
 

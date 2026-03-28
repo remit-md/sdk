@@ -1,5 +1,6 @@
 package md.remit.models;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -10,7 +11,8 @@ import java.time.Instant;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Reputation {
 
-    @JsonProperty("address")
+    @JsonProperty("wallet")
+    @JsonAlias("address")
     public String address;
 
     @JsonProperty("score")

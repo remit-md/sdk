@@ -174,7 +174,7 @@ class MockWallet:
 
     async def get_reputation(self, wallet: str) -> Reputation:
         return Reputation(
-            address=wallet,
+            wallet=wallet,
             score=1.0,
             total_paid=0.0,
             total_received=0.0,

@@ -79,12 +79,12 @@ public record Balance(
 
 /// <summary>On-chain payment reputation for an address.</summary>
 public record Reputation(
-    [property: JsonPropertyName("address")] string Address,
-    [property: JsonPropertyName("score")] int Score,
-    [property: JsonPropertyName("total_paid")] decimal TotalPaid,
-    [property: JsonPropertyName("total_received")] decimal TotalReceived,
-    [property: JsonPropertyName("transaction_count")] int TransactionCount,
-    [property: JsonPropertyName("member_since")] DateTimeOffset MemberSince
+    [property: JsonPropertyName("wallet")] string Wallet,
+    [property: JsonPropertyName("avg_rating")] decimal AvgRating,
+    [property: JsonPropertyName("tier")] string Tier,
+    [property: JsonPropertyName("total_volume")] decimal TotalVolume,
+    [property: JsonPropertyName("transactions_completed")] int TransactionsCompleted,
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt
 );
 
 /// <summary>A partial payment condition within an Escrow.</summary>

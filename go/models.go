@@ -117,7 +117,7 @@ type Balance struct {
 
 // Reputation is an agent's on-chain payment reputation score.
 type Reputation struct {
-	Address          string          `json:"address"`
+	Address          string          `json:"wallet"`
 	Score            int             `json:"score"`       // 0-1000
 	TotalPaid        decimal.Decimal `json:"total_paid"`
 	TotalReceived    decimal.Decimal `json:"total_received"`

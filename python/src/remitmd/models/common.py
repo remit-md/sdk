@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class ChainId(str, Enum):
@@ -102,12 +102,21 @@ class LinkResponse(BaseModel):
 class Reputation(BaseModel):
     """On-chain reputation profile."""
 
-    address: str
+    wallet: str
     score: float
     total_paid: float
     total_received: float
     escrows_completed: int
     member_since: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_wallet(cls, data: Any) -> Any:
+        """Accept both 'wallet' (preferred) and 'address' (legacy) from the server."""
+        if isinstance(data, dict):
+            if "wallet" not in data and "address" in data:
+                data["wallet"] = data.pop("address")
+        return data
 
 
 class Event(BaseModel):

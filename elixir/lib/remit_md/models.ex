@@ -83,24 +83,24 @@ defmodule RemitMd.Models do
 
   defmodule Reputation do
     @moduledoc "Reputation score and statistics for an agent address."
-    @enforce_keys [:address, :score]
-    defstruct [:address, :score, :total_paid, :total_received,
-               :escrows_completed, :member_since,
-               # Legacy fields
+    @enforce_keys [:wallet]
+    defstruct [:wallet, :avg_rating, :tier, :total_volume,
+               :transactions_completed, :updated_at,
+               # Legacy fields kept for backward compat
                :total_volume_usdc, :successful_txns, :avg_settlement_secs]
 
     @doc false
     def from_map(m) do
       %__MODULE__{
-        address:             Map.fetch!(m, "address"),
-        score:               Map.fetch!(m, "score"),
-        total_paid:          Map.get(m, "total_paid") || Map.get(m, "totalPaid"),
-        total_received:      Map.get(m, "total_received") || Map.get(m, "totalReceived"),
-        escrows_completed:   Map.get(m, "escrows_completed") || Map.get(m, "escrowsCompleted"),
-        member_since:        Map.get(m, "member_since") || Map.get(m, "memberSince"),
-        total_volume_usdc:   Map.get(m, "total_volume_usdc"),
-        successful_txns:     Map.get(m, "successful_txns"),
-        avg_settlement_secs: Map.get(m, "avg_settlement_secs")
+        wallet:                 Map.get(m, "wallet") || Map.get(m, "address"),
+        avg_rating:             Map.get(m, "avg_rating") || Map.get(m, "score"),
+        tier:                   Map.get(m, "tier"),
+        total_volume:           Map.get(m, "total_volume") || Map.get(m, "total_paid"),
+        transactions_completed: Map.get(m, "transactions_completed") || Map.get(m, "escrows_completed") || Map.get(m, "escrowsCompleted"),
+        updated_at:             Map.get(m, "updated_at") || Map.get(m, "member_since") || Map.get(m, "memberSince"),
+        total_volume_usdc:      Map.get(m, "total_volume_usdc"),
+        successful_txns:        Map.get(m, "successful_txns"),
+        avg_settlement_secs:    Map.get(m, "avg_settlement_secs")
       }
     end
   end

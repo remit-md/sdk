@@ -679,7 +679,7 @@ func TestBountyLifecycle(t *testing.T) {
 		decimal.NewFromFloat(5.0),
 		"Write a Go acceptance test",
 		deadline,
-		WithBountyPermit(permit),
+		remitmd.WithBountyPermit(permit),
 	)
 	if err != nil {
 		t.Fatalf("CreateBounty: %v", err)

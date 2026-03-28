@@ -102,13 +102,13 @@ defmodule RemitMdTest do
   test "reputation/2 returns reputation for an address", %{wallet: wallet} do
     {:ok, rep} = Wallet.reputation(wallet, @payee)
     assert %Reputation{} = rep
-    assert rep.address == @payee
-    assert rep.score >= 0 and rep.score <= 100
+    assert rep.wallet == @payee
+    assert rep.avg_rating >= 0 and rep.avg_rating <= 100
   end
 
   test "reputation/2 defaults to wallet address", %{wallet: wallet} do
     {:ok, rep} = Wallet.reputation(wallet)
-    assert rep.address == @payer
+    assert rep.wallet == @payer
   end
 
   # ─── Escrow ───────────────────────────────────────────────────────────────

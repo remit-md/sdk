@@ -43,8 +43,8 @@ IO.puts("   After releasing 'design_approved': #{esc.status}\n")
 # ── 4. Reputation ────────────────────────────────────────────────────────────
 IO.puts("4. Reputation")
 {:ok, rep} = Wallet.reputation(payer, payee)
-IO.puts("   address: #{rep.address}")
-IO.puts("   score:   #{rep.score}/100\n")
+IO.puts("   wallet:     #{rep.wallet}")
+IO.puts("   avg_rating: #{rep.avg_rating}/100\n")
 
 # ── 5. Spending analytics ────────────────────────────────────────────────────
 IO.puts("5. Spending Summary")

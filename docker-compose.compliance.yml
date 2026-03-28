@@ -47,7 +47,9 @@ services:
       ENV: testnet
       JWT_SECRET: "compliance-test-jwt-secret-not-for-production-xxxxxxxxxxxxxxxxx"
       SERVER_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
+      RPC_URL: "https://sepolia.base.org"
       READ_RPC_URL: "https://sepolia.base.org"
+      SERVER_SIGNING_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
       LOG_LEVEL: "info"
     depends_on:
       postgres:

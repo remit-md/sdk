@@ -76,6 +76,33 @@ def test_wallet_cannot_be_pickled():
         pickle.dumps(wallet)
 
 
+# ─── Chain key resolution ─────────────────────────────────────────────────────
+
+
+def test_chain_resolves_to_sepolia_when_testnet():
+    key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    wallet = Wallet(private_key=key, chain="base", testnet=True)
+    assert wallet.chain == "base-sepolia"
+
+
+def test_chain_stays_base_when_not_testnet():
+    key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    wallet = Wallet(private_key=key, chain="base", testnet=False)
+    assert wallet.chain == "base"
+
+
+def test_chain_no_double_sepolia():
+    key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    wallet = Wallet(private_key=key, chain="base-sepolia", testnet=True)
+    assert wallet.chain == "base-sepolia"
+
+
+def test_chain_localhost_stays_localhost():
+    key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    wallet = Wallet(private_key=key, chain="localhost", testnet=True)
+    assert wallet.chain == "localhost"
+
+
 def test_signer_repr_does_not_expose_key():
     key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
     signer = PrivateKeySigner(key)

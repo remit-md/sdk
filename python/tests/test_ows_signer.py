@@ -283,6 +283,36 @@ class TestOwsSignerSigConcat:
         assert sig == f"0x{MOCK_SIG_RSV}"
 
     @pytest.mark.asyncio
+    async def test_normalizes_rsv_with_recovery_id_0(self) -> None:
+        # OWS returns r+s+v where v=0x00 (recovery_id) instead of 0x1b (27)
+        sig_with_v0 = "a" * 64 + "b" * 64 + "00"
+        signer = OwsSigner(MOCK_WALLET_ID, _ows_module=MockOws(signature=sig_with_v0))
+
+        sig = await signer.sign_typed_data(
+            {"name": "T", "version": "1"},
+            {"M": [{"name": "x", "type": "uint256"}]},
+            {"x": 1},
+        )
+
+        assert len(sig) == 132
+        assert sig[-2:] == "1b"  # v=0 normalized to v=27
+
+    @pytest.mark.asyncio
+    async def test_normalizes_rsv_with_recovery_id_1(self) -> None:
+        # OWS returns r+s+v where v=0x01 (recovery_id) instead of 0x1c (28)
+        sig_with_v1 = "a" * 64 + "b" * 64 + "01"
+        signer = OwsSigner(MOCK_WALLET_ID, _ows_module=MockOws(signature=sig_with_v1))
+
+        sig = await signer.sign_typed_data(
+            {"name": "T", "version": "1"},
+            {"M": [{"name": "x", "type": "uint256"}]},
+            {"x": 1},
+        )
+
+        assert len(sig) == 132
+        assert sig[-2:] == "1c"  # v=1 normalized to v=28
+
+    @pytest.mark.asyncio
     async def test_handles_0x_prefixed_signature(self) -> None:
         signer = OwsSigner(
             MOCK_WALLET_ID, _ows_module=MockOws(signature=f"0x{MOCK_SIG_RS}", recovery_id=0)

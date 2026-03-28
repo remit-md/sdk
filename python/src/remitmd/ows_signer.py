@@ -123,11 +123,15 @@ class OwsSigner(Signer):
         if sig.startswith("0x"):
             sig = sig[2:]
 
-        # G6: If OWS already returns r+s+v (130 hex chars), use as-is.
+        # G6: If OWS already returns r+s+v (130 hex chars), normalize v.
+        # OWS may include recovery_id (0/1) rather than Ethereum v (27/28).
         if len(sig) == 130:
-            return f"0x{sig}"
+            v_byte = int(sig[128:130], 16)
+            if v_byte < 27:
+                v_byte += 27
+            return f"0x{sig[:128]}{v_byte:02x}"
 
-        # Otherwise it's r+s (128 hex chars), append v.
+        # Otherwise it's r+s (128 hex chars), append Ethereum v.
         recovery_id: int = result.get("recovery_id") or 0
         v = recovery_id + 27
         return f"0x{sig}{v:02x}"

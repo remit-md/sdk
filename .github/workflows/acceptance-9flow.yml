@@ -10,12 +10,17 @@ on:
         required: false
         default: "all"
         type: string
+      api_url:
+        description: "API URL (default: testnet)"
+        required: false
+        default: "https://testnet.remit.md"
+        type: string
 
 permissions:
   contents: read
 
 env:
-  ACCEPTANCE_API_URL: https://testnet.remit.md
+  ACCEPTANCE_API_URL: ${{ inputs.api_url || 'https://testnet.remit.md' }}
   ACCEPTANCE_RPC_URL: https://sepolia.base.org
 
 jobs:

@@ -1,0 +1,16 @@
+{
+  "name": "remit-acceptance-flows",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx test_flows.ts"
+  },
+  "dependencies": {
+    "@remitmd/sdk": "file:../../typescript",
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

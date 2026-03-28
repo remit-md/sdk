@@ -480,7 +480,10 @@ impl MockTransport {
                     .or_else(|| b["description"].as_str())
                     .unwrap_or("")
                     .to_string();
-                let deadline = b.get("deadline").cloned().unwrap_or(serde_json::Value::Number(0.into()));
+                let deadline = b
+                    .get("deadline")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Number(0.into()));
 
                 let mut s = self.state.lock().await;
                 check_balance(s.balance, amount)?;
@@ -535,7 +538,10 @@ impl MockTransport {
                     .map(|f| Decimal::from_str_exact(&format!("{f}")).unwrap_or_default())
                     .or_else(|| decimal_field(&b, "amount").ok())
                     .unwrap_or_default();
-                let expiry = b.get("expiry").cloned().unwrap_or(serde_json::Value::Number(0.into()));
+                let expiry = b
+                    .get("expiry")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Number(0.into()));
 
                 let mut s = self.state.lock().await;
                 check_balance(s.balance, amount)?;

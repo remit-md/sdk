@@ -342,7 +342,8 @@ async fn acceptance_pay_direct_with_permit() {
         tx.tx_hash
     );
 
-    let agent_after = wait_for_balance_change(agent.wallet.address(), agent_before, &contracts.usdc).await;
+    let agent_after =
+        wait_for_balance_change(agent.wallet.address(), agent_before, &contracts.usdc).await;
     let provider_after = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
@@ -412,7 +413,8 @@ async fn acceptance_escrow_lifecycle() {
         .expect("release_escrow");
 
     // Verify balances
-    let provider_after = wait_for_balance_change(provider.wallet.address(), provider_before, &contracts.usdc).await;
+    let provider_after =
+        wait_for_balance_change(provider.wallet.address(), provider_before, &contracts.usdc).await;
     let agent_after = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
@@ -508,7 +510,8 @@ async fn acceptance_tab_lifecycle() {
     eprintln!("Tab closed: status={:?}", closed.status);
 
     // 4. Verify balance: payer should have lost funds
-    let payer_after = wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
+    let payer_after =
+        wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
 
     let payer_delta = payer_after - payer_before;
     assert!(
@@ -573,7 +576,8 @@ async fn acceptance_stream_lifecycle() {
     eprintln!("Stream closed: status={:?}", closed.status);
 
     // 4. Conservation of funds: payer should have lost some amount
-    let payer_after = wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
+    let payer_after =
+        wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
     let payee_after = get_usdc_balance(payee.wallet.address(), &contracts.usdc).await;
 
     let payer_delta = payer_after - payer_before;
@@ -652,7 +656,8 @@ async fn acceptance_bounty_lifecycle() {
     eprintln!("Bounty awarded: status={:?}", awarded.status);
 
     // 4. Verify balances
-    let submitter_after = wait_for_balance_change(submitter.wallet.address(), 0.0, &contracts.usdc).await;
+    let submitter_after =
+        wait_for_balance_change(submitter.wallet.address(), 0.0, &contracts.usdc).await;
 
     assert!(
         submitter_after > 0.0,

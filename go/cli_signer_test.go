@@ -26,17 +26,17 @@ func TestCliSigner_IsAvailable_NoKeystore(t *testing.T) {
 }
 
 func TestCliSigner_IsAvailable_NoPassword(t *testing.T) {
-	// Temporarily unset REMIT_KEY_PASSWORD
-	old := os.Getenv("REMIT_KEY_PASSWORD")
-	os.Unsetenv("REMIT_KEY_PASSWORD")
+	// Temporarily unset REMIT_SIGNER_KEY
+	old := os.Getenv("REMIT_SIGNER_KEY")
+	os.Unsetenv("REMIT_SIGNER_KEY")
 	defer func() {
 		if old != "" {
-			os.Setenv("REMIT_KEY_PASSWORD", old)
+			os.Setenv("REMIT_SIGNER_KEY", old)
 		}
 	}()
 
 	if remitmd.IsCliSignerAvailable() {
-		t.Error("expected IsCliSignerAvailable to return false without REMIT_KEY_PASSWORD")
+		t.Error("expected IsCliSignerAvailable to return false without REMIT_SIGNER_KEY")
 	}
 }
 
@@ -73,15 +73,15 @@ func TestCliSigner_IsAvailable_AllConditions(t *testing.T) {
 	}
 
 	// If keystore exists but no password, should still be false
-	old := os.Getenv("REMIT_KEY_PASSWORD")
-	os.Unsetenv("REMIT_KEY_PASSWORD")
+	old := os.Getenv("REMIT_SIGNER_KEY")
+	os.Unsetenv("REMIT_SIGNER_KEY")
 	defer func() {
 		if old != "" {
-			os.Setenv("REMIT_KEY_PASSWORD", old)
+			os.Setenv("REMIT_SIGNER_KEY", old)
 		}
 	}()
 
 	if remitmd.IsCliSignerAvailable() {
-		t.Error("expected false without REMIT_KEY_PASSWORD even with keystore present")
+		t.Error("expected false without REMIT_SIGNER_KEY even with keystore present")
 	}
 }

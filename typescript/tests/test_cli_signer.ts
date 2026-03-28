@@ -75,10 +75,10 @@ describe("CliSigner", () => {
   });
 
   it("isAvailable() returns false when no password", () => {
-    const origPassword = process.env["REMIT_KEY_PASSWORD"];
-    delete process.env["REMIT_KEY_PASSWORD"];
+    const origPassword = process.env["REMIT_SIGNER_KEY"];
+    delete process.env["REMIT_SIGNER_KEY"];
     assert.equal(CliSigner.isAvailable(), false);
-    if (origPassword) process.env["REMIT_KEY_PASSWORD"] = origPassword;
+    if (origPassword) process.env["REMIT_SIGNER_KEY"] = origPassword;
   });
 
   it("create() throws when CLI not found", async () => {

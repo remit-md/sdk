@@ -13,7 +13,7 @@ Let AI agents pay for tools, data, and services - one env var, no crypto experie
 
 ```bash
 remit signer init            # creates encrypted keystore at ~/.remit/keys/
-export REMIT_KEY_PASSWORD=your-password
+export REMIT_SIGNER_KEY=your-password
 ```
 
 **Option B: Raw key** — for quick testing:
@@ -66,7 +66,7 @@ console.log('Paid:', tx.id);
       "command": "npx",
       "args": ["@remitmd/mcp"],
       "env": {
-        "REMIT_KEY_PASSWORD": "your-password",
+        "REMIT_SIGNER_KEY": "your-password",
         "REMIT_CLI_PATH": "/usr/local/bin/remit"
       }
     }

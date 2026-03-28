@@ -17,7 +17,7 @@ import (
 
 // CliSigner implements Signer by delegating to the `remit sign` CLI subprocess.
 // The CLI holds the encrypted keystore; this adapter only needs the binary on
-// PATH and the REMIT_KEY_PASSWORD env var set.
+// PATH and the REMIT_SIGNER_KEY env var set (falls back to REMIT_KEY_PASSWORD).
 //
 // Create with NewCliSigner, which fetches and caches the wallet address:
 //
@@ -33,7 +33,8 @@ const cliTimeout = 10 * time.Second
 
 // NewCliSigner creates a CliSigner by running `remit address` to fetch
 // and cache the wallet address. The CLI must be on PATH (or specify a
-// custom path), the keystore must exist, and REMIT_KEY_PASSWORD must be set.
+// custom path), the keystore must exist, and REMIT_SIGNER_KEY must be set
+// (falls back to REMIT_KEY_PASSWORD).
 func NewCliSigner(cliPath ...string) (*CliSigner, error) {
 	path := "remit"
 	if len(cliPath) > 0 && cliPath[0] != "" {
@@ -130,7 +131,7 @@ func (c *CliSigner) String() string {
 // IsCliSignerAvailable checks conditions for CliSigner activation:
 //  1. `remit` (or `remit.exe`) found on PATH
 //  2. ~/.remit/keys/default.meta exists (keychain, no password needed), OR
-//  3. ~/.remit/keys/default.enc exists AND REMIT_KEY_PASSWORD env var is set
+//  3. ~/.remit/keys/default.enc exists AND REMIT_SIGNER_KEY (or REMIT_KEY_PASSWORD) env var is set
 func IsCliSignerAvailable(cliPath ...string) bool {
 	path := "remit"
 	if len(cliPath) > 0 && cliPath[0] != "" {
@@ -157,7 +158,11 @@ func IsCliSignerAvailable(cliPath ...string) bool {
 	if _, err := os.Stat(keystorePath); os.IsNotExist(err) {
 		return false
 	}
-	if os.Getenv("REMIT_KEY_PASSWORD") == "" {
+	pw := os.Getenv("REMIT_SIGNER_KEY")
+	if pw == "" {
+		pw = os.Getenv("REMIT_KEY_PASSWORD")
+	}
+	if pw == "" {
 		return false
 	}
 

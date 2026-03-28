@@ -1,7 +1,7 @@
 //! CLI signer adapter for the `remit sign` subprocess.
 //!
 //! Delegates digest signing to the Remit CLI binary. The CLI holds the encrypted
-//! keystore; this adapter only needs the binary on PATH and the `REMIT_KEY_PASSWORD`
+//! keystore; this adapter only needs the binary on PATH and the `REMIT_SIGNER_KEY`
 //! env var set.
 //!
 //! # Usage
@@ -79,7 +79,7 @@ impl CliSigner {
     /// Check all three conditions for CliSigner activation:
     /// 1. `remit` found on PATH
     /// 2. Keystore file exists at `~/.remit/keys/default.enc`
-    /// 3. `REMIT_KEY_PASSWORD` env var is set (non-empty)
+    /// 3. `REMIT_SIGNER_KEY` env var is set (non-empty, falls back to `REMIT_KEY_PASSWORD`)
     pub fn is_available() -> bool {
         Self::is_available_with_path("remit")
     }
@@ -89,7 +89,7 @@ impl CliSigner {
     /// Detection order:
     /// 1. CLI on PATH
     /// 2. `~/.remit/keys/default.meta` exists → keychain-backed, no password needed
-    /// 3. `~/.remit/keys/default.enc` exists AND `REMIT_KEY_PASSWORD` set
+    /// 3. `~/.remit/keys/default.enc` exists AND `REMIT_SIGNER_KEY` set (falls back to `REMIT_KEY_PASSWORD`)
     pub fn is_available_with_path(cli_path: &str) -> bool {
         // Check 1: CLI on PATH
         if which::which(cli_path).is_err() {
@@ -108,7 +108,11 @@ impl CliSigner {
 
         // Check 3: Encrypted keystore + password
         if keys_dir.join("default.enc").exists() {
-            return matches!(std::env::var("REMIT_KEY_PASSWORD"), Ok(val) if !val.is_empty());
+            return matches!(
+                std::env::var("REMIT_SIGNER_KEY")
+                    .or_else(|_| std::env::var("REMIT_KEY_PASSWORD")),
+                Ok(val) if !val.is_empty()
+            );
         }
 
         false

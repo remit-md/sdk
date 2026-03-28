@@ -89,7 +89,7 @@ module Remitmd
       unless key
         raise ArgumentError,
           "No signing method available. Either:\n" \
-          "  1. Install the remit CLI and set REMIT_KEY_PASSWORD:\n" \
+          "  1. Install the remit CLI and set REMIT_SIGNER_KEY:\n" \
           "     macOS:   brew install remit-md/tap/remit\n" \
           "     Windows: winget install remit-md.remit\n" \
           "     Linux:   curl -fsSL https://remit.md/install.sh | sh\n" \

@@ -12,11 +12,11 @@ class CliSignerTest {
     // ─── isAvailable ──────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("isAvailable returns false when REMIT_KEY_PASSWORD is not set")
+    @DisplayName("isAvailable returns false when REMIT_SIGNER_KEY is not set")
     void testIsAvailableNoPassword() {
-        // In CI/test environments, REMIT_KEY_PASSWORD is typically not set.
+        // In CI/test environments, REMIT_SIGNER_KEY is typically not set.
         // If it IS set, this test is a no-op (we can't unset env vars in Java).
-        String password = System.getenv("REMIT_KEY_PASSWORD");
+        String password = System.getenv("REMIT_SIGNER_KEY");
         if (password == null || password.isEmpty()) {
             assertFalse(CliSigner.isAvailable());
         }

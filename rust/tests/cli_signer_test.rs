@@ -2,7 +2,8 @@ use remitmd::CliSigner;
 
 #[test]
 fn cli_signer_not_available_without_password() {
-    // Ensure REMIT_KEY_PASSWORD is not set
+    // Ensure REMIT_SIGNER_KEY is not set
+    std::env::remove_var("REMIT_SIGNER_KEY");
     std::env::remove_var("REMIT_KEY_PASSWORD");
     assert!(!CliSigner::is_available());
 }

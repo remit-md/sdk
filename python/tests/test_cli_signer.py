@@ -17,12 +17,15 @@ class TestCliSignerIsAvailable:
         assert CliSigner.is_available() is False
 
     def test_returns_false_when_no_password(self) -> None:
-        old = os.environ.pop("REMIT_KEY_PASSWORD", None)
+        old_new = os.environ.pop("REMIT_SIGNER_KEY", None)
+        old_legacy = os.environ.pop("REMIT_KEY_PASSWORD", None)
         try:
             assert CliSigner.is_available() is False
         finally:
-            if old is not None:
-                os.environ["REMIT_KEY_PASSWORD"] = old
+            if old_new is not None:
+                os.environ["REMIT_SIGNER_KEY"] = old_new
+            if old_legacy is not None:
+                os.environ["REMIT_KEY_PASSWORD"] = old_legacy
 
     def test_returns_false_when_cli_not_found(self) -> None:
         assert CliSigner.is_available("nonexistent-remit-binary-xyz") is False

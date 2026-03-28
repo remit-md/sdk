@@ -100,7 +100,7 @@ public sealed class CliSigner : IRemitSigner
     /// <list type="number">
     /// <item>CLI binary found on PATH (or at the given path).</item>
     /// <item><c>~/.remit/keys/default.meta</c> exists (keychain-backed, no password needed).</item>
-    /// <item><c>~/.remit/keys/default.enc</c> exists AND <c>REMIT_KEY_PASSWORD</c> is set.</item>
+    /// <item><c>~/.remit/keys/default.enc</c> exists AND <c>REMIT_SIGNER_KEY</c> (or <c>REMIT_KEY_PASSWORD</c>) is set.</item>
     /// </list>
     /// </summary>
     public static bool IsAvailable(string cliPath = "remit")
@@ -119,7 +119,8 @@ public sealed class CliSigner : IRemitSigner
         // 3. Encrypted keystore + password
         if (File.Exists(Path.Combine(keysDir, "default.enc")))
         {
-            var password = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
+            var password = Environment.GetEnvironmentVariable("REMIT_SIGNER_KEY")
+                ?? Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
             return !string.IsNullOrEmpty(password);
         }
 

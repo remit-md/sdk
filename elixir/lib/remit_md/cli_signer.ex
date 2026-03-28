@@ -4,7 +4,7 @@ defmodule RemitMd.CliSigner do
 
   Delegates EIP-712 signing to the `remit sign` subprocess. The CLI
   holds the encrypted keystore; this adapter only needs the binary on
-  PATH and the `REMIT_KEY_PASSWORD` env var set.
+  PATH and the `REMIT_SIGNER_KEY` env var set.
 
   - No key material in this process -- signing happens in a subprocess.
   - Address is cached at construction time via `remit address`.
@@ -82,7 +82,7 @@ defmodule RemitMd.CliSigner do
 
   1. CLI binary found on PATH
   2. Meta file at `~/.remit/keys/default.meta` (keychain -- no password needed), OR
-  3. Keystore file at `~/.remit/keys/default.enc` AND `REMIT_KEY_PASSWORD` env var set
+  3. Keystore file at `~/.remit/keys/default.enc` AND `REMIT_SIGNER_KEY` env var set
   """
   def available?(cli_path \\ "remit") do
     cli_exists?(cli_path) and (meta_exists?() or (keystore_exists?() and password_set?()))
@@ -105,7 +105,7 @@ defmodule RemitMd.CliSigner do
   end
 
   defp password_set? do
-    System.get_env("REMIT_KEY_PASSWORD") != nil
+    (System.get_env("REMIT_SIGNER_KEY") || System.get_env("REMIT_KEY_PASSWORD")) != nil
   end
 
   # ─── Protocol implementations ──────────────────────────────────────────────

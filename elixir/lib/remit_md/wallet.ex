@@ -100,7 +100,7 @@ defmodule RemitMd.Wallet do
   Build a wallet from environment variables.
 
   Credential priority:
-    1. `remit` CLI available (binary on PATH, keystore exists, REMIT_KEY_PASSWORD set)
+    1. `remit` CLI available (binary on PATH, keystore exists, REMIT_SIGNER_KEY set)
     2. `REMITMD_KEY` (or deprecated `REMITMD_PRIVATE_KEY`) - hex-encoded private key
 
   Optional: `REMITMD_CHAIN`, `REMITMD_API_URL`, `REMITMD_ROUTER_ADDRESS`

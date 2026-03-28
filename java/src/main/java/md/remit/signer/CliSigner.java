@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>No key material enters this process — signing happens in a child process that
  * holds the encrypted keystore. This adapter only needs the CLI binary on PATH and
- * the {@code REMIT_KEY_PASSWORD} environment variable set.
+ * the {@code REMIT_SIGNER_KEY} environment variable set.
  *
  * <p>The address is fetched and cached during construction via {@code remit address}.
  *
@@ -204,7 +204,7 @@ public class CliSigner implements Signer {
      * <ol>
      *   <li>CLI binary found on PATH (or at the given path)</li>
      *   <li>{@code ~/.remit/keys/default.meta} exists (keychain-backed, no password needed)</li>
-     *   <li>{@code ~/.remit/keys/default.enc} exists AND {@code REMIT_KEY_PASSWORD} is set</li>
+     *   <li>{@code ~/.remit/keys/default.enc} exists AND {@code REMIT_SIGNER_KEY} is set</li>
      * </ol>
      *
      * @return true if the CLI signer can be activated
@@ -246,7 +246,10 @@ public class CliSigner implements Signer {
 
         // 3. Encrypted keystore + password
         if (Files.exists(keysDir.resolve("default.enc"))) {
-            String password = System.getenv("REMIT_KEY_PASSWORD");
+            String password = System.getenv("REMIT_SIGNER_KEY");
+            if (password == null || password.isEmpty()) {
+                password = System.getenv("REMIT_KEY_PASSWORD");
+            }
             return password != null && !password.isEmpty();
         }
 

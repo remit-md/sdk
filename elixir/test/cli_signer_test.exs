@@ -8,7 +8,7 @@ defmodule RemitMd.CliSignerTest do
   describe "available?/1" do
     setup do
       on_exit(fn ->
-        System.delete_env("REMIT_KEY_PASSWORD")
+        System.delete_env("REMIT_SIGNER_KEY")
       end)
 
       :ok
@@ -18,8 +18,8 @@ defmodule RemitMd.CliSignerTest do
       refute CliSigner.available?("nonexistent_binary_xyz")
     end
 
-    test "returns false when REMIT_KEY_PASSWORD is not set" do
-      System.delete_env("REMIT_KEY_PASSWORD")
+    test "returns false when REMIT_SIGNER_KEY is not set" do
+      System.delete_env("REMIT_SIGNER_KEY")
       # Even if CLI exists, password must be set
       # (keystore also likely missing in test env)
       refute CliSigner.available?()
@@ -71,7 +71,7 @@ defmodule RemitMd.CliSignerTest do
         System.delete_env("REMITMD_CHAIN")
         System.delete_env("REMITMD_API_URL")
         System.delete_env("REMITMD_ROUTER_ADDRESS")
-        System.delete_env("REMIT_KEY_PASSWORD")
+        System.delete_env("REMIT_SIGNER_KEY")
       end)
 
       :ok
@@ -80,7 +80,7 @@ defmodule RemitMd.CliSignerTest do
     test "from_env raises clear error with install instructions when no credentials set" do
       System.delete_env("REMITMD_KEY")
       System.delete_env("REMITMD_PRIVATE_KEY")
-      System.delete_env("REMIT_KEY_PASSWORD")
+      System.delete_env("REMIT_SIGNER_KEY")
 
       error = assert_raise RemitMd.Error, ~r/No signing credentials found/, fn ->
         RemitMd.Wallet.from_env()
@@ -92,7 +92,7 @@ defmodule RemitMd.CliSignerTest do
     end
 
     test "from_env falls back to REMITMD_KEY when CLI not available" do
-      System.delete_env("REMIT_KEY_PASSWORD")
+      System.delete_env("REMIT_SIGNER_KEY")
       # Use a known test private key
       System.put_env("REMITMD_KEY", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 

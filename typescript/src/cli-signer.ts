@@ -3,7 +3,7 @@
  *
  * Delegates EIP-712 signing to the `remit sign` subprocess. The CLI
  * holds the encrypted keystore; this adapter only needs the binary on
- * PATH and the REMIT_KEY_PASSWORD env var set.
+ * PATH and the REMIT_SIGNER_KEY env var set.
  *
  * Usage:
  *   const signer = await CliSigner.create();
@@ -128,7 +128,7 @@ export class CliSigner implements Signer {
   /**
    * Check conditions for CliSigner activation:
    * 1. ~/.remit/keys/default.meta exists (keychain — no password needed), OR
-   * 2. ~/.remit/keys/default.enc exists AND REMIT_KEY_PASSWORD env var is set
+   * 2. ~/.remit/keys/default.enc exists AND REMIT_SIGNER_KEY env var is set (falls back to REMIT_KEY_PASSWORD)
    *
    * Note: CLI presence on PATH is not checked synchronously — it's
    * verified when create() is called.
@@ -141,7 +141,7 @@ export class CliSigner implements Signer {
       // Encrypted file path: .enc + password
       const keystorePath = join(homedir(), ".remit", "keys", "default.enc");
       if (!existsSync(keystorePath)) return false;
-      if (!process.env["REMIT_KEY_PASSWORD"]) return false;
+      if (!(process.env["REMIT_SIGNER_KEY"] ?? process.env["REMIT_KEY_PASSWORD"])) return false;
       return true;
     } catch {
       return false;

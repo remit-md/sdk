@@ -40,7 +40,7 @@ let wallet = try RemitWallet.fromEnvironment()
 
 ## CLI Signer (Recommended)
 
-The CLI signer delegates key management to the `remit` CLI binary, which holds your encrypted keystore at `~/.remit/keys/`. No private key in the environment -- just the CLI on PATH and `REMIT_KEY_PASSWORD` set.
+The CLI signer delegates key management to the `remit` CLI binary, which holds your encrypted keystore at `~/.remit/keys/`. No private key in the environment -- just the CLI on PATH and `REMIT_SIGNER_KEY` set.
 
 ```bash
 # macOS
@@ -49,7 +49,7 @@ brew install remit-md/tap/remit
 # Linux
 curl -fsSL https://remit.md/install.sh | sh
 
-export REMIT_KEY_PASSWORD=...
+export REMIT_SIGNER_KEY=...
 ```
 
 ```swift

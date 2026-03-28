@@ -55,7 +55,7 @@ The CLI signer delegates key management to the `remit` CLI binary, which holds y
 # Windows: winget install remit-md.remit
 # Linux:   curl -fsSL https://remit.md/install.sh | sh
 
-export REMIT_KEY_PASSWORD=your-keystore-password
+export REMIT_SIGNER_KEY=your-keystore-password
 ```
 
 ```ruby

@@ -37,7 +37,7 @@ IO.puts("tx_hash: #{tx.tx_hash}")
 The CLI signer delegates key management to the `remit` CLI, which holds your encrypted keystore at `~/.remit/keys/`. No private key in the environment.
 
 ```bash
-export REMIT_KEY_PASSWORD=your_password
+export REMIT_SIGNER_KEY=your_password
 ```
 
 ```elixir

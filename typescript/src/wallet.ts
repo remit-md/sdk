@@ -180,7 +180,7 @@ export class Wallet extends RemitClient {
     if (!key) {
       throw new Error(
         "No signing credentials found. Set one of:\n" +
-        "  1. Install Remit CLI + set REMIT_KEY_PASSWORD (recommended)\n" +
+        "  1. Install Remit CLI + set REMIT_SIGNER_KEY (recommended)\n" +
         "  2. Set OWS_WALLET_ID for OWS wallet\n" +
         "  3. Set REMITMD_KEY for raw private key"
       );
@@ -192,7 +192,7 @@ export class Wallet extends RemitClient {
    * Create a Wallet from the environment, trying all signing methods.
    *
    * Priority:
-   *   1. CLI signer (remit on PATH + keystore + REMIT_KEY_PASSWORD)
+   *   1. CLI signer (remit on PATH + keystore + REMIT_SIGNER_KEY)
    *   2. OWS wallet (OWS_WALLET_ID)
    *   3. Raw private key (REMITMD_KEY)
    *   4. Error with install instructions
@@ -224,7 +224,7 @@ export class Wallet extends RemitClient {
     // No signing method available
     throw new Error(
       "No signing method available.\n" +
-      "  1. Install Remit CLI + set REMIT_KEY_PASSWORD (recommended)\n" +
+      "  1. Install Remit CLI + set REMIT_SIGNER_KEY (recommended)\n" +
       "     Install: https://remit.md/install\n" +
       "  2. Set OWS_WALLET_ID for OWS wallet\n" +
       "  3. Set REMITMD_KEY for raw private key"
@@ -235,7 +235,7 @@ export class Wallet extends RemitClient {
    * Create a Wallet backed by the Remit CLI signer.
    *
    * The CLI binary must be on PATH (or specify cliPath) and
-   * REMIT_KEY_PASSWORD must be set. The encrypted keystore at
+   * REMIT_SIGNER_KEY must be set. The encrypted keystore at
    * ~/.remit/keys/default.enc is used for signing.
    *
    * @example

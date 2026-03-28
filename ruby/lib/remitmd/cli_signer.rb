@@ -71,7 +71,7 @@ module Remitmd
     #
     # 1. CLI binary found on PATH (via `which` / `where`)
     # 2. Meta file at ~/.remit/keys/default.meta (keychain — no password needed), OR
-    # 3. Keystore file at ~/.remit/keys/default.enc AND REMIT_KEY_PASSWORD env var set
+    # 3. Keystore file at ~/.remit/keys/default.enc AND REMIT_SIGNER_KEY env var set
     #
     # @param cli_path [String] path or name of the remit CLI binary
     # @return [Boolean]
@@ -90,7 +90,7 @@ module Remitmd
       keystore = File.join(keys_dir, "default.enc")
       return false unless File.exist?(keystore)
 
-      password = ENV["REMIT_KEY_PASSWORD"]
+      password = ENV["REMIT_SIGNER_KEY"] || ENV["REMIT_KEY_PASSWORD"]
       return false if password.nil? || password.empty?
 
       true

@@ -115,7 +115,7 @@ async def get_router() -> str:
 async def create_wallet() -> Wallet:
     key = "0x" + secrets.token_hex(32)
     router = await get_router()
-    return Wallet(private_key=key, chain="base-sepolia", api_url=API_BASE, router_address=router)
+    return Wallet(private_key=key, chain="base-sepolia", api_url=API_URL, router_address=router)
 
 
 async def fund_wallet(wallet: Wallet, amount: float = 100) -> None:

@@ -23,6 +23,10 @@ RPC_URL = ENV.fetch("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+def log_tx(flow, step, tx_hash)
+  puts "[ACCEPTANCE] #{flow} | #{step} | tx=#{tx_hash} | https://sepolia.basescan.org/tx/#{tx_hash}"
+end
+
 def fetch_contracts
   @fetch_contracts ||= begin
     uri = URI("#{API_URL}/api/v1/contracts")
@@ -44,6 +48,7 @@ def create_test_wallet
     api_url: base_url,
     router_address: contracts["router"]
   )
+  puts "[ACCEPTANCE] wallet: #{wallet.address} (chain=84532)"
   { wallet: wallet, key_hex: key_hex }
 end
 
@@ -84,7 +89,9 @@ def assert_balance_change(label, before, after, expected)
 end
 
 def fund_wallet(tw, amount)
-  tw[:wallet].mint(amount)
+  puts "[ACCEPTANCE] mint: #{amount} USDC -> #{tw[:wallet].address}"
+  result = tw[:wallet].mint(amount)
+  log_tx("mint", "mint", result["tx_hash"]) if result.is_a?(Hash) && result["tx_hash"]
   wait_for_balance_change(tw[:wallet].address, 0)
 end
 
@@ -167,6 +174,7 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
 
       tx = agent[:wallet].pay(provider[:wallet].address, 1.0,
                               memo: "ruby-sdk-acceptance", permit: permit)
+      log_tx("direct", "pay", tx.tx_hash)
       expect(tx.tx_hash).to start_with("0x")
 
       agent_after = wait_for_balance_change(agent[:wallet].address, agent_before)
@@ -210,7 +218,8 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       sleep 5
 
       # Agent releases
-      agent[:wallet].release_escrow(escrow.id)
+      release_tx = agent[:wallet].release_escrow(escrow.id)
+      log_tx("escrow", "release", release_tx.tx_hash)
 
       # Verify balances
       provider_after = wait_for_balance_change(provider[:wallet].address, provider_before)
@@ -401,7 +410,8 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       payer_after_deposit = get_usdc_balance(payer[:wallet].address)
 
       # 2. Return deposit (by provider)
-      provider[:wallet].return_deposit(deposit.id)
+      return_tx = provider[:wallet].return_deposit(deposit.id)
+      log_tx("deposit", "return", return_tx.tx_hash)
 
       # 3. Verify full refund (deposits have no fee)
       payer_after_return = wait_for_balance_change(payer[:wallet].address, payer_after_deposit)

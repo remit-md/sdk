@@ -66,7 +66,13 @@ class AcceptanceTest {
                 .routerAddress(contracts.router)
                 .build();
 
+        System.out.println("[ACCEPTANCE] wallet: " + wallet.address() + " (chain=84532)");
         return new TestWallet(wallet, keyPair);
+    }
+
+    private static void logTx(String flow, String step, String txHash) {
+        System.out.println("[ACCEPTANCE] " + flow + " | " + step + " | tx=" + txHash
+                + " | https://sepolia.basescan.org/tx/" + txHash);
     }
 
     // ─── Contract discovery (unauthenticated) ───────────────────────────────
@@ -142,7 +148,9 @@ class AcceptanceTest {
     // ─── Funding ────────────────────────────────────────────────────────────
 
     private static void fundWallet(TestWallet w, double amount) throws Exception {
-        w.wallet.mint(amount);
+        System.out.println("[ACCEPTANCE] mint: " + amount + " USDC -> " + w.address());
+        MintResponse mintResp = w.wallet.mint(amount);
+        if (mintResp.txHash != null) logTx("mint", "fund", mintResp.txHash);
         waitForBalanceChange(w.address(), 0);
     }
 
@@ -268,6 +276,7 @@ class AcceptanceTest {
                 permit);
         assertNotNull(tx.txHash, "tx_hash should not be null");
         assertTrue(tx.txHash.startsWith("0x"), "expected tx hash 0x prefix, got: " + tx.txHash);
+        logTx("direct", "pay", tx.txHash);
 
         double agentAfter = waitForBalanceChange(agent.address(), agentBefore);
         double providerAfter = getUsdcBalance(provider.address());
@@ -309,11 +318,13 @@ class AcceptanceTest {
         waitForBalanceChange(agent.address(), agentBefore);
 
         // Provider claims start
-        provider.wallet.claimStart(escrow.id);
+        Transaction claimTx = provider.wallet.claimStart(escrow.id);
+        if (claimTx.txHash != null) logTx("escrow", "claimStart", claimTx.txHash);
         Thread.sleep(5_000);
 
         // Agent releases
-        agent.wallet.releaseEscrow(escrow.id);
+        Transaction releaseTx = agent.wallet.releaseEscrow(escrow.id);
+        if (releaseTx.txHash != null) logTx("escrow", "release", releaseTx.txHash);
 
         // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
@@ -385,6 +396,7 @@ class AcceptanceTest {
         assertNotNull(closeTx.txHash, "close should return tx hash");
         assertTrue(closeTx.txHash.startsWith("0x"),
                 "close tx hash should start with 0x, got: " + closeTx.txHash);
+        logTx("tab", "close", closeTx.txHash);
 
         // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
@@ -437,6 +449,7 @@ class AcceptanceTest {
         // Step 3: Close stream (payer only)
         Transaction closeTx = agent.wallet.closeStream(stream.id);
         assertNotNull(closeTx.txHash, "close stream should return tx hash");
+        logTx("stream", "close", closeTx.txHash);
 
         // Wait for settlement (provider balance should increase)
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
@@ -491,6 +504,7 @@ class AcceptanceTest {
         String evidenceHash = "0x" + "ab".repeat(32);
         Transaction submitTx = provider.wallet.submitBounty(bounty.id, evidenceHash);
         assertNotNull(submitTx.id, "submission should have an id");
+        if (submitTx.txHash != null) logTx("bounty", "submit", submitTx.txHash);
 
         // Wait for submission to be recorded
         Thread.sleep(10_000);
@@ -498,6 +512,7 @@ class AcceptanceTest {
         // Step 3: Poster awards to the submission
         Transaction awardTx = poster.wallet.awardBounty(bounty.id, 1);
         assertNotNull(awardTx.txHash, "award should return tx hash");
+        logTx("bounty", "award", awardTx.txHash);
 
         // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
@@ -547,6 +562,7 @@ class AcceptanceTest {
         // Step 2: Provider returns the deposit
         Transaction returnTx = provider.wallet.returnDeposit(deposit.id);
         assertNotNull(returnTx.txHash, "return deposit should return tx hash");
+        logTx("deposit", "return", returnTx.txHash);
 
         // Wait for return settlement (agent gets full refund)
         double agentAfter = waitForBalanceChange(agent.address(), agentMid);

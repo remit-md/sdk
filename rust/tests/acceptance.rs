@@ -62,10 +62,12 @@ fn create_test_wallet(router: &str) -> TestWallet {
         .build()
         .expect("build wallet");
 
-    TestWallet {
+    let tw = TestWallet {
         wallet,
         signing_key,
-    }
+    };
+    eprintln!("[ACCEPTANCE] wallet: {} (chain=84532)", tw.wallet.address());
+    tw
 }
 
 // ─── On-chain balance via RPC ────────────────────────────────────────────────
@@ -123,8 +125,20 @@ fn assert_balance_change(label: &str, before: f64, after: f64, expected: f64) {
 // ─── Funding ─────────────────────────────────────────────────────────────────
 
 async fn fund_wallet(w: &TestWallet, amount: f64, usdc_address: &str) {
+    eprintln!(
+        "[ACCEPTANCE] mint: {} USDC -> {}",
+        amount,
+        w.wallet.address()
+    );
     w.wallet.mint(amount).await.expect("mint");
     wait_for_balance_change(w.wallet.address(), 0.0, usdc_address).await;
+}
+
+fn log_tx(flow: &str, step: &str, tx_hash: &str) {
+    eprintln!(
+        "[ACCEPTANCE] {} | {} | tx={} | https://sepolia.basescan.org/tx/{}",
+        flow, step, tx_hash, tx_hash
+    );
 }
 
 // ─── EIP-2612 Permit Signing ─────────────────────────────────────────────────
@@ -336,6 +350,7 @@ async fn acceptance_pay_direct_with_permit() {
         )
         .await
         .expect("pay_full");
+    log_tx("direct", "pay", &tx.tx_hash);
     assert!(
         tx.tx_hash.starts_with("0x"),
         "expected tx hash starting with 0x, got: {}",
@@ -393,24 +408,27 @@ async fn acceptance_escrow_lifecycle() {
         .await
         .expect("create_escrow_with_permit");
     assert!(!escrow.id.is_empty(), "escrow should have an id");
+    log_tx("escrow", "create", &escrow.tx_hash);
 
     // Wait for on-chain lock
     wait_for_balance_change(agent.wallet.address(), agent_before, &contracts.usdc).await;
 
     // Provider claims start
-    provider
+    let claimed = provider
         .wallet
         .claim_start(&escrow.id)
         .await
         .expect("claim_start");
+    log_tx("escrow", "claim_start", &claimed.tx_hash);
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
     // Agent releases
-    agent
+    let released = agent
         .wallet
         .release_escrow(&escrow.id, None)
         .await
         .expect("release_escrow");
+    log_tx("escrow", "release", &released.tx_hash);
 
     // Verify balances
     let provider_after =
@@ -463,6 +481,7 @@ async fn acceptance_tab_lifecycle() {
         .await
         .expect("create_tab_with_permit");
     assert!(!tab.id.is_empty(), "tab ID should not be empty");
+    log_tx("tab", "create", &tab.tx_hash);
     eprintln!("Tab created: {}", tab.id);
 
     // Wait for on-chain funding
@@ -507,6 +526,7 @@ async fn acceptance_tab_lifecycle() {
         remitmd::TabStatus::Open,
         "tab should not be open after close"
     );
+    log_tx("tab", "close", &closed.tx_hash);
     eprintln!("Tab closed: status={:?}", closed.status);
 
     // 4. Verify balance: payer should have lost funds
@@ -558,6 +578,7 @@ async fn acceptance_stream_lifecycle() {
         .await
         .expect("create_stream_with_permit");
     assert!(!stream.id.is_empty(), "stream ID should not be empty");
+    log_tx("stream", "create", &stream.tx_hash);
     eprintln!("Stream created: {}, status={:?}", stream.id, stream.status);
 
     // Wait for on-chain lock
@@ -573,6 +594,7 @@ async fn acceptance_stream_lifecycle() {
         .close_stream(&stream.id)
         .await
         .expect("close_stream");
+    log_tx("stream", "close", &closed.tx_hash);
     eprintln!("Stream closed: status={:?}", closed.status);
 
     // 4. Conservation of funds: payer should have lost some amount
@@ -626,6 +648,7 @@ async fn acceptance_bounty_lifecycle() {
         .await
         .expect("create_bounty_with_permit");
     assert!(!bounty.id.is_empty(), "bounty ID should not be empty");
+    log_tx("bounty", "create", &bounty.tx_hash);
     eprintln!("Bounty created: {}, status={:?}", bounty.id, bounty.status);
 
     // Wait for on-chain lock
@@ -653,6 +676,7 @@ async fn acceptance_bounty_lifecycle() {
         .award_bounty(&bounty.id, submission.id)
         .await
         .expect("award_bounty");
+    log_tx("bounty", "award", &awarded.tx_hash);
     eprintln!("Bounty awarded: status={:?}", awarded.status);
 
     // 4. Verify balances
@@ -704,6 +728,7 @@ async fn acceptance_deposit_lifecycle() {
         .await
         .expect("lock_deposit_with_permit");
     assert!(!deposit.id.is_empty(), "deposit ID should not be empty");
+    log_tx("deposit", "lock", &deposit.tx_hash);
     eprintln!(
         "Deposit placed: {}, status={:?}",
         deposit.id, deposit.status
@@ -714,11 +739,14 @@ async fn acceptance_deposit_lifecycle() {
     let payer_after_deposit = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
 
     // 2. Return deposit (by provider)
-    provider
+    let returned = provider
         .wallet
         .return_deposit(&deposit.id)
         .await
         .expect("return_deposit");
+    if let Some(tx) = returned.get("tx_hash").and_then(|v| v.as_str()) {
+        log_tx("deposit", "return", tx);
+    }
     eprintln!("Deposit returned");
 
     // 3. Verify full refund (deposits have no fee)

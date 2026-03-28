@@ -26,7 +26,9 @@ describe("TypeScript compliance: tab lifecycle", () => {
     if (skip) return t.skip("server not available");
 
     const { payer, payeeAddress } = await makeFundedPair();
+    console.log(`[COMPLIANCE] openTab: limit=20.0 perUnit=0.10 ${payer.address} -> ${payeeAddress}`);
     const tab = await payer.openTab({ to: payeeAddress, limit: 20.0, perUnit: 0.10 });
+    console.log(`[COMPLIANCE] tab opened: id=${tab.id} status=${tab.status}`);
 
     assert.ok(tab.id, "tab must have an id");
     assert.equal(tab.status, "open");
@@ -41,12 +43,16 @@ describe("TypeScript compliance: tab lifecycle", () => {
     if (skip) return t.skip("server not available");
 
     const { payer, payeeAddress } = await makeFundedPair();
+    console.log(`[COMPLIANCE] openTab (close test): limit=50.0 perUnit=1.0 ${payer.address} -> ${payeeAddress}`);
     const tab = await payer.openTab({ to: payeeAddress, limit: 50.0, perUnit: 1.0 });
+    console.log(`[COMPLIANCE] tab opened: id=${tab.id} status=${tab.status}`);
 
     const closeTx = await payer.closeTab(tab.id);
+    console.log(`[COMPLIANCE] tab closed: id=${tab.id} tx=${closeTx.txHash}`);
     assert.ok(closeTx.txHash, "closeTx must have txHash");
 
     const closedTab = await payer.getTab(tab.id);
+    console.log(`[COMPLIANCE] getTab after close: id=${closedTab.id} status=${closedTab.status}`);
     assert.notEqual(closedTab.status, "open", "tab must not be open after close");
   });
 });

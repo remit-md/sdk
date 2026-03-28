@@ -1,0 +1,1096 @@
+════════════════════════════════════════════════
+  PYTHON
+════════════════════════════════════════════════
+
+[1mPython SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 556, in <module>
+    asyncio.run(main())
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 506, in main
+    agent = await create_wallet()
+            ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 108, in create_wallet
+    router = await get_router()
+             ^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 101, in get_router
+    resp.raise_for_status()
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '502 Bad Gateway' for url 'https://testnet.remit.md/api/v1/contracts'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/502
+
+════════════════════════════════════════════════
+  TYPESCRIPT
+════════════════════════════════════════════════
+
+[1mTypeScript SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+Error: GET /contracts failed: 502
+    at getRouterAddress (/home/runner/work/sdk/sdk/acceptance/typescript/test_flows.ts:85:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async createWalletWithSigner (/home/runner/work/sdk/sdk/acceptance/typescript/test_flows.ts:100:25)
+    at async main (/home/runner/work/sdk/sdk/acceptance/typescript/test_flows.ts:487:19)
+
+════════════════════════════════════════════════
+  GO
+════════════════════════════════════════════════
+go: downloading github.com/ethereum/go-ethereum v1.13.14
+go: downloading github.com/shopspring/decimal v1.3.1
+go: downloading github.com/holiman/uint256 v1.2.4
+go: downloading golang.org/x/crypto v0.17.0
+
+[1mGo SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+FATAL: create agent wallet: GET /contracts returned 502
+exit status 1
+
+════════════════════════════════════════════════
+  RUST
+════════════════════════════════════════════════
+[1m[92m    Updating[0m crates.io index
+[1m[92m     Locking[0m 295 packages to latest compatible versions
+[1m[92m      Adding[0m crypto-common v0.1.6 [1m[33m(available: v0.1.7)[0m
+[1m[92m      Adding[0m getrandom v0.2.17 [1m[33m(available: v0.4.2)[0m
+[1m[92m      Adding[0m rand v0.8.5 [1m[33m(available: v0.10.0)[0m
+[1m[92m      Adding[0m reqwest v0.12.28 [1m[33m(available: v0.13.2)[0m
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m ahash v0.7.8
+[1m[92m  Downloaded[0m getrandom v0.4.2
+[1m[92m  Downloaded[0m atomic-waker v1.1.2
+[1m[92m  Downloaded[0m bitflags v2.11.0
+[1m[92m  Downloaded[0m pin-utils v0.1.0
+[1m[92m  Downloaded[0m percent-encoding v2.3.2
+[1m[92m  Downloaded[0m bytecheck_derive v0.6.12
+[1m[92m  Downloaded[0m block-buffer v0.10.4
+[1m[92m  Downloaded[0m pkg-config v0.3.32
+[1m[92m  Downloaded[0m group v0.13.0
+[1m[92m  Downloaded[0m parking_lot_core v0.9.12
+[1m[92m  Downloaded[0m potential_utf v0.1.4
+[1m[92m  Downloaded[0m rfc6979 v0.4.0
+[1m[92m  Downloaded[0m stable_deref_trait v1.2.1
+[1m[92m  Downloaded[0m scopeguard v1.2.0
+[1m[92m  Downloaded[0m futures-sink v0.3.32
+[1m[92m  Downloaded[0m hashbrown v0.12.3
+[1m[92m  Downloaded[0m proc-macro-crate v3.5.0
+[1m[92m  Downloaded[0m serde_core v1.0.228
+[1m[92m  Downloaded[0m ryu v1.0.23
+[1m[92m  Downloaded[0m want v0.3.1
+[1m[92m  Downloaded[0m icu_properties v2.1.2
+[1m[92m  Downloaded[0m ipnet v2.12.0
+[1m[92m  Downloaded[0m socket2 v0.6.3
+[1m[92m  Downloaded[0m utf8_iter v1.0.4
+[1m[92m  Downloaded[0m yoke v0.8.1
+[1m[92m  Downloaded[0m tower-layer v0.3.3
+[1m[92m  Downloaded[0m toml_parser v1.1.0+spec-1.1.0
+[1m[92m  Downloaded[0m thiserror v1.0.69
+[1m[92m  Downloaded[0m zerofrom-derive v0.1.6
+[1m[92m  Downloaded[0m foreign-types v0.3.2
+[1m[92m  Downloaded[0m digest v0.10.7
+[1m[92m  Downloaded[0m crypto-common v0.1.6
+[1m[92m  Downloaded[0m signal-hook-registry v1.4.8
+[1m[92m  Downloaded[0m zerovec v0.11.5
+[1m[92m  Downloaded[0m try-lock v0.2.5
+[1m[92m  Downloaded[0m find-msvc-tools v0.1.9
+[1m[92m  Downloaded[0m openssl-macros v0.1.1
+[1m[92m  Downloaded[0m yoke-derive v0.8.1
+[1m[92m  Downloaded[0m tinyvec_macros v0.1.1
+[1m[92m  Downloaded[0m memchr v2.8.0
+[1m[92m  Downloaded[0m writeable v0.6.2
+[1m[92m  Downloaded[0m ptr_meta v0.1.4
+[1m[92m  Downloaded[0m hex v0.4.3
+[1m[92m  Downloaded[0m zerovec-derive v0.11.2
+[1m[92m  Downloaded[0m k256 v0.13.4
+[1m[92m  Downloaded[0m hashbrown v0.16.1
+[1m[92m  Downloaded[0m tower-service v0.3.3
+[1m[92m  Downloaded[0m tap v1.0.1
+[1m[92m  Downloaded[0m quote v1.0.45
+[1m[92m  Downloaded[0m icu_collections v2.1.1
+[1m[92m  Downloaded[0m which v7.0.3
+[1m[92m  Downloaded[0m unicode-ident v1.0.24
+[1m[92m  Downloaded[0m toml_datetime v1.1.0+spec-1.1.0
+[1m[92m  Downloaded[0m uuid v1.23.0
+[1m[92m  Downloaded[0m tinystr v0.8.2
+[1m[92m  Downloaded[0m typenum v1.19.0
+[1m[92m  Downloaded[0m tinyvec v1.11.0
+[1m[92m  Downloaded[0m toml_edit v0.25.8+spec-1.1.0
+[1m[92m  Downloaded[0m tokio-util v0.7.18
+[1m[92m  Downloaded[0m url v2.5.8
+[1m[92m  Downloaded[0m zerotrie v0.2.3
+[1m[92m  Downloaded[0m tower-http v0.6.8
+[1m[92m  Downloaded[0m winnow v1.0.0
+[1m[92m  Downloaded[0m webpki-roots v1.0.6
+[1m[92m  Downloaded[0m zeroize v1.8.2
+[1m[92m  Downloaded[0m vcpkg v0.2.15
+[1m[92m  Downloaded[0m syn v1.0.109
+[1m[92m  Downloaded[0m zerocopy v0.8.47
+[1m[92m  Downloaded[0m quinn-proto v0.11.14
+[1m[92m  Downloaded[0m serde_json v1.0.149
+[1m[92m  Downloaded[0m zmij v1.0.21
+[1m[92m  Downloaded[0m syn v2.0.117
+[1m[92m  Downloaded[0m rust_decimal v1.41.0
+[1m[92m  Downloaded[0m encoding_rs v0.8.35
+[1m[92m  Downloaded[0m tower v0.5.3
+[1m[92m  Downloaded[0m rustls v0.23.37
+[1m[92m  Downloaded[0m tracing v0.1.44
+[1m[92m  Downloaded[0m rustix v1.1.4
+[1m[92m  Downloaded[0m rand v0.9.2
+[1m[92m  Downloaded[0m rand v0.8.5
+[1m[92m  Downloaded[0m reqwest v0.12.28
+[1m[92m  Downloaded[0m quinn v0.11.9
+[1m[92m  Downloaded[0m rustls-pki-types v1.14.0
+[1m[92m  Downloaded[0m rkyv v0.7.46
+[1m[92m  Downloaded[0m proc-macro2 v1.0.106
+[1m[92m  Downloaded[0m libc v0.2.183
+[1m[92m  Downloaded[0m tracing-core v0.1.36
+[1m[92m  Downloaded[0m tokio-rustls v0.26.4
+[1m[92m  Downloaded[0m thiserror-impl v1.0.69
+[1m[92m  Downloaded[0m synstructure v0.13.2
+[1m[92m  Downloaded[0m simdutf8 v0.1.5
+[1m[92m  Downloaded[0m mio v1.2.0
+[1m[92m  Downloaded[0m tokio-macros v2.6.1
+[1m[92m  Downloaded[0m subtle v2.6.1
+[1m[92m  Downloaded[0m smallvec v1.15.1
+[1m[92m  Downloaded[0m slab v0.4.12
+[1m[92m  Downloaded[0m rustc-hash v2.1.1
+[1m[92m  Downloaded[0m idna v1.1.0
+[1m[92m  Downloaded[0m tokio v1.50.0
+[1m[92m  Downloaded[0m sha3 v0.10.8
+[1m[92m  Downloaded[0m hyper v1.8.1
+[1m[92m  Downloaded[0m foreign-types-shared v0.1.1
+[1m[92m  Downloaded[0m chrono v0.4.44
+[1m[92m  Downloaded[0m zerofrom v0.1.6
+[1m[92m  Downloaded[0m wyz v0.5.1
+[1m[92m  Downloaded[0m thiserror v2.0.18
+[1m[92m  Downloaded[0m sha2 v0.10.9
+[1m[92m  Downloaded[0m rand_core v0.6.4
+[1m[92m  Downloaded[0m parking_lot v0.12.5
+[1m[92m  Downloaded[0m option-ext v0.2.0
+[1m[92m  Downloaded[0m once_cell v1.21.4
+[1m[92m  Downloaded[0m native-tls v0.2.18
+[1m[92m  Downloaded[0m hyper-util v0.1.20
+[1m[92m  Downloaded[0m hyper-tls v0.6.0
+[1m[92m  Downloaded[0m httparse v1.10.1
+[1m[92m  Downloaded[0m funty v2.0.0
+[1m[92m  Downloaded[0m version_check v0.9.5
+[1m[92m  Downloaded[0m linux-raw-sys v0.12.1
+[1m[92m  Downloaded[0m tokio-native-tls v0.3.1
+[1m[92m  Downloaded[0m sync_wrapper v1.0.2
+[1m[92m  Downloaded[0m shlex v1.3.0
+[1m[92m  Downloaded[0m ptr_meta_derive v0.1.4
+[1m[92m  Downloaded[0m iri-string v0.7.11
+[1m[92m  Downloaded[0m litemap v0.8.1
+[1m[92m  Downloaded[0m keccak v0.1.6
+[1m[92m  Downloaded[0m cc v1.2.58
+[1m[92m  Downloaded[0m log v0.4.29
+[1m[92m  Downloaded[0m icu_locale_core v2.1.1
+[1m[92m  Downloaded[0m futures-util v0.3.32
+[1m[92m  Downloaded[0m itoa v1.0.18
+[1m[92m  Downloaded[0m http-body v1.0.1
+[1m[92m  Downloaded[0m elliptic-curve v0.13.8
+[1m[92m  Downloaded[0m dirs-sys v0.4.1
+[1m[92m  Downloaded[0m borsh-derive v1.6.1
+[1m[92m  Downloaded[0m signature v2.2.0
+[1m[92m  Downloaded[0m radium v0.7.0
+[1m[92m  Downloaded[0m lock_api v0.4.14
+[1m[92m  Downloaded[0m idna_adapter v1.2.1
+[1m[92m  Downloaded[0m ring v0.17.14
+[1m[92m  Downloaded[0m getrandom v0.2.17
+[1m[92m  Downloaded[0m form_urlencoded v1.2.2
+[1m[92m  Downloaded[0m ff v0.13.1
+[1m[92m  Downloaded[0m der v0.7.10
+[1m[92m  Downloaded[0m arrayvec v0.7.6
+[1m[92m  Downloaded[0m quinn-udp v0.5.14
+[1m[92m  Downloaded[0m openssl-probe v0.2.1
+[1m[92m  Downloaded[0m lru-slab v0.1.2
+[1m[92m  Downloaded[0m getrandom v0.3.4
+[1m[92m  Downloaded[0m futures-task v0.3.32
+[1m[92m  Downloaded[0m serde_urlencoded v0.7.1
+[1m[92m  Downloaded[0m fnv v1.0.7
+[1m[92m  Downloaded[0m errno v0.3.14
+[1m[92m  Downloaded[0m env_home v0.1.0
+[1m[92m  Downloaded[0m base64 v0.22.1
+[1m[92m  Downloaded[0m thiserror-impl v2.0.18
+[1m[92m  Downloaded[0m serde_derive v1.0.228
+[1m[92m  Downloaded[0m rand_core v0.9.5
+[1m[92m  Downloaded[0m rand_chacha v0.9.0
+[1m[92m  Downloaded[0m rand_chacha v0.3.1
+[1m[92m  Downloaded[0m openssl-sys v0.9.112
+[1m[92m  Downloaded[0m indexmap v2.13.0
+[1m[92m  Downloaded[0m icu_normalizer v2.1.1
+[1m[92m  Downloaded[0m hyper-rustls v0.27.7
+[1m[92m  Downloaded[0m h2 v0.4.13
+[1m[92m  Downloaded[0m futures-core v0.3.32
+[1m[92m  Downloaded[0m futures-channel v0.3.32
+[1m[92m  Downloaded[0m icu_normalizer_data v2.1.1
+[1m[92m  Downloaded[0m dirs v5.0.1
+[1m[92m  Downloaded[0m rustls-webpki v0.103.10
+[1m[92m  Downloaded[0m hmac v0.12.1
+[1m[92m  Downloaded[0m rend v0.4.2
+[1m[92m  Downloaded[0m openssl v0.10.76
+[1m[92m  Downloaded[0m rkyv_derive v0.7.46
+[1m[92m  Downloaded[0m autocfg v1.5.0
+[1m[92m  Downloaded[0m untrusted v0.9.0
+[1m[92m  Downloaded[0m icu_properties_data v2.1.2
+[1m[92m  Downloaded[0m http v1.4.0
+[1m[92m  Downloaded[0m const-oid v0.9.6
+[1m[92m  Downloaded[0m seahash v4.1.0
+[1m[92m  Downloaded[0m mime v0.3.17
+[1m[92m  Downloaded[0m iana-time-zone v0.1.65
+[1m[92m  Downloaded[0m http-body-util v0.1.3
+[1m[92m  Downloaded[0m spki v0.7.3
+[1m[92m  Downloaded[0m sec1 v0.7.3
+[1m[92m  Downloaded[0m bitvec v1.0.1
+[1m[92m  Downloaded[0m serde v1.0.228
+[1m[92m  Downloaded[0m num-traits v0.2.19
+[1m[92m  Downloaded[0m icu_provider v2.1.1
+[1m[92m  Downloaded[0m bytes v1.11.1
+[1m[92m  Downloaded[0m displaydoc v0.2.5
+[1m[92m  Downloaded[0m ecdsa v0.16.9
+[1m[92m  Downloaded[0m crypto-bigint v0.5.5
+[1m[92m  Downloaded[0m bytecheck v0.6.12
+[1m[92m  Downloaded[0m ppv-lite86 v0.2.21
+[1m[92m  Downloaded[0m pin-project-lite v0.2.17
+[1m[92m  Downloaded[0m pkcs8 v0.10.2
+[1m[92m  Downloaded[0m equivalent v1.0.2
+[1m[92m  Downloaded[0m either v1.15.0
+[1m[92m  Downloaded[0m cpufeatures v0.2.17
+[1m[92m  Downloaded[0m cfg_aliases v0.2.1
+[1m[92m  Downloaded[0m cfg-if v1.0.4
+[1m[92m  Downloaded[0m borsh v1.6.1
+[1m[92m  Downloaded[0m generic-array v0.14.9
+[1m[92m  Downloaded[0m async-trait v0.1.89
+[1m[92m  Downloaded[0m base64ct v1.8.3
+[1m[92m  Downloaded[0m base16ct v0.2.0
+[1m[92m   Compiling[0m proc-macro2 v1.0.106
+[1m[92m   Compiling[0m unicode-ident v1.0.24
+[1m[92m   Compiling[0m quote v1.0.45
+[1m[92m   Compiling[0m libc v0.2.183
+[1m[92m   Compiling[0m cfg-if v1.0.4
+[1m[92m   Compiling[0m zeroize v1.8.2
+[1m[92m   Compiling[0m find-msvc-tools v0.1.9
+[1m[92m   Compiling[0m shlex v1.3.0
+[1m[92m   Compiling[0m cc v1.2.58
+[1m[92m   Compiling[0m smallvec v1.15.1
+[1m[92m   Compiling[0m subtle v2.6.1
+[1m[92m   Compiling[0m syn v2.0.117
+[1m[92m   Compiling[0m version_check v0.9.5
+[1m[92m   Compiling[0m typenum v1.19.0
+[1m[92m   Compiling[0m getrandom v0.2.17
+[1m[92m   Compiling[0m generic-array v0.14.9
+[1m[92m   Compiling[0m bytes v1.11.1
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
+[1m[92m   Compiling[0m pin-project-lite v0.2.17
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m scopeguard v1.2.0
+[1m[92m   Compiling[0m stable_deref_trait v1.2.1
+[1m[92m   Compiling[0m lock_api v0.4.14
+[1m[92m   Compiling[0m errno v0.3.14
+[1m[92m   Compiling[0m const-oid v0.9.6
+[1m[92m   Compiling[0m futures-core v0.3.32
+[1m[92m   Compiling[0m signal-hook-registry v1.4.8
+[1m[92m   Compiling[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m socket2 v0.6.3
+[1m[92m   Compiling[0m mio v1.2.0
+[1m[92m   Compiling[0m itoa v1.0.18
+[1m[92m   Compiling[0m vcpkg v0.2.15
+[1m[92m   Compiling[0m pkg-config v0.3.32
+[1m[92m   Compiling[0m http v1.4.0
+[1m[92m   Compiling[0m block-buffer v0.10.4
+[1m[92m   Compiling[0m openssl-sys v0.9.112
+[1m[92m   Compiling[0m crypto-common v0.1.6
+[1m[92m   Compiling[0m synstructure v0.13.2
+[1m[92m   Compiling[0m rand_core v0.6.4
+[1m[92m   Compiling[0m slab v0.4.12
+[1m[92m   Compiling[0m digest v0.10.7
+[1m[92m   Compiling[0m ring v0.17.14
+[1m[92m   Compiling[0m bitflags v2.11.0
+[1m[92m   Compiling[0m litemap v0.8.1
+[1m[92m   Compiling[0m writeable v0.6.2
+[1m[92m   Compiling[0m serde_core v1.0.228
+[1m[92m   Compiling[0m http-body v1.0.1
+[1m[92m   Compiling[0m tracing-core v0.1.36
+[1m[92m   Compiling[0m equivalent v1.0.2
+[1m[92m   Compiling[0m futures-task v0.3.32
+[1m[92m   Compiling[0m zerofrom-derive v0.1.6
+[1m[92m   Compiling[0m yoke-derive v0.8.1
+[1m[92m   Compiling[0m zerovec-derive v0.11.2
+[1m[92m   Compiling[0m tokio-macros v2.6.1
+[1m[92m   Compiling[0m zerofrom v0.1.6
+[1m[92m   Compiling[0m yoke v0.8.1
+[1m[92m   Compiling[0m displaydoc v0.2.5
+[1m[92m   Compiling[0m tokio v1.50.0
+[1m[92m   Compiling[0m zerovec v0.11.5
+[1m[92m   Compiling[0m zerotrie v0.2.3
+[1m[92m   Compiling[0m tinystr v0.8.2
+[1m[92m   Compiling[0m potential_utf v0.1.4
+[1m[92m   Compiling[0m icu_locale_core v2.1.1
+[1m[92m   Compiling[0m hashbrown v0.16.1
+[1m[92m   Compiling[0m icu_normalizer_data v2.1.1
+[1m[92m   Compiling[0m futures-sink v0.3.32
+[1m[92m   Compiling[0m percent-encoding v2.3.2
+[1m[92m   Compiling[0m icu_properties_data v2.1.2
+[1m[92m   Compiling[0m httparse v1.10.1
+[1m[92m   Compiling[0m icu_provider v2.1.1
+[1m[92m   Compiling[0m indexmap v2.13.0
+[1m[92m   Compiling[0m icu_collections v2.1.1
+[1m[92m   Compiling[0m tracing v0.1.44
+[1m[92m   Compiling[0m futures-util v0.3.32
+[1m[92m   Compiling[0m tokio-util v0.7.18
+[1m[92m   Compiling[0m der v0.7.10
+[1m[92m   Compiling[0m rustls-pki-types v1.14.0
+[1m[92m   Compiling[0m untrusted v0.9.0
+[1m[92m   Compiling[0m atomic-waker v1.1.2
+[1m[92m   Compiling[0m serde v1.0.228
+[1m[92m   Compiling[0m foreign-types-shared v0.1.1
+[1m[92m   Compiling[0m tower-service v0.3.3
+[1m[92m   Compiling[0m openssl v0.10.76
+[1m[92m   Compiling[0m try-lock v0.2.5
+[1m[92m   Compiling[0m fnv v1.0.7
+[1m[92m   Compiling[0m want v0.3.1
+[1m[92m   Compiling[0m h2 v0.4.13
+[1m[92m   Compiling[0m foreign-types v0.3.2
+[1m[92m   Compiling[0m serde_derive v1.0.228
+[1m[92m   Compiling[0m openssl-macros v0.1.1
+[1m[92m   Compiling[0m futures-channel v0.3.32
+[1m[92m   Compiling[0m rustls v0.23.37
+[1m[92m   Compiling[0m native-tls v0.2.18
+[1m[92m   Compiling[0m pin-utils v0.1.0
+[1m[92m   Compiling[0m autocfg v1.5.0
+[1m[92m   Compiling[0m hyper v1.8.1
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m   Compiling[0m icu_properties v2.1.2
+[1m[92m   Compiling[0m icu_normalizer v2.1.1
+[1m[92m   Compiling[0m rustls-webpki v0.103.10
+[1m[92m   Compiling[0m spki v0.7.3
+[1m[92m   Compiling[0m ff v0.13.1
+[1m[92m   Compiling[0m openssl-probe v0.2.1
+[1m[92m   Compiling[0m ipnet v2.12.0
+[1m[92m   Compiling[0m zmij v1.0.21
+[1m[92m   Compiling[0m base16ct v0.2.0
+[1m[92m   Compiling[0m base64 v0.22.1
+[1m[92m   Compiling[0m zerocopy v0.8.47
+[1m[92m   Compiling[0m log v0.4.29
+[1m[92m   Compiling[0m hyper-util v0.1.20
+[1m[92m   Compiling[0m sec1 v0.7.3
+[1m[92m   Compiling[0m group v0.13.0
+[1m[92m   Compiling[0m pkcs8 v0.10.2
+[1m[92m   Compiling[0m idna_adapter v1.2.1
+[1m[92m   Compiling[0m form_urlencoded v1.2.2
+[1m[92m   Compiling[0m hmac v0.12.1
+[1m[92m   Compiling[0m crypto-bigint v0.5.5
+[1m[92m   Compiling[0m sync_wrapper v1.0.2
+[1m[92m   Compiling[0m rustix v1.1.4
+[1m[92m   Compiling[0m utf8_iter v1.0.4
+[1m[92m   Compiling[0m getrandom v0.4.2
+[1m[92m   Compiling[0m tower-layer v0.3.3
+[1m[92m   Compiling[0m serde_json v1.0.149
+[1m[92m   Compiling[0m idna v1.1.0
+[1m[92m   Compiling[0m tower v0.5.3
+[1m[92m   Compiling[0m elliptic-curve v0.13.8
+[1m[92m   Compiling[0m rfc6979 v0.4.0
+[1m[92m   Compiling[0m tokio-rustls v0.26.4
+[1m[92m   Compiling[0m tokio-native-tls v0.3.1
+[1m[92m   Compiling[0m webpki-roots v1.0.6
+[1m[92m   Compiling[0m http-body-util v0.1.3
+[1m[92m   Compiling[0m signature v2.2.0
+[1m[92m   Compiling[0m ryu v1.0.23
+[1m[92m   Compiling[0m thiserror v1.0.69
+[1m[92m   Compiling[0m memchr v2.8.0
+[1m[92m   Compiling[0m iri-string v0.7.11
+[1m[92m   Compiling[0m option-ext v0.2.0
+[1m[92m   Compiling[0m rust_decimal v1.41.0
+[1m[92m   Compiling[0m cpufeatures v0.2.17
+[1m[92m   Compiling[0m linux-raw-sys v0.12.1
+[1m[92m   Compiling[0m tower-http v0.6.8
+[1m[92m   Compiling[0m sha2 v0.10.9
+[1m[92m   Compiling[0m ppv-lite86 v0.2.21
+[1m[92m   Compiling[0m dirs-sys v0.4.1
+[1m[92m   Compiling[0m serde_urlencoded v0.7.1
+[1m[92m   Compiling[0m ecdsa v0.16.9
+[1m[92m   Compiling[0m hyper-tls v0.6.0
+[1m[92m   Compiling[0m hyper-rustls v0.27.7
+[1m[92m   Compiling[0m url v2.5.8
+[1m[92m   Compiling[0m thiserror-impl v1.0.69
+[1m[92m   Compiling[0m encoding_rs v0.8.35
+[1m[92m   Compiling[0m iana-time-zone v0.1.65
+[1m[92m   Compiling[0m mime v0.3.17
+[1m[92m   Compiling[0m either v1.15.0
+[1m[92m   Compiling[0m env_home v0.1.0
+[1m[92m   Compiling[0m keccak v0.1.6
+[1m[92m   Compiling[0m arrayvec v0.7.6
+[1m[92m   Compiling[0m sha3 v0.10.8
+[1m[92m   Compiling[0m which v7.0.3
+[1m[92m   Compiling[0m reqwest v0.12.28
+[1m[92m   Compiling[0m chrono v0.4.44
+[1m[92m   Compiling[0m uuid v1.23.0
+[1m[92m   Compiling[0m k256 v0.13.4
+[1m[92m   Compiling[0m dirs v5.0.1
+[1m[92m   Compiling[0m rand_chacha v0.3.1
+[1m[92m   Compiling[0m async-trait v0.1.89
+[1m[92m   Compiling[0m hex v0.4.3
+[1m[92m   Compiling[0m remitmd v0.2.1 (/home/runner/work/sdk/sdk/rust)
+[1m[92m   Compiling[0m rand v0.8.5
+[1m[92m   Compiling[0m acceptance-flows v0.1.0 (/home/runner/work/sdk/sdk/acceptance/rust)
+[1m[91merror[E0433][0m[1m: failed to resolve: use of unresolved module or unlinked crate `serde`[0m
+  [1m[94m--> [0msrc/main.rs:87:10
+   [1m[94m|[0m
+[1m[94m87[0m [1m[94m|[0m #[derive(serde::Deserialize, Clone)]
+   [1m[94m|[0m          [1m[91m^^^^^[0m [1m[91muse of unresolved module or unlinked crate `serde`[0m
+
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:258:9
+    [1m[94m|[0m
+[1m[94m258[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mnote[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:320:9
+    [1m[94m|[0m
+[1m[94m320[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:385:9
+    [1m[94m|[0m
+[1m[94m385[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[91merror[E0277][0m[1m: the trait bound `Contracts: serde::de::DeserializeOwned` is not satisfied[0m
+   [1m[94m--> [0msrc/main.rs:101:17
+    [1m[94m|[0m
+[1m[94m101[0m [1m[94m|[0m     resp.json::<Contracts>().await.expect("parse /contracts")
+    [1m[94m|[0m          [1m[94m----[0m   [1m[91m^^^^^^^^^[0m [1m[91munsatisfied trait bound[0m
+    [1m[94m|[0m          [1m[94m|[0m
+    [1m[94m|[0m          [1m[94mrequired by a bound introduced by this call[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: the trait `for<'de> serde_core::de::Deserialize<'de>` is not implemented for `Contracts`
+   [1m[94m--> [0msrc/main.rs:88:1
+    [1m[94m|[0m
+[1m[94m 88[0m [1m[94m|[0m struct Contracts {
+    [1m[94m|[0m [1m[96m^^^^^^^^^^^^^^^^[0m
+    [1m[94m= [0m[1mhelp[0m: the following other types implement trait `serde_core::de::Deserialize<'de>`:
+              &'a Path
+              &'a [u8]
+              &'a str
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+            and 197 others
+    [1m[94m= [0m[1mnote[0m: required for `Contracts` to implement `serde_core::de::DeserializeOwned`
+[1m[92mnote[0m: required by a bound in `Response::json`
+   [1m[94m--> [0m/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.12.28/src/async_impl/response.rs:269:26
+    [1m[94m|[0m
+[1m[94m269[0m [1m[94m|[0m     pub async fn json<T: DeserializeOwned>(self) -> crate::Result<T> {
+    [1m[94m|[0m                          [1m[92m^^^^^^^^^^^^^^^^[0m [1m[92mrequired by this bound in `Response::json`[0m
+
+[1m[91merror[E0277][0m[1m: the trait bound `Contracts: serde::Deserialize<'de>` is not satisfied[0m
+   [1m[94m--> [0msrc/main.rs:101:5
+    [1m[94m|[0m
+[1m[94m101[0m [1m[94m|[0m     resp.json::<Contracts>().await.expect("parse /contracts")
+    [1m[94m|[0m     [1m[91m^^^^^^^^^^^^^^^^^^^^^^^^[0m [1m[91munsatisfied trait bound[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: the trait `for<'de> serde_core::de::Deserialize<'de>` is not implemented for `Contracts`
+   [1m[94m--> [0msrc/main.rs:88:1
+    [1m[94m|[0m
+[1m[94m 88[0m [1m[94m|[0m struct Contracts {
+    [1m[94m|[0m [1m[96m^^^^^^^^^^^^^^^^[0m
+    [1m[94m= [0m[1mnote[0m: for local types consider adding `#[derive(serde::Deserialize)]` to your `Contracts` type
+    [1m[94m= [0m[1mnote[0m: for types from other crates check whether the crate offers a `serde` feature flag
+    [1m[94m= [0m[1mhelp[0m: the following other types implement trait `serde_core::de::Deserialize<'de>`:
+              &'a Path
+              &'a [u8]
+              &'a str
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+            and 197 others
+    [1m[94m= [0m[1mnote[0m: required for `Contracts` to implement `serde_core::de::DeserializeOwned`
+[1m[92mnote[0m: required by a bound in `Response::json`
+   [1m[94m--> [0m/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.12.28/src/async_impl/response.rs:269:26
+    [1m[94m|[0m
+[1m[94m269[0m [1m[94m|[0m     pub async fn json<T: DeserializeOwned>(self) -> crate::Result<T> {
+    [1m[94m|[0m                          [1m[92m^^^^^^^^^^^^^^^^[0m [1m[92mrequired by this bound in `Response::json`[0m
+
+[1m[91merror[E0277][0m[1m: the trait bound `Contracts: serde::Deserialize<'de>` is not satisfied[0m
+   [1m[94m--> [0msrc/main.rs:101:30
+    [1m[94m|[0m
+[1m[94m101[0m [1m[94m|[0m     resp.json::<Contracts>().await.expect("parse /contracts")
+    [1m[94m|[0m                              [1m[91m^^^^^[0m [1m[91munsatisfied trait bound[0m
+    [1m[94m|[0m
+[1m[96mhelp[0m: the trait `for<'de> serde_core::de::Deserialize<'de>` is not implemented for `Contracts`
+   [1m[94m--> [0msrc/main.rs:88:1
+    [1m[94m|[0m
+[1m[94m 88[0m [1m[94m|[0m struct Contracts {
+    [1m[94m|[0m [1m[96m^^^^^^^^^^^^^^^^[0m
+    [1m[94m= [0m[1mnote[0m: for local types consider adding `#[derive(serde::Deserialize)]` to your `Contracts` type
+    [1m[94m= [0m[1mnote[0m: for types from other crates check whether the crate offers a `serde` feature flag
+    [1m[94m= [0m[1mhelp[0m: the following other types implement trait `serde_core::de::Deserialize<'de>`:
+              &'a Path
+              &'a [u8]
+              &'a str
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+            and 197 others
+    [1m[94m= [0m[1mnote[0m: required for `Contracts` to implement `serde_core::de::DeserializeOwned`
+[1m[92mnote[0m: required by a bound in `Response::json`
+   [1m[94m--> [0m/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.12.28/src/async_impl/response.rs:269:26
+    [1m[94m|[0m
+[1m[94m269[0m [1m[94m|[0m     pub async fn json<T: DeserializeOwned>(self) -> crate::Result<T> {
+    [1m[94m|[0m                          [1m[92m^^^^^^^^^^^^^^^^[0m [1m[92mrequired by this bound in `Response::json`[0m
+
+[1mSome errors have detailed explanations: E0277, E0433.[0m
+[1mFor more information about an error, try `rustc --explain E0277`.[0m
+[1m[33mwarning[0m: `acceptance-flows` (bin "acceptance-flows") generated 3 warnings
+[1m[91merror[0m: could not compile `acceptance-flows` (bin "acceptance-flows") due to 4 previous errors; 3 warnings emitted
+
+════════════════════════════════════════════════
+  .NET
+════════════════════════════════════════════════
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(113,26): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(114,20): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(115,23): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(117,21): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(119,26): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(122,22): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(129,18): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(333,26): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(334,21): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(335,24): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(337,21): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(340,20): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(343,22): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(350,18): error CS0122: 'Eip712' is inaccessible due to its protection level [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(23,14): warning CS0219: The variable 'FEE_WALLET' is assigned but its value is never used [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+
+The build failed. Fix the build errors and run again.
+
+════════════════════════════════════════════════
+  JAVA
+════════════════════════════════════════════════
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Could not determine the dependencies of task ':run'.
+> Could not resolve all dependencies for configuration ':runtimeClasspath'.
+   > Could not find md.remit:remit-sdk:.
+     Required by:
+         root project 'acceptance-java'
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 27s
+
+════════════════════════════════════════════════
+  RUBY
+════════════════════════════════════════════════
+acceptance/ruby/test_flows.rb:65:in `fetch_contracts': GET /contracts: 502 <!DOCTYPE html> (RuntimeError)
+<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+<head>
+
+<title>remit.md | 502: Bad gateway</title>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/main.css" />
+</head>
+<body>
+<div id="cf-wrapper">
+    <div id="cf-error-details" class="p-0">
+        <header class="mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-8">
+            <h1 class="inline-block sm:block sm:mb-2 font-light text-60 lg:text-4xl text-black-dark leading-tight mr-2">
+                <span class="inline-block">Bad gateway</span>
+                <span class="code-label">Error code 502</span>
+            </h1>
+            <div>
+                Visit <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&utm_campaign=testnet.remit.md" target="_blank" rel="noopener noreferrer">cloudflare.com</a> for more information.
+            </div>
+            <div class="mt-3">2026-03-28 00:09:54 UTC</div>
+        </header>
+        <div class="my-8 bg-gradient-gray">
+            <div class="w-240 lg:w-full mx-auto">
+                <div class="clearfix md:px-8">
+                    <div id="cf-browser-status" class=" relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center">
+  <div class="relative mb-10 md:m-0">
+    
+    <span class="cf-icon-browser block md:hidden h-20 bg-center bg-no-repeat"></span>
+    <span class="cf-icon-ok w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4"></span>
+    
+  </div>
+  <span class="md:block w-full truncate">You</span>
+  <h3 class="md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3">
+  
+    Browser
+  
+  </h3>
+  
+  <span class="leading-1.3 text-2xl text-green-success">Working</span>
+  
+</div>
+                    <div id="cf-cloudflare-status" class=" relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center">
+  <div class="relative mb-10 md:m-0">
+    <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&#38;utm_campaign=testnet.remit.md" target="_blank" rel="noopener noreferrer">
+    <span class="cf-icon-cloud block md:hidden h-20 bg-center bg-no-repeat"></span>
+    <span class="cf-icon-ok w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4"></span>
+    </a>
+  </div>
+  <span class="md:block w-full truncate">Ashburn</span>
+  <h3 class="md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3">
+  <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&utm_campaign=testnet.remit.md" target="_blank" rel="noopener noreferrer">
+    Cloudflare
+  </a>
+  </h3>
+  
+  <span class="leading-1.3 text-2xl text-green-success">Working</span>
+  
+</div>
+                    <div id="cf-host-status" class="cf-error-source relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center">
+  <div class="relative mb-10 md:m-0">
+    
+    <span class="cf-icon-server block md:hidden h-20 bg-center bg-no-repeat"></span>
+    <span class="cf-icon-error w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4"></span>
+    
+  </div>
+  <span class="md:block w-full truncate">testnet.remit.md</span>
+  <h3 class="md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3">
+  
+    Host
+  
+  </h3>
+  
+  <span class="leading-1.3 text-2xl text-red-error">Error</span>
+  
+</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-240 lg:w-full mx-auto mb-8 lg:px-8">
+            <div class="clearfix">
+                <div class="w-1/2 md:w-full float-left pr-6 md:pb-10 md:pr-0 leading-relaxed">
+                    <h2 class="text-3xl font-normal leading-1.3 mb-4">What happened?</h2>
+                    <p>The web server reported a bad gateway error.</p>
+                </div>
+                <div class="w-1/2 md:w-full float-left leading-relaxed">
+                    <h2 class="text-3xl font-normal leading-1.3 mb-4">What can I do?</h2>
+                    <p class="mb-6">Please try again in a few minutes.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+    <p class="text-13">
+      <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">9e3268a28b5f126a</strong></span>
+      <span class="cf-footer-separator sm:hidden">&bull;</span>
+      <span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1">
+        Your IP:
+        <button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn">Click to reveal</button>
+        <span class="hidden" id="cf-footer-ip">48.214.54.35</span>
+        <span class="cf-footer-separator sm:hidden">&bull;</span>
+      </span>
+      <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&#38;utm_campaign=testnet.remit.md" id="brand_link" target="_blank">Cloudflare</a></span>
+      
+    </p>
+    <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
+  </div><!-- /.error-footer -->
+
+    </div>
+</div>
+</body>
+</html>
+	from acceptance/ruby/test_flows.rb:95:in `create_test_wallet'
+	from acceptance/ruby/test_flows.rb:492:in `<main>'
+
+[1mRuby SDK -- 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+
+════════════════════════════════════════════════
+  SWIFT
+════════════════════════════════════════════════
+Fetching https://github.com/GigaBitcoin/secp256k1.swift.git
+[1/10077] Fetching secp256k1.swift
+Fetched https://github.com/GigaBitcoin/secp256k1.swift.git from cache (1.35s)
+Computing version for https://github.com/GigaBitcoin/secp256k1.swift.git
+Computed https://github.com/GigaBitcoin/secp256k1.swift.git at 0.17.0 (0.22s)
+Creating working copy for https://github.com/GigaBitcoin/secp256k1.swift.git
+Working copy of https://github.com/GigaBitcoin/secp256k1.swift.git resolved at 0.17.0
+Building for debugging...
+[0/13] Compiling precomputed_ecmult_gen.c
+[1/13] Compiling Utility.c
+[1/13] Write sources
+[5/13] Write swift-version--3BE7240F797CB9BC.txt
+[5/13] Compiling secp256k1.c
+[7/13] Compiling precomputed_ecmult.c
+[9/45] Emitting module secp256k1
+[10/55] Compiling secp256k1 ASN1.swift
+[11/55] Compiling secp256k1 ASN1Any.swift
+[12/55] Compiling secp256k1 ASN1BitString.swift
+[13/55] Compiling secp256k1 ASN1Boolean.swift
+[14/55] Compiling secp256k1 ASN1Identifier.swift
+[15/55] Compiling secp256k1 ASN1Integer.swift
+[16/55] Compiling secp256k1 ASN1Null.swift
+[17/55] Compiling secp256k1 ASN1OctetString.swift
+[18/55] Compiling secp256k1 ASN1Strings.swift
+[19/55] Compiling secp256k1 ArraySliceBigint.swift
+[20/55] Compiling secp256k1 GeneralizedTime.swift
+[21/55] Compiling secp256k1 Recovery.swift
+[22/55] Compiling secp256k1 SHA256.swift
+[23/55] Compiling secp256k1 SafeCompare.swift
+[24/55] Compiling secp256k1 Schnorr.swift
+[25/55] Compiling secp256k1 SecureBytes.swift
+[26/55] Compiling secp256k1 Signature.swift
+[27/55] Compiling secp256k1 Tweak.swift
+[28/55] Compiling secp256k1 Utility.swift
+[29/55] Compiling secp256k1 Zeroization.swift
+[30/55] Compiling secp256k1 secp256k1.swift
+[31/55] Compiling secp256k1 DH.swift
+[32/55] Compiling secp256k1 Digest.swift
+[33/55] Compiling secp256k1 ECDH.swift
+[34/55] Compiling secp256k1 ECDSA.swift
+[35/55] Compiling secp256k1 EdDSA.swift
+[36/55] Compiling secp256k1 Errors.swift
+[37/55] Compiling secp256k1 Exports.swift
+[38/55] Compiling secp256k1 HashDigest.swift
+[39/55] Compiling secp256k1 PrettyBytes.swift
+[40/55] Compiling secp256k1 RNG_boring.swift
+[41/55] Compiling secp256k1 ObjectIdentifier.swift
+[42/55] Compiling secp256k1 ECDSASignature.swift
+[43/55] Compiling secp256k1 PEMDocument.swift
+[44/55] Compiling secp256k1 PKCS8PrivateKey.swift
+[45/55] Compiling secp256k1 SEC1PrivateKey.swift
+[46/55] Compiling secp256k1 SubjectPublicKeyInfo.swift
+[47/55] Compiling secp256k1 Asymmetric.swift
+[48/55] Compiling secp256k1 Combine.swift
+[49/55] Compiling secp256k1 Context.swift
+[50/55] Compiling secp256k1 CryptoKitErrors.swift
+[51/56] Wrapping AST for secp256k1 for debugging
+[53/66] Compiling RemitMd A2A.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[54/66] Compiling RemitMd CliSigner.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[55/66] Compiling RemitMd Errors.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[56/69] Compiling RemitMd Wallet.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[57/69] Compiling RemitMd X402Client.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[58/69] Compiling RemitMd X402Paywall.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[59/69] Emitting module RemitMd
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+[60/69] Compiling RemitMd Models.swift
+[61/69] Compiling RemitMd RemitMd.swift
+[62/69] Compiling RemitMd Signer.swift
+[63/69] Compiling RemitMd HttpTransport.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+[64/69] Compiling RemitMd Keccak.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+[65/69] Compiling RemitMd Mock.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+error: fatalError
+
+════════════════════════════════════════════════
+  ELIXIR
+════════════════════════════════════════════════
+==> decimal
+Compiling 4 files (.ex)
+Generated decimal app
+==> mime
+Compiling 1 file (.ex)
+Generated mime app
+==> nimble_options
+Compiling 3 files (.ex)
+Generated nimble_options app
+===> Analyzing applications...
+===> Compiling telemetry
+==> jason
+Compiling 10 files (.ex)
+Generated jason app
+==> remit
+Compiling 13 files (.ex)
+Generated remit app
+==> hpax
+Compiling 4 files (.ex)
+Generated hpax app
+==> mint
+Compiling 1 file (.erl)
+Compiling 20 files (.ex)
+Generated mint app
+==> nimble_pool
+Compiling 2 files (.ex)
+Generated nimble_pool app
+==> finch
+Compiling 14 files (.ex)
+Generated finch app
+==> req
+Compiling 19 files (.ex)
+Generated req app
+==> acceptance_flows
+Generated acceptance_flows app
+** (Mix) Mix.install/2 cannot be used inside a Mix project
+
+
+════════════════════════════════════════════════
+  FINAL SUMMARY
+════════════════════════════════════════════════
+Completed at: Sat Mar 28 00:10:21 UTC 2026
+
+Total PASS: 0
+Total FAIL: 0
+
+── Per-language results ──
+  PYTHON         0
+0 passed, 0
+0 failed
+  TYPESCRIPT     0
+0 passed, 0
+0 failed
+  GO             0
+0 passed, 0
+0 failed
+  RUST           0
+0 passed, 0
+0 failed
+  .NET           0
+0 passed, 0
+0 failed
+  JAVA           0
+0 passed, 0
+0 failed
+  RUBY           0
+0 passed, 0
+0 failed
+  SWIFT          0
+0 passed, 0
+0 failed
+  ELIXIR         0
+0 passed, 0
+0 failed
+

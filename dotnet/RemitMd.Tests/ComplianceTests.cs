@@ -59,20 +59,24 @@ public class ComplianceTests
         var keyBytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
         var privateKey = "0x" + Convert.ToHexString(keyBytes).ToLowerInvariant();
         var wallet = MakeWallet(privateKey);
+        Console.WriteLine($"[COMPLIANCE] wallet created: {wallet.Address} (chain=84532)");
         return (privateKey, wallet.Address);
     }
 
     private static async Task FundWallet(string walletAddress)
     {
+        Console.WriteLine($"[COMPLIANCE] minting 1000 USDC to {walletAddress} ...");
         var resp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v1/mint", new
         {
             wallet = walletAddress,
             amount = 1000,
         });
         resp.EnsureSuccessStatusCode();
-        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-        Assert.True(doc.RootElement.TryGetProperty("tx_hash", out _),
+        var body = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.True(doc.RootElement.TryGetProperty("tx_hash", out var txHashElem),
             $"mint response must contain tx_hash");
+        Console.WriteLine($"[COMPLIANCE] mint: 1000 USDC -> {walletAddress} tx={txHashElem}");
     }
 
     private static Wallet MakeWallet(string privateKey) =>
@@ -88,9 +92,11 @@ public class ComplianceTests
         {
             if (_sharedPayer is not null) return _sharedPayer;
 
+            Console.WriteLine("[COMPLIANCE] creating shared payer wallet ...");
             var (pk, addr) = GenerateWallet();
             await FundWallet(addr);
             _sharedPayer = MakeWallet(pk);
+            Console.WriteLine($"[COMPLIANCE] shared payer ready: {_sharedPayer.Address}");
         }
         finally
         {
@@ -106,29 +112,40 @@ public class ComplianceTests
     {
         if (!await ServerAvailable.Value)
         {
-            // Server not reachable - pass vacuously (CI job only runs when server is up).
+            Console.WriteLine("[COMPLIANCE] server not reachable — skipping auth test");
             return;
         }
 
+        Console.WriteLine("[COMPLIANCE] === AuthenticatedRequest_ReturnsBalance_Not401 ===");
         var (pk, _) = GenerateWallet();
         var wallet = MakeWallet(pk);
 
         // BalanceAsync() makes an authenticated GET - will throw on 401.
+        Console.WriteLine($"[COMPLIANCE] fetching balance for {wallet.Address} ...");
         var balance = await wallet.BalanceAsync();
         Assert.NotNull(balance);
+        Console.WriteLine($"[COMPLIANCE] balance: {balance.Usdc} USDC (address={balance.Address}, chainId={balance.ChainId})");
     }
 
     [Fact]
     public async Task Compliance_UnauthenticatedRequest_Returns401()
     {
-        if (!await ServerAvailable.Value) return;
+        if (!await ServerAvailable.Value)
+        {
+            Console.WriteLine("[COMPLIANCE] server not reachable — skipping 401 test");
+            return;
+        }
 
+        Console.WriteLine("[COMPLIANCE] === UnauthenticatedRequest_Returns401 ===");
+        Console.WriteLine("[COMPLIANCE] sending unauthenticated POST to /api/v1/payments/direct ...");
         var resp = await Http.PostAsJsonAsync($"{ServerUrl}/api/v1/payments/direct", new
         {
             to     = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
             amount = "1.000000",
         });
+        Console.WriteLine($"[COMPLIANCE] response status: {(int)resp.StatusCode}");
         Assert.Equal(401, (int)resp.StatusCode);
+        Console.WriteLine("[COMPLIANCE] confirmed: unauthenticated request returned 401");
     }
 
     // ─── Payment tests ────────────────────────────────────────────────────────
@@ -136,26 +153,40 @@ public class ComplianceTests
     [Fact]
     public async Task Compliance_PayDirect_HappyPath_ReturnsTxHash()
     {
-        if (!await ServerAvailable.Value) return;
+        if (!await ServerAvailable.Value)
+        {
+            Console.WriteLine("[COMPLIANCE] server not reachable — skipping pay direct test");
+            return;
+        }
 
+        Console.WriteLine("[COMPLIANCE] === PayDirect_HappyPath_ReturnsTxHash ===");
         var payer = await GetSharedPayer();
         var (_, payeeAddr) = GenerateWallet();
 
+        Console.WriteLine($"[COMPLIANCE] pay: 5.0 USDC {payer.Address} -> {payeeAddr} ...");
         var tx = await payer.PayAsync(payeeAddr, 5.0m, memo: "dotnet compliance test");
 
         Assert.False(string.IsNullOrEmpty(tx.TxHash),
             "PayAsync() must return a non-empty TxHash");
+        Console.WriteLine($"[COMPLIANCE] pay: 5.0 USDC {payer.Address} -> {payeeAddr} tx={tx.TxHash} id={tx.Id}");
     }
 
     [Fact]
     public async Task Compliance_PayDirect_BelowMinimum_ThrowsRemitError()
     {
-        if (!await ServerAvailable.Value) return;
+        if (!await ServerAvailable.Value)
+        {
+            Console.WriteLine("[COMPLIANCE] server not reachable — skipping below-minimum test");
+            return;
+        }
 
+        Console.WriteLine("[COMPLIANCE] === PayDirect_BelowMinimum_ThrowsRemitError ===");
         var payer = await GetSharedPayer();
         var (_, payeeAddr) = GenerateWallet();
 
-        await Assert.ThrowsAsync<RemitError>(async () =>
+        Console.WriteLine($"[COMPLIANCE] pay: 0.0001 USDC {payer.Address} -> {payeeAddr} (expect error) ...");
+        var ex = await Assert.ThrowsAsync<RemitError>(async () =>
             await payer.PayAsync(payeeAddr, 0.0001m));
+        Console.WriteLine($"[COMPLIANCE] correctly threw RemitError: {ex.Message}");
     }
 }

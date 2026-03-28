@@ -1,0 +1,1223 @@
+════════════════════════════════════════════════
+  PYTHON
+════════════════════════════════════════════════
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 566, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 225, in flow_tab
+    log_tx(flow, "close", closed.closed_tx_hash or "n/a")
+                          ^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/pydantic/main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'Transaction' object has no attribute 'closed_tx_hash'
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 566, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 280, in flow_bounty
+    assert submission_id, "submission should have an id"
+           ^^^^^^^^^^^^^
+AssertionError: submission should have an id
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 566, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 399, in flow_x402_weather
+    settle_resp = await agent._http.post("/api/v1/x402/settle", settle_body)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 78, in post
+    return await self._request("POST", path, json=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 131, in _request
+    return self._parse_response(resp)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 162, in _parse_response
+    raise from_error_code(str(code), str(message), resp.status_code)
+remitmd.errors.RemitError: x402 nonce has already been used
+
+[1mPython SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x71d87CD1f0E909Ce2Dc1FedE5e470BC739330C72
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x14FEAE44271971c56035Dd7189150C633Abb2e62
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0xe474e11901c1a594dae144e50f4ebb0418ee3387bc04c8959298e926df5f572e
+[0;32m[PASS][0m 1. Direct Payment — tx=0xe474e11901c1a594...
+  [TX] 2. Escrow | fund | https://sepolia.basescan.org/tx/0x69985571c9bc8aa2d3b7d3d4a0660acda39edef0f1d8739d4663d5837fd8d045
+  [TX] 2. Escrow | claimStart | https://sepolia.basescan.org/tx/0x69985571c9bc8aa2d3b7d3d4a0660acda39edef0f1d8739d4663d5837fd8d045
+  [TX] 2. Escrow | release | https://sepolia.basescan.org/tx/0x69985571c9bc8aa2d3b7d3d4a0660acda39edef0f1d8739d4663d5837fd8d045
+[0;32m[PASS][0m 2. Escrow — escrow_id=44632cd6-19c0-4e8a-9c05-b1737e52e7a1
+  [TX] 3. Metered Tab | open | https://sepolia.basescan.org/tx/0x26bb3e52421aa6f53e4d80862c9a1dba2cdfc7558af5d3d6dcb374dbeed2cac4
+  [TX] 3. Metered Tab | charge1 | https://sepolia.basescan.org/tx/n/a
+  [TX] 3. Metered Tab | charge2 | https://sepolia.basescan.org/tx/n/a
+[0;31m[FAIL][0m 3. Metered Tab — AttributeError: 'Transaction' object has no attribute 'closed_tx_hash'
+  [TX] 4. Stream | close | https://sepolia.basescan.org/tx/0x4c62d8dcf839f8bf57065f7213e57f239d3b2ec10edbf7257a24de07299cc68f
+[0;32m[PASS][0m 4. Stream — stream_id=a42b6a31-27bb-485c-8965-34a38847ad98
+[0;31m[FAIL][0m 5. Bounty — AssertionError: submission should have an id
+  [TX] 6. Deposit | place | https://sepolia.basescan.org/tx/0x3a4f23bd1c9be6d628d123dfeeed45297a39ed085a95eda9a6b15b71627a8425
+  [TX] 6. Deposit | return | https://sepolia.basescan.org/tx/0x3a4f23bd1c9be6d628d123dfeeed45297a39ed085a95eda9a6b15b71627a8425
+[0;32m[PASS][0m 6. Deposit — deposit_id=d3db3e7e-0c2a-4069-a9a0-7e6eab356aae
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather — RemitError: x402 nonce has already been used
+
+[0;36m┌─────────────────────────────────────────────┐[0m
+[0;36m│[0m  [1mA2A Agent Card[0m                            [0;36m│[0m
+[0;36m├─────────────────────────────────────────────┤[0m
+[0;36m│[0m  Name:     remit.md                        [0;36m│[0m
+[0;36m│[0m  Version:  0.1.0                           [0;36m│[0m
+[0;36m│[0m  Protocol: 0.6                             [0;36m│[0m
+[0;36m│[0m  URL:      https://testnet.remit.md/a2a    [0;36m│[0m
+[0;36m│[0m  Skills:   7 total                         [0;36m│[0m
+[0;36m│[0m    - Direct Payment                        [0;36m│[0m
+[0;36m│[0m    - Metered Tab                           [0;36m│[0m
+[0;36m│[0m    - Streaming Payment                     [0;36m│[0m
+[0;36m│[0m    - Escrow                                [0;36m│[0m
+[0;36m│[0m    - Bounty                                [0;36m│[0m
+[0;36m│[0m  x402:     settle=https://testnet.remit.md/api/v1[0;36m│[0m
+[0;36m│[0m  Caps:     streaming=False, exts=payment-processo   [0;36m│[0m
+[0;36m└─────────────────────────────────────────────┘[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery — name=remit.md
+[1;33m[SKIP][0m 9. AP2 Payment — AP2 endpoint may not be available on testnet: a2a task should have an id
+
+[1mPython Summary: [0;32m5 passed[0m, [0;31m3 failed[0m, [1;33m1 skipped[0m / 9 flows
+{"passed": 5, "failed": 3, "skipped": 1}
+
+════════════════════════════════════════════════
+  TYPESCRIPT
+════════════════════════════════════════════════
+
+[1mTypeScript SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0xCB1F76704044d0409653A9D2A42a40cA6979E3b8
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0xda29c3CC3cc634564D3ab7F53a7A6BDc50121B1e
+[0;36m[INFO][0m Minting $100 USDC to agent...
+Error: mint failed (404): Not Found
+    at Wallet.mint (/home/runner/work/sdk/sdk/acceptance/typescript/node_modules/.pnpm/@remitmd+sdk@file+..+..+typescript_typescript@5.9.3/node_modules/@remitmd/sdk/dist/wallet.js:503:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async fundWallet (/home/runner/work/sdk/sdk/acceptance/typescript/test_flows.ts:112:3)
+    at async main (/home/runner/work/sdk/sdk/acceptance/typescript/test_flows.ts:497:3)
+
+════════════════════════════════════════════════
+  GO
+════════════════════════════════════════════════
+go: downloading github.com/ethereum/go-ethereum v1.13.14
+go: downloading github.com/shopspring/decimal v1.3.1
+go: downloading github.com/holiman/uint256 v1.2.4
+go: downloading golang.org/x/crypto v0.17.0
+
+[1mGo SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x33159878B588d8a6d4f27c08B8080b0bfDB3A5Cc
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0xdB52bf8327d1f2058AAe9e7930456925c9299ac2
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0xebf7358db7b9fa83ff9839c5f289b433a91dea5dccae8b09fa0d58ddd1c72a23
+[0;32m[PASS][0m 1. Direct Payment — tx=0xebf7358db7b9fa83...
+  [TX] 2. Escrow | fund | https://sepolia.basescan.org/tx/0x1c64b2baec95c7e76ee0d9d03bca51e4acf560cf1d3d8c1a000cfdae6fb8f7fd
+  [TX] 2. Escrow | claimStart | https://sepolia.basescan.org/tx/0x1c64b2baec95c7e76ee0d9d03bca51e4acf560cf1d3d8c1a000cfdae6fb8f7fd
+  [TX] 2. Escrow | release | https://sepolia.basescan.org/tx/0x1c64b2baec95c7e76ee0d9d03bca51e4acf560cf1d3d8c1a000cfdae6fb8f7fd
+[0;32m[PASS][0m 2. Escrow — escrow_id=3aa52c76d7841de5867851ef6a3ffc5e
+  [TX] 3. Metered Tab | open | https://sepolia.basescan.org/tx/0x0cb027477eb56d16c4e51bcc20a537670947b7f713e228464392485a74a8e620
+[0;36m[INFO][0m   Tab charge 1: amount=2, cumulative=2
+[0;36m[INFO][0m   Tab charge 2: amount=1, cumulative=3
+  [TX] 3. Metered Tab | close | https://sepolia.basescan.org/tx/0x0cb027477eb56d16c4e51bcc20a537670947b7f713e228464392485a74a8e620
+[0;32m[PASS][0m 3. Metered Tab — tab_id=2a6c2b27-e416-4fb4-b3e2-a3e7b5142ea1, charged=$3, 2 charges
+  [TX] 4. Stream | open | https://sepolia.basescan.org/tx/0x9c4260603799dd2c00efd360790184a5862ab5d15342c73969125fa5698884b0
+[0;36m[INFO][0m   Waiting 5 seconds for stream accrual...
+  [TX] 4. Stream | close | https://sepolia.basescan.org/tx/0x9c4260603799dd2c00efd360790184a5862ab5d15342c73969125fa5698884b0
+[0;32m[PASS][0m 4. Stream — stream_id=f5b4578f-24fb-446e-abec-ec2ba7a087b2
+[0;31m[FAIL][0m 5. Bounty — CreateBounty: remitmd: CHAIN_SUBMISSION_FAILED - Chain submission failed: permit failed (owner=0x33159878b588d8a6d4f27c08b8080b0bfdb3a5cc, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" (see: https://remit.md/docs/errors#CHAIN_SUBMISSION_FAILED)
+  [TX] 6. Deposit | place | https://sepolia.basescan.org/tx/0xf3a5d90aee00cba9665947a65bce2a75a04029828ff5dcc7177ccf6013d1e4e1
+  [TX] 6. Deposit | return | https://sepolia.basescan.org/tx/0xf3a5d90aee00cba9665947a65bce2a75a04029828ff5dcc7177ccf6013d1e4e1
+[0;32m[PASS][0m 6. Deposit — deposit_id=165a8384-c61d-41cf-81f1-6aae1a7bea56
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather — settle returned no tx_hash: {"code":"INTERNAL_ERROR","message":"Database error"}
+
+[0;36m┌─────────────────────────────────────────────┐[0m
+[0;36m│[0m  [1mA2A Agent Card[0m                            [0;36m│[0m
+[0;36m├─────────────────────────────────────────────┤[0m
+[0;36m│[0m  Name:     remit.md                        [0;36m│[0m
+[0;36m│[0m  Version:  0.1.0                           [0;36m│[0m
+[0;36m│[0m  Protocol: 0.6                             [0;36m│[0m
+[0;36m│[0m  URL:      https://testnet.remit.md/a2a    [0;36m│[0m
+[0;36m│[0m  Skills:   7 total                         [0;36m│[0m
+[0;36m│[0m    - Direct Payment                        [0;36m│[0m
+[0;36m│[0m    - Metered Tab                           [0;36m│[0m
+[0;36m│[0m    - Streaming Payment                     [0;36m│[0m
+[0;36m│[0m    - Escrow                                [0;36m│[0m
+[0;36m│[0m    - Bounty                                [0;36m│[0m
+[0;36m│[0m  x402:     settle=https://testnet.remit.md/[0;36m│[0m
+[0;36m│[0m  Caps:     streaming=false, exts=payment-processo   [0;36m│[0m
+[0;36m└─────────────────────────────────────────────┘[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery — name=remit.md
+[1;33m[SKIP][0m 9. AP2 Payment — AP2 task has no ID (endpoint may not be available on testnet)
+
+[1mGo Summary: [0;32m6 passed[0m, [0;31m3 failed[0m / 9 flows
+{"failed":3,"passed":6,"skipped":0}
+exit status 1
+
+════════════════════════════════════════════════
+  RUST
+════════════════════════════════════════════════
+[1m[92m    Updating[0m crates.io index
+[1m[92m     Locking[0m 295 packages to latest compatible versions
+[1m[92m      Adding[0m crypto-common v0.1.6 [1m[33m(available: v0.1.7)[0m
+[1m[92m      Adding[0m getrandom v0.2.17 [1m[33m(available: v0.4.2)[0m
+[1m[92m      Adding[0m rand v0.8.5 [1m[33m(available: v0.10.0)[0m
+[1m[92m      Adding[0m reqwest v0.12.28 [1m[33m(available: v0.13.2)[0m
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m bytecheck v0.6.12
+[1m[92m  Downloaded[0m cfg-if v1.0.4
+[1m[92m  Downloaded[0m block-buffer v0.10.4
+[1m[92m  Downloaded[0m bytecheck_derive v0.6.12
+[1m[92m  Downloaded[0m base16ct v0.2.0
+[1m[92m  Downloaded[0m atomic-waker v1.1.2
+[1m[92m  Downloaded[0m base64ct v1.8.3
+[1m[92m  Downloaded[0m radium v0.7.0
+[1m[92m  Downloaded[0m idna_adapter v1.2.1
+[1m[92m  Downloaded[0m rend v0.4.2
+[1m[92m  Downloaded[0m mime v0.3.17
+[1m[92m  Downloaded[0m rand_core v0.9.5
+[1m[92m  Downloaded[0m autocfg v1.5.0
+[1m[92m  Downloaded[0m either v1.15.0
+[1m[92m  Downloaded[0m digest v0.10.7
+[1m[92m  Downloaded[0m hex v0.4.3
+[1m[92m  Downloaded[0m potential_utf v0.1.4
+[1m[92m  Downloaded[0m percent-encoding v2.3.2
+[1m[92m  Downloaded[0m arrayvec v0.7.6
+[1m[92m  Downloaded[0m borsh-derive v1.6.1
+[1m[92m  Downloaded[0m rand_chacha v0.9.0
+[1m[92m  Downloaded[0m rand_chacha v0.3.1
+[1m[92m  Downloaded[0m hyper-tls v0.6.0
+[1m[92m  Downloaded[0m lru-slab v0.1.2
+[1m[92m  Downloaded[0m itoa v1.0.18
+[1m[92m  Downloaded[0m pin-project-lite v0.2.17
+[1m[92m  Downloaded[0m rfc6979 v0.4.0
+[1m[92m  Downloaded[0m pkg-config v0.3.32
+[1m[92m  Downloaded[0m http-body-util v0.1.3
+[1m[92m  Downloaded[0m parking_lot_core v0.9.12
+[1m[92m  Downloaded[0m openssl-probe v0.2.1
+[1m[92m  Downloaded[0m want v0.3.1
+[1m[92m  Downloaded[0m option-ext v0.2.0
+[1m[92m  Downloaded[0m generic-array v0.14.9
+[1m[92m  Downloaded[0m foreign-types v0.3.2
+[1m[92m  Downloaded[0m env_home v0.1.0
+[1m[92m  Downloaded[0m funty v2.0.0
+[1m[92m  Downloaded[0m yoke-derive v0.8.1
+[1m[92m  Downloaded[0m zerofrom-derive v0.1.6
+[1m[92m  Downloaded[0m tower-layer v0.3.3
+[1m[92m  Downloaded[0m zerofrom v0.1.6
+[1m[92m  Downloaded[0m hyper-rustls v0.27.7
+[1m[92m  Downloaded[0m utf8_iter v1.0.4
+[1m[92m  Downloaded[0m lock_api v0.4.14
+[1m[92m  Downloaded[0m try-lock v0.2.5
+[1m[92m  Downloaded[0m tokio-macros v2.6.1
+[1m[92m  Downloaded[0m ipnet v2.12.0
+[1m[92m  Downloaded[0m zerovec-derive v0.11.2
+[1m[92m  Downloaded[0m untrusted v0.9.0
+[1m[92m  Downloaded[0m wyz v0.5.1
+[1m[92m  Downloaded[0m toml_datetime v1.1.0+spec-1.1.0
+[1m[92m  Downloaded[0m iana-time-zone v0.1.65
+[1m[92m  Downloaded[0m zmij v1.0.21
+[1m[92m  Downloaded[0m which v7.0.3
+[1m[92m  Downloaded[0m writeable v0.6.2
+[1m[92m  Downloaded[0m socket2 v0.6.3
+[1m[92m  Downloaded[0m zerotrie v0.2.3
+[1m[92m  Downloaded[0m uuid v1.23.0
+[1m[92m  Downloaded[0m zerovec v0.11.5
+[1m[92m  Downloaded[0m url v2.5.8
+[1m[92m  Downloaded[0m rustls-webpki v0.103.10
+[1m[92m  Downloaded[0m tower v0.5.3
+[1m[92m  Downloaded[0m rkyv v0.7.46
+[1m[92m  Downloaded[0m tower-http v0.6.8
+[1m[92m  Downloaded[0m rust_decimal v1.41.0
+[1m[92m  Downloaded[0m winnow v1.0.0
+[1m[92m  Downloaded[0m serde_json v1.0.149
+[1m[92m  Downloaded[0m vcpkg v0.2.15
+[1m[92m  Downloaded[0m syn v1.0.109
+[1m[92m  Downloaded[0m quinn-proto v0.11.14
+[1m[92m  Downloaded[0m zerocopy v0.8.47
+[1m[92m  Downloaded[0m syn v2.0.117
+[1m[92m  Downloaded[0m webpki-roots v1.0.6
+[1m[92m  Downloaded[0m chrono v0.4.44
+[1m[92m  Downloaded[0m openssl v0.10.76
+[1m[92m  Downloaded[0m bitvec v1.0.1
+[1m[92m  Downloaded[0m rustls v0.23.37
+[1m[92m  Downloaded[0m tokio-util v0.7.18
+[1m[92m  Downloaded[0m rustix v1.1.4
+[1m[92m  Downloaded[0m tracing v0.1.44
+[1m[92m  Downloaded[0m reqwest v0.12.28
+[1m[92m  Downloaded[0m iri-string v0.7.11
+[1m[92m  Downloaded[0m icu_properties_data v2.1.2
+[1m[92m  Downloaded[0m h2 v0.4.13
+[1m[92m  Downloaded[0m idna v1.1.0
+[1m[92m  Downloaded[0m hyper v1.8.1
+[1m[92m  Downloaded[0m futures-util v0.3.32
+[1m[92m  Downloaded[0m typenum v1.19.0
+[1m[92m  Downloaded[0m serde v1.0.228
+[1m[92m  Downloaded[0m http v1.4.0
+[1m[92m  Downloaded[0m tinyvec v1.11.0
+[1m[92m  Downloaded[0m hyper-util v0.1.20
+[1m[92m  Downloaded[0m der v0.7.10
+[1m[92m  Downloaded[0m crypto-bigint v0.5.5
+[1m[92m  Downloaded[0m unicode-ident v1.0.24
+[1m[92m  Downloaded[0m toml_edit v0.25.8+spec-1.1.0
+[1m[92m  Downloaded[0m serde_core v1.0.228
+[1m[92m  Downloaded[0m mio v1.2.0
+[1m[92m  Downloaded[0m k256 v0.13.4
+[1m[92m  Downloaded[0m sha3 v0.10.8
+[1m[92m  Downloaded[0m libc v0.2.183
+[1m[92m  Downloaded[0m hashbrown v0.16.1
+[1m[92m  Downloaded[0m tracing-core v0.1.36
+[1m[92m  Downloaded[0m serde_derive v1.0.228
+[1m[92m  Downloaded[0m memchr v2.8.0
+[1m[92m  Downloaded[0m indexmap v2.13.0
+[1m[92m  Downloaded[0m icu_collections v2.1.1
+[1m[92m  Downloaded[0m tokio v1.50.0
+[1m[92m  Downloaded[0m hashbrown v0.12.3
+[1m[92m  Downloaded[0m elliptic-curve v0.13.8
+[1m[92m  Downloaded[0m ryu v1.0.23
+[1m[92m  Downloaded[0m openssl-sys v0.9.112
+[1m[92m  Downloaded[0m icu_properties v2.1.2
+[1m[92m  Downloaded[0m icu_normalizer v2.1.1
+[1m[92m  Downloaded[0m icu_locale_core v2.1.1
+[1m[92m  Downloaded[0m toml_parser v1.1.0+spec-1.1.0
+[1m[92m  Downloaded[0m tinystr v0.8.2
+[1m[92m  Downloaded[0m spki v0.7.3
+[1m[92m  Downloaded[0m smallvec v1.15.1
+[1m[92m  Downloaded[0m rand v0.8.5
+[1m[92m  Downloaded[0m quinn v0.11.9
+[1m[92m  Downloaded[0m num-traits v0.2.19
+[1m[92m  Downloaded[0m log v0.4.29
+[1m[92m  Downloaded[0m simdutf8 v0.1.5
+[1m[92m  Downloaded[0m signal-hook-registry v1.4.8
+[1m[92m  Downloaded[0m rustls-pki-types v1.14.0
+[1m[92m  Downloaded[0m rand v0.9.2
+[1m[92m  Downloaded[0m cc v1.2.58
+[1m[92m  Downloaded[0m yoke v0.8.1
+[1m[92m  Downloaded[0m version_check v0.9.5
+[1m[92m  Downloaded[0m tokio-rustls v0.26.4
+[1m[92m  Downloaded[0m encoding_rs v0.8.35
+[1m[92m  Downloaded[0m thiserror-impl v1.0.69
+[1m[92m  Downloaded[0m thiserror v1.0.69
+[1m[92m  Downloaded[0m synstructure v0.13.2
+[1m[92m  Downloaded[0m rkyv_derive v0.7.46
+[1m[92m  Downloaded[0m icu_provider v2.1.1
+[1m[92m  Downloaded[0m ring v0.17.14
+[1m[92m  Downloaded[0m httparse v1.10.1
+[1m[92m  Downloaded[0m futures-channel v0.3.32
+[1m[92m  Downloaded[0m litemap v0.8.1
+[1m[92m  Downloaded[0m slab v0.4.12
+[1m[92m  Downloaded[0m shlex v1.3.0
+[1m[92m  Downloaded[0m sha2 v0.10.9
+[1m[92m  Downloaded[0m sec1 v0.7.3
+[1m[92m  Downloaded[0m tokio-native-tls v0.3.1
+[1m[92m  Downloaded[0m thiserror-impl v2.0.18
+[1m[92m  Downloaded[0m seahash v4.1.0
+[1m[92m  Downloaded[0m zeroize v1.8.2
+[1m[92m  Downloaded[0m once_cell v1.21.4
+[1m[92m  Downloaded[0m native-tls v0.2.18
+[1m[92m  Downloaded[0m getrandom v0.4.2
+[1m[92m  Downloaded[0m getrandom v0.3.4
+[1m[92m  Downloaded[0m ecdsa v0.16.9
+[1m[92m  Downloaded[0m dirs v5.0.1
+[1m[92m  Downloaded[0m borsh v1.6.1
+[1m[92m  Downloaded[0m icu_normalizer_data v2.1.1
+[1m[92m  Downloaded[0m find-msvc-tools v0.1.9
+[1m[92m  Downloaded[0m thiserror v2.0.18
+[1m[92m  Downloaded[0m hmac v0.12.1
+[1m[92m  Downloaded[0m signature v2.2.0
+[1m[92m  Downloaded[0m displaydoc v0.2.5
+[1m[92m  Downloaded[0m dirs-sys v0.4.1
+[1m[92m  Downloaded[0m form_urlencoded v1.2.2
+[1m[92m  Downloaded[0m bytes v1.11.1
+[1m[92m  Downloaded[0m base64 v0.22.1
+[1m[92m  Downloaded[0m sync_wrapper v1.0.2
+[1m[92m  Downloaded[0m parking_lot v0.12.5
+[1m[92m  Downloaded[0m getrandom v0.2.17
+[1m[92m  Downloaded[0m futures-task v0.3.32
+[1m[92m  Downloaded[0m ff v0.13.1
+[1m[92m  Downloaded[0m subtle v2.6.1
+[1m[92m  Downloaded[0m errno v0.3.14
+[1m[92m  Downloaded[0m tower-service v0.3.3
+[1m[92m  Downloaded[0m tap v1.0.1
+[1m[92m  Downloaded[0m stable_deref_trait v1.2.1
+[1m[92m  Downloaded[0m scopeguard v1.2.0
+[1m[92m  Downloaded[0m cpufeatures v0.2.17
+[1m[92m  Downloaded[0m tinyvec_macros v0.1.1
+[1m[92m  Downloaded[0m serde_urlencoded v0.7.1
+[1m[92m  Downloaded[0m rustc-hash v2.1.1
+[1m[92m  Downloaded[0m proc-macro2 v1.0.106
+[1m[92m  Downloaded[0m keccak v0.1.6
+[1m[92m  Downloaded[0m fnv v1.0.7
+[1m[92m  Downloaded[0m crypto-common v0.1.6
+[1m[92m  Downloaded[0m quinn-udp v0.5.14
+[1m[92m  Downloaded[0m ppv-lite86 v0.2.21
+[1m[92m  Downloaded[0m openssl-macros v0.1.1
+[1m[92m  Downloaded[0m group v0.13.0
+[1m[92m  Downloaded[0m futures-sink v0.3.32
+[1m[92m  Downloaded[0m futures-core v0.3.32
+[1m[92m  Downloaded[0m foreign-types-shared v0.1.1
+[1m[92m  Downloaded[0m equivalent v1.0.2
+[1m[92m  Downloaded[0m ahash v0.7.8
+[1m[92m  Downloaded[0m bitflags v2.11.0
+[1m[92m  Downloaded[0m http-body v1.0.1
+[1m[92m  Downloaded[0m const-oid v0.9.6
+[1m[92m  Downloaded[0m quote v1.0.45
+[1m[92m  Downloaded[0m ptr_meta v0.1.4
+[1m[92m  Downloaded[0m proc-macro-crate v3.5.0
+[1m[92m  Downloaded[0m pin-utils v0.1.0
+[1m[92m  Downloaded[0m async-trait v0.1.89
+[1m[92m  Downloaded[0m rand_core v0.6.4
+[1m[92m  Downloaded[0m ptr_meta_derive v0.1.4
+[1m[92m  Downloaded[0m pkcs8 v0.10.2
+[1m[92m  Downloaded[0m cfg_aliases v0.2.1
+[1m[92m  Downloaded[0m linux-raw-sys v0.12.1
+[1m[92m   Compiling[0m proc-macro2 v1.0.106
+[1m[92m   Compiling[0m quote v1.0.45
+[1m[92m   Compiling[0m unicode-ident v1.0.24
+[1m[92m   Compiling[0m libc v0.2.183
+[1m[92m   Compiling[0m cfg-if v1.0.4
+[1m[92m   Compiling[0m zeroize v1.8.2
+[1m[92m   Compiling[0m shlex v1.3.0
+[1m[92m   Compiling[0m find-msvc-tools v0.1.9
+[1m[92m   Compiling[0m smallvec v1.15.1
+[1m[92m   Compiling[0m cc v1.2.58
+[1m[92m   Compiling[0m subtle v2.6.1
+[1m[92m   Compiling[0m typenum v1.19.0
+[1m[92m   Compiling[0m version_check v0.9.5
+[1m[92m   Compiling[0m syn v2.0.117
+[1m[92m   Compiling[0m generic-array v0.14.9
+[1m[92m   Compiling[0m pin-project-lite v0.2.17
+[1m[92m   Compiling[0m getrandom v0.2.17
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
+[1m[92m   Compiling[0m bytes v1.11.1
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m scopeguard v1.2.0
+[1m[92m   Compiling[0m stable_deref_trait v1.2.1
+[1m[92m   Compiling[0m lock_api v0.4.14
+[1m[92m   Compiling[0m errno v0.3.14
+[1m[92m   Compiling[0m const-oid v0.9.6
+[1m[92m   Compiling[0m futures-core v0.3.32
+[1m[92m   Compiling[0m signal-hook-registry v1.4.8
+[1m[92m   Compiling[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m mio v1.2.0
+[1m[92m   Compiling[0m socket2 v0.6.3
+[1m[92m   Compiling[0m itoa v1.0.18
+[1m[92m   Compiling[0m vcpkg v0.2.15
+[1m[92m   Compiling[0m pkg-config v0.3.32
+[1m[92m   Compiling[0m http v1.4.0
+[1m[92m   Compiling[0m block-buffer v0.10.4
+[1m[92m   Compiling[0m crypto-common v0.1.6
+[1m[92m   Compiling[0m openssl-sys v0.9.112
+[1m[92m   Compiling[0m rand_core v0.6.4
+[1m[92m   Compiling[0m slab v0.4.12
+[1m[92m   Compiling[0m synstructure v0.13.2
+[1m[92m   Compiling[0m digest v0.10.7
+[1m[92m   Compiling[0m ring v0.17.14
+[1m[92m   Compiling[0m writeable v0.6.2
+[1m[92m   Compiling[0m litemap v0.8.1
+[1m[92m   Compiling[0m bitflags v2.11.0
+[1m[92m   Compiling[0m serde_core v1.0.228
+[1m[92m   Compiling[0m http-body v1.0.1
+[1m[92m   Compiling[0m tracing-core v0.1.36
+[1m[92m   Compiling[0m icu_normalizer_data v2.1.1
+[1m[92m   Compiling[0m httparse v1.10.1
+[1m[92m   Compiling[0m icu_properties_data v2.1.2
+[1m[92m   Compiling[0m zerofrom-derive v0.1.6
+[1m[92m   Compiling[0m yoke-derive v0.8.1
+[1m[92m   Compiling[0m zerovec-derive v0.11.2
+[1m[92m   Compiling[0m tokio-macros v2.6.1
+[1m[92m   Compiling[0m zerofrom v0.1.6
+[1m[92m   Compiling[0m yoke v0.8.1
+[1m[92m   Compiling[0m displaydoc v0.2.5
+[1m[92m   Compiling[0m tokio v1.50.0
+[1m[92m   Compiling[0m zerovec v0.11.5
+[1m[92m   Compiling[0m zerotrie v0.2.3
+[1m[92m   Compiling[0m tinystr v0.8.2
+[1m[92m   Compiling[0m icu_locale_core v2.1.1
+[1m[92m   Compiling[0m potential_utf v0.1.4
+[1m[92m   Compiling[0m futures-task v0.3.32
+[1m[92m   Compiling[0m equivalent v1.0.2
+[1m[92m   Compiling[0m hashbrown v0.16.1
+[1m[92m   Compiling[0m futures-sink v0.3.32
+[1m[92m   Compiling[0m percent-encoding v2.3.2
+[1m[92m   Compiling[0m indexmap v2.13.0
+[1m[92m   Compiling[0m icu_provider v2.1.1
+[1m[92m   Compiling[0m futures-util v0.3.32
+[1m[92m   Compiling[0m icu_collections v2.1.1
+[1m[92m   Compiling[0m tracing v0.1.44
+[1m[92m   Compiling[0m tokio-util v0.7.18
+[1m[92m   Compiling[0m der v0.7.10
+[1m[92m   Compiling[0m rustls-pki-types v1.14.0
+[1m[92m   Compiling[0m openssl v0.10.76
+[1m[92m   Compiling[0m atomic-waker v1.1.2
+[1m[92m   Compiling[0m try-lock v0.2.5
+[1m[92m   Compiling[0m foreign-types-shared v0.1.1
+[1m[92m   Compiling[0m tower-service v0.3.3
+[1m[92m   Compiling[0m serde v1.0.228
+[1m[92m   Compiling[0m untrusted v0.9.0
+[1m[92m   Compiling[0m fnv v1.0.7
+[1m[92m   Compiling[0m h2 v0.4.13
+[1m[92m   Compiling[0m foreign-types v0.3.2
+[1m[92m   Compiling[0m want v0.3.1
+[1m[92m   Compiling[0m openssl-macros v0.1.1
+[1m[92m   Compiling[0m serde_derive v1.0.228
+[1m[92m   Compiling[0m futures-channel v0.3.32
+[1m[92m   Compiling[0m autocfg v1.5.0
+[1m[92m   Compiling[0m pin-utils v0.1.0
+[1m[92m   Compiling[0m native-tls v0.2.18
+[1m[92m   Compiling[0m rustls v0.23.37
+[1m[92m   Compiling[0m hyper v1.8.1
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m   Compiling[0m icu_properties v2.1.2
+[1m[92m   Compiling[0m icu_normalizer v2.1.1
+[1m[92m   Compiling[0m rustls-webpki v0.103.10
+[1m[92m   Compiling[0m spki v0.7.3
+[1m[92m   Compiling[0m ff v0.13.1
+[1m[92m   Compiling[0m zerocopy v0.8.47
+[1m[92m   Compiling[0m zmij v1.0.21
+[1m[92m   Compiling[0m log v0.4.29
+[1m[92m   Compiling[0m base16ct v0.2.0
+[1m[92m   Compiling[0m ipnet v2.12.0
+[1m[92m   Compiling[0m base64 v0.22.1
+[1m[92m   Compiling[0m openssl-probe v0.2.1
+[1m[92m   Compiling[0m hyper-util v0.1.20
+[1m[92m   Compiling[0m sec1 v0.7.3
+[1m[92m   Compiling[0m group v0.13.0
+[1m[92m   Compiling[0m pkcs8 v0.10.2
+[1m[92m   Compiling[0m idna_adapter v1.2.1
+[1m[92m   Compiling[0m form_urlencoded v1.2.2
+[1m[92m   Compiling[0m hmac v0.12.1
+[1m[92m   Compiling[0m crypto-bigint v0.5.5
+[1m[92m   Compiling[0m sync_wrapper v1.0.2
+[1m[92m   Compiling[0m serde_json v1.0.149
+[1m[92m   Compiling[0m utf8_iter v1.0.4
+[1m[92m   Compiling[0m getrandom v0.4.2
+[1m[92m   Compiling[0m rustix v1.1.4
+[1m[92m   Compiling[0m tower-layer v0.3.3
+[1m[92m   Compiling[0m tower v0.5.3
+[1m[92m   Compiling[0m idna v1.1.0
+[1m[92m   Compiling[0m elliptic-curve v0.13.8
+[1m[92m   Compiling[0m rfc6979 v0.4.0
+[1m[92m   Compiling[0m tokio-rustls v0.26.4
+[1m[92m   Compiling[0m tokio-native-tls v0.3.1
+[1m[92m   Compiling[0m webpki-roots v1.0.6
+[1m[92m   Compiling[0m http-body-util v0.1.3
+[1m[92m   Compiling[0m signature v2.2.0
+[1m[92m   Compiling[0m ryu v1.0.23
+[1m[92m   Compiling[0m linux-raw-sys v0.12.1
+[1m[92m   Compiling[0m memchr v2.8.0
+[1m[92m   Compiling[0m iri-string v0.7.11
+[1m[92m   Compiling[0m rust_decimal v1.41.0
+[1m[92m   Compiling[0m option-ext v0.2.0
+[1m[92m   Compiling[0m thiserror v1.0.69
+[1m[92m   Compiling[0m cpufeatures v0.2.17
+[1m[92m   Compiling[0m sha2 v0.10.9
+[1m[92m   Compiling[0m ppv-lite86 v0.2.21
+[1m[92m   Compiling[0m tower-http v0.6.8
+[1m[92m   Compiling[0m dirs-sys v0.4.1
+[1m[92m   Compiling[0m serde_urlencoded v0.7.1
+[1m[92m   Compiling[0m ecdsa v0.16.9
+[1m[92m   Compiling[0m hyper-tls v0.6.0
+[1m[92m   Compiling[0m hyper-rustls v0.27.7
+[1m[92m   Compiling[0m url v2.5.8
+[1m[92m   Compiling[0m thiserror-impl v1.0.69
+[1m[92m   Compiling[0m encoding_rs v0.8.35
+[1m[92m   Compiling[0m mime v0.3.17
+[1m[92m   Compiling[0m arrayvec v0.7.6
+[1m[92m   Compiling[0m env_home v0.1.0
+[1m[92m   Compiling[0m keccak v0.1.6
+[1m[92m   Compiling[0m iana-time-zone v0.1.65
+[1m[92m   Compiling[0m either v1.15.0
+[1m[92m   Compiling[0m which v7.0.3
+[1m[92m   Compiling[0m chrono v0.4.44
+[1m[92m   Compiling[0m sha3 v0.10.8
+[1m[92m   Compiling[0m reqwest v0.12.28
+[1m[92m   Compiling[0m uuid v1.23.0
+[1m[92m   Compiling[0m k256 v0.13.4
+[1m[92m   Compiling[0m dirs v5.0.1
+[1m[92m   Compiling[0m rand_chacha v0.3.1
+[1m[92m   Compiling[0m async-trait v0.1.89
+[1m[92m   Compiling[0m hex v0.4.3
+[1m[92m   Compiling[0m remitmd v0.2.1 (/home/runner/work/sdk/sdk/rust)
+[1m[92m   Compiling[0m rand v0.8.5
+[1m[92m   Compiling[0m acceptance-flows v0.1.0 (/home/runner/work/sdk/sdk/acceptance/rust)
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:258:9
+    [1m[94m|[0m
+[1m[94m258[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mnote[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:320:9
+    [1m[94m|[0m
+[1m[94m320[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:385:9
+    [1m[94m|[0m
+[1m[94m385[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:447:9
+    [1m[94m|[0m
+[1m[94m447[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m[1m: constant `FEE_WALLET` is never used[0m
+  [1m[94m--> [0msrc/main.rs:30:7
+   [1m[94m|[0m
+[1m[94m30[0m [1m[94m|[0m const FEE_WALLET: &str = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
+   [1m[94m|[0m       [1m[33m^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mnote[0m: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+[1m[33mwarning[0m[1m: field `usdc` is never read[0m
+  [1m[94m--> [0msrc/main.rs:95:5
+   [1m[94m|[0m
+[1m[94m88[0m [1m[94m|[0m struct Contracts {
+   [1m[94m|[0m        [1m[94m---------[0m [1m[94mfield in this struct[0m
+[1m[94m...[0m
+[1m[94m95[0m [1m[94m|[0m     usdc: String,
+   [1m[94m|[0m     [1m[33m^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mnote[0m: `Contracts` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+[1m[33mwarning[0m[1m: function `get_fee_balance` is never used[0m
+   [1m[94m--> [0msrc/main.rs:159:10
+    [1m[94m|[0m
+[1m[94m159[0m [1m[94m|[0m async fn get_fee_balance() -> f64 {
+    [1m[94m|[0m          [1m[33m^^^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m: `acceptance-flows` (bin "acceptance-flows") generated 7 warnings (run `cargo fix --bin "acceptance-flows" -p acceptance-flows` to apply 4 suggestions)
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 1m 00s
+[1m[92m     Running[0m `target/release/acceptance-flows`
+
+[1mRust SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x8b76d49a35149db8fac0a56e327ba52a8e5297d4
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0xaad7269172ac424df45b884bf75a7083e97b145b
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0xd157e9c981770af635bdb94250e6a7e683a762d158e51d63cec46a248ee2dc3d
+[0;32m[PASS][0m 1. Direct Payment — tx=0xd157e9c981770af6
+  [TX] 2. Escrow | fund | https://sepolia.basescan.org/tx/0xab47a840865d84f88594b81de556d8ba40587e187b0d0d0649ad4822efc55b48
+  [TX] 2. Escrow | claimStart | https://sepolia.basescan.org/tx/0xab47a840865d84f88594b81de556d8ba40587e187b0d0d0649ad4822efc55b48
+  [TX] 2. Escrow | release | https://sepolia.basescan.org/tx/0xab47a840865d84f88594b81de556d8ba40587e187b0d0d0649ad4822efc55b48
+[0;32m[PASS][0m 2. Escrow — escrow_id=efec576c65a1a996e458bca3292c5893
+
+thread 'main' (4825) panicked at src/main.rs:595:10:
+create_tab_with_permit: RemitError { code: "SERVER_ERROR", message: "failed to deserialize response: invalid type: string \"2026-03-29T05:22:47Z\", expected u64", doc_url: "https://remit.md/docs/errors#SERVER_ERROR", context: {} }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+════════════════════════════════════════════════
+  .NET
+════════════════════════════════════════════════
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(180,84): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(181,5): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(197,84): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(198,5): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(221,82): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(222,5): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(255,84): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(256,5): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(275,84): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(276,5): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(299,85): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(300,5): error CS0841: Cannot use local variable 'permitNonce' before it is declared [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(24,14): warning CS0219: The variable 'FEE_WALLET' is assigned but its value is never used [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+
+The build failed. Fix the build errors and run again.
+
+════════════════════════════════════════════════
+  JAVA
+════════════════════════════════════════════════
+Note: /home/runner/work/sdk/sdk/java/src/main/java/md/remit/MockRemit.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: /home/runner/work/sdk/sdk/acceptance/java/src/main/java/App.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+[1mJava SDK -- 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0xecf415264c52cb940db2d85053fc4cd2877ea4d3
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0xada574bff583163a4a5765d8be98d23ddd802106
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0xed29bd7fb9da317462b0135ca2f8a639ab8e800542a8f54cb49700c4d3a8be4f
+[0;32m[PASS][0m 1. Direct Payment -- tx=0xed29bd7fb9da3174...
+[0;32m[PASS][0m 2. Escrow -- escrow_id=623cc01d32ba103251af2e99cf721465
+  [TX] 3. Metered Tab | close | https://sepolia.basescan.org/tx/0xd13413de13d5276b7e6e12bc255e7d1d54791536c1a2e54e6eecd41a6129ffba
+[0;32m[PASS][0m 3. Metered Tab -- tab_id=8d9fa636-b606-4120-915a-24b7fdfd3e98, charged=$3, 2 charges
+  [TX] 4. Stream | close | https://sepolia.basescan.org/tx/0x63bc36bbe6fc51639206d1d3edba7b7adaec09bc6f7c6c68e72924024a4d961b
+[0;32m[PASS][0m 4. Stream -- stream_id=1223738a-41e9-43c6-94ff-6624f3fcc5f8
+[0;31m[FAIL][0m 5. Bounty -- RemitError: Bounty not found
+RemitError[BOUNTY_NOT_FOUND]: Bounty not found
+	at md.remit.internal.ApiClient.handleResponse(ApiClient.java:140)
+	at md.remit.internal.ApiClient.doPost(ApiClient.java:113)
+	at md.remit.internal.ApiClient.lambda$post$1(ApiClient.java:61)
+	at md.remit.internal.ApiClient.executeWithRetry(ApiClient.java:266)
+	at md.remit.internal.ApiClient.post(ApiClient.java:61)
+	at md.remit.Wallet.awardBounty(Wallet.java:482)
+	at App.flowBounty(App.java:328)
+	at App.lambda$main$4(App.java:638)
+	at App.main(App.java:647)
+  [TX] 6. Deposit | return | https://sepolia.basescan.org/tx/0x7439bdc8ad54e37937a702b13da2db3f3632a55a7623fc697f0cb96b7d8d4e99
+[0;32m[PASS][0m 6. Deposit -- deposit_id=1d71102a-73cb-4986-87da-c0f67a9844c8
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather -- settle returned no tx_hash
+
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  [1mA2A Agent Card[0m                            [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  Name:     remit.md                        [0;36m|[0m
+[0;36m|[0m  Version:  0.1.0                           [0;36m|[0m
+[0;36m|[0m  Protocol: 0.6                             [0;36m|[0m
+[0;36m|[0m  URL:      https://testnet.remit.md/a2a    [0;36m|[0m
+[0;36m|[0m  Skills:   7 total                         [0;36m|[0m
+[0;36m|[0m    - Direct Payment                        [0;36m|[0m
+[0;36m|[0m    - Metered Tab                           [0;36m|[0m
+[0;36m|[0m    - Streaming Payment                     [0;36m|[0m
+[0;36m|[0m    - Escrow                                [0;36m|[0m
+[0;36m|[0m    - Bounty                                [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery -- name=remit.md
+[1;33m[SKIP][0m 9. AP2 Payment -- AP2 task has no ID (endpoint may not be available on testnet)
+
+[1mJava Summary: [0;32m6 passed[0m, [0;31m2 failed[0m / 9 flows
+{"passed":6,"failed":2,"skipped":1}
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':run'.
+> Process 'command '/usr/lib/jvm/temurin-17-jdk-amd64/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 20s
+
+════════════════════════════════════════════════
+  RUBY
+════════════════════════════════════════════════
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:173:in `handle_response'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:51:in `request'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:38:in `post'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/wallet.rb:299:in `close_tab'
+acceptance/ruby/test_flows.rb:228:in `flow_tab'
+acceptance/ruby/test_flows.rb:557:in `block in <main>'
+acceptance/ruby/test_flows.rb:568:in `block in <main>'
+acceptance/ruby/test_flows.rb:566:in `each'
+acceptance/ruby/test_flows.rb:566:in `<main>'
+
+[1mRuby SDK -- 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0xce138819770a25874161b4992747dfa7c9e8c33e
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x94cc1eaf5c63d8b47a5b2c6897d4160c6e5c2f33
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0x74870a21e37bb875cf7054239ccb84188a3d6db0439afe90515502bef3c57b25
+[0;32m[PASS][0m 1. Direct Payment -- tx=0x74870a21e37bb875...
+[0;32m[PASS][0m 2. Escrow -- escrow_id=8c1b06442b32f8aa6db1d4d746acf7ac
+[0;31m[FAIL][0m 3. Metered Tab -- Remitmd::RemitError: [SERVER_ERROR] Chain submission failed: transport error: gas estimation: server returned an error response: error code 3: execution reverted, data: "0x8baa579f" - https://remit.md/docs/api-reference/error-codes#server_error
+[0;32m[PASS][0m 4. Stream -- stream_id=4862fd95-1142-4e78-8eba-347e2470b2c3
+[0;32m[PASS][0m 5. Bounty -- bounty_id=e349b539-8588-4c5c-914a-f8f0f0d5e601
+[0;32m[PASS][0m 6. Deposit -- deposit_id=671a1122-5c24-418f-8a0d-3f1f46de8f92
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather -- settle returned no tx_hash
+
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  [1mA2A Agent Card[0m                            [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  Name:     remit.md                        [0;36m|[0m
+[0;36m|[0m  Version:  0.1.0                           [0;36m|[0m
+[0;36m|[0m  Protocol: 0.6                             [0;36m|[0m
+[0;36m|[0m  URL:      https://testnet.remit.md/a2a    [0;36m|[0m
+[0;36m|[0m  Skills:   7 total                         [0;36m|[0m
+[0;36m|[0m    - Direct Payment                        [0;36m|[0m
+[0;36m|[0m    - Metered Tab                           [0;36m|[0m
+[0;36m|[0m    - Streaming Payment                     [0;36m|[0m
+[0;36m|[0m    - Escrow                                [0;36m|[0m
+[0;36m|[0m    - Bounty                                [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery -- name=remit.md
+[1;33m[SKIP][0m 9. AP2 Payment -- AP2 task has no ID (endpoint may not be available on testnet)
+
+[1mRuby Summary: [0;32m6 passed[0m, [0;31m2 failed[0m / 9 flows
+{"passed":6,"failed":2,"skipped":1}
+
+════════════════════════════════════════════════
+  SWIFT
+════════════════════════════════════════════════
+Fetching https://github.com/GigaBitcoin/secp256k1.swift.git
+[1/10077] Fetching secp256k1.swift
+Fetched https://github.com/GigaBitcoin/secp256k1.swift.git from cache (2.10s)
+Computing version for https://github.com/GigaBitcoin/secp256k1.swift.git
+Computed https://github.com/GigaBitcoin/secp256k1.swift.git at 0.17.0 (0.23s)
+Creating working copy for https://github.com/GigaBitcoin/secp256k1.swift.git
+Working copy of https://github.com/GigaBitcoin/secp256k1.swift.git resolved at 0.17.0
+Building for debugging...
+[0/13] Compiling precomputed_ecmult_gen.c
+[1/13] Compiling Utility.c
+[2/13] Write sources
+[5/13] Write swift-version--3BE7240F797CB9BC.txt
+[6/13] Compiling secp256k1.c
+[7/13] Compiling precomputed_ecmult.c
+[9/45] Emitting module secp256k1
+[10/55] Compiling secp256k1 DH.swift
+[11/55] Compiling secp256k1 Digest.swift
+[12/55] Compiling secp256k1 ECDH.swift
+[13/55] Compiling secp256k1 ECDSA.swift
+[14/55] Compiling secp256k1 EdDSA.swift
+[15/55] Compiling secp256k1 Errors.swift
+[16/55] Compiling secp256k1 Exports.swift
+[17/55] Compiling secp256k1 HashDigest.swift
+[18/55] Compiling secp256k1 PrettyBytes.swift
+[19/55] Compiling secp256k1 RNG_boring.swift
+[20/55] Compiling secp256k1 Recovery.swift
+[21/55] Compiling secp256k1 SHA256.swift
+[22/55] Compiling secp256k1 SafeCompare.swift
+[23/55] Compiling secp256k1 Schnorr.swift
+[24/55] Compiling secp256k1 SecureBytes.swift
+[25/55] Compiling secp256k1 Signature.swift
+[26/55] Compiling secp256k1 Tweak.swift
+[27/55] Compiling secp256k1 Utility.swift
+[28/55] Compiling secp256k1 Zeroization.swift
+[29/55] Compiling secp256k1 secp256k1.swift
+[30/55] Compiling secp256k1 ASN1.swift
+[31/55] Compiling secp256k1 ASN1Any.swift
+[32/55] Compiling secp256k1 ASN1BitString.swift
+[33/55] Compiling secp256k1 ASN1Boolean.swift
+[34/55] Compiling secp256k1 ASN1Identifier.swift
+[35/55] Compiling secp256k1 ASN1Integer.swift
+[36/55] Compiling secp256k1 ASN1Null.swift
+[37/55] Compiling secp256k1 ASN1OctetString.swift
+[38/55] Compiling secp256k1 ASN1Strings.swift
+[39/55] Compiling secp256k1 ArraySliceBigint.swift
+[40/55] Compiling secp256k1 GeneralizedTime.swift
+[41/55] Compiling secp256k1 ObjectIdentifier.swift
+[42/55] Compiling secp256k1 ECDSASignature.swift
+[43/55] Compiling secp256k1 PEMDocument.swift
+[44/55] Compiling secp256k1 PKCS8PrivateKey.swift
+[45/55] Compiling secp256k1 SEC1PrivateKey.swift
+[46/55] Compiling secp256k1 SubjectPublicKeyInfo.swift
+[47/55] Compiling secp256k1 Asymmetric.swift
+[48/55] Compiling secp256k1 Combine.swift
+[49/55] Compiling secp256k1 Context.swift
+[50/55] Compiling secp256k1 CryptoKitErrors.swift
+[51/56] Wrapping AST for secp256k1 for debugging
+[53/66] Compiling RemitMd A2A.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[54/66] Compiling RemitMd CliSigner.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[55/66] Compiling RemitMd Errors.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[56/69] Compiling RemitMd HttpTransport.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+[57/69] Compiling RemitMd Keccak.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+[58/69] Compiling RemitMd Mock.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+[59/69] Compiling RemitMd Wallet.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[60/69] Compiling RemitMd X402Client.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[61/69] Compiling RemitMd X402Paywall.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[62/69] Emitting module RemitMd
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+[63/69] Compiling RemitMd Models.swift
+[64/69] Compiling RemitMd RemitMd.swift
+[65/69] Compiling RemitMd Signer.swift
+error: fatalError
+
+════════════════════════════════════════════════
+  ELIXIR
+════════════════════════════════════════════════
+==> decimal
+Compiling 4 files (.ex)
+Generated decimal app
+==> mime
+Compiling 1 file (.ex)
+Generated mime app
+==> nimble_options
+Compiling 3 files (.ex)
+Generated nimble_options app
+===> Analyzing applications...
+===> Compiling telemetry
+==> jason
+Compiling 10 files (.ex)
+Generated jason app
+==> remit
+Compiling 13 files (.ex)
+Generated remit app
+==> hpax
+Compiling 4 files (.ex)
+Generated hpax app
+==> mint
+Compiling 1 file (.erl)
+Compiling 20 files (.ex)
+Generated mint app
+==> nimble_pool
+Compiling 2 files (.ex)
+Generated nimble_pool app
+==> finch
+Compiling 14 files (.ex)
+Generated finch app
+==> req
+Compiling 19 files (.ex)
+Generated req app
+==> acceptance_flows
+Generated acceptance_flows app
+
+[1mElixir SDK -- 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x26ae118f72282ede9b0f1fc3cf51b660e02da61a
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0xc43800c5e0874c3917bad56ed3fdf1008a4d5127
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0x2cc7cac41960050dbc9b81bb9ec578e2d350af40844a8cec3900e787ae903448
+[0;32m[PASS][0m 1. Direct Payment -- tx=0x2cc7cac41960050d...
+  [TX] 2. Escrow | fund | https://sepolia.basescan.org/tx/0x37899a5f61a3e3a4b0f03fa44f657f4dc36c92d1b49e0cb919e8424044fb98d8
+  [TX] 2. Escrow | claimStart | https://sepolia.basescan.org/tx/0x37899a5f61a3e3a4b0f03fa44f657f4dc36c92d1b49e0cb919e8424044fb98d8
+  [TX] 2. Escrow | release | https://sepolia.basescan.org/tx/0x37899a5f61a3e3a4b0f03fa44f657f4dc36c92d1b49e0cb919e8424044fb98d8
+[0;32m[PASS][0m 2. Escrow -- escrow_id=916ddc14d6d5f30a3736739783a3ec9d
+  [TX] 3. Metered Tab | charge1 | https://sepolia.basescan.org/tx/n/a
+  [TX] 3. Metered Tab | charge2 | https://sepolia.basescan.org/tx/n/a
+  [TX] 3. Metered Tab | close | https://sepolia.basescan.org/tx/0x9ba00730b8adc2afff8a5416c5c3c0856f85bb702f38edc37fe97fce459ce280
+[0;32m[PASS][0m 3. Metered Tab -- tab_id=a08c0a5b-3b62-4323-9d97-4ee8bf530c43, charged=$3, 2 charges
+  [TX] 4. Stream | open | https://sepolia.basescan.org/tx/5291d9fd-f112-44b1-bf81-6fadaa02d210
+  [TX] 4. Stream | close | https://sepolia.basescan.org/tx/0xd51138c339169544896cc048126ae3c2ce4e231c993a822d6a68a0cb8e40c6a7
+[0;32m[PASS][0m 4. Stream -- stream_id=5291d9fd-f112-44b1-bf81-6fadaa02d210
+  [TX] 5. Bounty | post | https://sepolia.basescan.org/tx/9ece12c9-7f3b-4274-ae70-bbbc87b5ea02
+[0;32m[PASS][0m 5. Bounty -- bounty_id=9ece12c9-7f3b-4274-ae70-bbbc87b5ea02
+  [TX] 6. Deposit | place | https://sepolia.basescan.org/tx/0x6f319e1248eda91e2c69abffbe1865449a129b7e16d088faf382f02468206a1f
+  [TX] 6. Deposit | return | https://sepolia.basescan.org/tx/0x6f319e1248eda91e2c69abffbe1865449a129b7e16d088faf382f02468206a1f
+[0;32m[PASS][0m 6. Deposit -- deposit_id=da33eea7-83ff-47ed-a2e3-88cc2c2b7e44
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather -- RuntimeError: Settle returned 401: {"code":"INVALID_SIGNATURE","message":"Invalid or expired signature"}
+** (RuntimeError) Settle returned 401: {"code":"INVALID_SIGNATURE","message":"Invalid or expired signature"}
+    test_flows.exs:461: anonymous fn/6 in :elixir_compiler_45.__FILE__/1
+    test_flows.exs:632: anonymous fn/2 in :elixir_compiler_45.__FILE__/1
+    (elixir 1.17.3) lib/enum.ex:2531: Enum."-reduce/3-lists^foldl/2-0-"/3
+    test_flows.exs:631: (file)
+    (elixir 1.17.3) src/elixir_compiler.erl:77: :elixir_compiler.dispatch/4
+    (elixir 1.17.3) src/elixir_compiler.erl:52: :elixir_compiler.compile/4
+    (elixir 1.17.3) src/elixir_compiler.erl:39: :elixir_compiler.maybe_fast_compile/2
+    (elixir 1.17.3) src/elixir_lexical.erl:15: :elixir_lexical.run/3
+
+
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  [1mA2A Agent Card[0m                            [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  Name:     remit.md                        [0;36m|[0m
+[0;36m|[0m  Version:  0.1.0                           [0;36m|[0m
+[0;36m|[0m  Protocol: 0.6                             [0;36m|[0m
+[0;36m|[0m  URL:      https://testnet.remit.md/a2a    [0;36m|[0m
+[0;36m|[0m  Skills:   7 total                         [0;36m|[0m
+[0;36m|[0m    - Direct Payment                        [0;36m|[0m
+[0;36m|[0m    - Metered Tab                           [0;36m|[0m
+[0;36m|[0m    - Streaming Payment                     [0;36m|[0m
+[0;36m|[0m    - Escrow                                [0;36m|[0m
+[0;36m|[0m    - Bounty                                [0;36m|[0m
+[0;36m|[0m  x402:     settle=https://testnet.remit.md/api/v1[0;36m|[0m
+[0;36m|[0m  Caps:     streaming=false, exts=payment-processo   [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery -- name=remit.md
+[0;31m[FAIL][0m 9. AP2 Payment -- MatchError: no match of right hand side value: {:error, %RemitMd.Error{code: "UNAUTHORIZED", message: "Authentication failed - check private key and chain ID", doc_url: "https://remit.md/docs/errors#unauthorized", context: nil}}
+** (MatchError) no match of right hand side value: {:error, %RemitMd.Error{code: "UNAUTHORIZED", message: "Authentication failed - check private key and chain ID", doc_url: "https://remit.md/docs/errors#unauthorized", context: nil}}
+    test_flows.exs:592: anonymous fn/6 in :elixir_compiler_45.__FILE__/1
+    test_flows.exs:632: anonymous fn/2 in :elixir_compiler_45.__FILE__/1
+    (elixir 1.17.3) lib/enum.ex:2531: Enum."-reduce/3-lists^foldl/2-0-"/3
+    test_flows.exs:631: (file)
+    (elixir 1.17.3) src/elixir_compiler.erl:77: :elixir_compiler.dispatch/4
+    (elixir 1.17.3) src/elixir_compiler.erl:52: :elixir_compiler.compile/4
+    (elixir 1.17.3) src/elixir_compiler.erl:39: :elixir_compiler.maybe_fast_compile/2
+    (elixir 1.17.3) src/elixir_lexical.erl:15: :elixir_lexical.run/3
+
+
+[1mElixir Summary: [0;32m7 passed[0m, [0;31m2 failed[0m / 9 flows
+{"failed":2,"skipped":0,"passed":7}
+
+
+════════════════════════════════════════════════
+  FINAL SUMMARY
+════════════════════════════════════════════════
+Completed at: Sat Mar 28 05:27:04 UTC 2026
+
+Total PASS: 32
+Total FAIL: 11
+
+── Per-language results ──
+  PYTHON         0
+0 passed, 0
+0 failed
+  TYPESCRIPT     0
+0 passed, 0
+0 failed
+  GO             0
+0 passed, 0
+0 failed
+  RUST           0
+0 passed, 0
+0 failed
+  .NET           0
+0 passed, 0
+0 failed
+  JAVA           0
+0 passed, 0
+0 failed
+  RUBY           0
+0 passed, 0
+0 failed
+  SWIFT          0
+0 passed, 0
+0 failed
+  ELIXIR         0
+0 passed, 0
+0 failed
+

@@ -90,6 +90,7 @@ async def wallet():
         api_url=SERVER_URL,
         router_address=ROUTER_ADDRESS,
     )
+    print(f"[COMPLIANCE] wallet created: {w.address} (chain={CHAIN_ID})")
     yield w
     await w.close()
 
@@ -99,6 +100,7 @@ async def funded_wallet(wallet):
     """A Wallet that has received testnet USDC via mint."""
     result = await wallet.mint(100)
     assert result["tx_hash"] is not None
+    print(f"[COMPLIANCE] mint: 100 USDC -> {wallet.address} tx={result['tx_hash']}")
     return wallet
 
 
@@ -124,8 +126,11 @@ async def wallet_pair():
         api_url=SERVER_URL,
         router_address=ROUTER_ADDRESS,
     )
+    print(f"[COMPLIANCE] wallet_pair payer created: {payer.address} (chain={CHAIN_ID})")
+    print(f"[COMPLIANCE] wallet_pair payee created: {payee.address} (chain={CHAIN_ID})")
     # Fund payer via mint
-    await payer.mint(100)
+    mint_result = await payer.mint(100)
+    print(f"[COMPLIANCE] mint: 100 USDC -> {payer.address} tx={mint_result['tx_hash']}")
 
     yield payer, payee, addr_b
 

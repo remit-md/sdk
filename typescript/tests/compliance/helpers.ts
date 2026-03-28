@@ -40,6 +40,7 @@ export function generateWallet(): {
     apiUrl: `${SERVER_URL}/api/v1`,
     routerAddress: ROUTER_ADDRESS,
   });
+  console.log(`[COMPLIANCE] wallet generated: ${wallet.address} (chain=${CHAIN_ID})`);
   return { privateKey, walletAddress: wallet.address };
 }
 
@@ -72,7 +73,9 @@ export async function makeFundedPair(): Promise<{
   const payer = new Wallet({ privateKey: pkA, ...walletOpts });
   const payee = new Wallet({ privateKey: pkB, ...walletOpts });
 
-  await payer.mint(100);
+  console.log(`[COMPLIANCE] funded pair: payer=${payer.address} payee=${payee.address}`);
+  const mintResult = await payer.mint(100);
+  console.log(`[COMPLIANCE] mint: 100 USDC -> ${payer.address} tx=${mintResult.tx_hash}`);
 
   return { payer, payee, payeeAddress: addrB };
 }

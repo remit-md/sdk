@@ -28,6 +28,7 @@ describe("TypeScript compliance: escrow lifecycle", () => {
 
     const { payer, payeeAddress } = await makeFundedPair();
 
+    console.log(`[COMPLIANCE] escrow create: 10.0 USDC ${payer.address} -> ${payeeAddress}`);
     const tx = await payer.pay({
       id: "",
       from: payer.address,
@@ -39,6 +40,7 @@ describe("TypeScript compliance: escrow lifecycle", () => {
       createdAt: 0,
       memo: "compliance escrow test",
     } as Invoice);
+    console.log(`[COMPLIANCE] escrow created: id=${tx.invoiceId} tx=${tx.txHash}`);
 
     assert.ok(tx.invoiceId, "invoiceId must be set after pay");
     assert.ok(tx.txHash, "txHash must be set after pay");
@@ -49,6 +51,7 @@ describe("TypeScript compliance: escrow lifecycle", () => {
 
     const { payer, payeeAddress } = await makeFundedPair();
 
+    console.log(`[COMPLIANCE] escrow create (funded check): 10.0 USDC ${payer.address} -> ${payeeAddress}`);
     const tx = await payer.pay({
       id: "",
       from: payer.address,
@@ -60,8 +63,10 @@ describe("TypeScript compliance: escrow lifecycle", () => {
       createdAt: 0,
       memo: "compliance escrow funded check",
     } as Invoice);
+    console.log(`[COMPLIANCE] escrow created: id=${tx.invoiceId} tx=${tx.txHash}`);
 
     const escrow = await payer.getEscrow(tx.invoiceId!);
+    console.log(`[COMPLIANCE] getEscrow: id=${escrow.invoiceId} status=${escrow.status} amount=${escrow.amount}`);
     assert.equal(escrow.invoiceId, tx.invoiceId);
     assert.equal(escrow.status, "funded");
     assert.ok(
@@ -75,6 +80,7 @@ describe("TypeScript compliance: escrow lifecycle", () => {
 
     const { payer, payeeAddress } = await makeFundedPair();
 
+    console.log(`[COMPLIANCE] escrow create (cancel test): 10.0 USDC ${payer.address} -> ${payeeAddress}`);
     const tx = await payer.pay({
       id: "",
       from: payer.address,
@@ -86,11 +92,14 @@ describe("TypeScript compliance: escrow lifecycle", () => {
       createdAt: 0,
       memo: "compliance escrow cancel test",
     } as Invoice);
+    console.log(`[COMPLIANCE] escrow created: id=${tx.invoiceId} tx=${tx.txHash}`);
 
     const cancelTx = await payer.cancelEscrow(tx.invoiceId!);
+    console.log(`[COMPLIANCE] escrow cancelled: id=${tx.invoiceId} tx=${cancelTx.txHash}`);
     assert.ok(cancelTx.txHash, "cancelTx must have txHash");
 
     const escrow = await payer.getEscrow(tx.invoiceId!);
+    console.log(`[COMPLIANCE] getEscrow after cancel: id=${escrow.invoiceId} status=${escrow.status}`);
     assert.equal(escrow.status, "cancelled");
   });
 });

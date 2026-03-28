@@ -27,7 +27,9 @@ describe("TypeScript compliance: payDirect", () => {
     if (skip) return t.skip("server not available");
 
     const { payer, payeeAddress } = await makeFundedPair();
+    console.log(`[COMPLIANCE] payDirect: 5.0 USDC ${payer.address} -> ${payeeAddress}`);
     const tx = await payer.payDirect(payeeAddress, 5.0, "compliance test");
+    console.log(`[COMPLIANCE] payDirect OK: tx=${tx.txHash} invoice=${tx.invoiceId}`);
 
     assert.ok(tx.txHash, "txHash must be set");
     assert.ok(tx.invoiceId, "invoiceId must be set");
@@ -37,10 +39,12 @@ describe("TypeScript compliance: payDirect", () => {
     if (skip) return t.skip("server not available");
 
     const { payer, payeeAddress } = await makeFundedPair();
+    console.log(`[COMPLIANCE] payDirect below-minimum: 0.001 USDC ${payer.address} -> ${payeeAddress} (expect 400/422)`);
     await assert.rejects(
       () => payer.payDirect(payeeAddress, 0.001, "too small"),
       (err: unknown) => {
         assert.ok(err instanceof RemitError, "must throw RemitError");
+        console.log(`[COMPLIANCE] payDirect below-minimum rejected: status=${err.httpStatus}`);
         assert.ok(
           err.httpStatus === 422 || err.httpStatus === 400,
           `Expected 400/422, got ${err.httpStatus}`,
@@ -54,10 +58,12 @@ describe("TypeScript compliance: payDirect", () => {
     if (skip) return t.skip("server not available");
 
     const { payer } = await makeFundedPair();
+    console.log(`[COMPLIANCE] payDirect self-payment: 1.0 USDC ${payer.address} -> ${payer.address} (expect 400/422)`);
     await assert.rejects(
       () => payer.payDirect(payer.address, 1.0, "self pay"),
       (err: unknown) => {
         assert.ok(err instanceof RemitError, "must throw RemitError");
+        console.log(`[COMPLIANCE] payDirect self-payment rejected: status=${err.httpStatus}`);
         assert.ok(
           err.httpStatus === 422 || err.httpStatus === 400,
           `Expected 400/422, got ${err.httpStatus}`,

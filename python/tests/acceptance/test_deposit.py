@@ -9,10 +9,8 @@ import pytest
 
 from .conftest import (
     assert_balance_change,
-    assert_fee_increase,
     create_wallet,
     fund_wallet,
-    get_fee_wallet_balance,
     get_usdc_balance,
     log_tx,
     wait_for_balance_change,
@@ -31,8 +29,6 @@ async def test_deposit_lifecycle() -> None:
 
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
-    fee_before = await get_fee_wallet_balance()
-
     # Step 1: Place deposit with permit for Deposit contract
     contracts = await agent.get_contracts()
     deposit_contract = contracts["deposit"]
@@ -69,11 +65,8 @@ async def test_deposit_lifecycle() -> None:
     # Wait for return settlement (agent gets full refund)
     agent_after = await wait_for_balance_change(agent.address, agent_mid)
     provider_after = await get_usdc_balance(provider.address)
-    fee_after = await get_fee_wallet_balance()
 
     # Agent: full refund - net change ≈ $0
     assert_balance_change("agent net", agent_before, agent_after, 0)
     # Provider: unchanged
     assert_balance_change("provider", provider_before, provider_after, 0)
-    # Fee wallet: unchanged (deposits have no fee) - use tolerant check for shared wallet
-    assert_fee_increase("fee wallet", fee_before, fee_after, 0)

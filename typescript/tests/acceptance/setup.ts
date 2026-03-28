@@ -5,7 +5,6 @@
  * No raw HTTP - everything goes through SDK methods.
  */
 
-import assert from "node:assert";
 import { Wallet } from "../../src/wallet.js";
 import { generatePrivateKey } from "viem/accounts";
 
@@ -13,32 +12,30 @@ import { generatePrivateKey } from "viem/accounts";
 
 export const API_URL = process.env["ACCEPTANCE_API_URL"] ?? "https://testnet.remit.md/api/v1";
 export const RPC_URL = process.env["ACCEPTANCE_RPC_URL"] ?? "https://sepolia.base.org";
-export const FEE_WALLET = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
 
-// ─── Router address (fetched once from /contracts) ──────────────────────────
+// ─── Contract addresses (fetched once from /contracts) ──────────────────────
 
-let _routerAddress: string | null = null;
+let _contracts: Record<string, string> | null = null;
 
-async function getRouterAddress(): Promise<string> {
-  if (_routerAddress) return _routerAddress;
+async function getContracts(): Promise<Record<string, string>> {
+  if (_contracts) return _contracts;
   const res = await fetch(`${API_URL}/contracts`);
   if (!res.ok) throw new Error(`GET /contracts failed: ${res.status}`);
-  const data = (await res.json()) as { router: string };
-  _routerAddress = data.router;
-  return _routerAddress;
+  _contracts = (await res.json()) as Record<string, string>;
+  return _contracts;
 }
 
 // ─── Wallet creation ────────────────────────────────────────────────────────
 
 export async function createWallet(): Promise<Wallet> {
   const key = generatePrivateKey();
-  const routerAddress = await getRouterAddress();
+  const contracts = await getContracts();
   return new Wallet({
     privateKey: key,
     chain: "base-sepolia",
     apiUrl: API_URL,
     rpcUrl: RPC_URL,
-    routerAddress,
+    routerAddress: contracts.router,
   });
 }
 
@@ -55,9 +52,9 @@ export async function fundWallet(wallet: Wallet, amount = 100): Promise<void> {
 
 /** Read USDC balance via RPC eth_call to balanceOf(address). Returns USD. */
 export async function getUsdcBalance(address: string): Promise<number> {
+  const contracts = await getContracts();
   const paddedAddr = address.toLowerCase().replace("0x", "").padStart(64, "0");
   const data = `0x70a08231${paddedAddr}`;
-  const usdcAddress = "0x2d846325766921935f37d5b4478196d3ef93707c";
 
   const res = await fetch(RPC_URL, {
     method: "POST",
@@ -66,16 +63,12 @@ export async function getUsdcBalance(address: string): Promise<number> {
       jsonrpc: "2.0",
       id: 1,
       method: "eth_call",
-      params: [{ to: usdcAddress, data }, "latest"],
+      params: [{ to: contracts.usdc, data }, "latest"],
     }),
   });
   const json = (await res.json()) as { result?: string; error?: { message: string } };
   if (json.error) throw new Error(`RPC balanceOf error: ${json.error.message}`);
   return Number(BigInt(json.result ?? "0x0")) / 1e6;
-}
-
-export async function getFeeWalletBalance(): Promise<number> {
-  return getUsdcBalance(FEE_WALLET);
 }
 
 /** Wait for a balance change (polls every 2s, up to maxWait). */
@@ -113,21 +106,6 @@ export function assertBalanceChange(
   }
 }
 
-/** Check fee wallet balance (soft: warn if no increase, fail only on decrease). */
-export function assertFeeIncrease(
-  label: string,
-  before: number,
-  after: number,
-  minExpected: number,
-): void {
-  const delta = after - before;
-  if (delta < minExpected - 0.001) {
-    console.warn(
-      `${label}: expected fee increase ~${minExpected}, got delta=${delta} (before=${before}, after=${after})`,
-    );
-  }
-  assert.ok(delta >= -0.001, `${label}: fee wallet should not decrease, got delta=${delta}`);
-}
 
 /** Log a transaction hash with a basescan link. */
 export function logTx(flow: string, step: string, txHash: string): void {

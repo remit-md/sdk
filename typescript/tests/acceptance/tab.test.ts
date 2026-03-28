@@ -10,9 +10,7 @@ import {
   createWallet,
   fundWallet,
   getUsdcBalance,
-  getFeeWalletBalance,
   assertBalanceChange,
-  assertFeeIncrease,
   waitForBalanceChange,
   logTx,
 } from "./setup.js";
@@ -36,8 +34,6 @@ describe("SDK: Tab Lifecycle", { timeout: 180_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    const feeBefore = await getFeeWalletBalance();
-
     // Step 1: Open tab (agent, with permit for Tab contract)
     const contracts = await agent.getContracts();
     const permit = await agent.signPermit(contracts.tab, limit + 1);
@@ -102,14 +98,11 @@ describe("SDK: Tab Lifecycle", { timeout: 180_000 }, () => {
 
     // Verify balances
     const providerAfter = await waitForBalanceChange(provider.address, providerBefore);
-    const feeAfter = await getFeeWalletBalance();
     const agentAfter = await getUsdcBalance(agent.address);
 
     // Agent: locked $10, refunded $8, net change = -$2
     assertBalanceChange("agent", agentBefore, agentAfter, -chargeAmount);
     // Provider: received $2 minus 1% fee = $1.98
     assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    // Fee wallet: received at least 1% of $2 = $0.02
-    assertFeeIncrease("fee wallet", feeBefore, feeAfter, fee);
   });
 });

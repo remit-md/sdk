@@ -1119,15 +1119,23 @@ func (w *Wallet) SignPermit(ctx context.Context, spender string, amount float64,
 			map[string]any{"chain": w.chainKey},
 		)
 	}
+	var dl int64
+	if len(deadline) > 0 && deadline[0] > 0 {
+		dl = deadline[0]
+	}
+	return w.signPermitWithUSDC(ctx, spender, amount, usdcAddr, dl)
+}
 
+// signPermitWithUSDC is the internal implementation that accepts an explicit USDC address.
+func (w *Wallet) signPermitWithUSDC(ctx context.Context, spender string, amount float64, usdcAddr string, deadline int64) (*PermitSignature, error) {
 	nonce, err := w.fetchPermitNonce(ctx, usdcAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	dl := time.Now().Unix() + 3600
-	if len(deadline) > 0 && deadline[0] > 0 {
-		dl = deadline[0]
+	dl := deadline
+	if dl <= 0 {
+		dl = time.Now().Unix() + 3600
 	}
 
 	// Convert USDC amount to base units (6 decimals) using integer math
@@ -1210,7 +1218,17 @@ func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64
 		log.Printf("[remitmd] auto-permit: empty spender for contract %q", contract)
 		return nil, nil // graceful: contract not available
 	}
-	p, err := w.SignPermit(ctx, spender, amount)
+	usdcAddr := contracts.USDC
+	if usdcAddr == "" {
+		log.Printf("[remitmd] auto-permit: no USDC address from API, falling back to hardcoded map")
+		p, err := w.SignPermit(ctx, spender, amount)
+		if err != nil {
+			log.Printf("[remitmd] auto-permit: SignPermit failed for %s (amount=%.2f): %v", contract, amount, err)
+			return nil, nil
+		}
+		return p, nil
+	}
+	p, err := w.signPermitWithUSDC(ctx, spender, amount, usdcAddr, 0)
 	if err != nil {
 		log.Printf("[remitmd] auto-permit: SignPermit failed for %s (amount=%.2f): %v", contract, amount, err)
 		return nil, nil // graceful: RPC unreachable

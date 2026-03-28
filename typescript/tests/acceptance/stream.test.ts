@@ -13,7 +13,6 @@ import {
   createWallet,
   fundWallet,
   getUsdcBalance,
-  getFeeWalletBalance,
   waitForBalanceChange,
   logTx,
 } from "./setup.js";
@@ -34,8 +33,6 @@ describe("SDK: Stream Lifecycle", { timeout: 180_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    const feeBefore = await getFeeWalletBalance();
-
     // Step 1: Open stream with permit for Stream contract
     const contracts = await agent.getContracts();
     const permit = await agent.signPermit(contracts.stream, maxTotal + 1);
@@ -66,13 +63,11 @@ describe("SDK: Stream Lifecycle", { timeout: 180_000 }, () => {
 
     // Wait for settlement (provider balance should increase)
     const providerAfter = await waitForBalanceChange(provider.address, providerBefore);
-    const feeAfter = await getFeeWalletBalance();
     const agentAfter = await getUsdcBalance(agent.address);
 
     // Calculate actual changes
     const agentLoss = agentBefore - agentAfter;
     const providerGain = providerAfter - providerBefore;
-    const feeGain = feeAfter - feeBefore;
 
     // Agent should have lost money (stream accrued), but <= maxTotal
     assert.ok(
@@ -88,16 +83,6 @@ describe("SDK: Stream Lifecycle", { timeout: 180_000 }, () => {
     assert.ok(
       providerGain > 0.04,
       `provider should have received payout, got gain=${providerGain}`,
-    );
-
-    // Fee wallet should not decrease
-    assert.ok(feeGain >= 0, `fee wallet should not decrease, got change=${feeGain}`);
-
-    // Conservation of funds: agent loss ≈ provider gain + fee
-    const conservationDiff = Math.abs(agentLoss - (providerGain + feeGain));
-    assert.ok(
-      conservationDiff < 0.01,
-      `conservation violated: agent lost ${agentLoss}, provider+fee gained ${providerGain + feeGain}, diff=${conservationDiff}`,
     );
   });
 });

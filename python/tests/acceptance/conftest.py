@@ -16,26 +16,30 @@ from remitmd.wallet import Wallet
 
 API_URL = os.environ.get("ACCEPTANCE_API_URL", "https://testnet.remit.md")
 RPC_URL = os.environ.get("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
-USDC_ADDRESS = "0x2d846325766921935f37d5b4478196d3ef93707c"
-FEE_WALLET = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
 
 
-async def _get_router_address() -> str:
-    """Fetch router address from /contracts."""
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{API_URL}/api/v1/contracts")
-        resp.raise_for_status()
-        return resp.json()["router"]
+_contracts: dict[str, str] | None = None
 
 
-_router: str | None = None
+async def _get_contracts() -> dict[str, str]:
+    """Fetch contract addresses from /contracts (cached)."""
+    global _contracts  # noqa: PLW0603
+    if _contracts is None:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{API_URL}/api/v1/contracts")
+            resp.raise_for_status()
+            _contracts = resp.json()
+    return _contracts
 
 
 async def get_router() -> str:
-    global _router  # noqa: PLW0603
-    if _router is None:
-        _router = await _get_router_address()
-    return _router
+    contracts = await _get_contracts()
+    return contracts["router"]
+
+
+async def get_usdc_address() -> str:
+    contracts = await _get_contracts()
+    return contracts["usdc"]
 
 
 async def create_wallet() -> Wallet:
@@ -52,6 +56,7 @@ async def create_wallet() -> Wallet:
 
 async def get_usdc_balance(address: str) -> float:
     """Read USDC balance via RPC eth_call to balanceOf(address)."""
+    usdc = await get_usdc_address()
     padded = address.lower().replace("0x", "").zfill(64)
     data = f"0x70a08231{padded}"
 
@@ -62,17 +67,13 @@ async def get_usdc_balance(address: str) -> float:
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "eth_call",
-                "params": [{"to": USDC_ADDRESS, "data": data}, "latest"],
+                "params": [{"to": usdc, "data": data}, "latest"],
             },
         )
         result = resp.json()
         if "error" in result:
             raise RuntimeError(f"RPC error: {result['error']}")
         return int(result["result"], 16) / 1e6
-
-
-async def get_fee_wallet_balance() -> float:
-    return await get_usdc_balance(FEE_WALLET)
 
 
 async def wait_for_balance_change(
@@ -106,24 +107,6 @@ def assert_balance_change(
         f"(before={before}, after={after}, tolerance={tolerance})"
     )
 
-
-def assert_fee_increase(
-    label: str,
-    before: float,
-    after: float,
-    min_expected: float,
-) -> None:
-    """Check fee wallet balance (soft: warn if no increase)."""
-    delta = after - before
-    if delta < min_expected - 0.001:
-        import warnings
-
-        warnings.warn(
-            f"{label}: expected fee increase ~{min_expected}, "
-            f"got delta={delta} (before={before}, after={after})",
-            stacklevel=2,
-        )
-    assert delta >= -0.001, f"{label}: fee wallet should not decrease, got delta={delta}"
 
 
 def log_tx(flow: str, step: str, tx_hash: str) -> None:

@@ -201,14 +201,30 @@ impl Wallet {
         amount: f64,
         deadline: Option<u64>,
     ) -> Result<PermitSignature, RemitError> {
+        self.sign_permit_with_usdc(spender, amount, deadline, None)
+            .await
+    }
+
+    /// Like `sign_permit`, but accepts an explicit USDC contract address
+    /// instead of looking it up from the hardcoded map.
+    async fn sign_permit_with_usdc(
+        &self,
+        spender: &str,
+        amount: f64,
+        deadline: Option<u64>,
+        usdc_override: Option<&str>,
+    ) -> Result<PermitSignature, RemitError> {
         validate_address(spender)?;
 
-        let usdc_addr = usdc_address(&self.chain_key).ok_or_else(|| {
-            remit_err(
-                codes::CHAIN_MISMATCH,
-                format!("no USDC address known for chain {:?}", self.chain_key),
-            )
-        })?;
+        let usdc_addr = match usdc_override {
+            Some(addr) => addr,
+            None => usdc_address(&self.chain_key).ok_or_else(|| {
+                remit_err(
+                    codes::CHAIN_MISMATCH,
+                    format!("no USDC address known for chain {:?}", self.chain_key),
+                )
+            })?,
+        };
 
         let nonce = fetch_permit_nonce(self.transport.as_ref(), &self.address).await?;
 
@@ -287,7 +303,8 @@ impl Wallet {
                 ))
             }
         };
-        self.sign_permit(spender, amount, None).await
+        self.sign_permit_with_usdc(spender, amount, None, Some(&contracts.usdc))
+            .await
     }
 
     /// Try to auto-sign a permit. Returns `Some(permit)` on success, `None` on failure.

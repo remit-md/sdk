@@ -631,7 +631,7 @@ defmodule RemitMd.Wallet do
   Returns `%PermitSignature{}`.
   """
   def sign_permit(%__MODULE__{} = w, spender, amount, opts \\ []) do
-    usdc_addr = @usdc_addresses[w.chain_key] ||
+    usdc_addr = Keyword.get(opts, :usdc_address) || @usdc_addresses[w.chain_key] ||
       raise Error.new(Error.chain_unsupported(), "No USDC address for chain #{w.chain_key}")
     nonce = fetch_permit_nonce(w, usdc_addr)
     deadline = Keyword.get(opts, :deadline) || (:os.system_time(:second) + 3600)
@@ -1056,7 +1056,7 @@ defmodule RemitMd.Wallet do
       Logger.warning("[remitmd] auto-permit: no #{contract} contract address available")
       nil
     else
-      sign_permit(w, spender, amount)
+      sign_permit(w, spender, amount, usdc_address: contracts.usdc)
     end
   rescue
     e ->

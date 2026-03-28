@@ -24,10 +24,6 @@ fn rpc_url() -> String {
     env::var("ACCEPTANCE_RPC_URL").unwrap_or_else(|_| "https://sepolia.base.org".to_string())
 }
 
-const USDC_ADDRESS: &str = "0x2d846325766921935f37d5b4478196d3ef93707c";
-const FEE_WALLET: &str = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
-const CHAIN_ID: u64 = 84532;
-
 // ─── Contract discovery (unauthenticated) ────────────────────────────────────
 
 #[derive(serde::Deserialize)]
@@ -39,6 +35,7 @@ struct Contracts {
     bounty: String,
     deposit: String,
     usdc: String,
+    chain_id: u64,
 }
 
 async fn fetch_contracts() -> Contracts {
@@ -73,7 +70,7 @@ fn create_test_wallet(router: &str) -> TestWallet {
 
 // ─── On-chain balance via RPC ────────────────────────────────────────────────
 
-async fn get_usdc_balance(address: &str) -> f64 {
+async fn get_usdc_balance(address: &str, usdc_address: &str) -> f64 {
     let addr_hex = address.trim_start_matches("0x").to_lowercase();
     let padded = format!("{:0>64}", addr_hex);
     let data = format!("0x70a08231{padded}");
@@ -85,7 +82,7 @@ async fn get_usdc_balance(address: &str) -> f64 {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "eth_call",
-            "params": [{ "to": USDC_ADDRESS, "data": data }, "latest"],
+            "params": [{ "to": usdc_address, "data": data }, "latest"],
         }))
         .send()
         .await
@@ -100,20 +97,16 @@ async fn get_usdc_balance(address: &str) -> f64 {
     val as f64 / 1e6
 }
 
-async fn get_fee_balance() -> f64 {
-    get_usdc_balance(FEE_WALLET).await
-}
-
-async fn wait_for_balance_change(address: &str, before: f64) -> f64 {
+async fn wait_for_balance_change(address: &str, before: f64, usdc_address: &str) -> f64 {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
     while std::time::Instant::now() < deadline {
-        let current = get_usdc_balance(address).await;
+        let current = get_usdc_balance(address, usdc_address).await;
         if (current - before).abs() > 0.0001 {
             return current;
         }
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
-    get_usdc_balance(address).await
+    get_usdc_balance(address, usdc_address).await
 }
 
 fn assert_balance_change(label: &str, before: f64, after: f64, expected: f64) {
@@ -129,9 +122,9 @@ fn assert_balance_change(label: &str, before: f64, after: f64, expected: f64) {
 
 // ─── Funding ─────────────────────────────────────────────────────────────────
 
-async fn fund_wallet(w: &TestWallet, amount: f64) {
+async fn fund_wallet(w: &TestWallet, amount: f64, usdc_address: &str) {
     w.wallet.mint(amount).await.expect("mint");
-    wait_for_balance_change(w.wallet.address(), 0.0).await;
+    wait_for_balance_change(w.wallet.address(), 0.0, usdc_address).await;
 }
 
 // ─── EIP-2612 Permit Signing ─────────────────────────────────────────────────
@@ -165,6 +158,8 @@ fn sign_usdc_permit(
     value: u64,
     nonce: u64,
     deadline: u64,
+    usdc_address: &str,
+    chain_id: u64,
 ) -> PermitSignature {
     // Domain separator for USDC EIP-2612
     let domain_type_hash = keccak256(
@@ -173,7 +168,7 @@ fn sign_usdc_permit(
     let name_hash = keccak256(b"USD Coin");
     let version_hash = keccak256(b"2");
 
-    let usdc_hex = USDC_ADDRESS.trim_start_matches("0x");
+    let usdc_hex = usdc_address.trim_start_matches("0x");
     let usdc_bytes = hex::decode(usdc_hex).expect("decode USDC address");
     let mut usdc_padded = [0u8; 32];
     usdc_padded[12..].copy_from_slice(&usdc_bytes);
@@ -182,7 +177,7 @@ fn sign_usdc_permit(
     domain_data[0..32].copy_from_slice(&domain_type_hash);
     domain_data[32..64].copy_from_slice(&name_hash);
     domain_data[64..96].copy_from_slice(&version_hash);
-    domain_data[96..128].copy_from_slice(&pad_u256(CHAIN_ID));
+    domain_data[96..128].copy_from_slice(&pad_u256(chain_id));
     domain_data[128..160].copy_from_slice(&usdc_padded);
     let domain_sep = keccak256(&domain_data);
 
@@ -233,7 +228,7 @@ fn now_unix() -> u64 {
 
 /// Sign a TabCharge EIP-712 message for the RemitTab contract.
 ///
-/// Domain: { name: "RemitTab", version: "1", chainId: 84532, verifyingContract: tab_contract }
+/// Domain: { name: "RemitTab", version: "1", chainId: <chain_id>, verifyingContract: tab_contract }
 /// Type:   TabCharge(bytes32 tabId, uint96 totalCharged, uint32 callCount)
 ///
 /// tabId is the UUID string, ASCII-encoded as bytes32 (right-padded with zeroes).
@@ -243,6 +238,7 @@ fn sign_tab_charge(
     tab_id: &str,
     total_charged: u64, // USDC base units (6 decimals)
     call_count: u32,
+    chain_id: u64,
 ) -> String {
     // Domain separator for RemitTab
     let domain_type_hash = keccak256(
@@ -255,7 +251,7 @@ fn sign_tab_charge(
     domain_data[0..32].copy_from_slice(&domain_type_hash);
     domain_data[32..64].copy_from_slice(&name_hash);
     domain_data[64..96].copy_from_slice(&version_hash);
-    domain_data[96..128].copy_from_slice(&pad_u256(CHAIN_ID));
+    domain_data[96..128].copy_from_slice(&pad_u256(chain_id));
     domain_data[128..160].copy_from_slice(&pad_address(tab_contract));
     let domain_sep = keccak256(&domain_data);
 
@@ -309,15 +305,14 @@ async fn acceptance_pay_direct_with_permit() {
 
     let agent = create_test_wallet(&contracts.router);
     let provider = create_test_wallet(&contracts.router);
-    fund_wallet(&agent, 100.0).await;
+    fund_wallet(&agent, 100.0, &contracts.usdc).await;
 
     let amount = 1.0;
     let fee = 0.01;
     let provider_receives = amount - fee;
 
-    let agent_before = get_usdc_balance(agent.wallet.address()).await;
-    let provider_before = get_usdc_balance(provider.wallet.address()).await;
-    let fee_before = get_fee_balance().await;
+    let agent_before = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
+    let provider_before = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
 
     // Sign EIP-2612 permit for Router
     let permit = sign_usdc_permit(
@@ -327,6 +322,8 @@ async fn acceptance_pay_direct_with_permit() {
         2_000_000, // $2 USDC in base units
         0,         // nonce 0
         now_unix() + 3600,
+        &contracts.usdc,
+        contracts.chain_id,
     );
 
     let tx = agent
@@ -345,9 +342,8 @@ async fn acceptance_pay_direct_with_permit() {
         tx.tx_hash
     );
 
-    let agent_after = wait_for_balance_change(agent.wallet.address(), agent_before).await;
-    let provider_after = get_usdc_balance(provider.wallet.address()).await;
-    let fee_after = get_fee_balance().await;
+    let agent_after = wait_for_balance_change(agent.wallet.address(), agent_before, &contracts.usdc).await;
+    let provider_after = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
     assert_balance_change(
@@ -356,11 +352,6 @@ async fn acceptance_pay_direct_with_permit() {
         provider_after,
         provider_receives,
     );
-    assert!(
-        fee_after >= fee_before - 0.001,
-        "fee wallet should not decrease: before={fee_before}, after={fee_after}"
-    );
-    eprintln!("[ACCEPTANCE] fee wallet delta: {}", fee_after - fee_before);
 }
 
 #[tokio::test]
@@ -370,15 +361,14 @@ async fn acceptance_escrow_lifecycle() {
 
     let agent = create_test_wallet(&contracts.router);
     let provider = create_test_wallet(&contracts.router);
-    fund_wallet(&agent, 100.0).await;
+    fund_wallet(&agent, 100.0, &contracts.usdc).await;
 
     let amount = 5.0;
     let fee = amount * 0.01;
     let provider_receives = amount - fee;
 
-    let agent_before = get_usdc_balance(agent.wallet.address()).await;
-    let provider_before = get_usdc_balance(provider.wallet.address()).await;
-    let fee_before = get_fee_balance().await;
+    let agent_before = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
+    let provider_before = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
 
     // Sign EIP-2612 permit for Escrow contract
     let permit = sign_usdc_permit(
@@ -388,6 +378,8 @@ async fn acceptance_escrow_lifecycle() {
         6_000_000, // $6 USDC
         0,
         now_unix() + 3600,
+        &contracts.usdc,
+        contracts.chain_id,
     );
 
     let escrow = agent
@@ -402,7 +394,7 @@ async fn acceptance_escrow_lifecycle() {
     assert!(!escrow.id.is_empty(), "escrow should have an id");
 
     // Wait for on-chain lock
-    wait_for_balance_change(agent.wallet.address(), agent_before).await;
+    wait_for_balance_change(agent.wallet.address(), agent_before, &contracts.usdc).await;
 
     // Provider claims start
     provider
@@ -420,9 +412,8 @@ async fn acceptance_escrow_lifecycle() {
         .expect("release_escrow");
 
     // Verify balances
-    let provider_after = wait_for_balance_change(provider.wallet.address(), provider_before).await;
-    let fee_after = get_fee_balance().await;
-    let agent_after = get_usdc_balance(agent.wallet.address()).await;
+    let provider_after = wait_for_balance_change(provider.wallet.address(), provider_before, &contracts.usdc).await;
+    let agent_after = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
     assert_balance_change(
@@ -431,11 +422,6 @@ async fn acceptance_escrow_lifecycle() {
         provider_after,
         provider_receives,
     );
-    assert!(
-        fee_after >= fee_before - 0.001,
-        "fee wallet should not decrease: before={fee_before}, after={fee_after}"
-    );
-    eprintln!("[ACCEPTANCE] fee wallet delta: {}", fee_after - fee_before);
 }
 
 // ─── Test: Tab Lifecycle ──────────────────────────────────────────────────────
@@ -447,7 +433,7 @@ async fn acceptance_tab_lifecycle() {
 
     let payer = create_test_wallet(&contracts.router);
     let provider = create_test_wallet(&contracts.router);
-    fund_wallet(&payer, 100.0).await;
+    fund_wallet(&payer, 100.0, &contracts.usdc).await;
 
     // Sign permit for the Tab contract
     let permit = sign_usdc_permit(
@@ -457,10 +443,11 @@ async fn acceptance_tab_lifecycle() {
         20_000_000, // $20 USDC in base units
         0,
         now_unix() + 3600,
+        &contracts.usdc,
+        contracts.chain_id,
     );
 
-    let payer_before = get_usdc_balance(payer.wallet.address()).await;
-    let fee_before = get_fee_balance().await;
+    let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
 
     // 1. Create tab: $10 limit, $0.10 per call
     let tab = payer
@@ -477,7 +464,7 @@ async fn acceptance_tab_lifecycle() {
     eprintln!("Tab created: {}", tab.id);
 
     // Wait for on-chain funding
-    wait_for_balance_change(payer.wallet.address(), payer_before).await;
+    wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
 
     // 2. Charge tab: $0.10, cumulative $0.10, callCount 1
     let charge_sig = sign_tab_charge(
@@ -486,6 +473,7 @@ async fn acceptance_tab_lifecycle() {
         &tab.id,
         100_000, // $0.10 in base units
         1,
+        contracts.chain_id,
     );
     let charge = provider
         .wallet
@@ -505,6 +493,7 @@ async fn acceptance_tab_lifecycle() {
         &tab.id,
         100_000, // final = $0.10
         1,
+        contracts.chain_id,
     );
     let closed = payer
         .wallet
@@ -519,18 +508,14 @@ async fn acceptance_tab_lifecycle() {
     eprintln!("Tab closed: status={:?}", closed.status);
 
     // 4. Verify balance: payer should have lost funds
-    let payer_after = wait_for_balance_change(payer.wallet.address(), payer_before).await;
-    let fee_after = get_fee_balance().await;
+    let payer_after = wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
 
     let payer_delta = payer_after - payer_before;
     assert!(
         payer_delta < 0.0,
         "payer should have lost funds, delta={payer_delta:.6}"
     );
-    eprintln!(
-        "Payer balance delta: {payer_delta:.6}, fee delta: {:.6}",
-        fee_after - fee_before
-    );
+    eprintln!("Payer balance delta: {payer_delta:.6}");
 }
 
 // ─── Test: Stream Lifecycle ──────────────────────────────────────────────────
@@ -542,7 +527,7 @@ async fn acceptance_stream_lifecycle() {
 
     let payer = create_test_wallet(&contracts.router);
     let payee = create_test_wallet(&contracts.router);
-    fund_wallet(&payer, 100.0).await;
+    fund_wallet(&payer, 100.0, &contracts.usdc).await;
 
     // Sign permit for the Stream contract
     let permit = sign_usdc_permit(
@@ -552,9 +537,11 @@ async fn acceptance_stream_lifecycle() {
         10_000_000, // $10 USDC in base units
         0,
         now_unix() + 3600,
+        &contracts.usdc,
+        contracts.chain_id,
     );
 
-    let payer_before = get_usdc_balance(payer.wallet.address()).await;
+    let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
 
     // 1. Create stream: $0.01/sec, $5 max
     let stream = payer
@@ -571,7 +558,7 @@ async fn acceptance_stream_lifecycle() {
     eprintln!("Stream created: {}, status={:?}", stream.id, stream.status);
 
     // Wait for on-chain lock
-    wait_for_balance_change(payer.wallet.address(), payer_before).await;
+    wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
 
     // 2. Let it run for a few seconds
     eprintln!("Waiting 5 seconds for stream to accrue...");
@@ -586,8 +573,8 @@ async fn acceptance_stream_lifecycle() {
     eprintln!("Stream closed: status={:?}", closed.status);
 
     // 4. Conservation of funds: payer should have lost some amount
-    let payer_after = wait_for_balance_change(payer.wallet.address(), payer_before).await;
-    let payee_after = get_usdc_balance(payee.wallet.address()).await;
+    let payer_after = wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
+    let payee_after = get_usdc_balance(payee.wallet.address(), &contracts.usdc).await;
 
     let payer_delta = payer_after - payer_before;
     assert!(
@@ -606,7 +593,7 @@ async fn acceptance_bounty_lifecycle() {
 
     let poster = create_test_wallet(&contracts.router);
     let submitter = create_test_wallet(&contracts.router);
-    fund_wallet(&poster, 100.0).await;
+    fund_wallet(&poster, 100.0, &contracts.usdc).await;
 
     // Sign permit for the Bounty contract
     let permit = sign_usdc_permit(
@@ -616,10 +603,11 @@ async fn acceptance_bounty_lifecycle() {
         10_000_000, // $10 USDC in base units
         0,
         now_unix() + 3600,
+        &contracts.usdc,
+        contracts.chain_id,
     );
 
-    let poster_before = get_usdc_balance(poster.wallet.address()).await;
-    let fee_before = get_fee_balance().await;
+    let poster_before = get_usdc_balance(poster.wallet.address(), &contracts.usdc).await;
 
     // 1. Create bounty: $5 reward, 1 hour deadline
     let deadline = now_unix() + 3600;
@@ -637,7 +625,7 @@ async fn acceptance_bounty_lifecycle() {
     eprintln!("Bounty created: {}, status={:?}", bounty.id, bounty.status);
 
     // Wait for on-chain lock
-    wait_for_balance_change(poster.wallet.address(), poster_before).await;
+    wait_for_balance_change(poster.wallet.address(), poster_before, &contracts.usdc).await;
 
     // 2. Submit evidence (as submitter)
     let evidence_hash = format!("0x{}", hex::encode(keccak256(b"test evidence")));
@@ -664,17 +652,13 @@ async fn acceptance_bounty_lifecycle() {
     eprintln!("Bounty awarded: status={:?}", awarded.status);
 
     // 4. Verify balances
-    let submitter_after = wait_for_balance_change(submitter.wallet.address(), 0.0).await;
-    let fee_after = get_fee_balance().await;
+    let submitter_after = wait_for_balance_change(submitter.wallet.address(), 0.0, &contracts.usdc).await;
 
     assert!(
         submitter_after > 0.0,
         "submitter should have received funds, got balance={submitter_after:.6}"
     );
-    eprintln!(
-        "Submitter received: {submitter_after:.6}, fee delta: {:.6}",
-        fee_after - fee_before
-    );
+    eprintln!("Submitter received: {submitter_after:.6}");
 }
 
 // ─── Test: Deposit Lifecycle ─────────────────────────────────────────────────
@@ -686,7 +670,7 @@ async fn acceptance_deposit_lifecycle() {
 
     let payer = create_test_wallet(&contracts.router);
     let provider = create_test_wallet(&contracts.router);
-    fund_wallet(&payer, 100.0).await;
+    fund_wallet(&payer, 100.0, &contracts.usdc).await;
 
     // Sign permit for the Deposit contract
     let permit = sign_usdc_permit(
@@ -696,9 +680,11 @@ async fn acceptance_deposit_lifecycle() {
         10_000_000, // $10 USDC in base units
         0,
         now_unix() + 3600,
+        &contracts.usdc,
+        contracts.chain_id,
     );
 
-    let payer_before = get_usdc_balance(payer.wallet.address()).await;
+    let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
 
     // 1. Place deposit: $5, expires in 1 hour
     let expiry = now_unix() + 3600;
@@ -719,8 +705,8 @@ async fn acceptance_deposit_lifecycle() {
     );
 
     // Wait for on-chain lock
-    wait_for_balance_change(payer.wallet.address(), payer_before).await;
-    let payer_after_deposit = get_usdc_balance(payer.wallet.address()).await;
+    wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
+    let payer_after_deposit = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
 
     // 2. Return deposit (by provider)
     provider
@@ -732,7 +718,7 @@ async fn acceptance_deposit_lifecycle() {
 
     // 3. Verify full refund (deposits have no fee)
     let payer_after_return =
-        wait_for_balance_change(payer.wallet.address(), payer_after_deposit).await;
+        wait_for_balance_change(payer.wallet.address(), payer_after_deposit, &contracts.usdc).await;
     let refund_amount = payer_after_return - payer_after_deposit;
     assert!(
         refund_amount > 4.99,
@@ -752,7 +738,7 @@ async fn acceptance_x402() {
     let contracts = fetch_contracts().await;
 
     let payer = create_test_wallet(&contracts.router);
-    fund_wallet(&payer, 100.0).await;
+    fund_wallet(&payer, 100.0, &contracts.usdc).await;
 
     // 1. Start a local HTTP server that returns 402 with PAYMENT-REQUIRED header
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind local server");

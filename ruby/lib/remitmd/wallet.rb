@@ -412,8 +412,8 @@ module Remitmd
     # @param amount [Numeric] amount in USDC (e.g. 5.0 for $5.00)
     # @param deadline [Integer, nil] optional Unix timestamp; defaults to 1 hour from now
     # @return [PermitSignature]
-    def sign_permit(spender, amount, deadline: nil)
-      usdc_addr = USDC_ADDRESSES[@chain_key]
+    def sign_permit(spender, amount, deadline: nil, usdc_address: nil)
+      usdc_addr = usdc_address || USDC_ADDRESSES[@chain_key]
       if usdc_addr.nil? || usdc_addr.empty?
         raise RemitError.new(
           RemitError::INVALID_ADDRESS,
@@ -722,7 +722,8 @@ module Remitmd
       spender = contracts.send(contract.to_sym)
       return nil unless spender
 
-      sign_permit(spender, amount)
+      usdc_addr = contracts.usdc
+      sign_permit(spender, amount, usdc_address: usdc_addr)
     rescue => e
       warn "[remitmd] auto-permit failed for #{contract} (amount=#{amount}): #{e.message}"
       nil

@@ -825,7 +825,14 @@ public class Wallet {
                 default:        return null;
             }
             if (spender == null || spender.isBlank()) return null;
-            return signPermit(spender, amount);
+            String usdcAddr = contracts.usdc;
+            if (usdcAddr == null || usdcAddr.isBlank()) {
+                usdcAddr = USDC_ADDRESSES.getOrDefault(chain, "");
+            }
+            long nonce = fetchPermitNonce(usdcAddr);
+            long dl = Instant.now().getEpochSecond() + 3600;
+            long rawAmount = amount.movePointRight(6).longValueExact();
+            return signUsdcPermit(spender, rawAmount, dl, nonce, usdcAddr);
         } catch (Exception e) {
             // Permit signing unavailable (mock context, API error, etc.)
             // Fall through - server will handle approval via other means

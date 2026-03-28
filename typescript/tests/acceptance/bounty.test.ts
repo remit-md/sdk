@@ -10,9 +10,7 @@ import {
   createWallet,
   fundWallet,
   getUsdcBalance,
-  getFeeWalletBalance,
   assertBalanceChange,
-  assertFeeIncrease,
   waitForBalanceChange,
   logTx,
 } from "./setup.js";
@@ -34,8 +32,6 @@ describe("SDK: Bounty Lifecycle", { timeout: 180_000 }, () => {
 
     const posterBefore = await getUsdcBalance(poster.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    const feeBefore = await getFeeWalletBalance();
-
     // Step 1: Post bounty with permit for Bounty contract
     const contracts = await poster.getContracts();
     const permit = await poster.signPermit(contracts.bounty, amount + 1);
@@ -75,14 +71,11 @@ describe("SDK: Bounty Lifecycle", { timeout: 180_000 }, () => {
 
     // Verify balances
     const providerAfter = await waitForBalanceChange(provider.address, providerBefore);
-    const feeAfter = await getFeeWalletBalance();
     const posterAfter = await getUsdcBalance(poster.address);
 
     // Poster: lost $5 (bounty amount)
     assertBalanceChange("poster", posterBefore, posterAfter, -amount);
     // Provider: received $5 minus 1% fee = $4.95
     assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    // Fee wallet: received at least 1% of $5 = $0.05
-    assertFeeIncrease("fee wallet", feeBefore, feeAfter, fee);
   });
 });

@@ -361,6 +361,7 @@ class Wallet(RemitClient):
         spender: str,
         amount: float,
         deadline: int | None = None,
+        usdc_address: str | None = None,
     ) -> PermitSignature:
         """Convenience: sign a USDC permit. Auto-fetches nonce, defaults deadline to 1 hour.
 
@@ -368,8 +369,9 @@ class Wallet(RemitClient):
             spender: Contract address to approve (e.g. router, escrow).
             amount: Amount in USDC (e.g. 5.0 for $5.00).
             deadline: Optional Unix timestamp. Defaults to 1 hour from now.
+            usdc_address: Override the USDC contract address (e.g. from get_contracts()).
         """
-        usdc_addr = USDC_ADDRESSES.get(self.chain, "")
+        usdc_addr = usdc_address or USDC_ADDRESSES.get(self.chain, "")
         if not usdc_addr:
             raise ValueError(
                 f"No USDC address for chain '{self.chain}'. "
@@ -395,7 +397,8 @@ class Wallet(RemitClient):
             spender = str(contracts.get(contract, ""))
             if not spender:
                 return None
-            return await self.sign_permit(spender, amount)
+            usdc = str(contracts.get("usdc", ""))
+            return await self.sign_permit(spender, amount, usdc_address=usdc or None)
         except (ValueError, KeyError, TypeError, RuntimeError) as exc:
             logger.warning(
                 "auto-permit failed for %s (amount=%s): %s",

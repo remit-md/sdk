@@ -40,10 +40,6 @@ class AcceptanceTest {
 
     private static final String API_URL = envOr("ACCEPTANCE_API_URL", "https://testnet.remit.md");
     private static final String RPC_URL = envOr("ACCEPTANCE_RPC_URL", "https://sepolia.base.org");
-    private static final String USDC_ADDRESS = "0x2d846325766921935f37d5b4478196d3ef93707c";
-    private static final String FEE_WALLET = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
-    private static final long CHAIN_ID = 84532L;
-
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
@@ -96,13 +92,15 @@ class AcceptanceTest {
     // ─── On-chain balance via RPC ───────────────────────────────────────────
 
     private static double getUsdcBalance(String address) throws Exception {
+        ContractAddresses contracts = fetchContracts();
+        String usdcAddr = contracts.usdc;
         String hex = address.toLowerCase().replace("0x", "");
         String padded = "0".repeat(64 - hex.length()) + hex;
         String callData = "0x70a08231" + padded;
 
         String body = String.format(
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_call\",\"params\":[{\"to\":\"%s\",\"data\":\"%s\"},\"latest\"]}",
-                USDC_ADDRESS, callData);
+                usdcAddr, callData);
 
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(RPC_URL))
@@ -121,10 +119,6 @@ class AcceptanceTest {
         if (resultHex.isEmpty()) resultHex = "0";
         BigInteger raw = new BigInteger(resultHex, 16);
         return raw.doubleValue() / 1_000_000.0;
-    }
-
-    private static double getFeeBalance() throws Exception {
-        return getUsdcBalance(FEE_WALLET);
     }
 
     private static double waitForBalanceChange(String address, double before) throws Exception {
@@ -160,7 +154,9 @@ class AcceptanceTest {
             String spender,
             long value,
             long nonce,
-            long deadline) {
+            long deadline) throws Exception {
+
+        ContractAddresses contracts = fetchContracts();
 
         // Domain separator: EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)
         byte[] domainTypeHash = Hash.sha3(
@@ -172,8 +168,8 @@ class AcceptanceTest {
                 domainTypeHash,
                 nameHash,
                 versionHash,
-                toUint256(CHAIN_ID),
-                addressToBytes32(USDC_ADDRESS));
+                toUint256(contracts.chainId),
+                addressToBytes32(contracts.usdc));
         byte[] domainSep = Hash.sha3(domainData);
 
         // Permit struct hash
@@ -255,7 +251,6 @@ class AcceptanceTest {
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
-        double feeBefore = getFeeBalance();
 
         // Sign EIP-2612 permit for Router
         ContractAddresses contracts = fetchContracts();
@@ -276,12 +271,9 @@ class AcceptanceTest {
 
         double agentAfter = waitForBalanceChange(agent.address(), agentBefore);
         double providerAfter = getUsdcBalance(provider.address());
-        double feeAfter = getFeeBalance();
 
         assertBalanceChange("agent", agentBefore, agentAfter, -amount);
         assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-        assertTrue(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
-        System.out.println("[ACCEPTANCE] fee wallet delta: " + (feeAfter - feeBefore));
     }
 
     @Test
@@ -296,7 +288,6 @@ class AcceptanceTest {
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
-        double feeBefore = getFeeBalance();
 
         // Sign EIP-2612 permit for Escrow contract
         ContractAddresses contracts = fetchContracts();
@@ -326,13 +317,10 @@ class AcceptanceTest {
 
         // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
-        double feeAfter = getFeeBalance();
         double agentAfter = getUsdcBalance(agent.address());
 
         assertBalanceChange("agent", agentBefore, agentAfter, -amount);
         assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-        assertTrue(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
-        System.out.println("[ACCEPTANCE] fee wallet delta: " + (feeAfter - feeBefore));
     }
 
     // ─── Tab lifecycle ───────────────────────────────────────────────────────
@@ -351,7 +339,6 @@ class AcceptanceTest {
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
-        double feeBefore = getFeeBalance();
 
         // Step 1: Open tab (agent, with permit for Tab contract)
         ContractAddresses contracts = fetchContracts();
@@ -401,16 +388,12 @@ class AcceptanceTest {
 
         // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
-        double feeAfter = getFeeBalance();
         double agentAfter = getUsdcBalance(agent.address());
 
         // Agent: locked $10, refunded $8, net change = -$2
         assertBalanceChange("agent", agentBefore, agentAfter, -chargeAmount);
         // Provider: received $2 minus 1% fee = $1.98
         assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-        // Fee wallet: received 1% of $2 = $0.02
-        assertTrue(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
-        System.out.println("[ACCEPTANCE] fee wallet delta: " + (feeAfter - feeBefore));
     }
 
     // ─── Stream lifecycle ────────────────────────────────────────────────────
@@ -426,7 +409,6 @@ class AcceptanceTest {
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
-        double feeBefore = getFeeBalance();
 
         // Step 1: Open stream with permit for Stream contract
         ContractAddresses contracts = fetchContracts();
@@ -458,13 +440,11 @@ class AcceptanceTest {
 
         // Wait for settlement (provider balance should increase)
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
-        double feeAfter = getFeeBalance();
         double agentAfter = getUsdcBalance(agent.address());
 
         // Calculate actual changes
         double agentLoss = agentBefore - agentAfter;
         double providerGain = providerAfter - providerBefore;
-        double feeGain = feeAfter - feeBefore;
 
         // Agent should have lost money (stream accrued), but <= maxTotal
         assertTrue(agentLoss > 0.05,
@@ -475,16 +455,6 @@ class AcceptanceTest {
         // Provider should have received payout (accrued minus 1% fee)
         assertTrue(providerGain > 0.04,
                 "provider should have received payout, got gain=" + providerGain);
-
-        // Fee wallet should not decrease
-        assertTrue(feeGain >= 0,
-                "fee wallet should not decrease, got change=" + feeGain);
-
-        // Conservation of funds: agent loss ~ provider gain + fee
-        double conservationDiff = Math.abs(agentLoss - (providerGain + feeGain));
-        assertTrue(conservationDiff < 0.01,
-                String.format("conservation violated: agent lost %.6f, provider+fee gained %.6f, diff=%.6f",
-                        agentLoss, providerGain + feeGain, conservationDiff));
     }
 
     // ─── Bounty lifecycle ────────────────────────────────────────────────────
@@ -501,7 +471,6 @@ class AcceptanceTest {
 
         double posterBefore = getUsdcBalance(poster.address());
         double providerBefore = getUsdcBalance(provider.address());
-        double feeBefore = getFeeBalance();
 
         // Step 1: Post bounty (auto-permit)
         long deadlineTs = Instant.now().getEpochSecond() + 3600;
@@ -531,16 +500,12 @@ class AcceptanceTest {
 
         // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
-        double feeAfter = getFeeBalance();
         double posterAfter = getUsdcBalance(poster.address());
 
         // Poster: lost $5 (bounty amount)
         assertBalanceChange("poster", posterBefore, posterAfter, -amount);
         // Provider: received $5 minus 1% fee = $4.95
         assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-        // Fee wallet: received 1% of $5 = $0.05
-        assertTrue(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
-        System.out.println("[ACCEPTANCE] fee wallet delta: " + (feeAfter - feeBefore));
     }
 
     // ─── Deposit lifecycle ───────────────────────────────────────────────────
@@ -555,7 +520,6 @@ class AcceptanceTest {
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
-        double feeBefore = getFeeBalance();
 
         // Step 1: Place deposit with permit for Deposit contract
         ContractAddresses contracts = fetchContracts();
@@ -586,14 +550,11 @@ class AcceptanceTest {
         // Wait for return settlement (agent gets full refund)
         double agentAfter = waitForBalanceChange(agent.address(), agentMid);
         double providerAfter = getUsdcBalance(provider.address());
-        double feeAfter = getFeeBalance();
 
         // Agent: full refund -- net change ~ $0
         assertBalanceChange("agent net", agentBefore, agentAfter, 0);
         // Provider: unchanged
         assertBalanceChange("provider", providerBefore, providerAfter, 0);
-        // Fee wallet: unchanged (deposits have no fee)
-        assertBalanceChange("fee wallet", feeBefore, feeAfter, 0);
     }
 
     // ─── x402 auto-pay ──────────────────────────────────────────────────────

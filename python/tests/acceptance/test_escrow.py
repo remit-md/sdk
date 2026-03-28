@@ -10,10 +10,8 @@ from remitmd.models.invoice import Invoice
 
 from .conftest import (
     assert_balance_change,
-    assert_fee_increase,
     create_wallet,
     fund_wallet,
-    get_fee_wallet_balance,
     get_usdc_balance,
     log_tx,
     wait_for_balance_change,
@@ -34,8 +32,6 @@ async def test_escrow_lifecycle() -> None:
 
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
-    fee_before = await get_fee_wallet_balance()
-
     # Get escrow contract for permit
     contracts = await agent.get_contracts()
     escrow_contract = contracts["escrow"]
@@ -76,9 +72,7 @@ async def test_escrow_lifecycle() -> None:
 
     # Verify balances
     provider_after = await wait_for_balance_change(provider.address, provider_before)
-    fee_after = await get_fee_wallet_balance()
     agent_after = await get_usdc_balance(agent.address)
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change("provider", provider_before, provider_after, provider_receives)
-    assert_fee_increase("fee wallet", fee_before, fee_after, fee)

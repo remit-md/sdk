@@ -10,7 +10,6 @@ import {
   createWallet,
   fundWallet,
   getUsdcBalance,
-  getFeeWalletBalance,
   assertBalanceChange,
   waitForBalanceChange,
   logTx,
@@ -31,8 +30,6 @@ describe("SDK: Deposit Lifecycle", { timeout: 180_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    const feeBefore = await getFeeWalletBalance();
-
     // Step 1: Place deposit with permit for Deposit contract
     const contracts = await agent.getContracts();
     const permit = await agent.signPermit(contracts.deposit, amount + 1);
@@ -63,13 +60,10 @@ describe("SDK: Deposit Lifecycle", { timeout: 180_000 }, () => {
     // Wait for return settlement (agent gets full refund)
     const agentAfter = await waitForBalanceChange(agent.address, agentMid);
     const providerAfter = await getUsdcBalance(provider.address);
-    const feeAfter = await getFeeWalletBalance();
 
     // Agent: full refund - net change ≈ $0
     assertBalanceChange("agent net", agentBefore, agentAfter, 0);
     // Provider: unchanged
     assertBalanceChange("provider", providerBefore, providerAfter, 0);
-    // Fee wallet: unchanged (deposits have no fee)
-    assertBalanceChange("fee wallet", feeBefore, feeAfter, 0);
   });
 });

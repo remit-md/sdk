@@ -123,10 +123,7 @@ def assert_fee_increase(
             f"got delta={delta} (before={before}, after={after})",
             stacklevel=2,
         )
-    assert delta >= -0.001, (
-        f"{label}: fee wallet should not decrease, "
-        f"got delta={delta}"
-    )
+    assert delta >= -0.001, f"{label}: fee wallet should not decrease, got delta={delta}"
 
 
 def log_tx(flow: str, step: str, tx_hash: str) -> None:

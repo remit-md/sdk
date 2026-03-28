@@ -65,7 +65,8 @@ async def test_bounty_lifecycle() -> None:
     # Step 2: Provider submits evidence
     evidence_hash = "0x" + "ab" * 32
     submission = await provider.submit_bounty(
-        bounty.id, evidence_hash=evidence_hash,
+        bounty.id,
+        evidence_hash=evidence_hash,
     )
     assert submission.tx_hash, "submission should produce a tx"
     if submission.tx_hash:

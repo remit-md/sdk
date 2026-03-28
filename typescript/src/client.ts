@@ -92,8 +92,13 @@ export class RemitClient {
     return this._fetch<WalletStatus>(`/status/${wallet}`);
   }
 
-  getReputation(wallet: string): Promise<Reputation> {
-    return this._fetch<Reputation>(`/reputation/${wallet}`);
+  async getReputation(wallet: string): Promise<Reputation> {
+    const raw = await this._fetch<Reputation & { wallet?: string }>(`/reputation/${wallet}`);
+    if (!raw.address && raw.wallet) {
+      raw.address = raw.wallet;
+      delete raw.wallet;
+    }
+    return raw as Reputation;
   }
 
   /** Get deployed contract addresses. Cached for the lifetime of this client instance. */

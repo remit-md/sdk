@@ -213,6 +213,7 @@ class A2AClient:
         amount: float,
         memo: str = "",
         mandate: IntentMandate | None = None,
+        permit: Any | None = None,
     ) -> A2ATask:
         """
         Send a direct USDC payment via ``message/send``.
@@ -221,10 +222,28 @@ class A2AClient:
         :param amount: Amount in USDC (e.g. ``10.0``).
         :param memo: Optional description / memo.
         :param mandate: Optional AP2 :class:`IntentMandate`.
+        :param permit: Optional :class:`~remitmd.wallet.PermitSignature` or dict
+            with keys ``value``, ``deadline``, ``v``, ``r``, ``s``.
         :returns: :class:`A2ATask` with state ``"completed"`` on success.
         """
         nonce = secrets.token_hex(16)
         message_id = secrets.token_hex(16)
+
+        data_payload: dict[str, Any] = {
+            "model": "direct",
+            "to": to,
+            "amount": f"{amount:.2f}",
+            "memo": memo,
+            "nonce": nonce,
+        }
+
+        if permit is not None:
+            if hasattr(permit, "to_dict"):
+                data_payload["permit"] = permit.to_dict()
+            elif isinstance(permit, dict):
+                data_payload["permit"] = permit
+            else:
+                raise TypeError(f"permit must be a PermitSignature or dict, got {type(permit)}")
 
         message: dict[str, Any] = {
             "messageId": message_id,
@@ -232,13 +251,7 @@ class A2AClient:
             "parts": [
                 {
                     "kind": "data",
-                    "data": {
-                        "model": "direct",
-                        "to": to,
-                        "amount": f"{amount:.2f}",
-                        "memo": memo,
-                        "nonce": nonce,
-                    },
+                    "data": data_payload,
                 }
             ],
         }

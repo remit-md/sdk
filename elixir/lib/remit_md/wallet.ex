@@ -1052,10 +1052,17 @@ defmodule RemitMd.Wallet do
     spender = Map.get(contracts, String.to_existing_atom(contract))
 
     unless spender do
-      raise Error.new(Error.server_error(), "No #{contract} contract address available")
+      require Logger
+      Logger.warning("[remitmd] auto-permit: no #{contract} contract address available")
+      nil
+    else
+      sign_permit(w, spender, amount)
     end
-
-    sign_permit(w, spender, amount)
+  rescue
+    e ->
+      require Logger
+      Logger.warning("[remitmd] auto-permit failed for #{contract} (amount=#{amount}): #{Exception.message(e)}")
+      nil
   end
 
   # Fetch the EIP-2612 permit nonce. Mock mode returns 0 directly.

@@ -1150,7 +1150,7 @@ func flowAP2Discovery() {
 
 // ─── Flow 9: AP2 Payment ────────────────────────────────────────────────────
 
-func flowAP2Payment(agent, provider *testWallet) {
+func flowAP2Payment(agent, provider *testWallet, contracts *contracts, permitNonce *int64) {
 	flow := "9. AP2 Payment"
 	ctx := context.Background()
 
@@ -1172,10 +1172,24 @@ func flowAP2Payment(agent, provider *testWallet) {
 		return
 	}
 
+	permit, err := signUSDCPermit(agent.key,
+		crypto.PubkeyToAddress(agent.key.PublicKey),
+		common.HexToAddress(contracts.Router),
+		big.NewInt(2_000_000), // $2 USDC
+		big.NewInt(*permitNonce),
+		big.NewInt(time.Now().Unix()+3600),
+	)
+	*permitNonce++
+	if err != nil {
+		logFail(flow, fmt.Sprintf("signUSDCPermit: %v", err))
+		return
+	}
+
 	task, err := a2a.Send(ctx, remitmd.SendOptions{
 		To:     provider.Address(),
 		Amount: 1.0,
 		Memo:   "acceptance-ap2-payment",
+		Permit: permit,
 		Mandate: &remitmd.IntentMandate{
 			MandateID: randomHex(16),
 			ExpiresAt: "2099-12-31T23:59:59Z",
@@ -1286,7 +1300,7 @@ func main() {
 		{"6. Deposit", func() { flowDeposit(agent, provider, &permitNonce) }},
 		{"7. x402 Weather", func() { flowX402Weather(agent) }},
 		{"8. AP2 Discovery", func() { flowAP2Discovery() }},
-		{"9. AP2 Payment", func() { flowAP2Payment(agent, provider) }},
+		{"9. AP2 Payment", func() { flowAP2Payment(agent, provider, cachedContracts, &permitNonce) }},
 	}
 
 	for _, f := range flows {
@@ -1298,6 +1312,8 @@ func main() {
 			}()
 			f.fn()
 		}()
+		// Allow indexer to catch up with on-chain nonce between permit-consuming flows
+		time.Sleep(5 * time.Second)
 	}
 
 	// Summary

@@ -169,7 +169,7 @@ module Remitmd
   class Reputation < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
-      @address           = h["address"]
+      @address           = h["wallet"] || h["address"]
       @score             = h["score"].to_i
       @total_paid        = decimal(h["total_paid"])
       @total_received    = decimal(h["total_received"])

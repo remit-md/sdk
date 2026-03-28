@@ -147,7 +147,7 @@ jobs:
           echo "════════════════════════════════════════════════" >> results.txt
           echo "  RUST" >> results.txt
           echo "════════════════════════════════════════════════" >> results.txt
-          cd acceptance/rust && cargo run --release 2>&1 | tee -a ../../results.txt || true
+          cd acceptance/rust && cargo build --release 2>&1 && ./target/release/acceptance-flows 2>&1 | tee -a ../../results.txt || true
           echo "" >> ../../results.txt
 
       - name: Run .NET (9 flows)
@@ -228,4 +228,44 @@ jobs:
         with:
           name: acceptance-9flow-results
           path: results.txt
+          retention-days: 30
+
+  swift-macos:
+    name: "Swift (macOS)"
+    runs-on: macos-latest
+    if: ${{ inputs.languages == 'all' || contains(inputs.languages, 'swift') }}
+    timeout-minutes: 30
+
+    env:
+      ACCEPTANCE_API_URL: ${{ inputs.api_url || 'https://testnet.remit.md' }}
+      ACCEPTANCE_RPC_URL: https://sepolia.base.org
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.10"
+
+      - name: Run Swift (9 flows)
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" > results-swift.txt
+          echo "  SWIFT (macOS)" >> results-swift.txt
+          echo "════════════════════════════════════════════════" >> results-swift.txt
+          cd acceptance/swift && swift run AcceptanceFlows 2>&1 | tee -a ../../results-swift.txt || true
+          echo "" >> ../../results-swift.txt
+
+      - name: Print Swift results
+        if: always()
+        run: cat results-swift.txt
+
+      - name: Upload Swift results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-9flow-swift-macos
+          path: results-swift.txt
           retention-days: 30

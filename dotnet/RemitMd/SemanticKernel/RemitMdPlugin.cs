@@ -69,9 +69,9 @@ public sealed class RemitMdPlugin
         CancellationToken cancellationToken = default)
     {
         var rep = await _wallet.ReputationAsync(address, cancellationToken);
-        return $"Reputation for {rep.Address}: {rep.Score}/1000. " +
-               $"Total paid: {rep.TotalPaid:F2} USDC. " +
-               $"Transactions: {rep.TransactionCount}.";
+        return $"Reputation for {rep.Wallet}: tier={rep.Tier}, avg_rating={rep.AvgRating:F2}. " +
+               $"Total volume: {rep.TotalVolume:F2} USDC. " +
+               $"Transactions completed: {rep.TransactionsCompleted}.";
     }
 
     /// <summary>Creates an escrow contract that holds funds until work is approved.</summary>

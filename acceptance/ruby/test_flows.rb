@@ -487,12 +487,19 @@ def flow_ap2_discovery
 end
 
 # ─── Flow 9: AP2 Payment ────────────────────────────────────────────────────────
-def flow_ap2_payment(agent, provider)
+def flow_ap2_payment(agent, provider, permit_nonce)
   flow = "9. AP2 Payment"
   card = Remitmd::AgentCard.discover(API_URL)
   contracts = fetch_contracts
 
   signer = Remitmd::PrivateKeySigner.new("0x#{agent[:key_hex]}")
+
+  deadline = Time.now.to_i + 3600
+  permit = sign_usdc_permit(
+    agent[:key_hex], agent[:wallet].address, contracts["router"],
+    2_000_000, permit_nonce[0], deadline
+  )
+  permit_nonce[0] += 1
 
   mandate = Remitmd::IntentMandate.new(
     mandate_id: SecureRandom.hex(16),
@@ -505,7 +512,7 @@ def flow_ap2_payment(agent, provider)
   a2a = Remitmd::A2AClient.from_card(card, signer, chain: "base-sepolia",
                                        verifying_contract: contracts["router"])
   task = a2a.send(to: provider[:wallet].address, amount: 1.0,
-                  memo: "ruby-acceptance-a2a", mandate: mandate)
+                  memo: "ruby-acceptance-a2a", mandate: mandate, permit: permit)
   if task.id.nil? || task.id.empty?
     puts "\033[1;33m[SKIP]\033[0m #{flow} -- AP2 task has no ID (endpoint may not be available on testnet)"
     RESULTS[flow] = "SKIP"
@@ -560,7 +567,7 @@ flows = [
   ["6. Deposit",        -> { flow_deposit(agent, provider, permit_nonce) }],
   ["7. x402 Weather",   -> { flow_x402_weather(agent) }],
   ["8. AP2 Discovery",  -> { flow_ap2_discovery }],
-  ["9. AP2 Payment",    -> { flow_ap2_payment(agent, provider) }],
+  ["9. AP2 Payment",    -> { flow_ap2_payment(agent, provider, permit_nonce) }],
 ]
 
 flows.each do |name, fn|
@@ -570,6 +577,8 @@ flows.each do |name, fn|
     log_fail(name, "#{e.class}: #{e.message}")
     $stderr.puts e.backtrace.first(10).join("\n")
   end
+  # Allow indexer to catch up with on-chain nonce between permit-consuming flows
+  sleep 5
 end
 
 # Summary

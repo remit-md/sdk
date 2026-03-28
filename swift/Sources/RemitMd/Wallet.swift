@@ -128,7 +128,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let p = permit {
             resolved = p
         } else if signer != nil {
-            resolved = try await autoPermit(contract: "router", amount: amount)
+            resolved = await autoPermit(contract: "router", amount: amount)
         } else {
             resolved = nil
         }
@@ -147,7 +147,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let p = permit {
             resolved = p
         } else if signer != nil {
-            resolved = try await autoPermit(contract: "escrow", amount: amount)
+            resolved = await autoPermit(contract: "escrow", amount: amount)
         } else {
             resolved = nil
         }
@@ -208,7 +208,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let p = permit {
             resolved = p
         } else if signer != nil {
-            resolved = try await autoPermit(contract: "tab", amount: limitAmount)
+            resolved = await autoPermit(contract: "tab", amount: limitAmount)
         } else {
             resolved = nil
         }
@@ -253,7 +253,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let p = permit {
             resolved = p
         } else if signer != nil {
-            resolved = try await autoPermit(contract: "stream", amount: maxTotal)
+            resolved = await autoPermit(contract: "stream", amount: maxTotal)
         } else {
             resolved = nil
         }
@@ -285,7 +285,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let p = permit {
             resolved = p
         } else if signer != nil {
-            resolved = try await autoPermit(contract: "bounty", amount: amount)
+            resolved = await autoPermit(contract: "bounty", amount: amount)
         } else {
             resolved = nil
         }
@@ -341,7 +341,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let p = permit {
             resolved = p
         } else if signer != nil {
-            resolved = try await autoPermit(contract: "deposit", amount: amount)
+            resolved = await autoPermit(contract: "deposit", amount: amount)
         } else {
             resolved = nil
         }
@@ -585,27 +585,31 @@ public final class RemitWallet: @unchecked Sendable {
 
     /// Internal: auto-sign a permit for the given contract type and amount.
     /// Used by payment methods when no explicit permit is provided.
+    /// Returns nil on failure instead of throwing, so callers can proceed without a permit.
     private func autoPermit(
         contract: String,
         amount: Double
-    ) async throws -> PermitSignature {
-        let contracts = try await getContracts()
-        let spender: String
-        switch contract {
-        case "router":  spender = contracts.router
-        case "escrow":  spender = contracts.escrow
-        case "tab":     spender = contracts.tab
-        case "stream":  spender = contracts.stream
-        case "bounty":  spender = contracts.bounty
-        case "deposit": spender = contracts.deposit
-        case "relayer": spender = contracts.relayer ?? ""
-        default:
-            throw RemitError(RemitError.serverError, "No \(contract) contract address available")
+    ) async -> PermitSignature? {
+        do {
+            let contracts = try await getContracts()
+            let spender: String
+            switch contract {
+            case "router":  spender = contracts.router
+            case "escrow":  spender = contracts.escrow
+            case "tab":     spender = contracts.tab
+            case "stream":  spender = contracts.stream
+            case "bounty":  spender = contracts.bounty
+            case "deposit": spender = contracts.deposit
+            case "relayer": spender = contracts.relayer ?? ""
+            default:
+                return nil
+            }
+            guard !spender.isEmpty else { return nil }
+            return try await signPermit(spender: spender, amount: amount)
+        } catch {
+            print("[remitmd] auto-permit failed for \(contract) (amount=\(amount)): \(error)")
+            return nil
         }
-        guard !spender.isEmpty else {
-            throw RemitError(RemitError.serverError, "No \(contract) contract address available")
-        }
-        return try await signPermit(spender: spender, amount: amount)
     }
 
     /// Fetch the EIP-2612 permit nonce from the API.
@@ -664,7 +668,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let p = permit {
             resolved = p
         } else if signer != nil {
-            resolved = try? await autoPermit(contract: "relayer", amount: 999_999_999.0)
+            resolved = await autoPermit(contract: "relayer", amount: 999_999_999.0)
         } else {
             resolved = nil
         }
@@ -689,7 +693,7 @@ public final class RemitWallet: @unchecked Sendable {
         if let p = permit {
             resolved = p
         } else if signer != nil {
-            resolved = try? await autoPermit(contract: "relayer", amount: 999_999_999.0)
+            resolved = await autoPermit(contract: "relayer", amount: 999_999_999.0)
         } else {
             resolved = nil
         }

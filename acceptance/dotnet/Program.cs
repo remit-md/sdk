@@ -525,8 +525,12 @@ async Task FlowAp2Payment(Wallet agent, PrivateKeySigner agentSigner, Wallet pro
         Allowance: new IntentMandateAllowance(MaxAmount: "5.00", Currency: "USDC")
     );
 
+    var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
+    var permit = SignUsdcPermit(agentSigner, agent.Address, routerAddr, 2_000_000, permitNonce, deadline);
+    permitNonce++;
+
     using var a2a = A2AClient.FromCard(card, agentSigner, chain: "base-sepolia", verifyingContract: routerAddr);
-    var task = await a2a.SendAsync(provider.Address, 1.0m, memo: "dotnet-acceptance-a2a", mandate: mandate);
+    var task = await a2a.SendAsync(provider.Address, 1.0m, memo: "dotnet-acceptance-a2a", mandate: mandate, permit: permit);
     if (string.IsNullOrEmpty(task.Id))
     {
         Console.WriteLine($"\x1b[1;33m[SKIP]\x1b[0m {flow} -- AP2 task has no ID (endpoint may not be available on testnet)");
@@ -603,6 +607,8 @@ foreach (var (name, run) in flows)
         LogFail(name, $"{ex.GetType().Name}: {ex.Message}");
         Console.Error.WriteLine(ex.ToString());
     }
+    // Allow indexer to catch up with on-chain nonce between permit-consuming flows
+    await Task.Delay(5000);
 }
 
 // Summary

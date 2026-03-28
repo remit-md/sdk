@@ -109,8 +109,9 @@ public sealed class MockRemit
                     new TransactionList(_mock._transactions.ToList(), _mock._transactions.Count, 1, 20, false),
 
                 var p when p.StartsWith("/api/v1/reputation/") => new Reputation(
-                    MockAddress, 750, _mock._transactions.Sum(t => t.Amount ?? 0m), 0m,
-                    _mock._transactions.Count, DateTimeOffset.UtcNow.AddDays(-30)),
+                    MockAddress, 0m, "standard",
+                    _mock._transactions.Sum(t => t.Amount ?? 0m),
+                    _mock._transactions.Count, DateTimeOffset.UtcNow),
 
                 var p when p.StartsWith("/api/v1/escrows/") =>
                     _mock._escrows.TryGetValue(PathId(p), out var e)

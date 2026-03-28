@@ -1106,7 +1106,9 @@ async fn flow_ap2_discovery(results: &mut Results) {
 async fn flow_ap2_payment(
     agent: &TestWallet,
     provider: &TestWallet,
+    contracts: &Contracts,
     results: &mut Results,
+    permit_nonce: &mut u64,
 ) {
     let flow = "9. AP2 Payment";
     let card = AgentCard::discover(&api_url()).await.expect("discover");
@@ -1114,12 +1116,38 @@ async fn flow_ap2_payment(
     let signer = PrivateKeySigner::new(&agent.hex_key).expect("create signer");
     let a2a = A2AClient::from_card(&card, Arc::new(signer));
 
+    let permit = sign_usdc_permit(
+        &agent.signing_key,
+        agent.wallet.address(),
+        &contracts.router,
+        2_000_000,
+        *permit_nonce,
+        now_unix() + 3600,
+    );
+    *permit_nonce += 1;
+
+    let mandate_id: String = {
+        use rand::Rng;
+        let bytes: [u8; 16] = rand::thread_rng().gen();
+        hex::encode(bytes)
+    };
+    let mandate = remitmd::a2a::IntentMandate {
+        mandate_id,
+        expires_at: "2099-12-31T23:59:59Z".to_string(),
+        issuer: agent.wallet.address().to_string(),
+        allowance: remitmd::a2a::IntentMandateAllowance {
+            max_amount: "5.00".to_string(),
+            currency: "USDC".to_string(),
+        },
+    };
+
     let task = a2a
         .send(SendOptions {
             to: provider.wallet.address().to_string(),
             amount: 1.0,
             memo: Some("acceptance-ap2-payment".to_string()),
-            mandate: None,
+            mandate: Some(mandate),
+            permit: Some(permit),
         })
         .await
         .expect("a2a send");
@@ -1181,15 +1209,22 @@ async fn main() {
     // If a flow panics, it will abort the entire suite (acceptable for acceptance tests).
     // For graceful error handling within flows, each flow uses .expect() on
     // critical operations — failures are visible in the output.
+    let nonce_delay = std::time::Duration::from_secs(5);
     flow_direct(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    tokio::time::sleep(nonce_delay).await;
     flow_escrow(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    tokio::time::sleep(nonce_delay).await;
     flow_tab(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    tokio::time::sleep(nonce_delay).await;
     flow_stream(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    tokio::time::sleep(nonce_delay).await;
     flow_bounty(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    tokio::time::sleep(nonce_delay).await;
     flow_deposit(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    tokio::time::sleep(nonce_delay).await;
     flow_x402_weather(&agent, &mut results).await;
     flow_ap2_discovery(&mut results).await;
-    flow_ap2_payment(&agent, &provider, &mut results).await;
+    flow_ap2_payment(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
 
     // Summary
     let passed = results.passed();

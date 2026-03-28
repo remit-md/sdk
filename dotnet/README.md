@@ -105,7 +105,7 @@ var balance = await wallet.BalanceAsync();
 Console.WriteLine($"Balance: {balance.Usdc:F2} USDC");
 
 var rep = await wallet.ReputationAsync("0xAgent...");
-Console.WriteLine($"Score: {rep.Score}/1000");
+Console.WriteLine($"Tier: {rep.Tier}, Rating: {rep.AvgRating:F2}");
 ```
 
 ## Testing with MockRemit

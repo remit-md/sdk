@@ -169,7 +169,7 @@ public sealed class Wallet
     {
         var status = await StatusAsync(ct);
         return new Balance(
-            decimal.Parse(status.Balance),
+            status.Balance is not null ? decimal.Parse(status.Balance) : 0m,
             status.Wallet,
             (ChainId)_chainId,
             DateTimeOffset.UtcNow);

@@ -46,10 +46,34 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: swift test --filter AcceptanceTests
+        run: swift test --filter AcceptanceTests 2>&1 | tee test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Swift Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-output.txt ]; then
+            pass=$(grep -c "Test.*passed" test-output.txt 2>/dev/null || echo 0)
+            fail=$(grep -c "Test.*failed" test-output.txt 2>/dev/null || echo 0)
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | $pass |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | $fail |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No test output captured." >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── 2. Python (after Swift) ─────────────────────────────────────────────────
   python:
@@ -72,10 +96,32 @@ jobs:
         run: cd python && pip install -e ".[dev]"
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: cd python && python -m pytest tests/acceptance/ -v -s --timeout=180
+        run: cd python && python -m pytest tests/acceptance/ -v -s --timeout=180 2>&1 | tee ../test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Python Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-output.txt ]; then
+            pass=$(grep -c " PASSED" test-output.txt 2>/dev/null || echo 0)
+            fail=$(grep -c " FAILED" test-output.txt 2>/dev/null || echo 0)
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | $pass |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | $fail |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── 3. TypeScript (after Python) ────────────────────────────────────────────
   typescript:
@@ -109,10 +155,35 @@ jobs:
         run: pnpm install
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md/api/v1
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: pnpm run acceptance
+        run: pnpm run acceptance 2>&1 | tee ../test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## TypeScript Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f typescript/test-output.txt ]; then
+            cat typescript/test-output.txt > test-output.txt
+          fi
+          if [ -f test-output.txt ]; then
+            pass=$(grep -c "✔\|pass" test-output.txt 2>/dev/null || echo 0)
+            fail=$(grep -c "✖\|fail" test-output.txt 2>/dev/null || echo 0)
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | $pass |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | $fail |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── 4. Go (after TS) ────────────────────────────────────────────────────────
   go:
@@ -136,10 +207,31 @@ jobs:
         run: cd go && go mod tidy
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: cd go && go test -tags acceptance -timeout 600s -v -count=1
+        run: cd go && go test -tags acceptance -timeout 600s -v -count=1 2>&1 | tee ../test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Go Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-output.txt ]; then
+            pass=$(grep -c "^--- PASS" test-output.txt 2>/dev/null || echo 0)
+            fail=$(grep -c "^--- FAIL" test-output.txt 2>/dev/null || echo 0)
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | $pass |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | $fail |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── 5. Java (after Go) ─────────────────────────────────────────────────────
   java:
@@ -169,10 +261,27 @@ jobs:
           gradle-version: "8.7"
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: gradle acceptanceTest --no-daemon
+        run: gradle acceptanceTest --no-daemon 2>&1 | tee test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Java Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f java/test-output.txt ]; then
+            cat java/test-output.txt > test-output.txt
+          fi
+          if [ -f test-output.txt ]; then
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── 6. Ruby (after Java) ────────────────────────────────────────────────────
   ruby:
@@ -198,10 +307,27 @@ jobs:
           working-directory: ruby
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance -f documentation
+        run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance -f documentation 2>&1 | tee test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Ruby Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f ruby/test-output.txt ]; then
+            cat ruby/test-output.txt > test-output.txt
+          fi
+          if [ -f test-output.txt ]; then
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── 7. .NET (after Ruby) ────────────────────────────────────────────────────
   dotnet:
@@ -231,10 +357,27 @@ jobs:
         run: dotnet build --no-restore -c Release
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: dotnet test --no-build -c Release --filter "Category=Acceptance" --verbosity normal
+        run: dotnet test --no-build -c Release --filter "Category=Acceptance" --verbosity normal 2>&1 | tee test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## .NET Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f dotnet/test-output.txt ]; then
+            cat dotnet/test-output.txt > test-output.txt
+          fi
+          if [ -f test-output.txt ]; then
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── 8. Elixir (after .NET) ─────────────────────────────────────────────────
   elixir:
@@ -262,10 +405,27 @@ jobs:
         run: mix deps.get
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: mix test test/acceptance_test.exs --include acceptance
+        run: mix test test/acceptance_test.exs --include acceptance 2>&1 | tee test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Elixir Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f elixir/test-output.txt ]; then
+            cat elixir/test-output.txt > test-output.txt
+          fi
+          if [ -f test-output.txt ]; then
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── 9. Rust (after Elixir, last — slowest to compile) ─────────────────────
   # MUST use --test-threads=1: Rust's cargo test runs in parallel by default,
@@ -290,7 +450,28 @@ jobs:
           workspaces: rust
 
       - name: Run acceptance tests
+        id: tests
         env:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture --test-threads=1
+        run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture --test-threads=1 2>&1 | tee ../test-output.txt
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Rust Acceptance Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-output.txt ]; then
+            pass=$(grep -c "^test .* ok$" test-output.txt 2>/dev/null || echo 0)
+            fail=$(grep -c "^test .* FAILED$" test-output.txt 2>/dev/null || echo 0)
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | $pass |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | $fail |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[ACCEPTANCE\]" test-output.txt 2>/dev/null || echo "(no [ACCEPTANCE] lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi

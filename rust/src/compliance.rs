@@ -35,7 +35,10 @@ mod compliance_tests {
 
     /// Returns false if the compliance server is not reachable.
     async fn is_server_available() -> bool {
-        eprintln!("[COMPLIANCE] checking server availability at {}/health", server_url());
+        eprintln!(
+            "[COMPLIANCE] checking server availability at {}/health",
+            server_url()
+        );
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(3))
             .build()
@@ -43,7 +46,11 @@ mod compliance_tests {
         match client.get(format!("{}/health", server_url())).send().await {
             Ok(r) => {
                 let ok = r.status().as_u16() == 200;
-                eprintln!("[COMPLIANCE] server health check: status={}, available={}", r.status(), ok);
+                eprintln!(
+                    "[COMPLIANCE] server health check: status={}, available={}",
+                    r.status(),
+                    ok
+                );
                 ok
             }
             Err(e) => {
@@ -62,7 +69,11 @@ mod compliance_tests {
         let private_key = format!("0x{}", hex::encode(key_bytes));
         let wallet = make_wallet(&private_key);
         let addr = wallet.address().to_string();
-        eprintln!("[COMPLIANCE] wallet generated: {} (chain={})", addr, wallet.chain_id());
+        eprintln!(
+            "[COMPLIANCE] wallet generated: {} (chain={})",
+            addr,
+            wallet.chain_id()
+        );
         (private_key, addr)
     }
 
@@ -82,7 +93,10 @@ mod compliance_tests {
             resp["tx_hash"].is_string(),
             "mint response must contain tx_hash, got: {resp}"
         );
-        eprintln!("[COMPLIANCE] mint: 1000 USDC -> {} tx={}", wallet_addr, resp["tx_hash"]);
+        eprintln!(
+            "[COMPLIANCE] mint: 1000 USDC -> {} tx={}",
+            wallet_addr, resp["tx_hash"]
+        );
     }
 
     fn make_wallet(private_key: &str) -> Wallet {
@@ -171,7 +185,10 @@ mod compliance_tests {
             .send()
             .await
             .expect("POST /payments/direct");
-        eprintln!("[COMPLIANCE] unauthenticated response: status={}", resp.status());
+        eprintln!(
+            "[COMPLIANCE] unauthenticated response: status={}",
+            resp.status()
+        );
         assert_eq!(
             resp.status().as_u16(),
             401,

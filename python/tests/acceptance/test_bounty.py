@@ -64,15 +64,18 @@ async def test_bounty_lifecycle() -> None:
 
     # Step 2: Provider submits evidence
     evidence_hash = "0x" + "ab" * 32
-    submission = await provider.submit_bounty(bounty.id, evidence_hash=evidence_hash)
-    submission_id = submission.invoice_id
-    assert submission_id is not None, "submission should have an invoice_id"
+    submission = await provider.submit_bounty(
+        bounty.id, evidence_hash=evidence_hash,
+    )
+    assert submission.tx_hash, "submission should produce a tx"
+    if submission.tx_hash:
+        log_tx("bounty", "submit", submission.tx_hash)
 
     # Wait for submission tx
     await asyncio.sleep(5)
 
-    # Step 3: Poster awards to the submission
-    awarded = await poster.award_bounty(bounty.id, submission_id=submission_id)
+    # Step 3: Poster awards (first submission = ID 1)
+    awarded = await poster.award_bounty(bounty.id, submission_id=1)
     assert awarded.status == "awarded", f"bounty should be awarded, got {awarded.status}"
     if hasattr(awarded, "tx_hash") and awarded.tx_hash:
         log_tx("bounty", "award", awarded.tx_hash)

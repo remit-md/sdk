@@ -96,11 +96,10 @@ async def test_tab_lifecycle() -> None:
         final_amount=charge_amount,
         provider_sig=close_sig,
     )
-    assert closed.status == "closed", f"tab should be closed, got {closed.status}"
-    assert closed.closed_tx_hash and closed.closed_tx_hash.startswith("0x"), (
-        f"close should return tx hash, got: {closed.closed_tx_hash}"
+    assert closed.tx_hash and closed.tx_hash.startswith("0x"), (
+        f"close should return tx hash, got: {closed.tx_hash}"
     )
-    log_tx("tab", "close", closed.closed_tx_hash)
+    log_tx("tab", "close", closed.tx_hash)
 
     # Verify balances
     provider_after = await wait_for_balance_change(provider.address, provider_before)

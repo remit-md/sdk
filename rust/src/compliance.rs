@@ -93,7 +93,12 @@ mod compliance_tests {
             .router_address(router_address())
             .build()
             .expect("build wallet");
-        eprintln!("[COMPLIANCE] wallet created: {} (chain={}, base_url={})", w.address(), w.chain_id(), server_url());
+        eprintln!(
+            "[COMPLIANCE] wallet created: {} (chain={}, base_url={})",
+            w.address(),
+            w.chain_id(),
+            server_url()
+        );
         w
     }
 
@@ -140,7 +145,11 @@ mod compliance_tests {
             .reputation(wallet.address())
             .await
             .expect("reputation() must not fail with valid auth");
-        eprintln!("[COMPLIANCE] reputation returned successfully for {}: {:?}", wallet.address(), rep);
+        eprintln!(
+            "[COMPLIANCE] reputation returned successfully for {}: {:?}",
+            wallet.address(),
+            rep
+        );
     }
 
     #[tokio::test]
@@ -185,7 +194,11 @@ mod compliance_tests {
         let payer = get_shared_payer(&client).await;
         let (_payee_key, payee_addr) = generate_wallet();
 
-        eprintln!("[COMPLIANCE] pay: 5.0 USDC {} -> {} memo=\"rust compliance test\"", payer.address(), payee_addr);
+        eprintln!(
+            "[COMPLIANCE] pay: 5.0 USDC {} -> {} memo=\"rust compliance test\"",
+            payer.address(),
+            payee_addr
+        );
         let tx = payer
             .pay_with_memo(
                 &payee_addr,
@@ -195,7 +208,13 @@ mod compliance_tests {
             .await
             .expect("pay_with_memo must succeed");
 
-        eprintln!("[COMPLIANCE] pay: 5.0 USDC {} -> {} tx={} id={}", payer.address(), payee_addr, tx.tx_hash, tx.id);
+        eprintln!(
+            "[COMPLIANCE] pay: 5.0 USDC {} -> {} tx={} id={}",
+            payer.address(),
+            payee_addr,
+            tx.tx_hash,
+            tx.id
+        );
         assert!(
             !tx.tx_hash.is_empty(),
             "pay() must return a non-empty tx_hash"

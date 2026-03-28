@@ -491,11 +491,11 @@ defmodule RemitMd.AcceptanceTest do
 
         if has_payment do
           body = ~s({"status":"ok","data":"secret"})
-          response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
+          response = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
           :gen_tcp.send(client, response)
         else
           body = ~s({"error":"payment required"})
-          response = "HTTP/1.1 402 Payment Required\r\nPayment-Required: #{encoded_header}\r\nContent-Type: application/json\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
+          response = "HTTP/1.1 402 Payment Required\r\nConnection: close\r\nPayment-Required: #{encoded_header}\r\nContent-Type: application/json\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
           :gen_tcp.send(client, response)
         end
 

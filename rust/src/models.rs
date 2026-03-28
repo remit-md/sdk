@@ -267,7 +267,7 @@ pub struct Tab {
     pub remaining: Decimal,
     pub status: TabStatus,
     #[serde(default)]
-    pub expiry: u64,
+    pub expiry: serde_json::Value,
     #[serde(default)]
     pub tx_hash: String,
     pub created_at: DateTime<Utc>,
@@ -357,7 +357,7 @@ pub struct Bounty {
     pub task_description: String,
     pub status: BountyStatus,
     #[serde(default)]
-    pub deadline: u64,
+    pub deadline: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_attempts: Option<u32>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -387,7 +387,7 @@ pub struct Deposit {
     pub amount: Decimal,
     pub status: DepositStatus,
     #[serde(default)]
-    pub expiry: u64,
+    pub expiry: serde_json::Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<DateTime<Utc>>,
     #[serde(default)]

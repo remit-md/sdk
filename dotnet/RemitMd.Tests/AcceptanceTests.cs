@@ -92,7 +92,7 @@ public class AcceptanceTests
 
     // ─── EIP-2612 Permit Signing ────────────────────────────────────────────
 
-    private static async Task<PermitSignature> SignUsdcPermitAsync(PrivateKeySigner signer, string owner, string spender,
+    private async Task<PermitSignature> SignUsdcPermitAsync(PrivateKeySigner signer, string owner, string spender,
                                                   long value, long nonce, long deadline)
     {
         var contracts = await FetchContracts();

@@ -2,7 +2,8 @@ name: Acceptance Tests
 
 # Manual-only. Tests hit live Base Sepolia via the testnet API.
 # Trigger after merging SDK changes to verify all payment flows work end-to-end.
-# 3 batches of 3 SDKs to balance speed vs RPC rate limits / relayer nonce contention.
+# FULLY SEQUENTIAL: one SDK at a time to avoid relayer nonce contention.
+# The server uses a single relayer EOA — concurrent SDK runs cause nonce conflicts.
 on:
   workflow_dispatch:
     inputs:
@@ -27,7 +28,7 @@ permissions:
   contents: read
 
 jobs:
-  # ── Batch 1: Python, TS, Go (parallel) ───────────────────────────────────
+  # ── 1. Python ───────────────────────────────────────────────────────────────
   python:
     name: Python SDK Acceptance
     if: inputs.sdk == 'all' || inputs.sdk == 'python'
@@ -52,9 +53,11 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd python && python -m pytest tests/acceptance/ -v -s --timeout=180
 
+  # ── 2. TypeScript (after Python) ────────────────────────────────────────────
   typescript:
     name: TS SDK Acceptance
-    if: inputs.sdk == 'all' || inputs.sdk == 'typescript'
+    needs: [python]
+    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'typescript') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -87,9 +90,11 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: pnpm run acceptance
 
+  # ── 3. Go (after TS) ───────────────────────────────────────────────────────
   go:
     name: Go SDK Acceptance
-    if: inputs.sdk == 'all' || inputs.sdk == 'go'
+    needs: [typescript]
+    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'go') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -112,10 +117,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd go && go test -tags acceptance -timeout 600s -v -count=1
 
-  # ── Batch 2: Rust, Java, Ruby (after batch 1) ────────────────────────────
+  # ── 4. Rust (after Go) ─────────────────────────────────────────────────────
   rust:
     name: Rust SDK Acceptance
-    needs: [python, typescript, go]
+    needs: [go]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'rust') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -138,9 +143,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture
 
+  # ── 5. Java (after Rust) ────────────────────────────────────────────────────
   java:
     name: Java SDK Acceptance
-    needs: [python, typescript, go]
+    needs: [rust]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'java') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -170,9 +176,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: gradle acceptanceTest --no-daemon
 
+  # ── 6. Ruby (after Java) ────────────────────────────────────────────────────
   ruby:
     name: Ruby SDK Acceptance
-    needs: [python, typescript, go]
+    needs: [java]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'ruby') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -198,10 +205,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance -f documentation
 
-  # ── Batch 3: Swift, .NET, Elixir (after batch 2) ─────────────────────────
+  # ── 7. Swift (after Ruby, macOS) ────────────────────────────────────────────
   swift:
     name: Swift SDK Acceptance
-    needs: [rust, java, ruby]
+    needs: [ruby]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'swift') }}
     runs-on: macos-latest
     timeout-minutes: 15
@@ -220,9 +227,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: swift test --filter AcceptanceTests
 
+  # ── 8. .NET (after Swift) ───────────────────────────────────────────────────
   dotnet:
     name: .NET SDK Acceptance
-    needs: [rust, java, ruby]
+    needs: [swift]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'dotnet') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -252,9 +260,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: dotnet test --no-build -c Release --filter "Category=Acceptance" --verbosity normal
 
+  # ── 9. Elixir (after .NET) ─────────────────────────────────────────────────
   elixir:
     name: Elixir SDK Acceptance
-    needs: [rust, java, ruby]
+    needs: [dotnet]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'elixir') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

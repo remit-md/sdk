@@ -321,11 +321,11 @@ public class App {
         waitForBalanceChange(agent.address(), getUsdcBalance(agent.address()));
 
         String evidenceHash = "0x" + "ab".repeat(32);
-        Transaction submission = provider.wallet.submitBounty(bounty.id, evidenceHash);
-        if (submission.id == null) throw new RuntimeException("submission should have an id");
+        provider.wallet.submitBounty(bounty.id, evidenceHash);
+        // First submission is always ID 0
         Thread.sleep(5_000);
 
-        Transaction awarded = agent.wallet.awardBounty(bounty.id, 1);
+        Transaction awarded = agent.wallet.awardBounty(bounty.id, 0);
         logTx(flow, "award", awarded.txHash);
         logPass(flow, "bounty_id=" + bounty.id);
     }

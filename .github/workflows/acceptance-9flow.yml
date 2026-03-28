@@ -222,6 +222,35 @@ jobs:
           echo "" >> results.txt
           cat results.txt
 
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## 9-Flow Acceptance Suite" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f results.txt ]; then
+            total_pass=$(grep -c "\[PASS\]" results.txt 2>/dev/null || echo 0)
+            total_fail=$(grep -c "\[FAIL\]" results.txt 2>/dev/null || echo 0)
+            echo "**Total: ${total_pass} passed, ${total_fail} failed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Language | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+            for lang in PYTHON TYPESCRIPT GO RUST .NET JAVA RUBY SWIFT ELIXIR; do
+              pass=$(sed -n "/  $lang/,/════/p" results.txt | grep -c "\[PASS\]" 2>/dev/null || echo 0)
+              fail=$(sed -n "/  $lang/,/════/p" results.txt | grep -c "\[FAIL\]" 2>/dev/null || echo 0)
+              icon="✅"
+              if [ "$fail" -gt 0 ]; then icon="❌"; fi
+              if [ "$pass" -eq 0 ] && [ "$fail" -eq 0 ]; then icon="⏭️"; fi
+              echo "| ${icon} ${lang} | ${pass} | ${fail} |" >> $GITHUB_STEP_SUMMARY
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Transaction hashes</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep "\[TX\]\|\[ACCEPTANCE\]" results.txt 2>/dev/null | head -100 || echo "(no tx lines found)"
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -260,7 +289,17 @@ jobs:
 
       - name: Print Swift results
         if: always()
-        run: cat results-swift.txt
+        run: |
+          cat results-swift.txt
+          echo "## Swift (macOS) 9-Flow Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f results-swift.txt ]; then
+            pass=$(grep -c "\[PASS\]" results-swift.txt 2>/dev/null || echo 0)
+            fail=$(grep -c "\[FAIL\]" results-swift.txt 2>/dev/null || echo 0)
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | $pass |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | $fail |" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload Swift results
         if: always()

@@ -350,10 +350,11 @@ pub struct Bounty {
     pub id: String,
     #[serde(default)]
     pub chain: String,
+    #[serde(default)]
     pub poster: String,
     #[serde(with = "rust_decimal::serde::float", alias = "award")]
     pub amount: Decimal,
-    #[serde(alias = "description", alias = "task")]
+    #[serde(default, alias = "description", alias = "task")]
     pub task_description: String,
     pub status: BountyStatus,
     #[serde(default)]
@@ -366,7 +367,8 @@ pub struct Bounty {
     pub expires_at: Option<DateTime<Utc>>,
     #[serde(default)]
     pub tx_hash: String,
-    pub created_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub submissions: Option<Vec<BountySubmission>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

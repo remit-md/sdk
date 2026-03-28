@@ -18,6 +18,7 @@ on:
           - typescript
           - python
           - go
+          - rust
           - java
           - ruby
           - swift
@@ -266,7 +267,30 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: mix test test/acceptance_test.exs --include acceptance
 
-  # ── Rust SKIPPED ────────────────────────────────────────────────────────────
-  # Rust SDK permit signing is broken — all on-chain flows revert with
-  # InsufficientAllowance. Needs SDK-level fix before acceptance tests can run.
-  # Re-enable after fixing rust/src/wallet.rs permit signing.
+  # ── 9. Rust (after Elixir, last — slowest to compile) ─────────────────────
+  # MUST use --test-threads=1: Rust's cargo test runs in parallel by default,
+  # which causes internal relayer nonce contention across the 7 test functions.
+  rust:
+    name: Rust SDK Acceptance
+    needs: [elixir]
+    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'rust') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+
+      - name: Cache
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          workspaces: rust
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://testnet.remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture --test-threads=1

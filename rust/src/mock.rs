@@ -498,7 +498,7 @@ impl MockTransport {
                     winner: String::new(),
                     expires_at: None,
                     tx_hash: format!("0x{}", mock_hash()),
-                    created_at: Utc::now(),
+                    created_at: Some(Utc::now()),
                     submissions: None,
                     validation: None,
                 };

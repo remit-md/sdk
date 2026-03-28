@@ -280,7 +280,7 @@ class AcceptanceTest {
 
         assertBalanceChange("agent", agentBefore, agentAfter, -amount);
         assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-        assertTrue("fee wallet should not decrease", feeAfter >= feeBefore - 0.001);
+        assertTrue(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
         System.out.println("[ACCEPTANCE] fee wallet delta: " + (feeAfter - feeBefore));
     }
 
@@ -331,7 +331,7 @@ class AcceptanceTest {
 
         assertBalanceChange("agent", agentBefore, agentAfter, -amount);
         assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-        assertTrue("fee wallet should not decrease", feeAfter >= feeBefore - 0.001);
+        assertTrue(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
         System.out.println("[ACCEPTANCE] fee wallet delta: " + (feeAfter - feeBefore));
     }
 
@@ -409,7 +409,7 @@ class AcceptanceTest {
         // Provider: received $2 minus 1% fee = $1.98
         assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
         // Fee wallet: received 1% of $2 = $0.02
-        assertTrue("fee wallet should not decrease", feeAfter >= feeBefore - 0.001);
+        assertTrue(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
         System.out.println("[ACCEPTANCE] fee wallet delta: " + (feeAfter - feeBefore));
     }
 
@@ -546,7 +546,7 @@ class AcceptanceTest {
         // Provider: received $5 minus 1% fee = $4.95
         assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
         // Fee wallet: received 1% of $5 = $0.05
-        assertTrue("fee wallet should not decrease", feeAfter >= feeBefore - 0.001);
+        assertTrue(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
         System.out.println("[ACCEPTANCE] fee wallet delta: " + (feeAfter - feeBefore));
     }
 

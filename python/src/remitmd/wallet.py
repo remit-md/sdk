@@ -82,7 +82,9 @@ class Wallet(RemitClient):
             raise ValueError("Provide private_key OR signer, not both")
 
         chain_id, url = get_chain_config(chain, testnet, api_url)
-        self.chain = f"{chain}-sepolia" if testnet and not chain.endswith("-sepolia") and chain != "localhost" else chain
+        if testnet and chain != "localhost" and not chain.endswith("-sepolia"):
+            chain = f"{chain}-sepolia"
+        self.chain = chain
         self.testnet = testnet
         self._chain_id = chain_id
 

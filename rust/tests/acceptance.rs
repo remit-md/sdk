@@ -125,7 +125,11 @@ fn assert_balance_change(label: &str, before: f64, after: f64, expected: f64) {
 // ─── Funding ─────────────────────────────────────────────────────────────────
 
 async fn fund_wallet(w: &TestWallet, amount: f64, usdc_address: &str) {
-    eprintln!("[ACCEPTANCE] mint: {} USDC -> {}", amount, w.wallet.address());
+    eprintln!(
+        "[ACCEPTANCE] mint: {} USDC -> {}",
+        amount,
+        w.wallet.address()
+    );
     w.wallet.mint(amount).await.expect("mint");
     wait_for_balance_change(w.wallet.address(), 0.0, usdc_address).await;
 }

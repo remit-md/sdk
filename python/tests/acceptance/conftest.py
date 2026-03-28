@@ -113,9 +113,7 @@ def assert_balance_change(
 def log_tx(flow: str, step: str, tx_hash: str) -> None:
     """Log a transaction hash with a basescan link."""
     print(
-        f"[ACCEPTANCE] {flow} | {step}"
-        f" | tx={tx_hash}"
-        f" | https://sepolia.basescan.org/tx/{tx_hash}"
+        f"[ACCEPTANCE] {flow} | {step} | tx={tx_hash} | https://sepolia.basescan.org/tx/{tx_hash}"
     )
 
 

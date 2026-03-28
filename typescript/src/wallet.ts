@@ -386,16 +386,16 @@ export class Wallet extends RemitClient {
    * @param amount Amount in USDC (e.g. 1.50 for $1.50).
    * @param deadline Optional Unix timestamp. Defaults to 1 hour from now.
    */
-  async signPermit(spender: string, amount: number, deadline?: number): Promise<PermitSignature> {
-    const usdcAddress = Wallet.USDC_ADDRESSES[this._chain];
-    if (!usdcAddress) {
+  async signPermit(spender: string, amount: number, deadline?: number, usdcAddress?: string): Promise<PermitSignature> {
+    const resolvedUsdc = usdcAddress ?? Wallet.USDC_ADDRESSES[this._chain];
+    if (!resolvedUsdc) {
       throw new Error(
         `No USDC address for chain '${this._chain}'. ` +
         `Supported chains: ${Object.keys(Wallet.USDC_ADDRESSES).join(", ")}. ` +
         "Pass usdcAddress to signUsdcPermit() instead.",
       );
     }
-    const nonce = await this.#fetchPermitNonce(usdcAddress);
+    const nonce = await this.#fetchPermitNonce(resolvedUsdc);
     const dl = deadline ?? Math.floor(Date.now() / 1000) + 3600;
     const rawAmount = BigInt(Math.round(amount * 1e6));
     return this.signUsdcPermit({
@@ -403,7 +403,7 @@ export class Wallet extends RemitClient {
       value: rawAmount,
       deadline: dl,
       nonce,
-      usdcAddress,
+      usdcAddress: resolvedUsdc,
     });
   }
 
@@ -419,7 +419,8 @@ export class Wallet extends RemitClient {
       const contracts = await this.getContracts();
       const spender = contracts[contract];
       if (!spender) return undefined;
-      return await this.signPermit(spender, amount);
+      const usdc = contracts.usdc;
+      return await this.signPermit(spender, amount, undefined, usdc);
     } catch (err) {
       console.warn(`[remitmd] auto-permit failed for ${contract} (amount=${amount}):`, err);
       return undefined;

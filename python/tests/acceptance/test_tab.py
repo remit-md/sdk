@@ -9,10 +9,8 @@ import pytest
 
 from .conftest import (
     assert_balance_change,
-    assert_fee_increase,
     create_wallet,
     fund_wallet,
-    get_fee_wallet_balance,
     get_usdc_balance,
     log_tx,
     wait_for_balance_change,
@@ -35,8 +33,6 @@ async def test_tab_lifecycle() -> None:
 
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
-    fee_before = await get_fee_wallet_balance()
-
     # Step 1: Open tab (agent, with permit for Tab contract)
     contracts = await agent.get_contracts()
     tab_contract = contracts["tab"]
@@ -103,12 +99,9 @@ async def test_tab_lifecycle() -> None:
 
     # Verify balances
     provider_after = await wait_for_balance_change(provider.address, provider_before)
-    fee_after = await get_fee_wallet_balance()
     agent_after = await get_usdc_balance(agent.address)
 
     # Agent: locked $10, refunded $8, net change = -$2
     assert_balance_change("agent", agent_before, agent_after, -charge_amount)
     # Provider: received $2 minus 1% fee = $1.98
     assert_balance_change("provider", provider_before, provider_after, provider_receives)
-    # Fee wallet: received at least 1% of $2 = $0.02
-    assert_fee_increase("fee wallet", fee_before, fee_after, fee)

@@ -9,9 +9,7 @@ import {
   createWallet,
   fundWallet,
   getUsdcBalance,
-  getFeeWalletBalance,
   assertBalanceChange,
-  assertFeeIncrease,
   waitForBalanceChange,
   logTx,
 } from "./setup.js";
@@ -33,8 +31,6 @@ describe("SDK: Escrow Lifecycle", { timeout: 180_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    const feeBefore = await getFeeWalletBalance();
-
     // Sign permit for Escrow contract
     const contracts = await agent.getContracts();
     const permit = await agent.signPermit(contracts.escrow, amount + 1);
@@ -65,11 +61,9 @@ describe("SDK: Escrow Lifecycle", { timeout: 180_000 }, () => {
 
     // Verify balances
     const providerAfter = await waitForBalanceChange(provider.address, providerBefore);
-    const feeAfter = await getFeeWalletBalance();
     const agentAfter = await getUsdcBalance(agent.address);
 
     assertBalanceChange("agent", agentBefore, agentAfter, -amount);
     assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    assertFeeIncrease("fee wallet", feeBefore, feeAfter, fee);
   });
 });

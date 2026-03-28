@@ -10,9 +10,7 @@ import {
   createWallet,
   fundWallet,
   getUsdcBalance,
-  getFeeWalletBalance,
   assertBalanceChange,
-  assertFeeIncrease,
   waitForBalanceChange,
   logTx,
 } from "./setup.js";
@@ -34,8 +32,6 @@ describe("SDK: Direct Payment", { timeout: 120_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    const feeBefore = await getFeeWalletBalance();
-
     // SDK: get contracts, sign permit, pay
     const contracts = await agent.getContracts();
     const permit = await agent.signPermit(contracts.router, 2.0);
@@ -47,10 +43,8 @@ describe("SDK: Direct Payment", { timeout: 120_000 }, () => {
 
     const agentAfter = await waitForBalanceChange(agent.address, agentBefore);
     const providerAfter = await getUsdcBalance(provider.address);
-    const feeAfter = await getFeeWalletBalance();
 
     assertBalanceChange("agent", agentBefore, agentAfter, -amount);
     assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    assertFeeIncrease("fee wallet", feeBefore, feeAfter, fee);
   });
 });

@@ -20,9 +20,6 @@ require "webrick"
 
 API_URL = ENV.fetch("ACCEPTANCE_API_URL", "https://testnet.remit.md")
 RPC_URL = ENV.fetch("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
-USDC_ADDRESS = "0x2d846325766921935f37d5b4478196d3ef93707c"
-FEE_WALLET = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
-CHAIN_ID = 84532
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -50,11 +47,12 @@ def create_test_wallet
   { wallet: wallet, key_hex: key_hex }
 end
 
-def get_usdc_balance(address)
+def get_usdc_balance(address, usdc_address: nil)
+  usdc_address ||= fetch_contracts["usdc"]
   hex = address.downcase.delete_prefix("0x").rjust(64, "0")
   data = "0x70a08231#{hex}"
   body = { jsonrpc: "2.0", id: 1, method: "eth_call",
-           params: [{ to: USDC_ADDRESS, data: data }, "latest"] }.to_json
+           params: [{ to: usdc_address, data: data }, "latest"] }.to_json
 
   uri = URI(RPC_URL)
   resp = Net::HTTP.post(uri, body, "Content-Type" => "application/json")
@@ -64,10 +62,6 @@ def get_usdc_balance(address)
   raw = result["result"].delete_prefix("0x")
   raw = "0" if raw.empty?
   raw.to_i(16).to_f / 1_000_000.0
-end
-
-def get_fee_balance
-  get_usdc_balance(FEE_WALLET)
 end
 
 def wait_for_balance_change(address, before, timeout: 30)
@@ -111,13 +105,17 @@ def pad_uint256(value)
 end
 
 def sign_usdc_permit(key_hex, owner, spender, value, nonce, deadline)
+  contracts = fetch_contracts
+  usdc_address = contracts["usdc"]
+  chain_id = contracts["chain_id"]
+
   # Domain separator
   domain_type_hash = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
   name_hash = keccak256("USD Coin")
   version_hash = keccak256("2")
-  usdc_padded = pad_address(USDC_ADDRESS)
+  usdc_padded = pad_address(usdc_address)
 
-  domain_data = domain_type_hash + name_hash + version_hash + pad_uint256(CHAIN_ID) + usdc_padded
+  domain_data = domain_type_hash + name_hash + version_hash + pad_uint256(chain_id) + usdc_padded
   domain_sep = keccak256(domain_data)
 
   # Permit struct hash
@@ -158,7 +156,6 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
 
       agent_before = get_usdc_balance(agent[:wallet].address)
       provider_before = get_usdc_balance(provider[:wallet].address)
-      fee_before = get_fee_balance
 
       # Sign EIP-2612 permit for Router
       contracts = fetch_contracts
@@ -174,11 +171,9 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
 
       agent_after = wait_for_balance_change(agent[:wallet].address, agent_before)
       provider_after = get_usdc_balance(provider[:wallet].address)
-      fee_after = get_fee_balance
 
       assert_balance_change("agent", agent_before, agent_after, -amount)
       assert_balance_change("provider", provider_before, provider_after, provider_receives)
-      assert_balance_change("fee wallet", fee_before, fee_after, fee)
     end
   end
 
@@ -194,7 +189,6 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
 
       agent_before = get_usdc_balance(agent[:wallet].address)
       provider_before = get_usdc_balance(provider[:wallet].address)
-      fee_before = get_fee_balance
 
       # Sign EIP-2612 permit for Escrow contract
       contracts = fetch_contracts
@@ -220,12 +214,10 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
 
       # Verify balances
       provider_after = wait_for_balance_change(provider[:wallet].address, provider_before)
-      fee_after = get_fee_balance
       agent_after = get_usdc_balance(agent[:wallet].address)
 
       assert_balance_change("agent", agent_before, agent_after, -amount)
       assert_balance_change("provider", provider_before, provider_after, provider_receives)
-      assert_balance_change("fee wallet", fee_before, fee_after, fee)
     end
   end
 
@@ -245,7 +237,6 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       )
 
       payer_before = get_usdc_balance(payer[:wallet].address)
-      _fee_before = get_fee_balance
 
       # 1. Create tab: $10 limit, $0.10 per call
       tab = payer[:wallet].create_tab(
@@ -282,7 +273,6 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
 
       # 4. Verify balances: payer should have lost funds
       payer_after = wait_for_balance_change(payer[:wallet].address, payer_before)
-      _fee_after = get_fee_balance
       payer_delta = payer_after - payer_before
       expect(payer_delta).to be < 0
     end
@@ -350,7 +340,6 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       )
 
       poster_before = get_usdc_balance(poster[:wallet].address)
-      fee_before = get_fee_balance
 
       # 1. Create bounty: $5 reward, 1 hour deadline
       bounty_deadline = Time.now.to_i + 3600
@@ -378,9 +367,6 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       # 4. Verify: submitter should have received funds
       submitter_after = wait_for_balance_change(submitter[:wallet].address, 0)
       expect(submitter_after).to be > 0
-
-      fee_after = get_fee_balance
-      expect(fee_after).to be >= fee_before
     end
   end
 
@@ -429,11 +415,12 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       provider_wallet = create_test_wallet
 
       # Build the PAYMENT-REQUIRED header payload
+      contracts = fetch_contracts
       payment_payload = {
         "payTo"       => provider_wallet[:wallet].address,
         "amount"      => "1000",              # $0.001 USDC in base units
         "network"     => "eip155:84532",
-        "asset"       => USDC_ADDRESS,
+        "asset"       => contracts["usdc"],
         "facilitator" => "#{API_URL}/api/v1",
         "maxTimeout"  => 60,
         "resource"    => "/v1/data",

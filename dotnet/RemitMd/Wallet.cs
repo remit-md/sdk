@@ -682,9 +682,11 @@ public sealed class Wallet
     /// <param name="spender">Contract address that will call transferFrom (e.g. Router, Escrow).</param>
     /// <param name="amount">Amount in USDC (e.g. 1.50 for $1.50).</param>
     /// <param name="deadline">Optional Unix timestamp. Defaults to 1 hour from now.</param>
-    public async Task<PermitSignature> SignPermitAsync(string spender, decimal amount, long? deadline = null)
+    public async Task<PermitSignature> SignPermitAsync(string spender, decimal amount, long? deadline = null, string? usdcAddress = null)
     {
-        var usdcAddr = UsdcAddresses.TryGetValue(_chainKey, out var a) ? a : null;
+        var usdcAddr = usdcAddress;
+        if (string.IsNullOrEmpty(usdcAddr))
+            usdcAddr = UsdcAddresses.TryGetValue(_chainKey, out var a) ? a : null;
         if (string.IsNullOrEmpty(usdcAddr))
             throw new RemitError(ErrorCodes.InvalidChain,
                 $"No USDC address for chain '{_chainKey}'. Supported: {string.Join(", ", UsdcAddresses.Keys)}. Use SignUsdcPermit() with explicit address.");
@@ -716,7 +718,7 @@ public sealed class Wallet
             };
             if (string.IsNullOrEmpty(spender))
                 return null;
-            return await SignPermitAsync(spender, amount);
+            return await SignPermitAsync(spender, amount, usdcAddress: contracts.Usdc);
         }
         catch (Exception ex)
         {

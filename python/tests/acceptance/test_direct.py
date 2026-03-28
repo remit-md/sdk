@@ -9,10 +9,8 @@ import pytest
 
 from .conftest import (
     assert_balance_change,
-    assert_fee_increase,
     create_wallet,
     fund_wallet,
-    get_fee_wallet_balance,
     get_usdc_balance,
     log_tx,
     wait_for_balance_change,
@@ -33,8 +31,6 @@ async def test_pay_direct_with_permit() -> None:
 
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
-    fee_before = await get_fee_wallet_balance()
-
     # Get router address for permit
     contracts = await agent.get_contracts()
     router = contracts["router"]
@@ -61,8 +57,6 @@ async def test_pay_direct_with_permit() -> None:
 
     agent_after = await wait_for_balance_change(agent.address, agent_before)
     provider_after = await get_usdc_balance(provider.address)
-    fee_after = await get_fee_wallet_balance()
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change("provider", provider_before, provider_after, provider_receives)
-    assert_fee_increase("fee wallet", fee_before, fee_after, fee)

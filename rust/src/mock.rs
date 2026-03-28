@@ -391,7 +391,7 @@ impl MockTransport {
                     used: Decimal::ZERO,
                     remaining: limit,
                     status: TabStatus::Open,
-                    expiry: 0,
+                    expiry: serde_json::Value::Number(0.into()),
                     tx_hash: format!("0x{}", mock_hash()),
                     created_at: Utc::now(),
                     closes_at: None,
@@ -480,7 +480,10 @@ impl MockTransport {
                     .or_else(|| b["description"].as_str())
                     .unwrap_or("")
                     .to_string();
-                let deadline = b["deadline"].as_u64().unwrap_or(0);
+                let deadline = b
+                    .get("deadline")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Number(0.into()));
 
                 let mut s = self.state.lock().await;
                 check_balance(s.balance, amount)?;
@@ -498,7 +501,7 @@ impl MockTransport {
                     winner: String::new(),
                     expires_at: None,
                     tx_hash: format!("0x{}", mock_hash()),
-                    created_at: Utc::now(),
+                    created_at: Some(Utc::now()),
                     submissions: None,
                     validation: None,
                 };
@@ -535,7 +538,10 @@ impl MockTransport {
                     .map(|f| Decimal::from_str_exact(&format!("{f}")).unwrap_or_default())
                     .or_else(|| decimal_field(&b, "amount").ok())
                     .unwrap_or_default();
-                let expiry = b["expiry"].as_u64().unwrap_or(0);
+                let expiry = b
+                    .get("expiry")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Number(0.into()));
 
                 let mut s = self.state.lock().await;
                 check_balance(s.balance, amount)?;

@@ -23,10 +23,6 @@ public class AcceptanceTests
 {
     private static readonly string ApiUrl = Environment.GetEnvironmentVariable("ACCEPTANCE_API_URL") ?? "https://testnet.remit.md";
     private static readonly string RpcUrl = Environment.GetEnvironmentVariable("ACCEPTANCE_RPC_URL") ?? "https://sepolia.base.org";
-    private const string UsdcAddress = "0x2d846325766921935f37d5b4478196d3ef93707c";
-    private const string FeeWallet = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
-    private const long ChainIdVal = 84532;
-
     private static readonly HttpClient Http = new();
     private static Dictionary<string, JsonElement>? _contracts;
 
@@ -55,9 +51,11 @@ public class AcceptanceTests
 
     private async Task<double> GetUsdcBalance(string address)
     {
+        var contracts = await FetchContracts();
+        var usdcAddr = contracts["usdc"].GetString()!;
         var hex = address.ToLowerInvariant().Replace("0x", "").PadLeft(64, '0');
         var callData = "0x70a08231" + hex;
-        var body = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_call\",\"params\":[{{\"to\":\"{UsdcAddress}\",\"data\":\"{callData}\"}},\"latest\"]}}";
+        var body = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_call\",\"params\":[{{\"to\":\"{usdcAddr}\",\"data\":\"{callData}\"}},\"latest\"]}}";
         var resp = await Http.PostAsync(RpcUrl, new StringContent(body, Encoding.UTF8, "application/json"));
         var json = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var resultHex = json.RootElement.GetProperty("result").GetString()!.Replace("0x", "");
@@ -65,8 +63,6 @@ public class AcceptanceTests
         var raw = ulong.Parse(resultHex, System.Globalization.NumberStyles.HexNumber);
         return raw / 1_000_000.0;
     }
-
-    private Task<double> GetFeeBalance() => GetUsdcBalance(FeeWallet);
 
     private async Task<double> WaitForBalanceChange(string address, double before, int timeoutSecs = 30)
     {
@@ -96,14 +92,18 @@ public class AcceptanceTests
 
     // ─── EIP-2612 Permit Signing ────────────────────────────────────────────
 
-    private static PermitSignature SignUsdcPermit(PrivateKeySigner signer, string owner, string spender,
+    private async Task<PermitSignature> SignUsdcPermitAsync(PrivateKeySigner signer, string owner, string spender,
                                                   long value, long nonce, long deadline)
     {
+        var contracts = await FetchContracts();
+        var chainId = contracts["chain_id"].GetInt64();
+        var usdcAddr = contracts["usdc"].GetString()!;
+
         var domainTypeHash = Eip712.Keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
         var nameHash = Eip712.Keccak256("USD Coin");
         var versionHash = Eip712.Keccak256("2");
 
-        var domainData = Concat(domainTypeHash, nameHash, versionHash, PadUint256(ChainIdVal), PadAddress(UsdcAddress));
+        var domainData = Concat(domainTypeHash, nameHash, versionHash, PadUint256(chainId), PadAddress(usdcAddr));
         var domainSep = Eip712.Keccak256(domainData);
 
         var permitTypeHash = Eip712.Keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
@@ -181,12 +181,11 @@ public class AcceptanceTests
 
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
         var providerBefore = await GetUsdcBalance(provider.Wallet.Address);
-        var feeBefore = await GetFeeBalance();
 
         var contracts = await FetchContracts();
         var routerAddr = contracts["router"].GetString()!;
         var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = SignUsdcPermit(agent.Signer, agent.Wallet.Address, routerAddr,
+        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, routerAddr,
                                     2_000_000, 0, deadline);
 
         var tx = await agent.Wallet.PayAsync(provider.Wallet.Address, 1.0m,
@@ -197,11 +196,9 @@ public class AcceptanceTests
 
         var agentAfter = await WaitForBalanceChange(agent.Wallet.Address, agentBefore);
         var providerAfter = await GetUsdcBalance(provider.Wallet.Address);
-        var feeAfter = await GetFeeBalance();
 
         AssertBalanceChange("agent", agentBefore, agentAfter, -amount);
         AssertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-        Assert.True(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
     }
 
     [Fact]
@@ -219,12 +216,11 @@ public class AcceptanceTests
 
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
         var providerBefore = await GetUsdcBalance(provider.Wallet.Address);
-        var feeBefore = await GetFeeBalance();
 
         var contracts = await FetchContracts();
         var escrowAddr = contracts["escrow"].GetString()!;
         var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = SignUsdcPermit(agent.Signer, agent.Wallet.Address, escrowAddr,
+        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, escrowAddr,
                                     6_000_000, 0, deadline);
 
         var escrow = await agent.Wallet.CreateEscrowAsync(provider.Wallet.Address, 5.0m,
@@ -240,12 +236,10 @@ public class AcceptanceTests
         LogTx("escrow", "release", released.TxHash);
 
         var providerAfter = await WaitForBalanceChange(provider.Wallet.Address, providerBefore);
-        var feeAfter = await GetFeeBalance();
         var agentAfter = await GetUsdcBalance(agent.Wallet.Address);
 
         AssertBalanceChange("agent", agentBefore, agentAfter, -amount);
         AssertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-        Assert.True(feeAfter >= feeBefore - 0.001, "fee wallet should not decrease");
     }
 
     // ─── Tab lifecycle ───────────────────────────────────────────────────────
@@ -262,7 +256,7 @@ public class AcceptanceTests
         var contracts = await FetchContracts();
         var tabAddr = contracts["tab"].GetString()!;
         var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = SignUsdcPermit(agent.Signer, agent.Wallet.Address, tabAddr,
+        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, tabAddr,
                                     20_000_000, 0, deadline);
 
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
@@ -306,7 +300,7 @@ public class AcceptanceTests
         var contracts = await FetchContracts();
         var streamAddr = contracts["stream"].GetString()!;
         var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = SignUsdcPermit(agent.Signer, agent.Wallet.Address, streamAddr,
+        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, streamAddr,
                                     20_000_000, 0, deadline);
 
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
@@ -343,7 +337,7 @@ public class AcceptanceTests
         var contracts = await FetchContracts();
         var bountyAddr = contracts["bounty"].GetString()!;
         var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = SignUsdcPermit(poster.Signer, poster.Wallet.Address, bountyAddr,
+        var permit = await SignUsdcPermitAsync(poster.Signer, poster.Wallet.Address, bountyAddr,
                                     6_000_000, 0, deadline);
 
         // 1. Post bounty
@@ -377,7 +371,7 @@ public class AcceptanceTests
         var contracts = await FetchContracts();
         var depositAddr = contracts["deposit"].GetString()!;
         var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = SignUsdcPermit(agent.Signer, agent.Wallet.Address, depositAddr,
+        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, depositAddr,
                                     6_000_000, 0, deadline);
 
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);

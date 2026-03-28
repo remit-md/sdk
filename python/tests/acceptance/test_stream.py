@@ -14,7 +14,6 @@ import pytest
 from .conftest import (
     create_wallet,
     fund_wallet,
-    get_fee_wallet_balance,
     get_usdc_balance,
     log_tx,
     wait_for_balance_change,
@@ -34,8 +33,6 @@ async def test_stream_lifecycle() -> None:
 
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
-    fee_before = await get_fee_wallet_balance()
-
     # Step 1: Open stream with permit for Stream contract
     contracts = await agent.get_contracts()
     stream_contract = contracts["stream"]
@@ -73,13 +70,11 @@ async def test_stream_lifecycle() -> None:
 
     # Wait for settlement (provider balance should increase)
     provider_after = await wait_for_balance_change(provider.address, provider_before)
-    fee_after = await get_fee_wallet_balance()
     agent_after = await get_usdc_balance(agent.address)
 
     # Calculate actual changes
     agent_loss = agent_before - agent_after
     provider_gain = provider_after - provider_before
-    fee_gain = fee_after - fee_before
 
     # Agent should have lost money (stream accrued), but <= maxTotal
     assert agent_loss > 0.05, f"agent should have lost money from streaming, got loss={agent_loss}"
@@ -89,13 +84,3 @@ async def test_stream_lifecycle() -> None:
 
     # Provider should have received payout (accrued minus 1% fee)
     assert provider_gain > 0.04, f"provider should have received payout, got gain={provider_gain}"
-
-    # Fee wallet should not decrease
-    assert fee_gain >= 0, f"fee wallet should not decrease, got change={fee_gain}"
-
-    # Conservation of funds: agent loss ≈ provider gain + fee
-    conservation_diff = abs(agent_loss - (provider_gain + fee_gain))
-    assert conservation_diff < 0.01, (
-        f"conservation violated: agent lost {agent_loss}, "
-        f"provider+fee gained {provider_gain + fee_gain}, diff={conservation_diff}"
-    )

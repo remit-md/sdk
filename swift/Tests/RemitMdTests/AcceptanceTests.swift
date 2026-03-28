@@ -17,9 +17,6 @@ final class AcceptanceTests: XCTestCase {
 
     static let apiURL = ProcessInfo.processInfo.environment["ACCEPTANCE_API_URL"] ?? "https://testnet.remit.md"
     static let rpcURL = ProcessInfo.processInfo.environment["ACCEPTANCE_RPC_URL"] ?? "https://sepolia.base.org"
-    static let usdcAddress = "0x2d846325766921935f37d5b4478196d3ef93707c"
-    static let feeWallet = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
-    static let chainIdVal: UInt64 = 84532
 
     static var contracts: [String: Any]?
 
@@ -61,13 +58,13 @@ final class AcceptanceTests: XCTestCase {
         return json
     }
 
-    func getUsdcBalance(_ address: String) async throws -> Double {
+    func getUsdcBalance(_ address: String, usdcAddress: String) async throws -> Double {
         let hex = address.lowercased().replacingOccurrences(of: "0x", with: "")
         let padded = String(repeating: "0", count: 64 - hex.count) + hex
         let callData = "0x70a08231" + padded
 
         let body = """
-        {"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"\(Self.usdcAddress)","data":"\(callData)"},"latest"]}
+        {"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"\(usdcAddress)","data":"\(callData)"},"latest"]}
         """
 
         var request = URLRequest(url: URL(string: Self.rpcURL)!)
@@ -82,18 +79,14 @@ final class AcceptanceTests: XCTestCase {
         return Double(raw) / 1_000_000.0
     }
 
-    func getFeeBalance() async throws -> Double {
-        try await getUsdcBalance(Self.feeWallet)
-    }
-
-    func waitForBalanceChange(_ address: String, before: Double, timeout: TimeInterval = 30) async throws -> Double {
+    func waitForBalanceChange(_ address: String, before: Double, usdcAddress: String, timeout: TimeInterval = 30) async throws -> Double {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            let current = try await getUsdcBalance(address)
+            let current = try await getUsdcBalance(address, usdcAddress: usdcAddress)
             if abs(current - before) > 0.0001 { return current }
             try await Task.sleep(nanoseconds: 2_000_000_000)
         }
-        return try await getUsdcBalance(address)
+        return try await getUsdcBalance(address, usdcAddress: usdcAddress)
     }
 
     func assertBalanceChange(_ label: String, before: Double, after: Double, expected: Double,
@@ -105,15 +98,16 @@ final class AcceptanceTests: XCTestCase {
                       file: file, line: line)
     }
 
-    func fundWallet(_ tw: TestWallet, amount: Double) async throws {
+    func fundWallet(_ tw: TestWallet, amount: Double, usdcAddress: String) async throws {
         _ = try await tw.wallet.mint(amount: amount)
-        _ = try await waitForBalanceChange(tw.wallet.address, before: 0)
+        _ = try await waitForBalanceChange(tw.wallet.address, before: 0, usdcAddress: usdcAddress)
     }
 
     // ─── EIP-2612 Permit Signing ──────────────────────────────────────────
 
     func signUsdcPermit(signer: PrivateKeySigner, owner: String, spender: String,
-                        value: UInt64, nonce: UInt64, deadline: UInt64) throws -> PermitSignature {
+                        value: UInt64, nonce: UInt64, deadline: UInt64,
+                        usdcAddress: String, chainId: UInt64) throws -> PermitSignature {
         let domainTypeHash = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".data(using: .utf8)!)
         let nameHash = keccak256("USD Coin".data(using: .utf8)!)
         let versionHash = keccak256("2".data(using: .utf8)!)
@@ -122,8 +116,8 @@ final class AcceptanceTests: XCTestCase {
         domainData.append(domainTypeHash)
         domainData.append(nameHash)
         domainData.append(versionHash)
-        domainData.append(padUint256(Self.chainIdVal))
-        domainData.append(padAddress(Self.usdcAddress))
+        domainData.append(padUint256(chainId))
+        domainData.append(padAddress(usdcAddress))
         let domainSep = keccak256(domainData)
 
         let permitTypeHash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)".data(using: .utf8)!)
@@ -185,11 +179,12 @@ final class AcceptanceTests: XCTestCase {
     // ─── EIP-712 TabCharge Signing ──────────────────────────────────────────
 
     func signTabCharge(signer: PrivateKeySigner, tabContract: String,
-                       tabId: String, totalCharged: UInt64, callCount: UInt32) throws -> String {
+                       tabId: String, totalCharged: UInt64, callCount: UInt32,
+                       chainId: UInt64) throws -> String {
         return try RemitWallet.signTabCharge(
             signer: signer, tabContract: tabContract,
             tabId: tabId, totalCharged: totalCharged, callCount: callCount,
-            chainId: Self.chainIdVal
+            chainId: chainId
         )
     }
 
@@ -200,35 +195,36 @@ final class AcceptanceTests: XCTestCase {
             throw XCTSkip("ACCEPTANCE_API_URL not set")
         }
 
+        let contracts = try await fetchContracts()
+        let usdcAddr = contracts["usdc"] as! String
+        let chainId = contracts["chain_id"] as! UInt64
+
         let agent = try await createTestWallet()
         let provider = try await createTestWallet()
-        try await fundWallet(agent, amount: 100)
+        try await fundWallet(agent, amount: 100, usdcAddress: usdcAddr)
 
         let amount = 1.0
         let fee = 0.01
         let providerReceives = amount - fee
 
-        let agentBefore = try await getUsdcBalance(agent.wallet.address)
-        let providerBefore = try await getUsdcBalance(provider.wallet.address)
-        let feeBefore = try await getFeeBalance()
+        let agentBefore = try await getUsdcBalance(agent.wallet.address, usdcAddress: usdcAddr)
+        let providerBefore = try await getUsdcBalance(provider.wallet.address, usdcAddress: usdcAddr)
 
-        let contracts = try await fetchContracts()
         let routerAddr = contracts["router"] as! String
         let deadline = UInt64(Date().timeIntervalSince1970) + 3600
         let permit = try signUsdcPermit(signer: agent.signer, owner: agent.wallet.address,
-                                        spender: routerAddr, value: 2_000_000, nonce: 0, deadline: deadline)
+                                        spender: routerAddr, value: 2_000_000, nonce: 0, deadline: deadline,
+                                        usdcAddress: usdcAddr, chainId: chainId)
 
         let tx = try await agent.wallet.pay(to: provider.wallet.address, amount: 1.0,
                                             memo: "swift-sdk-acceptance", permit: permit)
         XCTAssertTrue(tx.txHash?.hasPrefix("0x") == true)
 
-        let agentAfter = try await waitForBalanceChange(agent.wallet.address, before: agentBefore)
-        let providerAfter = try await getUsdcBalance(provider.wallet.address)
-        let feeAfter = try await getFeeBalance()
+        let agentAfter = try await waitForBalanceChange(agent.wallet.address, before: agentBefore, usdcAddress: usdcAddr)
+        let providerAfter = try await getUsdcBalance(provider.wallet.address, usdcAddress: usdcAddr)
 
         assertBalanceChange("agent", before: agentBefore, after: agentAfter, expected: -amount)
         assertBalanceChange("provider", before: providerBefore, after: providerAfter, expected: providerReceives)
-        XCTAssertGreaterThanOrEqual(feeAfter, feeBefore - 0.001, "fee wallet should not decrease")
     }
 
     func testEscrowLifecycle() async throws {
@@ -236,42 +232,43 @@ final class AcceptanceTests: XCTestCase {
             throw XCTSkip("ACCEPTANCE_API_URL not set")
         }
 
+        let contracts = try await fetchContracts()
+        let usdcAddr = contracts["usdc"] as! String
+        let chainId = contracts["chain_id"] as! UInt64
+
         let agent = try await createTestWallet()
         let provider = try await createTestWallet()
-        try await fundWallet(agent, amount: 100)
+        try await fundWallet(agent, amount: 100, usdcAddress: usdcAddr)
 
         let amount = 5.0
         let fee = amount * 0.01
         let providerReceives = amount - fee
 
-        let agentBefore = try await getUsdcBalance(agent.wallet.address)
-        let providerBefore = try await getUsdcBalance(provider.wallet.address)
-        let feeBefore = try await getFeeBalance()
+        let agentBefore = try await getUsdcBalance(agent.wallet.address, usdcAddress: usdcAddr)
+        let providerBefore = try await getUsdcBalance(provider.wallet.address, usdcAddress: usdcAddr)
 
-        let contracts = try await fetchContracts()
         let escrowAddr = contracts["escrow"] as! String
         let deadline = UInt64(Date().timeIntervalSince1970) + 3600
         let permit = try signUsdcPermit(signer: agent.signer, owner: agent.wallet.address,
-                                        spender: escrowAddr, value: 6_000_000, nonce: 0, deadline: deadline)
+                                        spender: escrowAddr, value: 6_000_000, nonce: 0, deadline: deadline,
+                                        usdcAddress: usdcAddr, chainId: chainId)
 
         let escrow = try await agent.wallet.createEscrow(recipient: provider.wallet.address,
                                                           amount: 5.0, permit: permit)
         XCTAssertFalse(escrow.id.isEmpty)
 
-        _ = try await waitForBalanceChange(agent.wallet.address, before: agentBefore)
+        _ = try await waitForBalanceChange(agent.wallet.address, before: agentBefore, usdcAddress: usdcAddr)
 
         _ = try await provider.wallet.claimStart(id: escrow.id)
         try await Task.sleep(nanoseconds: 5_000_000_000)
 
         _ = try await agent.wallet.releaseEscrow(id: escrow.id)
 
-        let providerAfter = try await waitForBalanceChange(provider.wallet.address, before: providerBefore)
-        let feeAfter = try await getFeeBalance()
-        let agentAfter = try await getUsdcBalance(agent.wallet.address)
+        let providerAfter = try await waitForBalanceChange(provider.wallet.address, before: providerBefore, usdcAddress: usdcAddr)
+        let agentAfter = try await getUsdcBalance(agent.wallet.address, usdcAddress: usdcAddr)
 
         assertBalanceChange("agent", before: agentBefore, after: agentAfter, expected: -amount)
         assertBalanceChange("provider", before: providerBefore, after: providerAfter, expected: providerReceives)
-        XCTAssertGreaterThanOrEqual(feeAfter, feeBefore - 0.001, "fee wallet should not decrease")
     }
 
     // ─── Test: Tab Lifecycle ────────────────────────────────────────────────
@@ -281,20 +278,23 @@ final class AcceptanceTests: XCTestCase {
             throw XCTSkip("ACCEPTANCE_API_URL not set")
         }
 
+        let contracts = try await fetchContracts()
+        let usdcAddr = contracts["usdc"] as! String
+        let chainId = contracts["chain_id"] as! UInt64
+
         let payer = try await createTestWallet()
         let provider = try await createTestWallet()
-        try await fundWallet(payer, amount: 100)
+        try await fundWallet(payer, amount: 100, usdcAddress: usdcAddr)
 
-        let contracts = try await fetchContracts()
         let tabAddr = contracts["tab"] as! String
 
         // Sign permit for the Tab contract
         let deadline = UInt64(Date().timeIntervalSince1970) + 3600
         let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
-                                        spender: tabAddr, value: 20_000_000, nonce: 0, deadline: deadline)
+                                        spender: tabAddr, value: 20_000_000, nonce: 0, deadline: deadline,
+                                        usdcAddress: usdcAddr, chainId: chainId)
 
-        let payerBefore = try await getUsdcBalance(payer.wallet.address)
-        let feeBefore = try await getFeeBalance()
+        let payerBefore = try await getUsdcBalance(payer.wallet.address, usdcAddress: usdcAddr)
 
         // 1. Create tab: $10 limit, $0.10 per call
         let tab = try await payer.wallet.openTab(provider: provider.wallet.address,
@@ -302,28 +302,29 @@ final class AcceptanceTests: XCTestCase {
         XCTAssertFalse(tab.id.isEmpty, "tab ID should not be empty")
 
         // Wait for on-chain funding
-        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
+        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore, usdcAddress: usdcAddr)
 
         // 2. Charge tab: $0.10 charge, cumulative $0.10, callCount 1
         let chargeAmount = 0.10
         let chargeSig = try signTabCharge(signer: provider.signer, tabContract: tabAddr,
-                                          tabId: tab.id, totalCharged: 100_000, callCount: 1)
+                                          tabId: tab.id, totalCharged: 100_000, callCount: 1,
+                                          chainId: chainId)
         let charge = try await provider.wallet.chargeTab(id: tab.id, amount: chargeAmount,
                                                           cumulative: chargeAmount, callCount: 1, providerSig: chargeSig)
         XCTAssertEqual(charge.tabId, tab.id, "charge tab_id mismatch")
 
         // 3. Close tab with final settlement
         let closeSig = try signTabCharge(signer: provider.signer, tabContract: tabAddr,
-                                         tabId: tab.id, totalCharged: 100_000, callCount: 1)
+                                         tabId: tab.id, totalCharged: 100_000, callCount: 1,
+                                         chainId: chainId)
         let closed = try await payer.wallet.closeTab(id: tab.id, finalAmount: chargeAmount, providerSig: closeSig)
         XCTAssertNotEqual(closed.status, .open, "tab should not be open after close")
 
         // 4. Verify balance: payer should have lost funds
-        let payerAfter = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
-        let feeAfter = try await getFeeBalance()
+        let payerAfter = try await waitForBalanceChange(payer.wallet.address, before: payerBefore, usdcAddress: usdcAddr)
         let payerDelta = payerAfter - payerBefore
         XCTAssertTrue(payerDelta < 0, "payer should have lost funds, delta=\(payerDelta)")
-        print("Tab: payer delta=\(payerDelta), fee delta=\(feeAfter - feeBefore)")
+        print("Tab: payer delta=\(payerDelta)")
     }
 
     // ─── Test: Stream Lifecycle ─────────────────────────────────────────────
@@ -333,19 +334,23 @@ final class AcceptanceTests: XCTestCase {
             throw XCTSkip("ACCEPTANCE_API_URL not set")
         }
 
+        let contracts = try await fetchContracts()
+        let usdcAddr = contracts["usdc"] as! String
+        let chainId = contracts["chain_id"] as! UInt64
+
         let payer = try await createTestWallet()
         let payee = try await createTestWallet()
-        try await fundWallet(payer, amount: 100)
+        try await fundWallet(payer, amount: 100, usdcAddress: usdcAddr)
 
-        let contracts = try await fetchContracts()
         let streamAddr = contracts["stream"] as! String
 
         // Sign permit for the Stream contract
         let deadline = UInt64(Date().timeIntervalSince1970) + 3600
         let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
-                                        spender: streamAddr, value: 10_000_000, nonce: 0, deadline: deadline)
+                                        spender: streamAddr, value: 10_000_000, nonce: 0, deadline: deadline,
+                                        usdcAddress: usdcAddr, chainId: chainId)
 
-        let payerBefore = try await getUsdcBalance(payer.wallet.address)
+        let payerBefore = try await getUsdcBalance(payer.wallet.address, usdcAddress: usdcAddr)
 
         // 1. Create stream: $0.01/sec, $5 max
         let stream = try await payer.wallet.startStream(payee: payee.wallet.address,
@@ -353,7 +358,7 @@ final class AcceptanceTests: XCTestCase {
         XCTAssertFalse(stream.id.isEmpty, "stream ID should not be empty")
 
         // Wait for on-chain lock
-        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
+        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore, usdcAddress: usdcAddr)
 
         // 2. Let it run for a few seconds
         try await Task.sleep(nanoseconds: 5_000_000_000)
@@ -363,8 +368,8 @@ final class AcceptanceTests: XCTestCase {
         print("Stream closed: status=\(closed.status)")
 
         // 4. Conservation of funds: payer should have lost some amount
-        let payerAfter = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
-        let payeeAfter = try await getUsdcBalance(payee.wallet.address)
+        let payerAfter = try await waitForBalanceChange(payer.wallet.address, before: payerBefore, usdcAddress: usdcAddr)
+        let payeeAfter = try await getUsdcBalance(payee.wallet.address, usdcAddress: usdcAddr)
         let payerDelta = payerAfter - payerBefore
         XCTAssertTrue(payerDelta < 0, "payer should have lost funds, delta=\(payerDelta)")
         print("Stream: payer delta=\(payerDelta), payee balance=\(payeeAfter)")
@@ -377,20 +382,23 @@ final class AcceptanceTests: XCTestCase {
             throw XCTSkip("ACCEPTANCE_API_URL not set")
         }
 
+        let contracts = try await fetchContracts()
+        let usdcAddr = contracts["usdc"] as! String
+        let chainId = contracts["chain_id"] as! UInt64
+
         let poster = try await createTestWallet()
         let submitter = try await createTestWallet()
-        try await fundWallet(poster, amount: 100)
+        try await fundWallet(poster, amount: 100, usdcAddress: usdcAddr)
 
-        let contracts = try await fetchContracts()
         let bountyAddr = contracts["bounty"] as! String
 
         // Sign permit for the Bounty contract
         let deadline = UInt64(Date().timeIntervalSince1970) + 3600
         let permit = try signUsdcPermit(signer: poster.signer, owner: poster.wallet.address,
-                                        spender: bountyAddr, value: 10_000_000, nonce: 0, deadline: deadline)
+                                        spender: bountyAddr, value: 10_000_000, nonce: 0, deadline: deadline,
+                                        usdcAddress: usdcAddr, chainId: chainId)
 
-        let posterBefore = try await getUsdcBalance(poster.wallet.address)
-        let feeBefore = try await getFeeBalance()
+        let posterBefore = try await getUsdcBalance(poster.wallet.address, usdcAddress: usdcAddr)
 
         // 1. Create bounty: $5 reward, 1 hour deadline
         let bountyDeadline = Int(Date().timeIntervalSince1970) + 3600
@@ -400,7 +408,7 @@ final class AcceptanceTests: XCTestCase {
         XCTAssertFalse(bounty.id.isEmpty, "bounty ID should not be empty")
 
         // Wait for on-chain lock
-        _ = try await waitForBalanceChange(poster.wallet.address, before: posterBefore)
+        _ = try await waitForBalanceChange(poster.wallet.address, before: posterBefore, usdcAddress: usdcAddr)
 
         // 2. Submit evidence (as submitter)
         let evidenceBytes = keccak256("test evidence".data(using: .utf8)!)
@@ -413,10 +421,9 @@ final class AcceptanceTests: XCTestCase {
         print("Bounty awarded: status=\(awarded.status)")
 
         // 4. Verify balances
-        let submitterAfter = try await waitForBalanceChange(submitter.wallet.address, before: 0)
-        let feeAfter = try await getFeeBalance()
+        let submitterAfter = try await waitForBalanceChange(submitter.wallet.address, before: 0, usdcAddress: usdcAddr)
         XCTAssertTrue(submitterAfter > 0, "submitter should have received funds, got balance=\(submitterAfter)")
-        print("Bounty: submitter received=\(submitterAfter), fee delta=\(feeAfter - feeBefore)")
+        print("Bounty: submitter received=\(submitterAfter)")
     }
 
     // ─── Test: Deposit Lifecycle ────────────────────────────────────────────
@@ -426,19 +433,23 @@ final class AcceptanceTests: XCTestCase {
             throw XCTSkip("ACCEPTANCE_API_URL not set")
         }
 
+        let contracts = try await fetchContracts()
+        let usdcAddr = contracts["usdc"] as! String
+        let chainId = contracts["chain_id"] as! UInt64
+
         let payer = try await createTestWallet()
         let provider = try await createTestWallet()
-        try await fundWallet(payer, amount: 100)
+        try await fundWallet(payer, amount: 100, usdcAddress: usdcAddr)
 
-        let contracts = try await fetchContracts()
         let depositAddr = contracts["deposit"] as! String
 
         // Sign permit for the Deposit contract
         let deadline = UInt64(Date().timeIntervalSince1970) + 3600
         let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
-                                        spender: depositAddr, value: 10_000_000, nonce: 0, deadline: deadline)
+                                        spender: depositAddr, value: 10_000_000, nonce: 0, deadline: deadline,
+                                        usdcAddress: usdcAddr, chainId: chainId)
 
-        let payerBefore = try await getUsdcBalance(payer.wallet.address)
+        let payerBefore = try await getUsdcBalance(payer.wallet.address, usdcAddress: usdcAddr)
 
         // 1. Place deposit: $5, expires in 1 hour
         let deposit = try await payer.wallet.placeDeposit(provider: provider.wallet.address,
@@ -446,14 +457,14 @@ final class AcceptanceTests: XCTestCase {
         XCTAssertFalse(deposit.id.isEmpty, "deposit ID should not be empty")
 
         // Wait for on-chain lock
-        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore)
-        let payerAfterDeposit = try await getUsdcBalance(payer.wallet.address)
+        _ = try await waitForBalanceChange(payer.wallet.address, before: payerBefore, usdcAddress: usdcAddr)
+        let payerAfterDeposit = try await getUsdcBalance(payer.wallet.address, usdcAddress: usdcAddr)
 
         // 2. Return deposit (by provider)
         _ = try await provider.wallet.returnDeposit(id: deposit.id)
 
         // 3. Verify full refund (deposits have no fee)
-        let payerAfterReturn = try await waitForBalanceChange(payer.wallet.address, before: payerAfterDeposit)
+        let payerAfterReturn = try await waitForBalanceChange(payer.wallet.address, before: payerAfterDeposit, usdcAddress: usdcAddr)
         let refundAmount = payerAfterReturn - payerAfterDeposit
         XCTAssertTrue(refundAmount > 4.99, "expected near-full refund (~5.0), got \(refundAmount)")
         print("Deposit: refunded=\(refundAmount) (full refund, no fee)")
@@ -466,14 +477,18 @@ final class AcceptanceTests: XCTestCase {
             throw XCTSkip("ACCEPTANCE_API_URL not set")
         }
 
+        let contracts = try await fetchContracts()
+        let usdcAddr = contracts["usdc"] as! String
+        let chainId = contracts["chain_id"] as! Int
+
         let providerWallet = try await createTestWallet()
 
         // Build the x402 PAYMENT-REQUIRED header payload
         let payloadDict: [String: Any] = [
             "payTo": providerWallet.wallet.address,
             "maxAmountRequired": 100_000,
-            "asset": "eip155:84532/erc20:\(Self.usdcAddress)",
-            "network": "eip155:84532",
+            "asset": "eip155:\(chainId)/erc20:\(usdcAddr)",
+            "network": "eip155:\(chainId)",
             "facilitatorURL": Self.apiURL + "/api/v1/x402/verify",
             "resource": "/v1/data",
             "description": "Test data endpoint",

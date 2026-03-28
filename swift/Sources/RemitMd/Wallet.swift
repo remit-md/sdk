@@ -573,8 +573,13 @@ public final class RemitWallet: @unchecked Sendable {
     ///   - amount: Amount in USDC (e.g. 1.50 for $1.50).
     ///   - deadline: Optional Unix timestamp. Defaults to 1 hour from now.
     /// - Returns: A `PermitSignature`.
-    public func signPermit(spender: String, amount: Double, deadline: Int? = nil) async throws -> PermitSignature {
-        guard let usdcAddr = RemitWallet.usdcAddresses[chain.chainName], !usdcAddr.isEmpty else {
+    public func signPermit(spender: String, amount: Double, deadline: Int? = nil, usdcAddress: String? = nil) async throws -> PermitSignature {
+        let usdcAddr: String
+        if let override_ = usdcAddress, !override_.isEmpty {
+            usdcAddr = override_
+        } else if let mapped = RemitWallet.usdcAddresses[chain.chainName], !mapped.isEmpty {
+            usdcAddr = mapped
+        } else {
             throw RemitError(RemitError.chainUnavailable, "No USDC address known for chain '\(chain.chainName)'")
         }
         let nonce = try await fetchPermitNonce(usdcAddress: usdcAddr)
@@ -605,7 +610,7 @@ public final class RemitWallet: @unchecked Sendable {
                 return nil
             }
             guard !spender.isEmpty else { return nil }
-            return try await signPermit(spender: spender, amount: amount)
+            return try await signPermit(spender: spender, amount: amount, usdcAddress: contracts.usdc)
         } catch {
             print("[remitmd] auto-permit failed for \(contract) (amount=\(amount)): \(error)")
             return nil

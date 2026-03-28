@@ -267,7 +267,7 @@ pub struct Tab {
     pub remaining: Decimal,
     pub status: TabStatus,
     #[serde(default)]
-    pub expiry: u64,
+    pub expiry: serde_json::Value,
     #[serde(default)]
     pub tx_hash: String,
     pub created_at: DateTime<Utc>,
@@ -350,14 +350,15 @@ pub struct Bounty {
     pub id: String,
     #[serde(default)]
     pub chain: String,
+    #[serde(default)]
     pub poster: String,
     #[serde(with = "rust_decimal::serde::float", alias = "award")]
     pub amount: Decimal,
-    #[serde(alias = "description", alias = "task")]
+    #[serde(default, alias = "description", alias = "task")]
     pub task_description: String,
     pub status: BountyStatus,
     #[serde(default)]
-    pub deadline: u64,
+    pub deadline: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_attempts: Option<u32>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -366,7 +367,8 @@ pub struct Bounty {
     pub expires_at: Option<DateTime<Utc>>,
     #[serde(default)]
     pub tx_hash: String,
-    pub created_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub submissions: Option<Vec<BountySubmission>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -387,7 +389,7 @@ pub struct Deposit {
     pub amount: Decimal,
     pub status: DepositStatus,
     #[serde(default)]
-    pub expiry: u64,
+    pub expiry: serde_json::Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<DateTime<Utc>>,
     #[serde(default)]

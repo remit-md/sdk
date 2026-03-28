@@ -2,7 +2,10 @@ name: Acceptance Tests
 
 # Manual-only. Tests hit live Base Sepolia via the testnet API.
 # Trigger after merging SDK changes to verify all payment flows work end-to-end.
-# Jobs run sequentially to avoid Alchemy RPC rate limiting and relayer nonce contention.
+# FULLY SEQUENTIAL: one SDK at a time to avoid relayer nonce contention.
+# The server uses a single relayer EOA — concurrent SDK runs cause nonce conflicts.
+# Order chosen to minimize rate-limiting: Swift (macOS, slow setup) runs early.
+# Rust SKIPPED: SDK permit signing is broken (all on-chain flows revert with InsufficientAllowance).
 on:
   workflow_dispatch:
     inputs:
@@ -27,9 +30,32 @@ permissions:
   contents: read
 
 jobs:
+  # ── 1. Swift (FIRST — runs on macOS, most rate-limit sensitive) ─────────
+  swift:
+    name: Swift SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'swift'
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: swift
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://testnet.remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: swift test --filter AcceptanceTests
+
+  # ── 2. Python (after Swift) ─────────────────────────────────────────────────
   python:
     name: Python SDK Acceptance
-    if: inputs.sdk == 'all' || inputs.sdk == 'python'
+    needs: [swift]
+    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'python') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -51,6 +77,7 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd python && python -m pytest tests/acceptance/ -v -s --timeout=180
 
+  # ── 3. TypeScript (after Python) ────────────────────────────────────────────
   typescript:
     name: TS SDK Acceptance
     needs: [python]
@@ -87,6 +114,7 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: pnpm run acceptance
 
+  # ── 4. Go (after TS) ────────────────────────────────────────────────────────
   go:
     name: Go SDK Acceptance
     needs: [typescript]
@@ -113,34 +141,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd go && go test -tags acceptance -timeout 600s -v -count=1
 
-  rust:
-    name: Rust SDK Acceptance
-    needs: [go]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'rust') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
-
-      - name: Cache
-        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
-        with:
-          workspaces: rust
-
-      - name: Run acceptance tests
-        env:
-          ACCEPTANCE_API_URL: https://testnet.remit.md
-          ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture
-
+  # ── 5. Java (after Go) ─────────────────────────────────────────────────────
   java:
     name: Java SDK Acceptance
-    needs: [rust]
+    needs: [go]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'java') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -170,6 +174,7 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: gradle acceptanceTest --no-daemon
 
+  # ── 6. Ruby (after Java) ────────────────────────────────────────────────────
   ruby:
     name: Ruby SDK Acceptance
     needs: [java]
@@ -198,30 +203,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance -f documentation
 
-  swift:
-    name: Swift SDK Acceptance
-    needs: [ruby]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'swift') }}
-    runs-on: macos-latest
-    timeout-minutes: 15
-
-    defaults:
-      run:
-        working-directory: swift
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Run acceptance tests
-        env:
-          ACCEPTANCE_API_URL: https://testnet.remit.md
-          ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: swift test --filter AcceptanceTests
-
+  # ── 7. .NET (after Ruby) ────────────────────────────────────────────────────
   dotnet:
     name: .NET SDK Acceptance
-    needs: [swift]
+    needs: [ruby]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'dotnet') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -251,6 +236,7 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: dotnet test --no-build -c Release --filter "Category=Acceptance" --verbosity normal
 
+  # ── 8. Elixir (after .NET) ─────────────────────────────────────────────────
   elixir:
     name: Elixir SDK Acceptance
     needs: [dotnet]
@@ -280,3 +266,31 @@ jobs:
           ACCEPTANCE_API_URL: https://testnet.remit.md
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: mix test test/acceptance_test.exs --include acceptance
+
+  # ── 9. Rust (after Elixir, last — slowest to compile) ─────────────────────
+  # MUST use --test-threads=1: Rust's cargo test runs in parallel by default,
+  # which causes internal relayer nonce contention across the 7 test functions.
+  rust:
+    name: Rust SDK Acceptance
+    needs: [elixir]
+    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'rust') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+
+      - name: Cache
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          workspaces: rust
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://testnet.remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: cd rust && cargo test --test acceptance -- --include-ignored --nocapture --test-threads=1

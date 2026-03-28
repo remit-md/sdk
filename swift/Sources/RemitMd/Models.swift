@@ -155,6 +155,15 @@ public struct Reputation: Codable, Sendable {
         case escrowRate = "escrow_rate"
     }
 
+    public init(
+        address: String, score: Double, totalVolume: Double,
+        transactionCount: Int, counterpartyCount: Int, agedays: Int, escrowRate: Double
+    ) {
+        self.address = address; self.score = score; self.totalVolume = totalVolume
+        self.transactionCount = transactionCount; self.counterpartyCount = counterpartyCount
+        self.agedays = agedays; self.escrowRate = escrowRate
+    }
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.address = (try? container.decode(String.self, forKey: .wallet))
@@ -165,6 +174,17 @@ public struct Reputation: Codable, Sendable {
         self.counterpartyCount = try container.decode(Int.self, forKey: .counterpartyCount)
         self.agedays = try container.decode(Int.self, forKey: .agedays)
         self.escrowRate = try container.decode(Double.self, forKey: .escrowRate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(address, forKey: .address)
+        try container.encode(score, forKey: .score)
+        try container.encode(totalVolume, forKey: .totalVolume)
+        try container.encode(transactionCount, forKey: .transactionCount)
+        try container.encode(counterpartyCount, forKey: .counterpartyCount)
+        try container.encode(agedays, forKey: .agedays)
+        try container.encode(escrowRate, forKey: .escrowRate)
     }
 }
 

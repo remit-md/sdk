@@ -103,7 +103,7 @@ jobs:
         run: cd rust && cargo clippy -- -D warnings
       # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
       - name: Test with coverage gate
-        run: cd rust && cargo llvm-cov --fail-under-lines 40
+        run: cd rust && cargo llvm-cov --fail-under-lines 40 --ignore-filename-regex 'compliance\.rs'
 
   dotnet:
     name: SDK .NET

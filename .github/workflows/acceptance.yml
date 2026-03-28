@@ -30,10 +30,32 @@ permissions:
   contents: read
 
 jobs:
-  # ── 1. Python ───────────────────────────────────────────────────────────────
+  # ── 1. Swift (FIRST — runs on macOS, most rate-limit sensitive) ─────────
+  swift:
+    name: Swift SDK Acceptance
+    if: inputs.sdk == 'all' || inputs.sdk == 'swift'
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: swift
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Run acceptance tests
+        env:
+          ACCEPTANCE_API_URL: https://testnet.remit.md
+          ACCEPTANCE_RPC_URL: https://sepolia.base.org
+        run: swift test --filter AcceptanceTests
+
+  # ── 2. Python (after Swift) ─────────────────────────────────────────────────
   python:
     name: Python SDK Acceptance
-    if: inputs.sdk == 'all' || inputs.sdk == 'python'
+    needs: [swift]
+    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'python') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -55,7 +77,7 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: cd python && python -m pytest tests/acceptance/ -v -s --timeout=180
 
-  # ── 2. TypeScript (after Python) ────────────────────────────────────────────
+  # ── 3. TypeScript (after Python) ────────────────────────────────────────────
   typescript:
     name: TS SDK Acceptance
     needs: [python]
@@ -92,32 +114,10 @@ jobs:
           ACCEPTANCE_RPC_URL: https://sepolia.base.org
         run: pnpm run acceptance
 
-  # ── 3. Swift (after TS, early to avoid rate limiting from later SDKs) ───────
-  swift:
-    name: Swift SDK Acceptance
-    needs: [typescript]
-    if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'swift') }}
-    runs-on: macos-latest
-    timeout-minutes: 15
-
-    defaults:
-      run:
-        working-directory: swift
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Run acceptance tests
-        env:
-          ACCEPTANCE_API_URL: https://testnet.remit.md
-          ACCEPTANCE_RPC_URL: https://sepolia.base.org
-        run: swift test --filter AcceptanceTests
-
-  # ── 4. Go (after Swift) ────────────────────────────────────────────────────
+  # ── 4. Go (after TS) ────────────────────────────────────────────────────────
   go:
     name: Go SDK Acceptance
-    needs: [swift]
+    needs: [typescript]
     if: ${{ !cancelled() && (inputs.sdk == 'all' || inputs.sdk == 'go') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

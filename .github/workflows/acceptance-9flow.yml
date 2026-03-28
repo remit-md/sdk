@@ -1,0 +1,226 @@
+name: 9-Flow Acceptance Suite
+
+# Manual-only. Runs all 9 payment flows across all 9 SDKs against Base Sepolia.
+# Results are collected into a single text file artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      languages:
+        description: "Comma-separated list of languages (or 'all')"
+        required: false
+        default: "all"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  ACCEPTANCE_API_URL: https://testnet.remit.md
+  ACCEPTANCE_RPC_URL: https://sepolia.base.org
+
+jobs:
+  acceptance-suite:
+    name: "9-Flow Suite"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Language runtimes ──────────────────────────────────────────
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.10"
+
+      # ── Install Python SDK from source ─────────────────────────────
+      - name: Install Python SDK
+        run: pip install -e "./python[dev]"
+
+      # ── Install TS SDK from source ─────────────────────────────────
+      - name: Install TS SDK dependencies
+        working-directory: typescript
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Build TS SDK
+        working-directory: typescript
+        run: pnpm build || true
+
+      - name: Install TS acceptance deps
+        working-directory: acceptance/typescript
+        run: pnpm install || pnpm install --no-frozen-lockfile
+
+      # ── Install Ruby SDK from source ───────────────────────────────
+      - name: Install Ruby SDK
+        working-directory: ruby
+        run: |
+          gem build remitmd.gemspec 2>/dev/null || true
+          gem install ./remitmd-*.gem --no-document 2>/dev/null || true
+
+      # ── Run each language and collect output ───────────────────────
+      - name: Run Python (9 flows)
+        id: python
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  PYTHON" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          python3 acceptance/python/test_flows.py 2>&1 | tee -a results.txt || true
+          echo "" >> results.txt
+
+      - name: Run TypeScript (9 flows)
+        id: typescript
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  TYPESCRIPT" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          cd acceptance/typescript && npx tsx test_flows.ts 2>&1 | tee -a ../../results.txt || true
+          echo "" >> ../../results.txt
+
+      - name: Run Go (9 flows)
+        id: go_sdk
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  GO" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          cd acceptance/go && go run . 2>&1 | tee -a ../../results.txt || true
+          echo "" >> ../../results.txt
+
+      - name: Run Rust (9 flows)
+        id: rust
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  RUST" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          cd acceptance/rust && cargo run --release 2>&1 | tee -a ../../results.txt || true
+          echo "" >> ../../results.txt
+
+      - name: Run .NET (9 flows)
+        id: dotnet_sdk
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  .NET" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          cd acceptance/dotnet && dotnet run -c Release 2>&1 | tee -a ../../results.txt || true
+          echo "" >> ../../results.txt
+
+      - name: Run Java (9 flows)
+        id: java
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  JAVA" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          cd acceptance/java && gradle run --no-daemon -q 2>&1 | tee -a ../../results.txt || true
+          echo "" >> ../../results.txt
+
+      - name: Run Ruby (9 flows)
+        id: ruby_sdk
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  RUBY" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          ruby acceptance/ruby/test_flows.rb 2>&1 | tee -a results.txt || true
+          echo "" >> results.txt
+
+      - name: Run Swift (9 flows)
+        id: swift
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  SWIFT" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          cd acceptance/swift && swift run AcceptanceFlows 2>&1 | tee -a ../../results.txt || true
+          echo "" >> ../../results.txt
+
+      - name: Run Elixir (9 flows)
+        id: elixir
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  ELIXIR" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          cd acceptance/elixir && mix deps.get --quiet 2>/dev/null && mix run test_flows.exs 2>&1 | tee -a ../../results.txt || true
+          echo "" >> ../../results.txt
+
+      # ── Final summary ──────────────────────────────────────────────
+      - name: Print summary
+        if: always()
+        run: |
+          echo "" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "  FINAL SUMMARY" >> results.txt
+          echo "════════════════════════════════════════════════" >> results.txt
+          echo "Completed at: $(date -u)" >> results.txt
+          echo "" >> results.txt
+          grep -c "\[PASS\]" results.txt | xargs -I{} echo "Total PASS: {}" >> results.txt || true
+          grep -c "\[FAIL\]" results.txt | xargs -I{} echo "Total FAIL: {}" >> results.txt || true
+          echo "" >> results.txt
+          echo "── Per-language results ──" >> results.txt
+          for lang in PYTHON TYPESCRIPT GO RUST .NET JAVA RUBY SWIFT ELIXIR; do
+            pass=$(sed -n "/  $lang/,/════/p" results.txt | grep -c "\[PASS\]" || echo 0)
+            fail=$(sed -n "/  $lang/,/════/p" results.txt | grep -c "\[FAIL\]" || echo 0)
+            printf "  %-14s %s passed, %s failed\n" "$lang" "$pass" "$fail" >> results.txt
+          done
+          echo "" >> results.txt
+          cat results.txt
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-9flow-results
+          path: results.txt
+          retention-days: 30

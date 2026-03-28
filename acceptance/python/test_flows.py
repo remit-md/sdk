@@ -399,7 +399,7 @@ async def flow_x402_weather(agent: Wallet) -> None:
             },
         }
 
-        settle_resp = await agent._http.post("/x402/settle", settle_body)
+        settle_resp = await agent._http.post("/api/v1/x402/settle", settle_body)
         tx_hash = settle_resp.get("transactionHash", "") if isinstance(settle_resp, dict) else ""
         if not tx_hash:
             log_fail(flow, f"settle returned no tx_hash: {settle_resp}")
@@ -479,10 +479,17 @@ async def flow_ap2_discovery() -> None:
 
 
 # ─── Flow 9: AP2 Payment ─────────────────────────────────────────────────────
-async def flow_ap2_payment(agent: Wallet, provider: Wallet) -> None:
+async def flow_ap2_payment(agent: Wallet, provider: Wallet, permit_nonce: list[int]) -> None:
     flow = "9. AP2 Payment"
     try:
         card = await AgentCard.discover(API_URL)
+        contracts = await agent.get_contracts()
+
+        deadline = int(time.time()) + 3600
+        permit = await agent.sign_usdc_permit(
+            contracts["router"], int(2 * 1e6), deadline, permit_nonce[0],
+        )
+        permit_nonce[0] += 1
 
         mandate = IntentMandate(
             mandate_id=secrets.token_hex(16),
@@ -498,6 +505,7 @@ async def flow_ap2_payment(agent: Wallet, provider: Wallet) -> None:
                 amount=1.0,
                 memo="acceptance-ap2-payment",
                 mandate=mandate,
+                permit=permit,
             )
             assert task.id, "a2a task should have an id"
             assert task.succeeded, f"a2a task should be completed, got state={task.state}"
@@ -561,7 +569,7 @@ async def main() -> None:
         ("6. Deposit", lambda: flow_deposit(agent, provider, permit_nonce)),
         ("7. x402 Weather", lambda: flow_x402_weather(agent)),
         ("8. AP2 Discovery", lambda: flow_ap2_discovery()),
-        ("9. AP2 Payment", lambda: flow_ap2_payment(agent, provider)),
+        ("9. AP2 Payment", lambda: flow_ap2_payment(agent, provider, permit_nonce)),
     ]
 
     for name, fn in flows:
@@ -570,6 +578,8 @@ async def main() -> None:
         except Exception as e:
             log_fail(name, f"{type(e).__name__}: {e}")
             traceback.print_exc()
+        # Allow indexer to catch up with on-chain nonce between permit-consuming flows
+        await asyncio.sleep(5)
 
     # Summary
     passed = sum(1 for v in results.values() if v == "PASS")

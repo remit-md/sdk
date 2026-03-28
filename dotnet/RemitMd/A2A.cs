@@ -205,10 +205,22 @@ public sealed class A2AClient : IDisposable
     /// <summary>
     /// Send a direct USDC payment via <c>message/send</c>.
     /// </summary>
-    public Task<A2ATask> SendAsync(string to, decimal amount, string memo = "", IntentMandate? mandate = null, CancellationToken ct = default)
+    public Task<A2ATask> SendAsync(string to, decimal amount, string memo = "", IntentMandate? mandate = null, PermitSignature? permit = null, CancellationToken ct = default)
     {
         var nonce = Guid.NewGuid().ToString("N");
         var messageId = Guid.NewGuid().ToString("N");
+
+        var data = new Dictionary<string, object>
+        {
+            ["model"] = "direct",
+            ["to"] = to,
+            ["amount"] = amount.ToString("F2"),
+            ["memo"] = memo,
+            ["nonce"] = nonce,
+        };
+
+        if (permit is not null)
+            data["permit"] = permit;
 
         var message = new Dictionary<string, object>
         {
@@ -219,14 +231,7 @@ public sealed class A2AClient : IDisposable
                 new Dictionary<string, object>
                 {
                     ["kind"] = "data",
-                    ["data"] = new Dictionary<string, object>
-                    {
-                        ["model"] = "direct",
-                        ["to"] = to,
-                        ["amount"] = amount.ToString("F2"),
-                        ["memo"] = memo,
-                        ["nonce"] = nonce,
-                    },
+                    ["data"] = data,
                 },
             },
         };

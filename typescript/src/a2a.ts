@@ -6,6 +6,7 @@
  */
 
 import type { Signer } from "./signer.js";
+import type { PermitSignature } from "./wallet.js";
 import { AuthenticatedClient } from "./http.js";
 import { CHAIN_IDS } from "./client.js";
 
@@ -136,6 +137,7 @@ export interface SendOptions {
   amount: number;
   memo?: string;
   mandate?: IntentMandate;
+  permit?: PermitSignature;
 }
 
 // ─── A2A client ───────────────────────────────────────────────────────────────
@@ -189,25 +191,26 @@ export class A2AClient {
    * @returns :interface:`A2ATask` with ``status.state === "completed"`` on success.
    */
   async send(opts: SendOptions): Promise<A2ATask> {
-    const { to, amount, memo = "", mandate } = opts;
+    const { to, amount, memo = "", mandate, permit } = opts;
     const nonce = crypto.randomUUID().replace(/-/g, "");
     const messageId = crypto.randomUUID().replace(/-/g, "");
+
+    const data: Record<string, unknown> = {
+      model: "direct",
+      to,
+      amount: amount.toFixed(2),
+      memo,
+      nonce,
+    };
+
+    if (permit) {
+      data.permit = permit;
+    }
 
     const message: Record<string, unknown> = {
       messageId,
       role: "user",
-      parts: [
-        {
-          kind: "data",
-          data: {
-            model: "direct",
-            to,
-            amount: amount.toFixed(2),
-            memo,
-            nonce,
-          },
-        },
-      ],
+      parts: [{ kind: "data", data }],
     };
 
     if (mandate) {

@@ -612,6 +612,8 @@ flow9 = fn ->
   try do
     {:ok, card} = RemitMd.A2A.discover(api_url)
 
+    permit = RemitMd.Wallet.sign_permit(agent.wallet, contracts["router"], "2.0")
+
     mandate = RemitMd.A2A.IntentMandate.new(
       mandate_id: :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower),
       expires_at: "2099-12-31T23:59:59Z",
@@ -621,13 +623,15 @@ flow9 = fn ->
     )
 
     signer = RemitMd.PrivateKeySigner.new("0x#{agent.key_hex}")
-    client = RemitMd.A2A.Client.from_card(card, signer, chain: "base_sepolia")
+    client = RemitMd.A2A.Client.from_card(card, signer,
+      chain: "base_sepolia", verifying_contract: contracts["router"])
 
     {:ok, task} = RemitMd.A2A.Client.send(client,
       to: provider.wallet.address,
       amount: 1.0,
       memo: "elixir-acceptance-ap2",
-      mandate: mandate
+      mandate: mandate,
+      permit: permit
     )
 
     tx_hash = RemitMd.A2A.Task.get_tx_hash(task)
@@ -664,6 +668,8 @@ flows = [
 
 for {_name, flow_fn} <- flows do
   flow_fn.()
+  # Allow indexer to catch up with on-chain nonce between permit-consuming flows
+  :timer.sleep(5000)
 end
 
 # ── Summary ───────────────────────────────────────────────────────────────────

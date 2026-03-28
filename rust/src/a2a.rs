@@ -205,6 +205,7 @@ pub struct SendOptions {
     pub amount: f64,
     pub memo: Option<String>,
     pub mandate: Option<IntentMandate>,
+    pub permit: Option<crate::PermitSignature>,
 }
 
 /// A2A JSON-RPC client for sending payments and managing tasks.
@@ -215,7 +216,7 @@ pub struct SendOptions {
 /// let card = AgentCard::discover("https://remit.md").await?;
 /// let signer = remitmd::PrivateKeySigner::new("0x...")?;
 /// let client = A2AClient::from_card(&card, std::sync::Arc::new(signer));
-/// let task = client.send(SendOptions { to: "0x...".into(), amount: 10.0, memo: None, mandate: None }).await?;
+/// let task = client.send(SendOptions { to: "0x...".into(), amount: 10.0, memo: None, mandate: None, permit: None }).await?;
 /// println!("{} {:?}", task.status.state, get_task_tx_hash(&task));
 /// ```
 pub struct A2AClient {
@@ -262,6 +263,10 @@ impl A2AClient {
                 },
             }],
         });
+
+        if let Some(permit) = &opts.permit {
+            message["parts"][0]["data"]["permit"] = serde_json::json!(permit);
+        }
 
         if let Some(mandate) = &opts.mandate {
             message["metadata"] = serde_json::json!({ "mandate": mandate });

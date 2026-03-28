@@ -438,6 +438,8 @@ async function flowAP2Payment(agent: Wallet, provider: Wallet, signer: PrivateKe
     verifyingContract: contracts.router,
   });
 
+  const permit = await agent.signPermit(contracts.router, 2.0);
+
   const mandate: IntentMandate = {
     mandateId: crypto.randomUUID().replace(/-/g, ""),
     expiresAt: "2099-12-31T23:59:59Z",
@@ -447,7 +449,7 @@ async function flowAP2Payment(agent: Wallet, provider: Wallet, signer: PrivateKe
 
   const task = await a2a.send({
     to: provider.address, amount: 1.0,
-    memo: "acceptance-ap2-payment", mandate,
+    memo: "acceptance-ap2-payment", mandate, permit,
   });
 
   if (!task.id) throw new Error("a2a task should have an id");

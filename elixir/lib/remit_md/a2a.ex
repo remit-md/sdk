@@ -352,6 +352,7 @@ defmodule RemitMd.A2A.Client do
   - `:amount` - USDC amount (required)
   - `:memo` - payment memo (default: `""`)
   - `:mandate` - `%RemitMd.A2A.IntentMandate{}` (optional)
+  - `:permit` - `%RemitMd.Models.PermitSignature{}` for gasless approval (optional)
 
   Returns `{:ok, %RemitMd.A2A.Task{}}` or `{:error, reason}`.
   """
@@ -361,11 +362,27 @@ defmodule RemitMd.A2A.Client do
     amount = Keyword.fetch!(opts, :amount)
     memo = Keyword.get(opts, :memo, "")
     mandate = Keyword.get(opts, :mandate)
+    permit = Keyword.get(opts, :permit)
 
     nonce = :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
     message_id = :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
 
     amount_str = if is_float(amount), do: :erlang.float_to_binary(amount, decimals: 2), else: to_string(amount)
+
+    data = %{
+      "model" => "direct",
+      "to" => to,
+      "amount" => amount_str,
+      "memo" => memo,
+      "nonce" => nonce
+    }
+
+    data =
+      if permit do
+        Map.put(data, "permit", RemitMd.Models.PermitSignature.to_map(permit))
+      else
+        data
+      end
 
     message = %{
       "messageId" => message_id,
@@ -373,13 +390,7 @@ defmodule RemitMd.A2A.Client do
       "parts" => [
         %{
           "kind" => "data",
-          "data" => %{
-            "model" => "direct",
-            "to" => to,
-            "amount" => amount_str,
-            "memo" => memo,
-            "nonce" => nonce
-          }
+          "data" => data
         }
       ]
     }

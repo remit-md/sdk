@@ -172,6 +172,7 @@ type SendOptions struct {
 	Amount   float64
 	Memo     string
 	Mandate  *IntentMandate
+	Permit   *PermitSignature `json:"permit,omitempty"`
 }
 
 // A2AClient is a JSON-RPC client for sending payments via the A2A protocol.
@@ -224,19 +225,24 @@ func (c *A2AClient) Send(ctx context.Context, opts SendOptions) (*A2ATask, error
 	nonce := randomHex(16)
 	messageID := randomHex(16)
 
+	data := map[string]any{
+		"model":  "direct",
+		"to":     opts.To,
+		"amount": fmt.Sprintf("%.2f", opts.Amount),
+		"memo":   opts.Memo,
+		"nonce":  nonce,
+	}
+	if opts.Permit != nil {
+		data["permit"] = opts.Permit
+	}
+
 	message := map[string]any{
 		"messageId": messageID,
 		"role":      "user",
 		"parts": []map[string]any{
 			{
 				"kind": "data",
-				"data": map[string]any{
-					"model":  "direct",
-					"to":     opts.To,
-					"amount": fmt.Sprintf("%.2f", opts.Amount),
-					"memo":   opts.Memo,
-					"nonce":  nonce,
-				},
+				"data": data,
 			},
 		},
 	}

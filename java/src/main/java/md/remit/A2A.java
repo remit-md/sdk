@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import md.remit.internal.ApiClient;
+import md.remit.models.PermitSignature;
 import md.remit.signer.Signer;
 
 import java.net.URI;
@@ -149,14 +150,19 @@ public final class A2A {
             String to,
             double amount,
             String memo,
-            IntentMandate mandate
+            IntentMandate mandate,
+            PermitSignature permit
     ) {
         public SendOptions(String to, double amount) {
-            this(to, amount, "", null);
+            this(to, amount, "", null, null);
         }
 
         public SendOptions(String to, double amount, String memo) {
-            this(to, amount, memo, null);
+            this(to, amount, memo, null, null);
+        }
+
+        public SendOptions(String to, double amount, String memo, IntentMandate mandate) {
+            this(to, amount, memo, mandate, null);
         }
     }
 
@@ -241,6 +247,17 @@ public final class A2A {
             data.put("amount", String.format("%.2f", opts.amount()));
             data.put("memo", opts.memo() != null ? opts.memo() : "");
             data.put("nonce", nonce);
+
+            if (opts.permit() != null) {
+                PermitSignature p = opts.permit();
+                Map<String, Object> permitMap = new LinkedHashMap<>();
+                permitMap.put("value", p.value);
+                permitMap.put("deadline", p.deadline);
+                permitMap.put("v", p.v);
+                permitMap.put("r", p.r);
+                permitMap.put("s", p.s);
+                data.put("permit", permitMap);
+            }
 
             Map<String, Object> part = Map.of("kind", "data", "data", data);
             Map<String, Object> message = new LinkedHashMap<>();

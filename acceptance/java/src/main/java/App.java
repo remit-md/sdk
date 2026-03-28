@@ -561,7 +561,7 @@ public class App {
     }
 
     // ─── Flow 9: AP2 Payment ─────────────────────────────────────────────────────
-    static void flowAp2Payment(TestWallet agent, TestWallet provider) throws Exception {
+    static void flowAp2Payment(TestWallet agent, TestWallet provider, long[] permitNonce) throws Exception {
         String flow = "9. AP2 Payment";
         A2A.AgentCard card = A2A.AgentCard.discover(API_URL).join();
         ContractAddresses contracts = fetchContracts();
@@ -569,6 +569,12 @@ public class App {
         ECKeyPair kp = agent.keyPair;
         String hexKey = "0x" + Numeric.toHexStringNoPrefixZeroPadded(kp.getPrivateKey(), 64);
         md.remit.signer.Signer signer = new PrivateKeySigner(hexKey);
+
+        // Sign USDC permit for the router
+        long deadline = Instant.now().getEpochSecond() + 3600;
+        PermitSignature permit = signUsdcPermit(kp, agent.address(), contracts.router,
+                2_000_000, permitNonce[0], deadline);
+        permitNonce[0]++;
 
         A2A.IntentMandate mandate = new A2A.IntentMandate(
                 UUID.randomUUID().toString().replace("-", ""),
@@ -578,7 +584,7 @@ public class App {
         );
 
         A2A.Client a2a = A2A.Client.fromCard(card, signer, CHAIN_ID, contracts.router);
-        A2A.SendOptions opts = new A2A.SendOptions(provider.address(), 1.0, "java-acceptance-a2a", mandate);
+        A2A.SendOptions opts = new A2A.SendOptions(provider.address(), 1.0, "java-acceptance-a2a", mandate, permit);
         A2A.Task task = a2a.send(opts);
         if (task.id() == null || task.id().isEmpty()) {
             System.out.println("\033[1;33m[SKIP]\033[0m " + flow + " -- AP2 task has no ID (endpoint may not be available on testnet)");
@@ -639,7 +645,7 @@ public class App {
                 new FlowEntry("6. Deposit", () -> { try { flowDeposit(agent, provider, permitNonce); } catch (Exception e) { throw new RuntimeException(e); } }),
                 new FlowEntry("7. x402 Weather", () -> { try { flowX402Weather(agent); } catch (Exception e) { throw new RuntimeException(e); } }),
                 new FlowEntry("8. AP2 Discovery", () -> { try { flowAp2Discovery(); } catch (Exception e) { throw new RuntimeException(e); } }),
-                new FlowEntry("9. AP2 Payment", () -> { try { flowAp2Payment(agent, provider); } catch (Exception e) { throw new RuntimeException(e); } })
+                new FlowEntry("9. AP2 Payment", () -> { try { flowAp2Payment(agent, provider, permitNonce); } catch (Exception e) { throw new RuntimeException(e); } })
         );
 
         for (FlowEntry entry : flows) {
@@ -650,6 +656,8 @@ public class App {
                 logFail(entry.name, cause.getClass().getSimpleName() + ": " + cause.getMessage());
                 cause.printStackTrace(System.err);
             }
+            // Allow indexer to catch up with on-chain nonce between permit-consuming flows
+            Thread.sleep(5_000);
         }
 
         // Summary

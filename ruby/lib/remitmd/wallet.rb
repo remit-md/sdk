@@ -335,7 +335,7 @@ module Remitmd
       )
 
       # Encode tabId as bytes32: ASCII bytes right-padded with zeroes
-      tab_id_bytes = tab_id.b.ljust(32, "\x00".b)
+      tab_id_bytes = tab_id.b[0, 32].ljust(32, "\x00".b)
 
       struct_data = type_hash + tab_id_bytes + abi_uint256(total_charged_base_units) + abi_uint256(call_count)
       struct_hash = keccak256_raw(struct_data)

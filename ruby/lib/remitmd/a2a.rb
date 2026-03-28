@@ -188,9 +188,18 @@ module Remitmd
     # @param memo [String] optional memo
     # @param mandate [IntentMandate, nil] optional intent mandate
     # @return [A2ATask]
-    def send(to:, amount:, memo: "", mandate: nil)
+    def send(to:, amount:, memo: "", mandate: nil, permit: nil)
       nonce      = SecureRandom.hex(16)
       message_id = SecureRandom.hex(16)
+
+      data = {
+        model:  "direct",
+        to:     to,
+        amount: format("%.2f", amount),
+        memo:   memo,
+        nonce:  nonce,
+      }
+      data[:permit] = permit_to_h(permit) if permit
 
       message = {
         messageId: message_id,
@@ -198,13 +207,7 @@ module Remitmd
         parts: [
           {
             kind: "data",
-            data: {
-              model:  "direct",
-              to:     to,
-              amount: format("%.2f", amount),
-              memo:   memo,
-              nonce:  nonce,
-            },
+            data: data,
           },
         ],
       }
@@ -229,6 +232,16 @@ module Remitmd
     end
 
     private
+
+    def permit_to_h(permit)
+      {
+        value:    permit.value.to_s,
+        deadline: permit.deadline.to_s,
+        v:        permit.v,
+        r:        permit.r,
+        s:        permit.s,
+      }
+    end
 
     def rpc(method, params, call_id)
       body = { jsonrpc: "2.0", id: call_id, method: method, params: params }

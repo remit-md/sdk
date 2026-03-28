@@ -99,6 +99,7 @@ func registerAndGetWalletC(t *testing.T) (privateKey string, walletAddress strin
 	}
 	pk := "0x" + hex.EncodeToString(keyBytes)
 	w := makeWalletC(t, pk)
+	t.Logf("[COMPLIANCE] wallet created: %s (chain=84532)", w.Address())
 	return pk, w.Address()
 }
 
@@ -113,6 +114,7 @@ func makeWalletC(t *testing.T, privateKey string) *remitmd.Wallet {
 	if err != nil {
 		t.Fatalf("NewWallet failed: %v", err)
 	}
+	t.Logf("[COMPLIANCE] makeWalletC: address=%s server=%s router=%s", w.Address(), compServerURL, compRouterAddress)
 	return w
 }
 
@@ -123,12 +125,14 @@ func requestFundsWithRetry(t *testing.T, w *remitmd.Wallet) {
 	var lastErr error
 	for attempt := 0; attempt < 5; attempt++ {
 		if attempt > 0 {
+			t.Logf("[COMPLIANCE] mint retry attempt %d/5 for %s", attempt+1, w.Address())
 			time.Sleep(2 * time.Second)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_, lastErr = w.Mint(ctx, 100)
 		cancel()
 		if lastErr == nil {
+			t.Logf("[COMPLIANCE] mint via SDK: 100 USDC -> %s (attempt %d)", w.Address(), attempt+1)
 			return
 		}
 	}
@@ -149,6 +153,7 @@ func getSharedPayer(t *testing.T) *remitmd.Wallet {
 	t.Helper()
 	oncePayer.Do(func() {
 		pk, addr := registerAndGetWalletC(t)
+		t.Logf("[COMPLIANCE] shared payer: funding %s with 1000 USDC", addr)
 		// Fund with 1000 USDC via direct HTTP - mint is public (no EIP-712 auth required).
 		resp := doJSONC(t, "POST", compServerURL+"/api/v1/mint", map[string]any{
 			"wallet": addr,
@@ -157,7 +162,9 @@ func getSharedPayer(t *testing.T) *remitmd.Wallet {
 		if resp["tx_hash"] == nil {
 			t.Fatalf("mint: no tx_hash in response (wallet=%s): %v", addr, resp)
 		}
+		t.Logf("[COMPLIANCE] mint: 1000 USDC -> %s tx=%v", addr, resp["tx_hash"])
 		sharedPayer = makeWalletC(t, pk)
+		t.Logf("[COMPLIANCE] shared payer ready: %s", sharedPayer.Address())
 	})
 	if sharedPayer == nil {
 		t.Fatalf("shared payer not initialized (previous setup failed)")
@@ -172,6 +179,7 @@ func makeFundedPairC(t *testing.T) (payer *remitmd.Wallet, payee *remitmd.Wallet
 	pkB, addrB := registerAndGetWalletC(t)
 	payee = makeWalletC(t, pkB)
 	payer = getSharedPayer(t)
+	t.Logf("[COMPLIANCE] funded pair: payer=%s payee=%s", payer.Address(), addrB)
 	return payer, payee, addrB
 }
 
@@ -182,6 +190,8 @@ func TestComplianceAuth_AuthenticatedRequestSucceeds(t *testing.T) {
 	pk, addr := registerAndGetWalletC(t)
 	wallet := makeWalletC(t, pk)
 
+	t.Logf("[COMPLIANCE] auth test: wallet=%s registered_addr=%s", wallet.Address(), addr)
+
 	// Verify authenticated wallet creation: address must be non-empty and match server.
 	if wallet.Address() == "" {
 		t.Fatal("wallet address is empty after registration")
@@ -190,6 +200,7 @@ func TestComplianceAuth_AuthenticatedRequestSucceeds(t *testing.T) {
 	if !strings.EqualFold(wallet.Address(), addr) {
 		t.Errorf("address mismatch: sdk=%s server=%s", wallet.Address(), addr)
 	}
+	t.Logf("[COMPLIANCE] auth test PASSED: addresses match (case-insensitive)")
 }
 
 func TestComplianceAuth_MintCredits(t *testing.T) {
@@ -197,8 +208,10 @@ func TestComplianceAuth_MintCredits(t *testing.T) {
 	pk, _ := registerAndGetWalletC(t)
 	wallet := makeWalletC(t, pk)
 
+	t.Logf("[COMPLIANCE] mint test: wallet=%s requesting 100 USDC (with retry)", wallet.Address())
 	// requestFundsWithRetry handles the global mint rate limit.
 	requestFundsWithRetry(t, wallet)
+	t.Logf("[COMPLIANCE] mint test PASSED: wallet=%s funded", wallet.Address())
 }
 
 // ─── Payment tests ────────────────────────────────────────────────────────────
@@ -209,6 +222,7 @@ func TestCompliancePayDirect_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	t.Logf("[COMPLIANCE] pay: 5.0 USDC %s -> %s", payer.Address(), payeeAddr)
 	tx, err := payer.Pay(ctx, payeeAddr, decimal.NewFromFloat(5.0), remitmd.WithMemo("compliance test"))
 	if err != nil {
 		t.Fatalf("Pay() failed: %v", err)
@@ -216,6 +230,7 @@ func TestCompliancePayDirect_HappyPath(t *testing.T) {
 	if tx.TxHash == "" {
 		t.Error("tx_hash must be non-empty")
 	}
+	t.Logf("[COMPLIANCE] pay: 5.0 USDC %s -> %s tx=%s invoice=%s", payer.Address(), payeeAddr, tx.TxHash, tx.InvoiceID)
 }
 
 func TestCompliancePayDirect_BelowMinimumReturnsError(t *testing.T) {
@@ -224,10 +239,12 @@ func TestCompliancePayDirect_BelowMinimumReturnsError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	t.Logf("[COMPLIANCE] pay below-minimum: 0.001 USDC %s -> %s", payer.Address(), payeeAddr)
 	_, err := payer.Pay(ctx, payeeAddr, decimal.NewFromFloat(0.001))
 	if err == nil {
 		t.Fatal("expected error for amount below minimum, got nil")
 	}
+	t.Logf("[COMPLIANCE] pay below-minimum rejected as expected: %v", err)
 }
 
 func TestCompliancePayDirect_SelfPaymentReturnsError(t *testing.T) {
@@ -237,10 +254,12 @@ func TestCompliancePayDirect_SelfPaymentReturnsError(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	t.Logf("[COMPLIANCE] pay self: 1.0 USDC %s -> %s (same wallet)", wallet.Address(), wallet.Address())
 	_, err := wallet.Pay(ctx, wallet.Address(), decimal.NewFromFloat(1.0), remitmd.WithMemo("self pay"))
 	if err == nil {
 		t.Fatal("expected error for self-payment, got nil")
 	}
+	t.Logf("[COMPLIANCE] pay self rejected as expected: %v", err)
 }
 
 // ─── Escrow tests ─────────────────────────────────────────────────────────────
@@ -251,6 +270,7 @@ func TestComplianceEscrow_CreateReturnsFunded(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	t.Logf("[COMPLIANCE] escrow create: 10.0 USDC %s -> %s", payer.Address(), payeeAddr)
 	escrow, err := payer.CreateEscrow(ctx, payeeAddr, decimal.NewFromFloat(10.0),
 		remitmd.WithEscrowMemo("compliance escrow test"))
 	if err != nil {
@@ -265,6 +285,7 @@ func TestComplianceEscrow_CreateReturnsFunded(t *testing.T) {
 	if escrow.Status != remitmd.EscrowStatusFunded {
 		t.Errorf("expected status %s, got %s", remitmd.EscrowStatusFunded, escrow.Status)
 	}
+	t.Logf("[COMPLIANCE] escrow create: 10.0 USDC %s -> %s id=%s tx=%s status=%s", payer.Address(), payeeAddr, escrow.InvoiceID, escrow.TxHash, escrow.Status)
 }
 
 func TestComplianceEscrow_GetEscrowAfterCreate(t *testing.T) {
@@ -273,10 +294,12 @@ func TestComplianceEscrow_GetEscrowAfterCreate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	t.Logf("[COMPLIANCE] escrow create (for get): 10.0 USDC %s -> %s", payer.Address(), payeeAddr)
 	escrow, err := payer.CreateEscrow(ctx, payeeAddr, decimal.NewFromFloat(10.0))
 	if err != nil {
 		t.Fatalf("CreateEscrow() failed: %v", err)
 	}
+	t.Logf("[COMPLIANCE] escrow created: id=%s tx=%s status=%s", escrow.InvoiceID, escrow.TxHash, escrow.Status)
 
 	fetched, err := payer.GetEscrow(ctx, escrow.InvoiceID)
 	if err != nil {
@@ -288,6 +311,7 @@ func TestComplianceEscrow_GetEscrowAfterCreate(t *testing.T) {
 	if fetched.Status != remitmd.EscrowStatusFunded {
 		t.Errorf("expected status funded, got %s", fetched.Status)
 	}
+	t.Logf("[COMPLIANCE] escrow get: id=%s status=%s (matches)", fetched.InvoiceID, fetched.Status)
 }
 
 func TestComplianceEscrow_CancelTransitionsStatus(t *testing.T) {
@@ -296,12 +320,15 @@ func TestComplianceEscrow_CancelTransitionsStatus(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	t.Logf("[COMPLIANCE] escrow create (for cancel): 10.0 USDC %s -> %s", payer.Address(), payeeAddr)
 	escrow, err := payer.CreateEscrow(ctx, payeeAddr, decimal.NewFromFloat(10.0),
 		remitmd.WithEscrowMemo("to be cancelled"))
 	if err != nil {
 		t.Fatalf("CreateEscrow() failed: %v", err)
 	}
+	t.Logf("[COMPLIANCE] escrow created: id=%s tx=%s status=%s", escrow.InvoiceID, escrow.TxHash, escrow.Status)
 
+	t.Logf("[COMPLIANCE] escrow cancel: id=%s", escrow.InvoiceID)
 	cancelTx, err := payer.CancelEscrow(ctx, escrow.InvoiceID)
 	if err != nil {
 		t.Fatalf("CancelEscrow() failed: %v", err)
@@ -309,6 +336,8 @@ func TestComplianceEscrow_CancelTransitionsStatus(t *testing.T) {
 	if cancelTx.TxHash == "" {
 		t.Error("expected non-empty tx_hash after cancel")
 	}
+	t.Logf("[COMPLIANCE] escrow cancel: id=%s tx=%s", escrow.InvoiceID, cancelTx.TxHash)
+
 	// Verify status via GetEscrow
 	fetched, err := payer.GetEscrow(ctx, escrow.InvoiceID)
 	if err != nil {
@@ -317,6 +346,7 @@ func TestComplianceEscrow_CancelTransitionsStatus(t *testing.T) {
 	if fetched.Status != remitmd.EscrowStatusCancelled {
 		t.Errorf("expected status cancelled, got %s", fetched.Status)
 	}
+	t.Logf("[COMPLIANCE] escrow cancel verified: id=%s status=%s", fetched.InvoiceID, fetched.Status)
 }
 
 // ─── Tab tests ────────────────────────────────────────────────────────────────
@@ -327,6 +357,7 @@ func TestComplianceTab_OpenReturnsOpenState(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	t.Logf("[COMPLIANCE] tab open: limit=20.0 per_unit=0.10 %s -> %s", payer.Address(), payeeAddr)
 	tab, err := payer.CreateTab(ctx, payeeAddr,
 		decimal.NewFromFloat(20.0),
 		decimal.NewFromFloat(0.10))
@@ -339,6 +370,7 @@ func TestComplianceTab_OpenReturnsOpenState(t *testing.T) {
 	if tab.Status != remitmd.TabStatusOpen {
 		t.Errorf("expected status open, got %s", tab.Status)
 	}
+	t.Logf("[COMPLIANCE] tab open: limit=20.0 per_unit=0.10 id=%s status=%s", tab.ID, tab.Status)
 }
 
 func TestComplianceTab_CloseSettlesTab(t *testing.T) {
@@ -347,13 +379,16 @@ func TestComplianceTab_CloseSettlesTab(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	t.Logf("[COMPLIANCE] tab open (for close): limit=50.0 per_unit=1.0 %s -> %s", payer.Address(), payeeAddr)
 	tab, err := payer.CreateTab(ctx, payeeAddr,
 		decimal.NewFromFloat(50.0),
 		decimal.NewFromFloat(1.0))
 	if err != nil {
 		t.Fatalf("CreateTab() failed: %v", err)
 	}
+	t.Logf("[COMPLIANCE] tab created: id=%s status=%s", tab.ID, tab.Status)
 
+	t.Logf("[COMPLIANCE] tab close: id=%s", tab.ID)
 	closed, err := payer.CloseTab(ctx, tab.ID)
 	if err != nil {
 		t.Fatalf("CloseTab() failed: %v", err)
@@ -361,6 +396,7 @@ func TestComplianceTab_CloseSettlesTab(t *testing.T) {
 	if closed.TxHash == "" {
 		t.Error("closed tab must have tx_hash")
 	}
+	t.Logf("[COMPLIANCE] tab close: id=%s tx=%s", tab.ID, closed.TxHash)
 
 	fetched, err := payer.GetTab(ctx, tab.ID)
 	if err != nil {
@@ -369,4 +405,5 @@ func TestComplianceTab_CloseSettlesTab(t *testing.T) {
 	if fetched.Status == remitmd.TabStatusOpen {
 		t.Error("tab must not be in open state after close")
 	}
+	t.Logf("[COMPLIANCE] tab close verified: id=%s status=%s", fetched.ID, fetched.Status)
 }

@@ -47,7 +47,7 @@ services:
       ENV: testnet
       JWT_SECRET: "compliance-test-jwt-secret-not-for-production-xxxxxxxxxxxxxxxxx"
       SERVER_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
-      LOG_LEVEL: "info"
+      LOG_LEVEL: "debug"
     depends_on:
       postgres:
         condition: service_healthy

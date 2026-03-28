@@ -199,14 +199,15 @@ public class CliSigner implements Signer {
     }
 
     /**
-     * Checks whether the CLI signer can be activated. Requires all three:
+     * Checks whether the CLI signer can be activated.
+     * <p>Detection order:
      * <ol>
      *   <li>CLI binary found on PATH (or at the given path)</li>
-     *   <li>Keystore file exists at {@code ~/.remit/keys/default.enc}</li>
-     *   <li>{@code REMIT_KEY_PASSWORD} environment variable is set</li>
+     *   <li>{@code ~/.remit/keys/default.meta} exists (keychain-backed, no password needed)</li>
+     *   <li>{@code ~/.remit/keys/default.enc} exists AND {@code REMIT_KEY_PASSWORD} is set</li>
      * </ol>
      *
-     * @return true if all three conditions are met
+     * @return true if the CLI signer can be activated
      */
     public static boolean isAvailable() {
         return isAvailable("remit");
@@ -216,22 +217,10 @@ public class CliSigner implements Signer {
      * Checks whether the CLI signer can be activated with the given CLI path.
      *
      * @param cliPath path to the remit CLI binary
-     * @return true if all three conditions are met
+     * @return true if the CLI signer can be activated
      */
     public static boolean isAvailable(String cliPath) {
-        // 1. Check REMIT_KEY_PASSWORD env var
-        String password = System.getenv("REMIT_KEY_PASSWORD");
-        if (password == null || password.isEmpty()) {
-            return false;
-        }
-
-        // 2. Check keystore exists
-        Path keystore = Path.of(System.getProperty("user.home"), ".remit", "keys", "default.enc");
-        if (!Files.exists(keystore)) {
-            return false;
-        }
-
-        // 3. Check CLI on PATH
+        // 1. Check CLI on PATH
         try {
             ProcessBuilder pb = new ProcessBuilder(cliPath, "address");
             pb.redirectErrorStream(true);
@@ -241,10 +230,27 @@ public class CliSigner implements Signer {
                 process.destroyForcibly();
                 return false;
             }
-            return process.exitValue() == 0;
+            if (process.exitValue() != 0) {
+                return false;
+            }
         } catch (IOException | InterruptedException e) {
             return false;
         }
+
+        Path keysDir = Path.of(System.getProperty("user.home"), ".remit", "keys");
+
+        // 2. Keychain meta file (no password needed)
+        if (Files.exists(keysDir.resolve("default.meta"))) {
+            return true;
+        }
+
+        // 3. Encrypted keystore + password
+        if (Files.exists(keysDir.resolve("default.enc"))) {
+            String password = System.getenv("REMIT_KEY_PASSWORD");
+            return password != null && !password.isEmpty();
+        }
+
+        return false;
     }
 
     @Override

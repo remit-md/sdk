@@ -78,18 +78,24 @@ defmodule RemitMd.CliSigner do
   def address(%__MODULE__{address: addr}), do: addr
 
   @doc """
-  Check all three conditions for CliSigner activation.
+  Check conditions for CliSigner activation.
 
   1. CLI binary found on PATH
-  2. Keystore file exists at `~/.remit/keys/default.enc`
-  3. `REMIT_KEY_PASSWORD` env var is set
+  2. Meta file at `~/.remit/keys/default.meta` (keychain -- no password needed), OR
+  3. Keystore file at `~/.remit/keys/default.enc` AND `REMIT_KEY_PASSWORD` env var set
   """
   def available?(cli_path \\ "remit") do
-    cli_exists?(cli_path) and keystore_exists?() and password_set?()
+    cli_exists?(cli_path) and (meta_exists?() or (keystore_exists?() and password_set?()))
   end
 
   defp cli_exists?(cli_path) do
     System.find_executable(cli_path) != nil
+  end
+
+  defp meta_exists? do
+    home = System.user_home!()
+    meta = Path.join([home, ".remit", "keys", "default.meta"])
+    File.exists?(meta)
   end
 
   defp keystore_exists? do

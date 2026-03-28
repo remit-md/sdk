@@ -1,0 +1,1397 @@
+════════════════════════════════════════════════
+  PYTHON
+════════════════════════════════════════════════
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 548, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 154, in flow_escrow
+    escrow = await agent.pay(invoice, permit=permit)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/wallet.py", line 466, in pay
+    data = await self._http.post("/api/v1/escrows", escrow_body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 78, in post
+    return await self._request("POST", path, json=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 131, in _request
+    return self._parse_response(resp)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 162, in _parse_response
+    raise from_error_code(str(code), str(message), resp.status_code)
+remitmd.errors.RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 548, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 184, in flow_tab
+    tab = await agent.open_tab(
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/wallet.py", line 533, in open_tab
+    data = await self._http.post("/api/v1/tabs", body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 78, in post
+    return await self._request("POST", path, json=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 131, in _request
+    return self._parse_response(resp)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 162, in _parse_response
+    raise from_error_code(str(code), str(message), resp.status_code)
+remitmd.errors.RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0x9415f510d8c6199e0f66bde927d7d88de391f5e8): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 548, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 236, in flow_stream
+    stream = await agent.open_stream(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/wallet.py", line 635, in open_stream
+    data = await self._http.post("/api/v1/streams", body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 78, in post
+    return await self._request("POST", path, json=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 131, in _request
+    return self._parse_response(resp)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 162, in _parse_response
+    raise from_error_code(str(code), str(message), resp.status_code)
+remitmd.errors.RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0x20d413e0eac0f5da3c8630667fd16a94fcd7231a): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 548, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 262, in flow_bounty
+    bounty = await agent.post_bounty(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/wallet.py", line 662, in post_bounty
+    data = await self._http.post("/api/v1/bounties", body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 78, in post
+    return await self._request("POST", path, json=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 131, in _request
+    return self._parse_response(resp)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 162, in _parse_response
+    raise from_error_code(str(code), str(message), resp.status_code)
+remitmd.errors.RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 548, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 295, in flow_deposit
+    deposit = await agent.place_deposit(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/wallet.py", line 708, in place_deposit
+    data = await self._http.post("/api/v1/deposits", body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 78, in post
+    return await self._request("POST", path, json=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 131, in _request
+    return self._parse_response(resp)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 162, in _parse_response
+    raise from_error_code(str(code), str(message), resp.status_code)
+remitmd.errors.RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0x7e0ae37df62e93c1c16a5661a7998bd174331554): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 548, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 393, in flow_x402_weather
+    settle_resp = await agent._http.post("/api/v1/x402/settle", settle_body)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 78, in post
+    return await self._request("POST", path, json=body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 131, in _request
+    return self._parse_response(resp)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk/sdk/python/src/remitmd/_http.py", line 162, in _parse_response
+    raise from_error_code(str(code), str(message), resp.status_code)
+remitmd.errors.RemitError: x402 nonce has already been used
+Traceback (most recent call last):
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 548, in main
+    await fn()
+  File "/home/runner/work/sdk/sdk/acceptance/python/test_flows.py", line 492, in flow_ap2_payment
+    assert task.id, "a2a task should have an id"
+           ^^^^^^^
+AssertionError: a2a task should have an id
+
+[1mPython SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0xEA870097bD7979f342dc4e5C65511526a7eb904b
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x8cEE7DF68601E65985592658B11b9A1C02A2529c
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0x998da4b46eb9f0763629ff41b033c768c7165a722dba2fc52dddd74865bb9b55
+[0;32m[PASS][0m 1. Direct Payment — tx=0x998da4b46eb9f076...
+[0;31m[FAIL][0m 2. Escrow — RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;31m[FAIL][0m 3. Metered Tab — RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0x9415f510d8c6199e0f66bde927d7d88de391f5e8): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;31m[FAIL][0m 4. Stream — RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0x20d413e0eac0f5da3c8630667fd16a94fcd7231a): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;31m[FAIL][0m 5. Bounty — RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;31m[FAIL][0m 6. Deposit — RemitError: Chain submission failed: permit failed (owner=0xea870097bd7979f342dc4e5c65511526a7eb904b, spender=0x7e0ae37df62e93c1c16a5661a7998bd174331554): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather — RemitError: x402 nonce has already been used
+
+[0;36m┌─────────────────────────────────────────────┐[0m
+[0;36m│[0m  [1mA2A Agent Card[0m                            [0;36m│[0m
+[0;36m├─────────────────────────────────────────────┤[0m
+[0;36m│[0m  Name:     remit.md                        [0;36m│[0m
+[0;36m│[0m  Version:  0.1.0                           [0;36m│[0m
+[0;36m│[0m  Protocol: 0.6                             [0;36m│[0m
+[0;36m│[0m  URL:      https://testnet.remit.md/a2a    [0;36m│[0m
+[0;36m│[0m  Skills:   7 total                         [0;36m│[0m
+[0;36m│[0m    - Direct Payment                        [0;36m│[0m
+[0;36m│[0m    - Metered Tab                           [0;36m│[0m
+[0;36m│[0m    - Streaming Payment                     [0;36m│[0m
+[0;36m│[0m    - Escrow                                [0;36m│[0m
+[0;36m│[0m    - Bounty                                [0;36m│[0m
+[0;36m│[0m  x402:     settle=https://testnet.remit.md/api/v1[0;36m│[0m
+[0;36m│[0m  Caps:     streaming=False, exts=payment-processo   [0;36m│[0m
+[0;36m└─────────────────────────────────────────────┘[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery — name=remit.md
+[0;31m[FAIL][0m 9. AP2 Payment — AssertionError: a2a task should have an id
+
+[1mPython Summary: [0;32m2 passed[0m, [0;31m7 failed[0m / 9 flows
+{"passed": 2, "failed": 7, "skipped": 0}
+
+════════════════════════════════════════════════
+  TYPESCRIPT
+════════════════════════════════════════════════
+
+[1mTypeScript SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x141Bf767B4576703e048525e71C69216D3f93a49
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x104E85244c018bB6CDAfd91412a616806936EbE4
+[0;36m[INFO][0m Minting $100 USDC to agent...
+Error: mint failed (404): Not Found
+    at Wallet.mint (/home/runner/work/sdk/sdk/acceptance/typescript/node_modules/.pnpm/@remitmd+sdk@file+..+..+typescript_typescript@5.9.3/node_modules/@remitmd/sdk/dist/wallet.js:503:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async fundWallet (/home/runner/work/sdk/sdk/acceptance/typescript/test_flows.ts:112:3)
+    at async main (/home/runner/work/sdk/sdk/acceptance/typescript/test_flows.ts:497:3)
+
+════════════════════════════════════════════════
+  GO
+════════════════════════════════════════════════
+go: downloading github.com/ethereum/go-ethereum v1.13.14
+go: downloading github.com/shopspring/decimal v1.3.1
+go: downloading github.com/holiman/uint256 v1.2.4
+go: downloading golang.org/x/crypto v0.17.0
+
+[1mGo SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x1609C8e5b85aee5D1D73A5C58EB70Ac0BEA441DD
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x28da684ca71bA1b34F220D631058E2f252a22bAB
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0x1be057633cd6cc4869b447423d5579104cda0da73cd1f5149cbc0ae0d936a60a
+[0;32m[PASS][0m 1. Direct Payment — tx=0x1be057633cd6cc48...
+[0;31m[FAIL][0m 2. Escrow — CreateEscrow: remitmd: CHAIN_SUBMISSION_FAILED - Chain submission failed: permit failed (owner=0x1609c8e5b85aee5d1d73a5c58eb70ac0bea441dd, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" (see: https://remit.md/docs/errors#CHAIN_SUBMISSION_FAILED)
+[0;31m[FAIL][0m 3. Metered Tab — CreateTab: remitmd: CHAIN_SUBMISSION_FAILED - Chain submission failed: permit failed (owner=0x1609c8e5b85aee5d1d73a5c58eb70ac0bea441dd, spender=0x9415f510d8c6199e0f66bde927d7d88de391f5e8): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" (see: https://remit.md/docs/errors#CHAIN_SUBMISSION_FAILED)
+[0;31m[FAIL][0m 4. Stream — CreateStream: remitmd: CHAIN_SUBMISSION_FAILED - Chain submission failed: permit failed (owner=0x1609c8e5b85aee5d1d73a5c58eb70ac0bea441dd, spender=0x20d413e0eac0f5da3c8630667fd16a94fcd7231a): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" (see: https://remit.md/docs/errors#CHAIN_SUBMISSION_FAILED)
+[0;31m[FAIL][0m 5. Bounty — CreateBounty: remitmd: CHAIN_SUBMISSION_FAILED - Chain submission failed: permit failed (owner=0x1609c8e5b85aee5d1d73a5c58eb70ac0bea441dd, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" (see: https://remit.md/docs/errors#CHAIN_SUBMISSION_FAILED)
+[0;31m[FAIL][0m 6. Deposit — PlaceDeposit: remitmd: CHAIN_SUBMISSION_FAILED - Chain submission failed: permit failed (owner=0x1609c8e5b85aee5d1d73a5c58eb70ac0bea441dd, spender=0x7e0ae37df62e93c1c16a5661a7998bd174331554): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" (see: https://remit.md/docs/errors#CHAIN_SUBMISSION_FAILED)
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather — settle returned no tx_hash: {"code":"INVALID_SIGNATURE","message":"Invalid or expired signature"}
+
+[0;36m┌─────────────────────────────────────────────┐[0m
+[0;36m│[0m  [1mA2A Agent Card[0m                            [0;36m│[0m
+[0;36m├─────────────────────────────────────────────┤[0m
+[0;36m│[0m  Name:     remit.md                        [0;36m│[0m
+[0;36m│[0m  Version:  0.1.0                           [0;36m│[0m
+[0;36m│[0m  Protocol: 0.6                             [0;36m│[0m
+[0;36m│[0m  URL:      https://testnet.remit.md/a2a    [0;36m│[0m
+[0;36m│[0m  Skills:   7 total                         [0;36m│[0m
+[0;36m│[0m    - Direct Payment                        [0;36m│[0m
+[0;36m│[0m    - Metered Tab                           [0;36m│[0m
+[0;36m│[0m    - Streaming Payment                     [0;36m│[0m
+[0;36m│[0m    - Escrow                                [0;36m│[0m
+[0;36m│[0m    - Bounty                                [0;36m│[0m
+[0;36m│[0m  x402:     settle=https://testnet.remit.md/[0;36m│[0m
+[0;36m│[0m  Caps:     streaming=false, exts=payment-processo   [0;36m│[0m
+[0;36m└─────────────────────────────────────────────┘[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery — name=remit.md
+[0;31m[FAIL][0m 9. AP2 Payment — task should have an ID
+
+[1mGo Summary: [0;32m2 passed[0m, [0;31m7 failed[0m / 9 flows
+{"failed":7,"passed":2,"skipped":0}
+exit status 1
+
+════════════════════════════════════════════════
+  RUST
+════════════════════════════════════════════════
+[1m[92m    Updating[0m crates.io index
+[1m[92m     Locking[0m 295 packages to latest compatible versions
+[1m[92m      Adding[0m crypto-common v0.1.6 [1m[33m(available: v0.1.7)[0m
+[1m[92m      Adding[0m getrandom v0.2.17 [1m[33m(available: v0.4.2)[0m
+[1m[92m      Adding[0m rand v0.8.5 [1m[33m(available: v0.10.0)[0m
+[1m[92m      Adding[0m reqwest v0.12.28 [1m[33m(available: v0.13.2)[0m
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m ahash v0.7.8
+[1m[92m  Downloaded[0m arrayvec v0.7.6
+[1m[92m  Downloaded[0m cfg_aliases v0.2.1
+[1m[92m  Downloaded[0m base16ct v0.2.0
+[1m[92m  Downloaded[0m bytecheck v0.6.12
+[1m[92m  Downloaded[0m ptr_meta v0.1.4
+[1m[92m  Downloaded[0m bytecheck_derive v0.6.12
+[1m[92m  Downloaded[0m atomic-waker v1.1.2
+[1m[92m  Downloaded[0m radium v0.7.0
+[1m[92m  Downloaded[0m block-buffer v0.10.4
+[1m[92m  Downloaded[0m borsh-derive v1.6.1
+[1m[92m  Downloaded[0m cfg-if v1.0.4
+[1m[92m  Downloaded[0m base64ct v1.8.3
+[1m[92m  Downloaded[0m async-trait v0.1.89
+[1m[92m  Downloaded[0m idna_adapter v1.2.1
+[1m[92m  Downloaded[0m ptr_meta_derive v0.1.4
+[1m[92m  Downloaded[0m dirs-sys v0.4.1
+[1m[92m  Downloaded[0m rand_chacha v0.3.1
+[1m[92m  Downloaded[0m autocfg v1.5.0
+[1m[92m  Downloaded[0m fnv v1.0.7
+[1m[92m  Downloaded[0m cpufeatures v0.2.17
+[1m[92m  Downloaded[0m pin-utils v0.1.0
+[1m[92m  Downloaded[0m futures-task v0.3.32
+[1m[92m  Downloaded[0m proc-macro-crate v3.5.0
+[1m[92m  Downloaded[0m crypto-common v0.1.6
+[1m[92m  Downloaded[0m bitflags v2.11.0
+[1m[92m  Downloaded[0m const-oid v0.9.6
+[1m[92m  Downloaded[0m subtle v2.6.1
+[1m[92m  Downloaded[0m potential_utf v0.1.4
+[1m[92m  Downloaded[0m lru-slab v0.1.2
+[1m[92m  Downloaded[0m hyper-tls v0.6.0
+[1m[92m  Downloaded[0m form_urlencoded v1.2.2
+[1m[92m  Downloaded[0m scopeguard v1.2.0
+[1m[92m  Downloaded[0m futures-sink v0.3.32
+[1m[92m  Downloaded[0m rend v0.4.2
+[1m[92m  Downloaded[0m foreign-types-shared v0.1.1
+[1m[92m  Downloaded[0m openssl-probe v0.2.1
+[1m[92m  Downloaded[0m percent-encoding v2.3.2
+[1m[92m  Downloaded[0m option-ext v0.2.0
+[1m[92m  Downloaded[0m funty v2.0.0
+[1m[92m  Downloaded[0m want v0.3.1
+[1m[92m  Downloaded[0m try-lock v0.2.5
+[1m[92m  Downloaded[0m env_home v0.1.0
+[1m[92m  Downloaded[0m dirs v5.0.1
+[1m[92m  Downloaded[0m keccak v0.1.6
+[1m[92m  Downloaded[0m zerofrom-derive v0.1.6
+[1m[92m  Downloaded[0m equivalent v1.0.2
+[1m[92m  Downloaded[0m stable_deref_trait v1.2.1
+[1m[92m  Downloaded[0m rand_chacha v0.9.0
+[1m[92m  Downloaded[0m tinyvec_macros v0.1.1
+[1m[92m  Downloaded[0m signature v2.2.0
+[1m[92m  Downloaded[0m sync_wrapper v1.0.2
+[1m[92m  Downloaded[0m http-body-util v0.1.3
+[1m[92m  Downloaded[0m quote v1.0.45
+[1m[92m  Downloaded[0m ff v0.13.1
+[1m[92m  Downloaded[0m openssl-macros v0.1.1
+[1m[92m  Downloaded[0m digest v0.10.7
+[1m[92m  Downloaded[0m yoke-derive v0.8.1
+[1m[92m  Downloaded[0m untrusted v0.9.0
+[1m[92m  Downloaded[0m tap v1.0.1
+[1m[92m  Downloaded[0m rustc-hash v2.1.1
+[1m[92m  Downloaded[0m native-tls v0.2.18
+[1m[92m  Downloaded[0m group v0.13.0
+[1m[92m  Downloaded[0m base64 v0.22.1
+[1m[92m  Downloaded[0m zmij v1.0.21
+[1m[92m  Downloaded[0m zeroize v1.8.2
+[1m[92m  Downloaded[0m signal-hook-registry v1.4.8
+[1m[92m  Downloaded[0m rfc6979 v0.4.0
+[1m[92m  Downloaded[0m thiserror v2.0.18
+[1m[92m  Downloaded[0m version_check v0.9.5
+[1m[92m  Downloaded[0m getrandom v0.4.2
+[1m[92m  Downloaded[0m zerofrom v0.1.6
+[1m[92m  Downloaded[0m zerotrie v0.2.3
+[1m[92m  Downloaded[0m tokio-macros v2.6.1
+[1m[92m  Downloaded[0m wyz v0.5.1
+[1m[92m  Downloaded[0m indexmap v2.13.0
+[1m[92m  Downloaded[0m hyper-util v0.1.20
+[1m[92m  Downloaded[0m zerovec v0.11.5
+[1m[92m  Downloaded[0m smallvec v1.15.1
+[1m[92m  Downloaded[0m iri-string v0.7.11
+[1m[92m  Downloaded[0m tokio-native-tls v0.3.1
+[1m[92m  Downloaded[0m which v7.0.3
+[1m[92m  Downloaded[0m tinyvec v1.11.0
+[1m[92m  Downloaded[0m socket2 v0.6.3
+[1m[92m  Downloaded[0m openssl v0.10.76
+[1m[92m  Downloaded[0m uuid v1.23.0
+[1m[92m  Downloaded[0m slab v0.4.12
+[1m[92m  Downloaded[0m serde_core v1.0.228
+[1m[92m  Downloaded[0m quinn v0.11.9
+[1m[92m  Downloaded[0m typenum v1.19.0
+[1m[92m  Downloaded[0m url v2.5.8
+[1m[92m  Downloaded[0m serde v1.0.228
+[1m[92m  Downloaded[0m rustls-webpki v0.103.10
+[1m[92m  Downloaded[0m tracing-core v0.1.36
+[1m[92m  Downloaded[0m tower v0.5.3
+[1m[92m  Downloaded[0m rkyv v0.7.46
+[1m[92m  Downloaded[0m tower-http v0.6.8
+[1m[92m  Downloaded[0m rust_decimal v1.41.0
+[1m[92m  Downloaded[0m winnow v1.0.0
+[1m[92m  Downloaded[0m tokio-util v0.7.18
+[1m[92m  Downloaded[0m serde_json v1.0.149
+[1m[92m  Downloaded[0m webpki-roots v1.0.6
+[1m[92m  Downloaded[0m zerocopy v0.8.47
+[1m[92m  Downloaded[0m quinn-proto v0.11.14
+[1m[92m  Downloaded[0m syn v2.0.117
+[1m[92m  Downloaded[0m vcpkg v0.2.15
+[1m[92m  Downloaded[0m syn v1.0.109
+[1m[92m  Downloaded[0m rustls v0.23.37
+[1m[92m  Downloaded[0m reqwest v0.12.28
+[1m[92m  Downloaded[0m toml_edit v0.25.8+spec-1.1.0
+[1m[92m  Downloaded[0m serde_derive v1.0.228
+[1m[92m  Downloaded[0m rustix v1.1.4
+[1m[92m  Downloaded[0m ryu v1.0.23
+[1m[92m  Downloaded[0m unicode-ident v1.0.24
+[1m[92m  Downloaded[0m tracing v0.1.44
+[1m[92m  Downloaded[0m tokio-rustls v0.26.4
+[1m[92m  Downloaded[0m rustls-pki-types v1.14.0
+[1m[92m  Downloaded[0m libc v0.2.183
+[1m[92m  Downloaded[0m rand_core v0.6.4
+[1m[92m  Downloaded[0m quinn-udp v0.5.14
+[1m[92m  Downloaded[0m chrono v0.4.44
+[1m[92m  Downloaded[0m h2 v0.4.13
+[1m[92m  Downloaded[0m bitvec v1.0.1
+[1m[92m  Downloaded[0m icu_properties_data v2.1.2
+[1m[92m  Downloaded[0m hyper v1.8.1
+[1m[92m  Downloaded[0m hashbrown v0.16.1
+[1m[92m  Downloaded[0m futures-util v0.3.32
+[1m[92m  Downloaded[0m rand v0.8.5
+[1m[92m  Downloaded[0m proc-macro2 v1.0.106
+[1m[92m  Downloaded[0m pkcs8 v0.10.2
+[1m[92m  Downloaded[0m idna v1.1.0
+[1m[92m  Downloaded[0m yoke v0.8.1
+[1m[92m  Downloaded[0m toml_parser v1.1.0+spec-1.1.0
+[1m[92m  Downloaded[0m thiserror-impl v1.0.69
+[1m[92m  Downloaded[0m simdutf8 v0.1.5
+[1m[92m  Downloaded[0m tokio v1.50.0
+[1m[92m  Downloaded[0m sha3 v0.10.8
+[1m[92m  Downloaded[0m serde_urlencoded v0.7.1
+[1m[92m  Downloaded[0m sec1 v0.7.3
+[1m[92m  Downloaded[0m http v1.4.0
+[1m[92m  Downloaded[0m writeable v0.6.2
+[1m[92m  Downloaded[0m sha2 v0.10.9
+[1m[92m  Downloaded[0m encoding_rs v0.8.35
+[1m[92m  Downloaded[0m rand_core v0.9.5
+[1m[92m  Downloaded[0m thiserror-impl v2.0.18
+[1m[92m  Downloaded[0m mio v1.2.0
+[1m[92m  Downloaded[0m icu_collections v2.1.1
+[1m[92m  Downloaded[0m hashbrown v0.12.3
+[1m[92m  Downloaded[0m crypto-bigint v0.5.5
+[1m[92m  Downloaded[0m ppv-lite86 v0.2.21
+[1m[92m  Downloaded[0m parking_lot_core v0.9.12
+[1m[92m  Downloaded[0m memchr v2.8.0
+[1m[92m  Downloaded[0m k256 v0.13.4
+[1m[92m  Downloaded[0m elliptic-curve v0.13.8
+[1m[92m  Downloaded[0m der v0.7.10
+[1m[92m  Downloaded[0m utf8_iter v1.0.4
+[1m[92m  Downloaded[0m toml_datetime v1.1.0+spec-1.1.0
+[1m[92m  Downloaded[0m tinystr v0.8.2
+[1m[92m  Downloaded[0m thiserror v1.0.69
+[1m[92m  Downloaded[0m synstructure v0.13.2
+[1m[92m  Downloaded[0m rand v0.9.2
+[1m[92m  Downloaded[0m openssl-sys v0.9.112
+[1m[92m  Downloaded[0m log v0.4.29
+[1m[92m  Downloaded[0m icu_properties v2.1.2
+[1m[92m  Downloaded[0m icu_normalizer_data v2.1.1
+[1m[92m  Downloaded[0m icu_locale_core v2.1.1
+[1m[92m  Downloaded[0m borsh v1.6.1
+[1m[92m  Downloaded[0m parking_lot v0.12.5
+[1m[92m  Downloaded[0m num-traits v0.2.19
+[1m[92m  Downloaded[0m icu_normalizer v2.1.1
+[1m[92m  Downloaded[0m getrandom v0.3.4
+[1m[92m  Downloaded[0m getrandom v0.2.17
+[1m[92m  Downloaded[0m ring v0.17.14
+[1m[92m  Downloaded[0m spki v0.7.3
+[1m[92m  Downloaded[0m shlex v1.3.0
+[1m[92m  Downloaded[0m seahash v4.1.0
+[1m[92m  Downloaded[0m rkyv_derive v0.7.46
+[1m[92m  Downloaded[0m pkg-config v0.3.32
+[1m[92m  Downloaded[0m pin-project-lite v0.2.17
+[1m[92m  Downloaded[0m httparse v1.10.1
+[1m[92m  Downloaded[0m generic-array v0.14.9
+[1m[92m  Downloaded[0m futures-channel v0.3.32
+[1m[92m  Downloaded[0m displaydoc v0.2.5
+[1m[92m  Downloaded[0m cc v1.2.58
+[1m[92m  Downloaded[0m zerovec-derive v0.11.2
+[1m[92m  Downloaded[0m once_cell v1.21.4
+[1m[92m  Downloaded[0m litemap v0.8.1
+[1m[92m  Downloaded[0m ipnet v2.12.0
+[1m[92m  Downloaded[0m icu_provider v2.1.1
+[1m[92m  Downloaded[0m iana-time-zone v0.1.65
+[1m[92m  Downloaded[0m hyper-rustls v0.27.7
+[1m[92m  Downloaded[0m hmac v0.12.1
+[1m[92m  Downloaded[0m ecdsa v0.16.9
+[1m[92m  Downloaded[0m bytes v1.11.1
+[1m[92m  Downloaded[0m tower-service v0.3.3
+[1m[92m  Downloaded[0m tower-layer v0.3.3
+[1m[92m  Downloaded[0m lock_api v0.4.14
+[1m[92m  Downloaded[0m itoa v1.0.18
+[1m[92m  Downloaded[0m futures-core v0.3.32
+[1m[92m  Downloaded[0m find-msvc-tools v0.1.9
+[1m[92m  Downloaded[0m either v1.15.0
+[1m[92m  Downloaded[0m http-body v1.0.1
+[1m[92m  Downloaded[0m hex v0.4.3
+[1m[92m  Downloaded[0m foreign-types v0.3.2
+[1m[92m  Downloaded[0m errno v0.3.14
+[1m[92m  Downloaded[0m mime v0.3.17
+[1m[92m  Downloaded[0m linux-raw-sys v0.12.1
+[1m[92m   Compiling[0m proc-macro2 v1.0.106
+[1m[92m   Compiling[0m unicode-ident v1.0.24
+[1m[92m   Compiling[0m quote v1.0.45
+[1m[92m   Compiling[0m libc v0.2.183
+[1m[92m   Compiling[0m cfg-if v1.0.4
+[1m[92m   Compiling[0m zeroize v1.8.2
+[1m[92m   Compiling[0m shlex v1.3.0
+[1m[92m   Compiling[0m find-msvc-tools v0.1.9
+[1m[92m   Compiling[0m smallvec v1.15.1
+[1m[92m   Compiling[0m cc v1.2.58
+[1m[92m   Compiling[0m subtle v2.6.1
+[1m[92m   Compiling[0m version_check v0.9.5
+[1m[92m   Compiling[0m typenum v1.19.0
+[1m[92m   Compiling[0m syn v2.0.117
+[1m[92m   Compiling[0m generic-array v0.14.9
+[1m[92m   Compiling[0m pin-project-lite v0.2.17
+[1m[92m   Compiling[0m bytes v1.11.1
+[1m[92m   Compiling[0m getrandom v0.2.17
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
+[1m[92m   Compiling[0m stable_deref_trait v1.2.1
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m scopeguard v1.2.0
+[1m[92m   Compiling[0m lock_api v0.4.14
+[1m[92m   Compiling[0m errno v0.3.14
+[1m[92m   Compiling[0m futures-core v0.3.32
+[1m[92m   Compiling[0m const-oid v0.9.6
+[1m[92m   Compiling[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m signal-hook-registry v1.4.8
+[1m[92m   Compiling[0m socket2 v0.6.3
+[1m[92m   Compiling[0m mio v1.2.0
+[1m[92m   Compiling[0m itoa v1.0.18
+[1m[92m   Compiling[0m vcpkg v0.2.15
+[1m[92m   Compiling[0m pkg-config v0.3.32
+[1m[92m   Compiling[0m http v1.4.0
+[1m[92m   Compiling[0m block-buffer v0.10.4
+[1m[92m   Compiling[0m openssl-sys v0.9.112
+[1m[92m   Compiling[0m crypto-common v0.1.6
+[1m[92m   Compiling[0m rand_core v0.6.4
+[1m[92m   Compiling[0m slab v0.4.12
+[1m[92m   Compiling[0m synstructure v0.13.2
+[1m[92m   Compiling[0m digest v0.10.7
+[1m[92m   Compiling[0m ring v0.17.14
+[1m[92m   Compiling[0m bitflags v2.11.0
+[1m[92m   Compiling[0m writeable v0.6.2
+[1m[92m   Compiling[0m litemap v0.8.1
+[1m[92m   Compiling[0m serde_core v1.0.228
+[1m[92m   Compiling[0m http-body v1.0.1
+[1m[92m   Compiling[0m tracing-core v0.1.36
+[1m[92m   Compiling[0m httparse v1.10.1
+[1m[92m   Compiling[0m icu_normalizer_data v2.1.1
+[1m[92m   Compiling[0m zerofrom-derive v0.1.6
+[1m[92m   Compiling[0m yoke-derive v0.8.1
+[1m[92m   Compiling[0m tokio-macros v2.6.1
+[1m[92m   Compiling[0m zerovec-derive v0.11.2
+[1m[92m   Compiling[0m zerofrom v0.1.6
+[1m[92m   Compiling[0m yoke v0.8.1
+[1m[92m   Compiling[0m tokio v1.50.0
+[1m[92m   Compiling[0m displaydoc v0.2.5
+[1m[92m   Compiling[0m zerotrie v0.2.3
+[1m[92m   Compiling[0m zerovec v0.11.5
+[1m[92m   Compiling[0m hashbrown v0.16.1
+[1m[92m   Compiling[0m tinystr v0.8.2
+[1m[92m   Compiling[0m icu_locale_core v2.1.1
+[1m[92m   Compiling[0m potential_utf v0.1.4
+[1m[92m   Compiling[0m equivalent v1.0.2
+[1m[92m   Compiling[0m futures-sink v0.3.32
+[1m[92m   Compiling[0m percent-encoding v2.3.2
+[1m[92m   Compiling[0m futures-task v0.3.32
+[1m[92m   Compiling[0m icu_properties_data v2.1.2
+[1m[92m   Compiling[0m icu_provider v2.1.1
+[1m[92m   Compiling[0m futures-util v0.3.32
+[1m[92m   Compiling[0m indexmap v2.13.0
+[1m[92m   Compiling[0m icu_collections v2.1.1
+[1m[92m   Compiling[0m tokio-util v0.7.18
+[1m[92m   Compiling[0m tracing v0.1.44
+[1m[92m   Compiling[0m der v0.7.10
+[1m[92m   Compiling[0m rustls-pki-types v1.14.0
+[1m[92m   Compiling[0m fnv v1.0.7
+[1m[92m   Compiling[0m foreign-types-shared v0.1.1
+[1m[92m   Compiling[0m untrusted v0.9.0
+[1m[92m   Compiling[0m tower-service v0.3.3
+[1m[92m   Compiling[0m serde v1.0.228
+[1m[92m   Compiling[0m openssl v0.10.76
+[1m[92m   Compiling[0m try-lock v0.2.5
+[1m[92m   Compiling[0m atomic-waker v1.1.2
+[1m[92m   Compiling[0m want v0.3.1
+[1m[92m   Compiling[0m h2 v0.4.13
+[1m[92m   Compiling[0m foreign-types v0.3.2
+[1m[92m   Compiling[0m serde_derive v1.0.228
+[1m[92m   Compiling[0m openssl-macros v0.1.1
+[1m[92m   Compiling[0m futures-channel v0.3.32
+[1m[92m   Compiling[0m native-tls v0.2.18
+[1m[92m   Compiling[0m rustls v0.23.37
+[1m[92m   Compiling[0m autocfg v1.5.0
+[1m[92m   Compiling[0m pin-utils v0.1.0
+[1m[92m   Compiling[0m hyper v1.8.1
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m   Compiling[0m icu_properties v2.1.2
+[1m[92m   Compiling[0m icu_normalizer v2.1.1
+[1m[92m   Compiling[0m rustls-webpki v0.103.10
+[1m[92m   Compiling[0m spki v0.7.3
+[1m[92m   Compiling[0m ff v0.13.1
+[1m[92m   Compiling[0m base64 v0.22.1
+[1m[92m   Compiling[0m openssl-probe v0.2.1
+[1m[92m   Compiling[0m ipnet v2.12.0
+[1m[92m   Compiling[0m zerocopy v0.8.47
+[1m[92m   Compiling[0m base16ct v0.2.0
+[1m[92m   Compiling[0m log v0.4.29
+[1m[92m   Compiling[0m zmij v1.0.21
+[1m[92m   Compiling[0m sec1 v0.7.3
+[1m[92m   Compiling[0m hyper-util v0.1.20
+[1m[92m   Compiling[0m group v0.13.0
+[1m[92m   Compiling[0m pkcs8 v0.10.2
+[1m[92m   Compiling[0m idna_adapter v1.2.1
+[1m[92m   Compiling[0m form_urlencoded v1.2.2
+[1m[92m   Compiling[0m hmac v0.12.1
+[1m[92m   Compiling[0m crypto-bigint v0.5.5
+[1m[92m   Compiling[0m sync_wrapper v1.0.2
+[1m[92m   Compiling[0m serde_json v1.0.149
+[1m[92m   Compiling[0m utf8_iter v1.0.4
+[1m[92m   Compiling[0m rustix v1.1.4
+[1m[92m   Compiling[0m tower-layer v0.3.3
+[1m[92m   Compiling[0m getrandom v0.4.2
+[1m[92m   Compiling[0m tower v0.5.3
+[1m[92m   Compiling[0m elliptic-curve v0.13.8
+[1m[92m   Compiling[0m idna v1.1.0
+[1m[92m   Compiling[0m rfc6979 v0.4.0
+[1m[92m   Compiling[0m tokio-rustls v0.26.4
+[1m[92m   Compiling[0m tokio-native-tls v0.3.1
+[1m[92m   Compiling[0m webpki-roots v1.0.6
+[1m[92m   Compiling[0m http-body-util v0.1.3
+[1m[92m   Compiling[0m signature v2.2.0
+[1m[92m   Compiling[0m option-ext v0.2.0
+[1m[92m   Compiling[0m memchr v2.8.0
+[1m[92m   Compiling[0m iri-string v0.7.11
+[1m[92m   Compiling[0m thiserror v1.0.69
+[1m[92m   Compiling[0m rust_decimal v1.41.0
+[1m[92m   Compiling[0m linux-raw-sys v0.12.1
+[1m[92m   Compiling[0m cpufeatures v0.2.17
+[1m[92m   Compiling[0m ryu v1.0.23
+[1m[92m   Compiling[0m serde_urlencoded v0.7.1
+[1m[92m   Compiling[0m tower-http v0.6.8
+[1m[92m   Compiling[0m ppv-lite86 v0.2.21
+[1m[92m   Compiling[0m sha2 v0.10.9
+[1m[92m   Compiling[0m dirs-sys v0.4.1
+[1m[92m   Compiling[0m ecdsa v0.16.9
+[1m[92m   Compiling[0m hyper-tls v0.6.0
+[1m[92m   Compiling[0m hyper-rustls v0.27.7
+[1m[92m   Compiling[0m url v2.5.8
+[1m[92m   Compiling[0m thiserror-impl v1.0.69
+[1m[92m   Compiling[0m encoding_rs v0.8.35
+[1m[92m   Compiling[0m mime v0.3.17
+[1m[92m   Compiling[0m iana-time-zone v0.1.65
+[1m[92m   Compiling[0m arrayvec v0.7.6
+[1m[92m   Compiling[0m either v1.15.0
+[1m[92m   Compiling[0m keccak v0.1.6
+[1m[92m   Compiling[0m env_home v0.1.0
+[1m[92m   Compiling[0m which v7.0.3
+[1m[92m   Compiling[0m sha3 v0.10.8
+[1m[92m   Compiling[0m chrono v0.4.44
+[1m[92m   Compiling[0m reqwest v0.12.28
+[1m[92m   Compiling[0m uuid v1.23.0
+[1m[92m   Compiling[0m k256 v0.13.4
+[1m[92m   Compiling[0m dirs v5.0.1
+[1m[92m   Compiling[0m rand_chacha v0.3.1
+[1m[92m   Compiling[0m async-trait v0.1.89
+[1m[92m   Compiling[0m hex v0.4.3
+[1m[92m   Compiling[0m remitmd v0.2.1 (/home/runner/work/sdk/sdk/rust)
+[1m[92m   Compiling[0m rand v0.8.5
+[1m[92m   Compiling[0m acceptance-flows v0.1.0 (/home/runner/work/sdk/sdk/acceptance/rust)
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:258:9
+    [1m[94m|[0m
+[1m[94m258[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    [1m[94m|[0m
+    [1m[94m= [0m[1mnote[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:320:9
+    [1m[94m|[0m
+[1m[94m320[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m[1m: unused import: `k256::ecdsa::signature::hazmat::PrehashSigner`[0m
+   [1m[94m--> [0msrc/main.rs:385:9
+    [1m[94m|[0m
+[1m[94m385[0m [1m[94m|[0m     use k256::ecdsa::signature::hazmat::PrehashSigner;
+    [1m[94m|[0m         [1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m[1m: constant `FEE_WALLET` is never used[0m
+  [1m[94m--> [0msrc/main.rs:30:7
+   [1m[94m|[0m
+[1m[94m30[0m [1m[94m|[0m const FEE_WALLET: &str = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
+   [1m[94m|[0m       [1m[33m^^^^^^^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mnote[0m: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+[1m[33mwarning[0m[1m: field `usdc` is never read[0m
+  [1m[94m--> [0msrc/main.rs:95:5
+   [1m[94m|[0m
+[1m[94m88[0m [1m[94m|[0m struct Contracts {
+   [1m[94m|[0m        [1m[94m---------[0m [1m[94mfield in this struct[0m
+[1m[94m...[0m
+[1m[94m95[0m [1m[94m|[0m     usdc: String,
+   [1m[94m|[0m     [1m[33m^^^^[0m
+   [1m[94m|[0m
+   [1m[94m= [0m[1mnote[0m: `Contracts` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+[1m[33mwarning[0m[1m: function `get_fee_balance` is never used[0m
+   [1m[94m--> [0msrc/main.rs:159:10
+    [1m[94m|[0m
+[1m[94m159[0m [1m[94m|[0m async fn get_fee_balance() -> f64 {
+    [1m[94m|[0m          [1m[33m^^^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m: `acceptance-flows` (bin "acceptance-flows") generated 6 warnings (run `cargo fix --bin "acceptance-flows" -p acceptance-flows` to apply 3 suggestions)
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 1m 02s
+[1m[92m     Running[0m `target/release/acceptance-flows`
+
+[1mRust SDK — 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x152a86aa6d80f6d079e28f1ded42a23c979ef4a0
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x70a76727aa3b047536b553e67f9450a830ddfac8
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0x1febad811d6b81c408be1dfcf440619f6f73d60ce6b4fd0cbe9bc104b97ab88e
+[0;32m[PASS][0m 1. Direct Payment — tx=0x1febad811d6b81c4
+
+thread 'main' (4789) panicked at src/main.rs:462:10:
+create_escrow_with_permit: RemitError { code: "CHAIN_SUBMISSION_FAILED", message: "Chain submission failed: permit failed (owner=0x152a86aa6d80f6d079e28f1ded42a23c979ef4a0, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: \"0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000\"", doc_url: "https://remit.md/docs/errors#CHAIN_SUBMISSION_FAILED", context: {} }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+════════════════════════════════════════════════
+  .NET
+════════════════════════════════════════════════
+/home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs(24,14): warning CS0219: The variable 'FEE_WALLET' is assigned but its value is never used [/home/runner/work/sdk/sdk/acceptance/dotnet/AcceptanceFlows.csproj]
+
+[1mC#/.NET SDK -- 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x08B5B7B2Cf7846dD1976C408478b43887B83310A
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x3DEF5005157D31B3408ca6822302087a9fDd3916
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0x707ce58f1909ebc6992d3ba87b6271ed9b36082f3e6227788b8d518fbd534450
+[0;32m[PASS][0m 1. Direct Payment -- tx=0x707ce58f1909ebc6...
+[0;31m[FAIL][0m 2. Escrow -- RemitError: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError [CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;31m[FAIL][0m 3. Metered Tab -- RemitError: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0x9415f510d8c6199e0f66bde927d7d88de391f5e8): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError [CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0x9415f510d8c6199e0f66bde927d7d88de391f5e8): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;31m[FAIL][0m 4. Stream -- RemitError: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0x20d413e0eac0f5da3c8630667fd16a94fcd7231a): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError [CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0x20d413e0eac0f5da3c8630667fd16a94fcd7231a): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;31m[FAIL][0m 5. Bounty -- RemitError: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError [CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;31m[FAIL][0m 6. Deposit -- RemitError: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0x7e0ae37df62e93c1c16a5661a7998bd174331554): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError [CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x08b5b7b2cf7846dd1976c408478b43887b83310a, spender=0x7e0ae37df62e93c1c16a5661a7998bd174331554): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather -- settle returned no tx_hash
+
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  [1mA2A Agent Card[0m                            [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  Name:     remit.md                        [0;36m|[0m
+[0;36m|[0m  Version:  0.1.0                           [0;36m|[0m
+[0;36m|[0m  Protocol: 0.6                             [0;36m|[0m
+[0;36m|[0m  URL:      https://testnet.remit.md/a2a    [0;36m|[0m
+[0;36m|[0m  Skills:   7 total                         [0;36m|[0m
+[0;36m|[0m    - Direct Payment                        [0;36m|[0m
+[0;36m|[0m    - Metered Tab                           [0;36m|[0m
+[0;36m|[0m    - Streaming Payment                     [0;36m|[0m
+[0;36m|[0m    - Escrow                                [0;36m|[0m
+[0;36m|[0m    - Bounty                                [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery -- name=remit.md
+[0;31m[FAIL][0m 9. AP2 Payment -- Exception: a2a task should have an id
+System.Exception: a2a task should have an id
+   at Program.<>c__DisplayClass0_0.<<<Main>$>g__FlowAp2Payment|23>d.MoveNext() in /home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs:line 488
+--- End of stack trace from previous location ---
+   at Program.<Main>$(String[] args) in /home/runner/work/sdk/sdk/acceptance/dotnet/Program.cs:line 547
+
+[1mC# Summary: [0;32m2 passed[0m, [0;31m7 failed[0m / 9 flows
+{"passed":2,"failed":7,"skipped":0}
+
+════════════════════════════════════════════════
+  JAVA
+════════════════════════════════════════════════
+Note: /home/runner/work/sdk/sdk/java/src/main/java/md/remit/MockRemit.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: /home/runner/work/sdk/sdk/acceptance/java/src/main/java/App.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+[1mJava SDK -- 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x28aecb68ca07d06b22d82c643be0d5709088334e
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0xfda09147ec4a324823105382f9c0e3a9f0cb245c
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0x2669367441bf18e2aac49a658c5c225ff8b2dac14e34fef087add31e4db49cb5
+[0;32m[PASS][0m 1. Direct Payment -- tx=0x2669367441bf18e2...
+[0;31m[FAIL][0m 2. Escrow -- RemitError: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError[CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+	at md.remit.internal.ApiClient.handleResponse(ApiClient.java:140)
+	at md.remit.internal.ApiClient.doPost(ApiClient.java:113)
+	at md.remit.internal.ApiClient.lambda$post$1(ApiClient.java:61)
+	at md.remit.internal.ApiClient.executeWithRetry(ApiClient.java:266)
+	at md.remit.internal.ApiClient.post(ApiClient.java:61)
+	at md.remit.Wallet.createEscrow(Wallet.java:215)
+	at md.remit.Wallet.createEscrow(Wallet.java:165)
+	at App.flowEscrow(App.java:236)
+	at App.lambda$main$1(App.java:585)
+	at App.main(App.java:597)
+[0;31m[FAIL][0m 3. Metered Tab -- RemitError: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0x9415f510d8c6199e0f66bde927d7d88de391f5e8): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError[CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0x9415f510d8c6199e0f66bde927d7d88de391f5e8): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+	at md.remit.internal.ApiClient.handleResponse(ApiClient.java:140)
+	at md.remit.internal.ApiClient.doPost(ApiClient.java:113)
+	at md.remit.internal.ApiClient.lambda$post$1(ApiClient.java:61)
+	at md.remit.internal.ApiClient.executeWithRetry(ApiClient.java:266)
+	at md.remit.internal.ApiClient.post(ApiClient.java:61)
+	at md.remit.Wallet.createTab(Wallet.java:304)
+	at md.remit.Wallet.createTab(Wallet.java:284)
+	at App.flowTab(App.java:260)
+	at App.lambda$main$2(App.java:586)
+	at App.main(App.java:597)
+[0;31m[FAIL][0m 4. Stream -- RemitError: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0x20d413e0eac0f5da3c8630667fd16a94fcd7231a): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError[CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0x20d413e0eac0f5da3c8630667fd16a94fcd7231a): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+	at md.remit.internal.ApiClient.handleResponse(ApiClient.java:140)
+	at md.remit.internal.ApiClient.doPost(ApiClient.java:113)
+	at md.remit.internal.ApiClient.lambda$post$1(ApiClient.java:61)
+	at md.remit.internal.ApiClient.executeWithRetry(ApiClient.java:266)
+	at md.remit.internal.ApiClient.post(ApiClient.java:61)
+	at md.remit.Wallet.createStream(Wallet.java:417)
+	at App.flowStream(App.java:293)
+	at App.lambda$main$3(App.java:587)
+	at App.main(App.java:597)
+[0;31m[FAIL][0m 5. Bounty -- RemitError: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError[CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+	at md.remit.internal.ApiClient.handleResponse(ApiClient.java:140)
+	at md.remit.internal.ApiClient.doPost(ApiClient.java:113)
+	at md.remit.internal.ApiClient.lambda$post$1(ApiClient.java:61)
+	at md.remit.internal.ApiClient.executeWithRetry(ApiClient.java:266)
+	at md.remit.internal.ApiClient.post(ApiClient.java:61)
+	at md.remit.Wallet.createBounty(Wallet.java:459)
+	at md.remit.Wallet.createBounty(Wallet.java:445)
+	at App.flowBounty(App.java:312)
+	at App.lambda$main$4(App.java:588)
+	at App.main(App.java:597)
+[0;31m[FAIL][0m 6. Deposit -- RemitError: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0x7e0ae37df62e93c1c16a5661a7998bd174331554): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+RemitError[CHAIN_SUBMISSION_FAILED]: Chain submission failed: permit failed (owner=0x28aecb68ca07d06b22d82c643be0d5709088334e, spender=0x7e0ae37df62e93c1c16a5661a7998bd174331554): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000"
+	at md.remit.internal.ApiClient.handleResponse(ApiClient.java:140)
+	at md.remit.internal.ApiClient.doPost(ApiClient.java:113)
+	at md.remit.internal.ApiClient.lambda$post$1(ApiClient.java:61)
+	at md.remit.internal.ApiClient.executeWithRetry(ApiClient.java:266)
+	at md.remit.internal.ApiClient.post(ApiClient.java:61)
+	at md.remit.Wallet.lockDeposit(Wallet.java:533)
+	at App.flowDeposit(App.java:338)
+	at App.lambda$main$5(App.java:589)
+	at App.main(App.java:597)
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather -- settle returned no tx_hash
+
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  [1mA2A Agent Card[0m                            [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  Name:     remit.md                        [0;36m|[0m
+[0;36m|[0m  Version:  0.1.0                           [0;36m|[0m
+[0;36m|[0m  Protocol: 0.6                             [0;36m|[0m
+[0;36m|[0m  URL:      https://testnet.remit.md/a2a    [0;36m|[0m
+[0;36m|[0m  Skills:   7 total                         [0;36m|[0m
+[0;36m|[0m    - Direct Payment                        [0;36m|[0m
+[0;36m|[0m    - Metered Tab                           [0;36m|[0m
+[0;36m|[0m    - Streaming Payment                     [0;36m|[0m
+[0;36m|[0m    - Escrow                                [0;36m|[0m
+[0;36m|[0m    - Bounty                                [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery -- name=remit.md
+[0;31m[FAIL][0m 9. AP2 Payment -- RuntimeException: a2a task should have an id
+java.lang.RuntimeException: a2a task should have an id
+	at App.flowAp2Payment(App.java:540)
+	at App.lambda$main$8(App.java:592)
+	at App.main(App.java:597)
+
+[1mJava Summary: [0;32m2 passed[0m, [0;31m7 failed[0m / 9 flows
+{"passed":2,"failed":7,"skipped":0}
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':run'.
+> Process 'command '/usr/lib/jvm/temurin-17-jdk-amd64/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 1s
+
+════════════════════════════════════════════════
+  RUBY
+════════════════════════════════════════════════
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:173:in `handle_response'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:51:in `request'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:38:in `post'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/wallet.rb:204:in `create_escrow'
+acceptance/ruby/test_flows.rb:182:in `flow_escrow'
+acceptance/ruby/test_flows.rb:512:in `block in <main>'
+acceptance/ruby/test_flows.rb:524:in `block in <main>'
+acceptance/ruby/test_flows.rb:522:in `each'
+acceptance/ruby/test_flows.rb:522:in `<main>'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:173:in `handle_response'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:51:in `request'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:38:in `post'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/wallet.rb:258:in `create_tab'
+acceptance/ruby/test_flows.rb:208:in `flow_tab'
+acceptance/ruby/test_flows.rb:513:in `block in <main>'
+acceptance/ruby/test_flows.rb:524:in `block in <main>'
+acceptance/ruby/test_flows.rb:522:in `each'
+acceptance/ruby/test_flows.rb:522:in `<main>'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:173:in `handle_response'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:51:in `request'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:38:in `post'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/wallet.rb:451:in `create_stream'
+acceptance/ruby/test_flows.rb:240:in `flow_stream'
+acceptance/ruby/test_flows.rb:514:in `block in <main>'
+acceptance/ruby/test_flows.rb:524:in `block in <main>'
+acceptance/ruby/test_flows.rb:522:in `each'
+acceptance/ruby/test_flows.rb:522:in `<main>'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:173:in `handle_response'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:51:in `request'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:38:in `post'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/wallet.rb:488:in `create_bounty'
+acceptance/ruby/test_flows.rb:259:in `flow_bounty'
+acceptance/ruby/test_flows.rb:515:in `block in <main>'
+acceptance/ruby/test_flows.rb:524:in `block in <main>'
+acceptance/ruby/test_flows.rb:522:in `each'
+acceptance/ruby/test_flows.rb:522:in `<main>'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:173:in `handle_response'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:51:in `request'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/http.rb:38:in `post'
+/home/runner/work/sdk/sdk/ruby/lib/remitmd/wallet.rb:542:in `place_deposit'
+acceptance/ruby/test_flows.rb:285:in `flow_deposit'
+acceptance/ruby/test_flows.rb:516:in `block in <main>'
+acceptance/ruby/test_flows.rb:524:in `block in <main>'
+acceptance/ruby/test_flows.rb:522:in `each'
+acceptance/ruby/test_flows.rb:522:in `<main>'
+acceptance/ruby/test_flows.rb:472:in `flow_ap2_payment'
+acceptance/ruby/test_flows.rb:519:in `block in <main>'
+acceptance/ruby/test_flows.rb:524:in `block in <main>'
+acceptance/ruby/test_flows.rb:522:in `each'
+acceptance/ruby/test_flows.rb:522:in `<main>'
+
+[1mRuby SDK -- 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x85f1d82afde7cb785c1ff271bd41108aeabad9b9
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x3f1ac8f933e743b05249d5bccca1a086acfeb243
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0xd06ed808a8ea714d33dd8e47f61c72b16c757dc00dec5a0e5baf4af00da41cba
+[0;32m[PASS][0m 1. Direct Payment -- tx=0xd06ed808a8ea714d...
+[0;31m[FAIL][0m 2. Escrow -- Remitmd::RemitError: [SERVER_ERROR] Chain submission failed: permit failed (owner=0x85f1d82afde7cb785c1ff271bd41108aeabad9b9, spender=0x47de7cdd757e3765d36c083dab59b2c5a9d249f2): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" - https://remit.md/docs/api-reference/error-codes#server_error
+[0;31m[FAIL][0m 3. Metered Tab -- Remitmd::RemitError: [SERVER_ERROR] Chain submission failed: permit failed (owner=0x85f1d82afde7cb785c1ff271bd41108aeabad9b9, spender=0x9415f510d8c6199e0f66bde927d7d88de391f5e8): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" - https://remit.md/docs/api-reference/error-codes#server_error
+[0;31m[FAIL][0m 4. Stream -- Remitmd::RemitError: [SERVER_ERROR] Chain submission failed: permit failed (owner=0x85f1d82afde7cb785c1ff271bd41108aeabad9b9, spender=0x20d413e0eac0f5da3c8630667fd16a94fcd7231a): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" - https://remit.md/docs/api-reference/error-codes#server_error
+[0;31m[FAIL][0m 5. Bounty -- Remitmd::RemitError: [SERVER_ERROR] Chain submission failed: permit failed (owner=0x85f1d82afde7cb785c1ff271bd41108aeabad9b9, spender=0xb3868471c3034280cce3a56dd37c6154c3bb0b32): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" - https://remit.md/docs/api-reference/error-codes#server_error
+[0;31m[FAIL][0m 6. Deposit -- Remitmd::RemitError: [SERVER_ERROR] Chain submission failed: permit failed (owner=0x85f1d82afde7cb785c1ff271bd41108aeabad9b9, spender=0x7e0ae37df62e93c1c16a5661a7998bd174331554): transport error: gas estimation: server returned an error response: error code 3: execution reverted: MockUSDC: invalid permit signature, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000224d6f636b555344433a20696e76616c6964207065726d6974207369676e6174757265000000000000000000000000000000000000000000000000000000000000" - https://remit.md/docs/api-reference/error-codes#server_error
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather -- settle returned no tx_hash
+
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  [1mA2A Agent Card[0m                            [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  Name:     remit.md                        [0;36m|[0m
+[0;36m|[0m  Version:  0.1.0                           [0;36m|[0m
+[0;36m|[0m  Protocol: 0.6                             [0;36m|[0m
+[0;36m|[0m  URL:      https://testnet.remit.md/a2a    [0;36m|[0m
+[0;36m|[0m  Skills:   7 total                         [0;36m|[0m
+[0;36m|[0m    - Direct Payment                        [0;36m|[0m
+[0;36m|[0m    - Metered Tab                           [0;36m|[0m
+[0;36m|[0m    - Streaming Payment                     [0;36m|[0m
+[0;36m|[0m    - Escrow                                [0;36m|[0m
+[0;36m|[0m    - Bounty                                [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery -- name=remit.md
+[0;31m[FAIL][0m 9. AP2 Payment -- RuntimeError: a2a task should have an id
+
+[1mRuby Summary: [0;32m2 passed[0m, [0;31m7 failed[0m / 9 flows
+{"passed":2,"failed":7,"skipped":0}
+
+════════════════════════════════════════════════
+  SWIFT
+════════════════════════════════════════════════
+Fetching https://github.com/GigaBitcoin/secp256k1.swift.git
+[1/10077] Fetching secp256k1.swift
+Fetched https://github.com/GigaBitcoin/secp256k1.swift.git from cache (1.57s)
+Computing version for https://github.com/GigaBitcoin/secp256k1.swift.git
+Computed https://github.com/GigaBitcoin/secp256k1.swift.git at 0.17.0 (0.20s)
+Creating working copy for https://github.com/GigaBitcoin/secp256k1.swift.git
+Working copy of https://github.com/GigaBitcoin/secp256k1.swift.git resolved at 0.17.0
+Building for debugging...
+[0/13] Compiling precomputed_ecmult_gen.c
+[1/13] Write swift-version--3BE7240F797CB9BC.txt
+[1/13] Write sources
+[5/13] Compiling Utility.c
+[6/13] Compiling secp256k1.c
+[7/13] Compiling precomputed_ecmult.c
+[9/45] Emitting module secp256k1
+[10/55] Compiling secp256k1 DH.swift
+[11/55] Compiling secp256k1 Digest.swift
+[12/55] Compiling secp256k1 ECDH.swift
+[13/55] Compiling secp256k1 ECDSA.swift
+[14/55] Compiling secp256k1 EdDSA.swift
+[15/55] Compiling secp256k1 Errors.swift
+[16/55] Compiling secp256k1 Exports.swift
+[17/55] Compiling secp256k1 HashDigest.swift
+[18/55] Compiling secp256k1 PrettyBytes.swift
+[19/55] Compiling secp256k1 RNG_boring.swift
+[20/55] Compiling secp256k1 ASN1.swift
+[21/55] Compiling secp256k1 ASN1Any.swift
+[22/55] Compiling secp256k1 ASN1BitString.swift
+[23/55] Compiling secp256k1 ASN1Boolean.swift
+[24/55] Compiling secp256k1 ASN1Identifier.swift
+[25/55] Compiling secp256k1 ASN1Integer.swift
+[26/55] Compiling secp256k1 ASN1Null.swift
+[27/55] Compiling secp256k1 ASN1OctetString.swift
+[28/55] Compiling secp256k1 ASN1Strings.swift
+[29/55] Compiling secp256k1 ArraySliceBigint.swift
+[30/55] Compiling secp256k1 GeneralizedTime.swift
+[31/55] Compiling secp256k1 ObjectIdentifier.swift
+[32/55] Compiling secp256k1 ECDSASignature.swift
+[33/55] Compiling secp256k1 PEMDocument.swift
+[34/55] Compiling secp256k1 PKCS8PrivateKey.swift
+[35/55] Compiling secp256k1 SEC1PrivateKey.swift
+[36/55] Compiling secp256k1 SubjectPublicKeyInfo.swift
+[37/55] Compiling secp256k1 Asymmetric.swift
+[38/55] Compiling secp256k1 Combine.swift
+[39/55] Compiling secp256k1 Context.swift
+[40/55] Compiling secp256k1 CryptoKitErrors.swift
+[41/55] Compiling secp256k1 Recovery.swift
+[42/55] Compiling secp256k1 SHA256.swift
+[43/55] Compiling secp256k1 SafeCompare.swift
+[44/55] Compiling secp256k1 Schnorr.swift
+[45/55] Compiling secp256k1 SecureBytes.swift
+[46/55] Compiling secp256k1 Signature.swift
+[47/55] Compiling secp256k1 Tweak.swift
+[48/55] Compiling secp256k1 Utility.swift
+[49/55] Compiling secp256k1 Zeroization.swift
+[50/55] Compiling secp256k1 secp256k1.swift
+[51/56] Wrapping AST for secp256k1 for debugging
+[53/66] Compiling RemitMd A2A.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[54/66] Compiling RemitMd CliSigner.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[55/66] Compiling RemitMd Errors.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:74:60: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await URLSession.shared.data(for: request)
+                                         ~~~~~~~~~~~~~~~~~ ^~~~
+[56/69] Compiling RemitMd Wallet.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[57/69] Compiling RemitMd X402Client.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[58/69] Compiling RemitMd X402Paywall.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:75:50: error: value of type 'URLSession' has no member 'data'
+        let (data, response) = try await session.data(for: req)
+                                         ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:171:51: error: value of type 'URLSession' has no member 'data'
+        let (data, response2) = try await session.data(for: retryReq)
+                                          ~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:137:54: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await session.data(for: req)
+                                             ~~~~~~~ ^~~~
+[59/69] Emitting module RemitMd
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/A2A.swift:310:17: warning: stored property 'value' of 'Sendable'-conforming struct 'AnyCodable' has non-sendable type 'Any'
+    private let value: Any
+                ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:35:16: warning: stored property 'response' of 'Sendable'-conforming struct 'X402Response' has non-sendable type 'HTTPURLResponse'
+    public let response: HTTPURLResponse
+               ^
+FoundationNetworking.HTTPURLResponse:1:12: note: class 'HTTPURLResponse' does not conform to the 'Sendable' protocol
+open class HTTPURLResponse : URLResponse {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Client.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:43:17: warning: stored property 'session' of 'Sendable'-conforming struct 'X402Paywall' has non-sendable type 'URLSession'
+    private let session: URLSession
+                ^
+FoundationNetworking.URLSession:1:12: note: class 'URLSession' does not conform to the 'Sendable' protocol
+open class URLSession : NSObject {
+           ^
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/X402Paywall.swift:3:1: remark: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'FoundationNetworking'
+import FoundationNetworking
+^
+@preconcurrency 
+[60/69] Compiling RemitMd Models.swift
+[61/69] Compiling RemitMd RemitMd.swift
+[62/69] Compiling RemitMd Signer.swift
+[63/69] Compiling RemitMd HttpTransport.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+[64/69] Compiling RemitMd Keccak.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+[65/69] Compiling RemitMd Mock.swift
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/HttpTransport.swift:105:59: error: value of type 'URLSession' has no member 'data'
+            let (data, response) = try await self.session.data(for: req)
+                                             ~~~~~~~~~~~~ ^~~~
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:83:13: warning: variable 'c0' was never mutated; consider changing to 'let' constant
+        var c0 = state[0] ^ state[5]  ^ state[10] ^ state[15] ^ state[20]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:84:13: warning: variable 'c1' was never mutated; consider changing to 'let' constant
+        var c1 = state[1] ^ state[6]  ^ state[11] ^ state[16] ^ state[21]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:85:13: warning: variable 'c2' was never mutated; consider changing to 'let' constant
+        var c2 = state[2] ^ state[7]  ^ state[12] ^ state[17] ^ state[22]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:86:13: warning: variable 'c3' was never mutated; consider changing to 'let' constant
+        var c3 = state[3] ^ state[8]  ^ state[13] ^ state[18] ^ state[23]
+        ~~~ ^
+        let
+/home/runner/work/sdk/sdk/swift/Sources/RemitMd/Keccak.swift:87:13: warning: variable 'c4' was never mutated; consider changing to 'let' constant
+        var c4 = state[4] ^ state[9]  ^ state[14] ^ state[19] ^ state[24]
+        ~~~ ^
+        let
+error: fatalError
+
+════════════════════════════════════════════════
+  ELIXIR
+════════════════════════════════════════════════
+==> decimal
+Compiling 4 files (.ex)
+Generated decimal app
+==> mime
+Compiling 1 file (.ex)
+Generated mime app
+==> nimble_options
+Compiling 3 files (.ex)
+Generated nimble_options app
+===> Analyzing applications...
+===> Compiling telemetry
+==> jason
+Compiling 10 files (.ex)
+Generated jason app
+==> remit
+Compiling 13 files (.ex)
+Generated remit app
+==> hpax
+Compiling 4 files (.ex)
+Generated hpax app
+==> mint
+Compiling 1 file (.erl)
+Compiling 20 files (.ex)
+Generated mint app
+==> nimble_pool
+Compiling 2 files (.ex)
+Generated nimble_pool app
+==> finch
+Compiling 14 files (.ex)
+Generated finch app
+==> req
+Compiling 19 files (.ex)
+Generated req app
+==> acceptance_flows
+Generated acceptance_flows app
+
+[1mElixir SDK -- 9 Flow Acceptance Suite[0m
+  API: https://testnet.remit.md
+  RPC: https://sepolia.base.org
+
+[0;36m[INFO][0m Creating agent wallet...
+[0;36m[INFO][0m   Agent:    0x1b34988a5d262f1ef669921a4a5a1fd472858e09
+[0;36m[INFO][0m Creating provider wallet...
+[0;36m[INFO][0m   Provider: 0x7341e1dc4807febdaae61cff0fd56c8c36130ddd
+[0;36m[INFO][0m Minting $100 USDC to agent...
+[0;36m[INFO][0m   Agent balance: $100.00
+[0;36m[INFO][0m Minting $100 USDC to provider...
+[0;36m[INFO][0m   Provider balance: $100.00
+
+  [TX] 1. Direct Payment | pay | https://sepolia.basescan.org/tx/0x1409d79ac1471dcedfc1b0707832c3526d9f73f72f0d50183bb82425ddf621a2
+[0;32m[PASS][0m 1. Direct Payment -- tx=0x1409d79ac1471dce...
+  [TX] 2. Escrow | fund | https://sepolia.basescan.org/tx/0x6534c00b9cd0dd53b4eacb481d776ef37fe6d251f43ea4a17096f02ea17060c3
+  [TX] 2. Escrow | claimStart | https://sepolia.basescan.org/tx/0x6534c00b9cd0dd53b4eacb481d776ef37fe6d251f43ea4a17096f02ea17060c3
+  [TX] 2. Escrow | release | https://sepolia.basescan.org/tx/0x6534c00b9cd0dd53b4eacb481d776ef37fe6d251f43ea4a17096f02ea17060c3
+[0;32m[PASS][0m 2. Escrow -- escrow_id=b0ce1a2c123e578029981f90f5026252
+  [TX] 3. Metered Tab | charge1 | https://sepolia.basescan.org/tx/n/a
+  [TX] 3. Metered Tab | charge2 | https://sepolia.basescan.org/tx/n/a
+  [TX] 3. Metered Tab | close | https://sepolia.basescan.org/tx/0xdbf97a7e222a917e5b44104c8faee0336fb9c56abe7909c68f370829dd200983
+[0;32m[PASS][0m 3. Metered Tab -- tab_id=9a83350d-35cb-4152-9c52-49dd33f4911c, charged=$3, 2 charges
+  [TX] 4. Stream | open | https://sepolia.basescan.org/tx/74f489d9-2423-4136-9c43-330f08d994b4
+  [TX] 4. Stream | close | https://sepolia.basescan.org/tx/0xde90cf2a66f258a457a0b74f878e8adf82d48df53d866afa1d767e66be3d3945
+[0;32m[PASS][0m 4. Stream -- stream_id=74f489d9-2423-4136-9c43-330f08d994b4
+  [TX] 5. Bounty | post | https://sepolia.basescan.org/tx/b9f71aab-d1df-4b7b-8b94-9cefdab3fd94
+[0;32m[PASS][0m 5. Bounty -- bounty_id=b9f71aab-d1df-4b7b-8b94-9cefdab3fd94
+  [TX] 6. Deposit | place | https://sepolia.basescan.org/tx/0xd446b0cf663f08094e03719d1b1cbcaaddcec0469be989e030307af5dc676c2c
+  [TX] 6. Deposit | return | https://sepolia.basescan.org/tx/0xd446b0cf663f08094e03719d1b1cbcaaddcec0469be989e030307af5dc676c2c
+[0;32m[PASS][0m 6. Deposit -- deposit_id=92bf0438-385f-421f-8084-80345c7ae55d
+[0;36m[INFO][0m   Paywall: exact | $5.00 USDC | network=eip155:84532
+[0;31m[FAIL][0m 7. x402 Weather -- RuntimeError: Settle returned 401: {"code":"INVALID_SIGNATURE","message":"Invalid or expired signature"}
+** (RuntimeError) Settle returned 401: {"code":"INVALID_SIGNATURE","message":"Invalid or expired signature"}
+    test_flows.exs:461: anonymous fn/6 in :elixir_compiler_16.__FILE__/1
+    test_flows.exs:632: anonymous fn/2 in :elixir_compiler_16.__FILE__/1
+    (elixir 1.17.3) lib/enum.ex:2531: Enum."-reduce/3-lists^foldl/2-0-"/3
+    test_flows.exs:631: (file)
+    (elixir 1.17.3) src/elixir_compiler.erl:77: :elixir_compiler.dispatch/4
+    (elixir 1.17.3) src/elixir_compiler.erl:52: :elixir_compiler.compile/4
+    (elixir 1.17.3) src/elixir_compiler.erl:39: :elixir_compiler.maybe_fast_compile/2
+    (elixir 1.17.3) src/elixir_lexical.erl:15: :elixir_lexical.run/3
+
+
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  [1mA2A Agent Card[0m                            [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+[0;36m|[0m  Name:     remit.md                        [0;36m|[0m
+[0;36m|[0m  Version:  0.1.0                           [0;36m|[0m
+[0;36m|[0m  Protocol: 0.6                             [0;36m|[0m
+[0;36m|[0m  URL:      https://testnet.remit.md/a2a    [0;36m|[0m
+[0;36m|[0m  Skills:   7 total                         [0;36m|[0m
+[0;36m|[0m    - Direct Payment                        [0;36m|[0m
+[0;36m|[0m    - Metered Tab                           [0;36m|[0m
+[0;36m|[0m    - Streaming Payment                     [0;36m|[0m
+[0;36m|[0m    - Escrow                                [0;36m|[0m
+[0;36m|[0m    - Bounty                                [0;36m|[0m
+[0;36m|[0m  x402:     settle=https://testnet.remit.md/api/v1[0;36m|[0m
+[0;36m|[0m  Caps:     streaming=false, exts=payment-processo   [0;36m|[0m
+[0;36m+---------------------------------------------+[0m
+
+[0;32m[PASS][0m 8. AP2 Discovery -- name=remit.md
+[0;31m[FAIL][0m 9. AP2 Payment -- MatchError: no match of right hand side value: {:error, %RemitMd.Error{code: "UNAUTHORIZED", message: "Authentication failed - check private key and chain ID", doc_url: "https://remit.md/docs/errors#unauthorized", context: nil}}
+** (MatchError) no match of right hand side value: {:error, %RemitMd.Error{code: "UNAUTHORIZED", message: "Authentication failed - check private key and chain ID", doc_url: "https://remit.md/docs/errors#unauthorized", context: nil}}
+    test_flows.exs:592: anonymous fn/6 in :elixir_compiler_16.__FILE__/1
+    test_flows.exs:632: anonymous fn/2 in :elixir_compiler_16.__FILE__/1
+    (elixir 1.17.3) lib/enum.ex:2531: Enum."-reduce/3-lists^foldl/2-0-"/3
+    test_flows.exs:631: (file)
+    (elixir 1.17.3) src/elixir_compiler.erl:77: :elixir_compiler.dispatch/4
+    (elixir 1.17.3) src/elixir_compiler.erl:52: :elixir_compiler.compile/4
+    (elixir 1.17.3) src/elixir_compiler.erl:39: :elixir_compiler.maybe_fast_compile/2
+    (elixir 1.17.3) src/elixir_lexical.erl:15: :elixir_lexical.run/3
+
+
+[1mElixir Summary: [0;32m7 passed[0m, [0;31m2 failed[0m / 9 flows
+{"failed":2,"skipped":0,"passed":7}
+
+
+════════════════════════════════════════════════
+  FINAL SUMMARY
+════════════════════════════════════════════════
+Completed at: Sat Mar 28 05:00:37 UTC 2026
+
+Total PASS: 18
+Total FAIL: 37
+
+── Per-language results ──
+  PYTHON         0
+0 passed, 0
+0 failed
+  TYPESCRIPT     0
+0 passed, 0
+0 failed
+  GO             0
+0 passed, 0
+0 failed
+  RUST           0
+0 passed, 0
+0 failed
+  .NET           0
+0 passed, 0
+0 failed
+  JAVA           0
+0 passed, 0
+0 failed
+  RUBY           0
+0 passed, 0
+0 failed
+  SWIFT          0
+0 passed, 0
+0 failed
+  ELIXIR         0
+0 passed, 0
+0 failed
+

@@ -84,12 +84,15 @@ defmodule RemitMd.ComplianceTest do
     key_bytes = :crypto.strong_rand_bytes(32)
     private_key = "0x" <> Base.encode16(key_bytes, case: :lower)
     wallet = make_wallet(private_key)
+    IO.puts("[COMPLIANCE] wallet created: #{wallet.address} (chain=#{wallet.chain})")
     {private_key, wallet.address}
   end
 
   defp fund_wallet(wallet_addr) do
+    IO.puts("[COMPLIANCE] mint: requesting 1000 USDC -> #{wallet_addr}")
     {200, resp} = http_post("/api/v1/mint", %{wallet: wallet_addr, amount: 1000})
     assert resp["tx_hash"] != nil, "mint response must contain tx_hash, got: #{inspect(resp)}"
+    IO.puts("[COMPLIANCE] mint: 1000 USDC -> #{wallet_addr} tx=#{resp["tx_hash"]}")
   end
 
   defp make_wallet(private_key) do
@@ -104,13 +107,18 @@ defmodule RemitMd.ComplianceTest do
   defp get_shared_payer do
     case SharedPayer.get() do
       nil ->
+        IO.puts("[COMPLIANCE] shared payer: creating new payer wallet")
         {pk, addr} = register_and_get_key()
         fund_wallet(addr)
         SharedPayer.set(pk)
-        make_wallet(pk)
+        wallet = make_wallet(pk)
+        IO.puts("[COMPLIANCE] shared payer: ready #{wallet.address}")
+        wallet
 
       pk ->
-        make_wallet(pk)
+        wallet = make_wallet(pk)
+        IO.puts("[COMPLIANCE] shared payer: reusing #{wallet.address}")
+        wallet
     end
   end
 
@@ -121,12 +129,13 @@ defmodule RemitMd.ComplianceTest do
       IO.puts("SKIP: compliance server not reachable at #{@server_url}")
       :ok
     else
+      IO.puts("[COMPLIANCE] test: authenticated request returns balance, not 401")
       wallet = get_shared_payer()
 
-      # reputation/2 makes an authenticated GET to /api/v1/reputation/{address} -
-      # this endpoint exists for all registered addresses and returns 401 if auth fails.
+      IO.puts("[COMPLIANCE] reputation: querying #{wallet.address}")
       {:ok, rep} = Wallet.reputation(wallet, wallet.address)
       assert rep != nil
+      IO.puts("[COMPLIANCE] reputation: got result for #{wallet.address} -> #{inspect(rep)}")
     end
   end
 
@@ -134,13 +143,16 @@ defmodule RemitMd.ComplianceTest do
     if not server_available?() do
       :ok
     else
-      {status, _body} =
+      IO.puts("[COMPLIANCE] test: unauthenticated POST /payments/direct returns 401")
+      {status, body} =
         http_post("/api/v1/payments/direct", %{
           to: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
           amount: "1.000000"
         })
 
+      IO.puts("[COMPLIANCE] unauthenticated POST /payments/direct: status=#{status}")
       assert status == 401, "unauthenticated POST must return 401, got: #{status}"
+      IO.puts("[COMPLIANCE] unauthenticated POST correctly rejected with 401")
     end
   end
 
@@ -150,12 +162,15 @@ defmodule RemitMd.ComplianceTest do
     if not server_available?() do
       :ok
     else
+      IO.puts("[COMPLIANCE] test: pay_direct happy path returns tx_hash")
       payer = get_shared_payer()
       {_pk, payee_addr} = register_and_get_key()
 
+      IO.puts("[COMPLIANCE] pay: 5.0 USDC #{payer.address} -> #{payee_addr}")
       {:ok, tx} = Wallet.pay(payer, payee_addr, "5.0", description: "elixir compliance test")
       assert tx.tx_hash != nil
       assert tx.tx_hash != ""
+      IO.puts("[COMPLIANCE] pay: 5.0 USDC #{payer.address} -> #{payee_addr} tx=#{tx.tx_hash} invoice=#{tx.invoice_id}")
     end
   end
 
@@ -163,12 +178,15 @@ defmodule RemitMd.ComplianceTest do
     if not server_available?() do
       :ok
     else
+      IO.puts("[COMPLIANCE] test: pay_direct below minimum returns error")
       payer = get_shared_payer()
       {_pk, payee_addr} = register_and_get_key()
 
+      IO.puts("[COMPLIANCE] pay (expect failure): 0.0001 USDC #{payer.address} -> #{payee_addr}")
       result = Wallet.pay(payer, payee_addr, "0.0001")
       assert match?({:error, _}, result),
              "pay with amount below minimum must return {:error, ...}, got: #{inspect(result)}"
+      IO.puts("[COMPLIANCE] pay below minimum correctly rejected: #{inspect(result)}")
     end
   end
 end

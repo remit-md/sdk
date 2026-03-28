@@ -142,13 +142,26 @@ RSpec.describe Remitmd::CliSigner do
 
   describe ".available?" do
     let(:which_cmd) { Gem.win_platform? ? "where" : "which" }
+    let(:meta_path) { File.join(Dir.home, ".remit", "keys", "default.meta") }
+    let(:enc_path) { File.join(Dir.home, ".remit", "keys", "default.enc") }
 
-    it "returns true when all three conditions are met" do
+    it "returns true when .meta file exists (keychain, no password)" do
       success = instance_double(Process::Status, success?: true)
       allow(Open3).to receive(:capture3).with(which_cmd, "remit").and_return(
         ["/usr/local/bin/remit\n", "", success]
       )
-      allow(File).to receive(:exist?).with(File.join(Dir.home, ".remit", "keys", "default.enc")).and_return(true)
+      allow(File).to receive(:exist?).with(meta_path).and_return(true)
+
+      expect(described_class.available?).to be true
+    end
+
+    it "returns true when .enc file and password are set (no .meta)" do
+      success = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture3).with(which_cmd, "remit").and_return(
+        ["/usr/local/bin/remit\n", "", success]
+      )
+      allow(File).to receive(:exist?).with(meta_path).and_return(false)
+      allow(File).to receive(:exist?).with(enc_path).and_return(true)
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:[]).with("REMIT_KEY_PASSWORD").and_return("secret")
 
@@ -164,22 +177,24 @@ RSpec.describe Remitmd::CliSigner do
       expect(described_class.available?).to be false
     end
 
-    it "returns false when keystore file is missing" do
+    it "returns false when no .meta and no .enc file" do
       success = instance_double(Process::Status, success?: true)
       allow(Open3).to receive(:capture3).with(which_cmd, "remit").and_return(
         ["/usr/local/bin/remit\n", "", success]
       )
-      allow(File).to receive(:exist?).with(File.join(Dir.home, ".remit", "keys", "default.enc")).and_return(false)
+      allow(File).to receive(:exist?).with(meta_path).and_return(false)
+      allow(File).to receive(:exist?).with(enc_path).and_return(false)
 
       expect(described_class.available?).to be false
     end
 
-    it "returns false when REMIT_KEY_PASSWORD is not set" do
+    it "returns false when .enc exists but REMIT_KEY_PASSWORD is not set" do
       success = instance_double(Process::Status, success?: true)
       allow(Open3).to receive(:capture3).with(which_cmd, "remit").and_return(
         ["/usr/local/bin/remit\n", "", success]
       )
-      allow(File).to receive(:exist?).with(File.join(Dir.home, ".remit", "keys", "default.enc")).and_return(true)
+      allow(File).to receive(:exist?).with(meta_path).and_return(false)
+      allow(File).to receive(:exist?).with(enc_path).and_return(true)
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:[]).with("REMIT_KEY_PASSWORD").and_return(nil)
 

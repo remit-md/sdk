@@ -47,6 +47,7 @@ module ComplianceHelpers
   def register_and_get_key
     private_key = "0x" + SecureRandom.hex(32)
     wallet = make_wallet(private_key)
+    puts "[COMPLIANCE] wallet created: #{wallet.address} (chain=84532)"
     [private_key, wallet.address]
   end
 
@@ -54,6 +55,7 @@ module ComplianceHelpers
     mint_resp = http_post("/api/v1/mint", { "wallet" => wallet_addr, "amount" => 1000 })
     data = JSON.parse(mint_resp.body)
     raise "mint failed: #{mint_resp.body}" unless data["tx_hash"]
+    puts "[COMPLIANCE] mint: 1000 USDC -> #{wallet_addr} tx=#{data['tx_hash']}"
   end
 
   def make_wallet(private_key)
@@ -67,11 +69,13 @@ module ComplianceHelpers
 
   def funded_wallet_pair
     # Payer: registered + funded via mint (1000 USDC).
+    puts "[COMPLIANCE] --- setting up funded wallet pair ---"
     payer_pk, payer_addr = register_and_get_key
     fund_wallet(payer_addr)
     payer = make_wallet(payer_pk)
     # Payee: registered only.
     _payee_pk, payee_addr = register_and_get_key
+    puts "[COMPLIANCE] payer=#{payer.address} payee=#{payee_addr}"
     [payer, payee_addr]
   end
 end
@@ -89,15 +93,19 @@ RSpec.describe "Ruby SDK compliance" do
     it "authenticated request returns balance, not 401" do
       pk, _addr = register_and_get_key
       wallet = make_wallet(pk)
+      puts "[COMPLIANCE] auth test: querying reputation for #{wallet.address}"
       # reputation() makes an authenticated GET to /api/v1/reputation/{address} -
       # this endpoint exists for all registered addresses and returns 401 if auth fails.
       rep = wallet.reputation(wallet.address)
+      puts "[COMPLIANCE] auth test: reputation returned (not nil), auth succeeded"
       expect(rep).not_to be_nil
     end
 
     it "unauthenticated POST /payments/direct returns 401" do
+      puts "[COMPLIANCE] auth test: POST /payments/direct without token"
       resp = http_post("/api/v1/payments/direct",
                         { "to" => "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "amount" => "1.000000" })
+      puts "[COMPLIANCE] auth test: response code=#{resp.code} (expected 401)"
       expect(resp.code.to_i).to eq(401)
     end
   end
@@ -107,16 +115,20 @@ RSpec.describe "Ruby SDK compliance" do
   describe "pay_direct" do
     it "returns a non-empty tx_hash on success" do
       payer, payee_addr = funded_wallet_pair
+      puts "[COMPLIANCE] pay: 5.0 USDC #{payer.address} -> #{payee_addr}"
       tx = payer.pay(payee_addr, BigDecimal("5.0"), memo: "ruby compliance test")
+      puts "[COMPLIANCE] pay: 5.0 USDC #{payer.address} -> #{payee_addr} tx=#{tx.tx_hash}"
       expect(tx.tx_hash).not_to be_nil
       expect(tx.tx_hash).not_to be_empty
     end
 
     it "raises RemitError when amount is below minimum" do
       payer, payee_addr = funded_wallet_pair
+      puts "[COMPLIANCE] pay: 0.0001 USDC #{payer.address} -> #{payee_addr} (expect error)"
       expect do
         payer.pay(payee_addr, BigDecimal("0.0001"))
       end.to raise_error(Remitmd::RemitError)
+      puts "[COMPLIANCE] pay: below-minimum correctly raised RemitError"
     end
   end
 end

@@ -90,14 +90,19 @@ class CliSigner(Signer):
 
     @staticmethod
     def is_available(cli_path: str = "remit") -> bool:
-        """Check all three conditions for CliSigner activation.
+        """Check conditions for CliSigner activation.
 
         1. CLI binary found on PATH
-        2. Keystore file exists at ~/.remit/keys/default.enc
-        3. REMIT_KEY_PASSWORD env var is set
+        2. ~/.remit/keys/default.meta exists (keychain, no password needed), OR
+        3. ~/.remit/keys/default.enc exists AND REMIT_KEY_PASSWORD env var is set
         """
         if not shutil.which(cli_path):
             return False
+        # Keychain path: .meta file exists (no password needed)
+        meta = Path.home() / ".remit" / "keys" / "default.meta"
+        if meta.exists():
+            return True
+        # Encrypted file path: .enc + password
         keystore = Path.home() / ".remit" / "keys" / "default.enc"
         if not keystore.exists():
             return False

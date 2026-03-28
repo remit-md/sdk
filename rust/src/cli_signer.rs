@@ -85,23 +85,33 @@ impl CliSigner {
     }
 
     /// Check availability with a custom CLI path.
+    ///
+    /// Detection order:
+    /// 1. CLI on PATH
+    /// 2. `~/.remit/keys/default.meta` exists → keychain-backed, no password needed
+    /// 3. `~/.remit/keys/default.enc` exists AND `REMIT_KEY_PASSWORD` set
     pub fn is_available_with_path(cli_path: &str) -> bool {
         // Check 1: CLI on PATH
         if which::which(cli_path).is_err() {
             return false;
         }
 
-        // Check 2: Keystore exists
-        let keystore_path = match dirs::home_dir() {
-            Some(home) => home.join(".remit").join("keys").join("default.enc"),
+        let keys_dir = match dirs::home_dir() {
+            Some(home) => home.join(".remit").join("keys"),
             None => return false,
         };
-        if !keystore_path.exists() {
-            return false;
+
+        // Check 2: Keychain meta file (no password needed)
+        if keys_dir.join("default.meta").exists() {
+            return true;
         }
 
-        // Check 3: Password available
-        matches!(std::env::var("REMIT_KEY_PASSWORD"), Ok(val) if !val.is_empty())
+        // Check 3: Encrypted keystore + password
+        if keys_dir.join("default.enc").exists() {
+            return matches!(std::env::var("REMIT_KEY_PASSWORD"), Ok(val) if !val.is_empty());
+        }
+
+        false
     }
 }
 

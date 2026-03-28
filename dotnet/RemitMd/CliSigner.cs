@@ -95,12 +95,12 @@ public sealed class CliSigner : IRemitSigner
     }
 
     /// <summary>
-    /// Checks whether the CLI signer can be activated. All three conditions
-    /// must be met:
+    /// Checks whether the CLI signer can be activated.
+    /// <para>Detection order:</para>
     /// <list type="number">
     /// <item>CLI binary found on PATH (or at the given path).</item>
-    /// <item>Keystore file exists at <c>~/.remit/keys/default.enc</c>.</item>
-    /// <item><c>REMIT_KEY_PASSWORD</c> env var is set and non-empty.</item>
+    /// <item><c>~/.remit/keys/default.meta</c> exists (keychain-backed, no password needed).</item>
+    /// <item><c>~/.remit/keys/default.enc</c> exists AND <c>REMIT_KEY_PASSWORD</c> is set.</item>
     /// </list>
     /// </summary>
     public static bool IsAvailable(string cliPath = "remit")
@@ -109,18 +109,21 @@ public sealed class CliSigner : IRemitSigner
         if (!CliExists(cliPath))
             return false;
 
-        // 2. Check keystore file
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var keystore = Path.Combine(home, ".remit", "keys", "default.enc");
-        if (!File.Exists(keystore))
-            return false;
+        var keysDir = Path.Combine(home, ".remit", "keys");
 
-        // 3. Check password env var
-        var password = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
-        if (string.IsNullOrEmpty(password))
-            return false;
+        // 2. Keychain meta file (no password needed)
+        if (File.Exists(Path.Combine(keysDir, "default.meta")))
+            return true;
 
-        return true;
+        // 3. Encrypted keystore + password
+        if (File.Exists(Path.Combine(keysDir, "default.enc")))
+        {
+            var password = Environment.GetEnvironmentVariable("REMIT_KEY_PASSWORD");
+            return !string.IsNullOrEmpty(password);
+        }
+
+        return false;
     }
 
     /// <inheritdoc />

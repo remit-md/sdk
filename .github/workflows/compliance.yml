@@ -61,9 +61,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd python && pytest tests/compliance/ -v -s --tb=short
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()
@@ -119,9 +119,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd typescript && pnpm run compliance
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()
@@ -172,9 +172,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd go && go test -v -run TestCompliance -timeout 120s ./...
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()
@@ -226,9 +226,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd java && gradle test --no-daemon --tests "md.remit.ComplianceTest"
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()
@@ -277,9 +277,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd ruby && bundle exec rspec spec/compliance_spec.rb --format documentation
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()
@@ -328,9 +328,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd rust && cargo test compliance -- --include-ignored
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()
@@ -380,9 +380,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd dotnet && dotnet test --no-build -c Release --verbosity normal --filter "FullyQualifiedName~ComplianceTests"
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()
@@ -431,9 +431,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd swift && swift test --filter ComplianceTests
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()
@@ -484,9 +484,9 @@ jobs:
           REMIT_CHAIN_ID: "84532"
         run: cd elixir && mix test test/compliance_test.exs --trace
 
-      - name: Dump server logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.compliance.yml logs server 2>&1 | tail -200
+      - name: Dump server logs
+        if: always()
+        run: docker compose -f docker-compose.compliance.yml logs server 2>&1
 
       - name: Tear down compliance harness
         if: always()

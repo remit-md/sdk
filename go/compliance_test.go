@@ -230,7 +230,7 @@ func TestCompliancePayDirect_HappyPath(t *testing.T) {
 	if tx.TxHash == "" {
 		t.Error("tx_hash must be non-empty")
 	}
-	t.Logf("[COMPLIANCE] pay: 5.0 USDC %s -> %s tx=%s invoice=%s", payer.Address(), payeeAddr, tx.TxHash, tx.InvoiceID)
+	t.Logf("[COMPLIANCE] pay: 5.0 USDC %s -> %s tx=%s invoice=%s", payer.Address(), payeeAddr, tx.TxHash, tx.ID)
 }
 
 func TestCompliancePayDirect_BelowMinimumReturnsError(t *testing.T) {

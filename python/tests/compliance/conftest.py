@@ -19,7 +19,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
-# ─── Config ───────────────────────────────────────────────────────────────────
+# ─── Config ─────────────────────────────────────────────────────────────
 
 SERVER_URL = os.environ.get("REMIT_TEST_SERVER_URL", "http://localhost:3000")
 ROUTER_ADDRESS = os.environ.get(
@@ -27,7 +27,7 @@ ROUTER_ADDRESS = os.environ.get(
 )
 CHAIN_ID = int(os.environ.get("REMIT_CHAIN_ID", "84532"))
 
-# ─── Server availability check ────────────────────────────────────────────────
+# ─── Server availability check ──────────────────────────────────────────
 
 
 def _server_is_reachable() -> bool:
@@ -49,7 +49,7 @@ server_available = pytest.mark.skipif(
 )
 
 
-# ─── Fixtures ─────────────────────────────────────────────────────────────────
+# ─── Fixtures ───────────────────────────────────────────────────────────
 
 
 @pytest_asyncio.fixture

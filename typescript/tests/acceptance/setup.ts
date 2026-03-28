@@ -5,6 +5,7 @@
  * No raw HTTP - everything goes through SDK methods.
  */
 
+import assert from "node:assert";
 import { Wallet } from "../../src/wallet.js";
 import { generatePrivateKey } from "viem/accounts";
 

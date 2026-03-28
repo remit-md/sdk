@@ -669,23 +669,12 @@ func TestBountyLifecycle(t *testing.T) {
 	posterBefore := getUsdcBalance(t, poster.Address())
 	feeBefore := getFeeBalance(t)
 
-	// Sign EIP-2612 permit for the Bounty contract
-	contracts := fetchContracts(t)
-	permit := signUSDCPermit(t, poster.key,
-		crypto.PubkeyToAddress(poster.key.PublicKey),
-		common.HexToAddress(contracts.Bounty),
-		big.NewInt(6_000_000), // $6 USDC (headroom for fees)
-		big.NewInt(0),         // nonce 0 (fresh wallet)
-		big.NewInt(time.Now().Unix()+3600),
-	)
-
-	// 1. Create bounty: $5 reward, 1 hour deadline
+	// 1. Create bounty: $5 reward, 1 hour deadline (auto-permit)
 	deadline := time.Now().Unix() + 3600
 	bounty, err := poster.CreateBounty(ctx,
 		decimal.NewFromFloat(5.0),
 		"Write a Go acceptance test",
 		deadline,
-		remitmd.WithBountyPermit(permit),
 	)
 	if err != nil {
 		t.Fatalf("CreateBounty: %v", err)

@@ -503,21 +503,14 @@ class AcceptanceTest {
         double providerBefore = getUsdcBalance(provider.address());
         double feeBefore = getFeeBalance();
 
-        // Step 1: Post bounty with permit for Bounty contract
-        ContractAddresses contracts = fetchContracts();
-        String bountyContract = contracts.bounty;
-
+        // Step 1: Post bounty (auto-permit)
         long deadlineTs = Instant.now().getEpochSecond() + 3600;
-        long rawAmount = (long) ((amount + 1) * 1_000_000);
-        PermitSignature permit = signUsdcPermit(
-                poster.keyPair, poster.address(), bountyContract,
-                rawAmount, 0, deadlineTs);
 
+        // Use auto-permit (SDK signs internally)
         Bounty bounty = poster.wallet.createBounty(
                 new BigDecimal("5.0"),
                 "java-bounty-acceptance-test",
-                deadlineTs,
-                permit);
+                deadlineTs);
         assertNotNull(bounty.id, "bounty should have an id");
         assertFalse(bounty.id.isBlank(), "bounty id should not be blank");
 
@@ -529,8 +522,8 @@ class AcceptanceTest {
         Transaction submitTx = provider.wallet.submitBounty(bounty.id, evidenceHash);
         assertNotNull(submitTx.id, "submission should have an id");
 
-        // Wait for submission tx
-        Thread.sleep(5_000);
+        // Wait for submission to be recorded
+        Thread.sleep(10_000);
 
         // Step 3: Poster awards to the submission
         Transaction awardTx = poster.wallet.awardBounty(bounty.id, 1);

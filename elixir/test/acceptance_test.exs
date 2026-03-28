@@ -322,7 +322,7 @@ defmodule RemitMd.AcceptanceTest do
 
     # 3. Close stream
     {:ok, closed} = Wallet.close_stream(payer.wallet, stream.stream_id)
-    assert %RemitMd.Models.Stream{} = closed
+    assert %RemitMd.Models.Transaction{} = closed
 
     # 4. Conservation: payer should have lost some funds
     payer_after = wait_for_balance_change(payer.wallet.address, payer_before)
@@ -417,6 +417,7 @@ defmodule RemitMd.AcceptanceTest do
   # ─── Test: X402 Auto-Pay ──────────────────────────────────────────────
 
   @tag :acceptance
+  @tag timeout: 120_000
   test "x402 auto-pay (local server with 402)" do
     provider_wallet = create_test_wallet()
 

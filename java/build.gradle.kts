@@ -79,7 +79,7 @@ tasks.jacocoTestReport {
     }
 }
 
-// Target from MASTER.md: 50%. Gate: 40% (compliance tests skipped without server).
+// Coverage gate: target 50%, gate 40%.
 tasks.jacocoTestCoverageVerification {
     violationRules {
         rule {

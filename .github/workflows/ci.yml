@@ -33,10 +33,10 @@ jobs:
         run: cd python && ruff format --check .
       - name: Type check
         run: cd python && mypy src/
-      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
+      # Coverage gate: target 50%, gate 40%.
       # Exclude acceptance tests (live Base Sepolia) - they have their own manual workflow.
       - name: Test with coverage gate
-        run: cd python && pytest -v --cov=remitmd --cov-fail-under=40 --cov-report=term-missing --ignore=tests/acceptance --ignore=tests/compliance
+        run: cd python && pytest -v --cov=remitmd --cov-fail-under=40 --cov-report=term-missing --ignore=tests/acceptance
 
   typescript:
     name: SDK TypeScript
@@ -59,7 +59,7 @@ jobs:
         run: cd typescript && pnpm tsc --noEmit
       - name: Build
         run: cd typescript && pnpm tsc
-      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
+      # Coverage gate: target 50%, gate 40%.
       - name: Test with coverage gate
         run: cd typescript && pnpm dlx c8@10 --reporter=text --lines 40 --branches 40 --functions 40 node --import ./node_modules/tsx/dist/esm/index.cjs --test tests/*.ts
 
@@ -101,9 +101,9 @@ jobs:
         run: cd rust && cargo fmt --check
       - name: Clippy
         run: cd rust && cargo clippy -- -D warnings
-      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
+      # Coverage gate: target 50%, gate 40%.
       - name: Test with coverage gate
-        run: cd rust && cargo llvm-cov --fail-under-lines 40 --ignore-filename-regex 'compliance\.rs'
+        run: cd rust && cargo llvm-cov --fail-under-lines 40
 
   dotnet:
     name: SDK .NET
@@ -117,7 +117,7 @@ jobs:
         run: cd dotnet && dotnet restore
       - name: Build
         run: cd dotnet && dotnet build --no-restore -c Release
-      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
+      # Coverage gate: target 50%, gate 40%.
       # /p:Threshold=40 fails the test run if line coverage drops below 40%.
       - name: Test with coverage gate
         run: cd dotnet && dotnet test --no-build -c Release --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:Threshold=40 /p:ThresholdType=Line
@@ -134,7 +134,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
         with:
           gradle-version: '8.7'
-      # Coverage gate: target 50% (MASTER.md); gate 40% (compliance tests server-gated).
+      # Coverage gate: target 50%, gate 40%.
       # jacocoTestCoverageVerification fails the build if line coverage < 40%.
       # Single build+test step avoids double compilation.
       - name: Build + Test with coverage gate

@@ -12,7 +12,7 @@ defmodule RemitMd.MixProject do
       package: package(),
       source_url: "https://github.com/remit-md/sdk",
       docs: [main: "RemitMd", extras: ["README.md"]],
-      # Coverage gate: target 50% (MASTER.md); initial gate 35% (compliance skipped w/o server).
+      # Coverage gate: target 50%, gate 35%.
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [coveralls: :test, "coveralls.detail": :test]
     ]

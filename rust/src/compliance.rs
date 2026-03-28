@@ -35,7 +35,10 @@ mod compliance_tests {
 
     /// Returns false if the compliance server is not reachable.
     async fn is_server_available() -> bool {
-        eprintln!("[COMPLIANCE] checking server availability at {}/health", server_url());
+        eprintln!(
+            "[COMPLIANCE] checking server availability at {}/health",
+            server_url()
+        );
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(3))
             .build()
@@ -43,7 +46,11 @@ mod compliance_tests {
         match client.get(format!("{}/health", server_url())).send().await {
             Ok(r) => {
                 let ok = r.status().as_u16() == 200;
-                eprintln!("[COMPLIANCE] server health check: status={}, available={}", r.status(), ok);
+                eprintln!(
+                    "[COMPLIANCE] server health check: status={}, available={}",
+                    r.status(),
+                    ok
+                );
                 ok
             }
             Err(e) => {
@@ -62,7 +69,11 @@ mod compliance_tests {
         let private_key = format!("0x{}", hex::encode(key_bytes));
         let wallet = make_wallet(&private_key);
         let addr = wallet.address().to_string();
-        eprintln!("[COMPLIANCE] wallet generated: {} (chain={})", addr, wallet.chain_id());
+        eprintln!(
+            "[COMPLIANCE] wallet generated: {} (chain={})",
+            addr,
+            wallet.chain_id()
+        );
         (private_key, addr)
     }
 
@@ -82,7 +93,10 @@ mod compliance_tests {
             resp["tx_hash"].is_string(),
             "mint response must contain tx_hash, got: {resp}"
         );
-        eprintln!("[COMPLIANCE] mint: 1000 USDC -> {} tx={}", wallet_addr, resp["tx_hash"]);
+        eprintln!(
+            "[COMPLIANCE] mint: 1000 USDC -> {} tx={}",
+            wallet_addr, resp["tx_hash"]
+        );
     }
 
     fn make_wallet(private_key: &str) -> Wallet {
@@ -93,7 +107,12 @@ mod compliance_tests {
             .router_address(router_address())
             .build()
             .expect("build wallet");
-        eprintln!("[COMPLIANCE] wallet created: {} (chain={}, base_url={})", w.address(), w.chain_id(), server_url());
+        eprintln!(
+            "[COMPLIANCE] wallet created: {} (chain={}, base_url={})",
+            w.address(),
+            w.chain_id(),
+            server_url()
+        );
         w
     }
 
@@ -140,7 +159,11 @@ mod compliance_tests {
             .reputation(wallet.address())
             .await
             .expect("reputation() must not fail with valid auth");
-        eprintln!("[COMPLIANCE] reputation returned successfully for {}: {:?}", wallet.address(), rep);
+        eprintln!(
+            "[COMPLIANCE] reputation returned successfully for {}: {:?}",
+            wallet.address(),
+            rep
+        );
     }
 
     #[tokio::test]
@@ -162,7 +185,10 @@ mod compliance_tests {
             .send()
             .await
             .expect("POST /payments/direct");
-        eprintln!("[COMPLIANCE] unauthenticated response: status={}", resp.status());
+        eprintln!(
+            "[COMPLIANCE] unauthenticated response: status={}",
+            resp.status()
+        );
         assert_eq!(
             resp.status().as_u16(),
             401,
@@ -185,7 +211,11 @@ mod compliance_tests {
         let payer = get_shared_payer(&client).await;
         let (_payee_key, payee_addr) = generate_wallet();
 
-        eprintln!("[COMPLIANCE] pay: 5.0 USDC {} -> {} memo=\"rust compliance test\"", payer.address(), payee_addr);
+        eprintln!(
+            "[COMPLIANCE] pay: 5.0 USDC {} -> {} memo=\"rust compliance test\"",
+            payer.address(),
+            payee_addr
+        );
         let tx = payer
             .pay_with_memo(
                 &payee_addr,
@@ -195,7 +225,13 @@ mod compliance_tests {
             .await
             .expect("pay_with_memo must succeed");
 
-        eprintln!("[COMPLIANCE] pay: 5.0 USDC {} -> {} tx={} id={}", payer.address(), payee_addr, tx.tx_hash, tx.id);
+        eprintln!(
+            "[COMPLIANCE] pay: 5.0 USDC {} -> {} tx={} id={}",
+            payer.address(),
+            payee_addr,
+            tx.tx_hash,
+            tx.id
+        );
         assert!(
             !tx.tx_hash.is_empty(),
             "pay() must return a non-empty tx_hash"
@@ -215,7 +251,11 @@ mod compliance_tests {
         let payer = get_shared_payer(&client).await;
         let (_payee_key, payee_addr) = generate_wallet();
 
-        eprintln!("[COMPLIANCE] pay: 0.0001 USDC {} -> {} (expect error: below minimum)", payer.address(), payee_addr);
+        eprintln!(
+            "[COMPLIANCE] pay: 0.0001 USDC {} -> {} (expect error: below minimum)",
+            payer.address(),
+            payee_addr
+        );
         let result = payer
             .pay(&payee_addr, Decimal::from_str("0.0001").unwrap())
             .await;

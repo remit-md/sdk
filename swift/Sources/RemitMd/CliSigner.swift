@@ -84,24 +84,30 @@ public final class CliSigner: Signer, @unchecked Sendable {
 
     // MARK: - Availability check
 
-    /// Check all three conditions for CliSigner activation:
+    /// Check conditions for CliSigner activation:
     /// 1. CLI binary found (runs `remit --version` successfully)
-    /// 2. Keystore file exists at `~/.remit/keys/default.enc`
-    /// 3. `REMIT_KEY_PASSWORD` env var is set
+    /// 2. Meta file at `~/.remit/keys/default.meta` (keychain -- no password needed), OR
+    /// 3. Keystore file at `~/.remit/keys/default.enc` AND `REMIT_KEY_PASSWORD` env var set
     ///
     /// - Parameter cliPath: Path to the `remit` binary (default: `"remit"`).
-    /// - Returns: `true` if all three conditions are met.
+    /// - Returns: `true` if CLI exists and either keychain meta or encrypted keystore + password are available.
     public static func isAvailable(cliPath: String = "remit") -> Bool {
         // 1. CLI binary exists and runs
         let (_, _, exitCode) = run(cliPath: cliPath, arguments: ["--version"], stdin: nil)
         guard exitCode == 0 else { return false }
 
-        // 2. Keystore file exists
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let keystorePath = home + "/.remit/keys/default.enc"
-        guard FileManager.default.fileExists(atPath: keystorePath) else { return false }
+        let keysDir = home + "/.remit/keys"
+        let fm = FileManager.default
 
-        // 3. REMIT_KEY_PASSWORD env var is set
+        // 2. Keychain meta file -- no password needed
+        if fm.fileExists(atPath: keysDir + "/default.meta") {
+            return true
+        }
+
+        // 3. Encrypted keystore + password
+        guard fm.fileExists(atPath: keysDir + "/default.enc") else { return false }
+
         guard let password = ProcessInfo.processInfo.environment["REMIT_KEY_PASSWORD"],
               !password.isEmpty else {
             return false

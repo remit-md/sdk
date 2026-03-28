@@ -67,11 +67,11 @@ module Remitmd
 
     alias to_s inspect
 
-    # Check all three conditions for CliSigner activation.
+    # Check conditions for CliSigner activation.
     #
     # 1. CLI binary found on PATH (via `which` / `where`)
-    # 2. Keystore file exists at ~/.remit/keys/default.enc
-    # 3. REMIT_KEY_PASSWORD env var is set
+    # 2. Meta file at ~/.remit/keys/default.meta (keychain — no password needed), OR
+    # 3. Keystore file at ~/.remit/keys/default.enc AND REMIT_KEY_PASSWORD env var set
     #
     # @param cli_path [String] path or name of the remit CLI binary
     # @return [Boolean]
@@ -81,11 +81,15 @@ module Remitmd
       _out, _err, st = Open3.capture3(which_cmd, cli_path)
       return false unless st.success?
 
-      # 2. Keystore file exists
-      keystore = File.join(Dir.home, ".remit", "keys", "default.enc")
+      keys_dir = File.join(Dir.home, ".remit", "keys")
+
+      # 2. Keychain meta file — no password needed
+      return true if File.exist?(File.join(keys_dir, "default.meta"))
+
+      # 3. Encrypted keystore + password
+      keystore = File.join(keys_dir, "default.enc")
       return false unless File.exist?(keystore)
 
-      # 3. REMIT_KEY_PASSWORD set
       password = ENV["REMIT_KEY_PASSWORD"]
       return false if password.nil? || password.empty?
 

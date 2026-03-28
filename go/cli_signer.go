@@ -127,10 +127,10 @@ func (c *CliSigner) String() string {
 	return fmt.Sprintf("CliSigner{address: %s}", c.address.Hex())
 }
 
-// IsCliSignerAvailable checks all three conditions for CliSigner activation:
+// IsCliSignerAvailable checks conditions for CliSigner activation:
 //  1. `remit` (or `remit.exe`) found on PATH
-//  2. Keystore file exists at ~/.remit/keys/default.enc
-//  3. REMIT_KEY_PASSWORD env var is set (non-empty)
+//  2. ~/.remit/keys/default.meta exists (keychain, no password needed), OR
+//  3. ~/.remit/keys/default.enc exists AND REMIT_KEY_PASSWORD env var is set
 func IsCliSignerAvailable(cliPath ...string) bool {
 	path := "remit"
 	if len(cliPath) > 0 && cliPath[0] != "" {
@@ -142,17 +142,21 @@ func IsCliSignerAvailable(cliPath ...string) bool {
 		return false
 	}
 
-	// Check 2: Keystore exists
+	// Check 2: Keychain path — .meta file exists (no password needed)
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return false
 	}
+	metaPath := filepath.Join(home, ".remit", "keys", "default.meta")
+	if _, err := os.Stat(metaPath); err == nil {
+		return true
+	}
+
+	// Check 3: Encrypted file path — .enc + password
 	keystorePath := filepath.Join(home, ".remit", "keys", "default.enc")
 	if _, err := os.Stat(keystorePath); os.IsNotExist(err) {
 		return false
 	}
-
-	// Check 3: Password available
 	if os.Getenv("REMIT_KEY_PASSWORD") == "" {
 		return false
 	}

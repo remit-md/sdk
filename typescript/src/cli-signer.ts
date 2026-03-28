@@ -126,15 +126,19 @@ export class CliSigner implements Signer {
   }
 
   /**
-   * Check all three conditions for CliSigner activation:
-   * 1. Keystore file exists at ~/.remit/keys/default.enc
-   * 2. REMIT_KEY_PASSWORD env var is set
+   * Check conditions for CliSigner activation:
+   * 1. ~/.remit/keys/default.meta exists (keychain — no password needed), OR
+   * 2. ~/.remit/keys/default.enc exists AND REMIT_KEY_PASSWORD env var is set
    *
    * Note: CLI presence on PATH is not checked synchronously — it's
    * verified when create() is called.
    */
   static isAvailable(): boolean {
     try {
+      // Keychain path: .meta file exists (no password needed)
+      const metaPath = join(homedir(), ".remit", "keys", "default.meta");
+      if (existsSync(metaPath)) return true;
+      // Encrypted file path: .enc + password
       const keystorePath = join(homedir(), ".remit", "keys", "default.enc");
       if (!existsSync(keystorePath)) return false;
       if (!process.env["REMIT_KEY_PASSWORD"]) return false;

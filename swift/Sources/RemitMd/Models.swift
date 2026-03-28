@@ -166,8 +166,11 @@ public struct Reputation: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.address = (try? container.decode(String.self, forKey: .wallet))
-            ?? (try container.decode(String.self, forKey: .address))
+        if let wallet = try? container.decode(String.self, forKey: .wallet) {
+            self.address = wallet
+        } else {
+            self.address = try container.decode(String.self, forKey: .address)
+        }
         self.score = try container.decode(Double.self, forKey: .score)
         self.totalVolume = try container.decode(Double.self, forKey: .totalVolume)
         self.transactionCount = try container.decode(Int.self, forKey: .transactionCount)

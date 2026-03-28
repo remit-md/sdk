@@ -70,7 +70,6 @@
 
 pub mod a2a;
 pub mod cli_signer;
-mod compliance;
 pub mod error;
 mod http;
 mod mock;

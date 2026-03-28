@@ -69,10 +69,11 @@ async def test_bounty_lifecycle() -> None:
     else:
         print("[ACCEPTANCE] bounty submit: no tx_hash (off-chain submission)")
 
-    # Wait for submission tx
-    await asyncio.sleep(5)
+    # Wait for submission to be indexed
+    await asyncio.sleep(10)
 
-    # Step 3: Poster awards (first submission = ID 1)
+    # Step 3: Poster awards the submission
+    print(f"[ACCEPTANCE] awarding bounty={bounty.id}")
     awarded = await poster.award_bounty(bounty.id, submission_id=1)
     assert awarded.status == "awarded", f"bounty should be awarded, got {awarded.status}"
     if hasattr(awarded, "tx_hash") and awarded.tx_hash:

@@ -668,12 +668,18 @@ func TestBountyLifecycle(t *testing.T) {
 	contracts := fetchContracts(t)
 	posterBefore := getUsdcBalance(t, contracts.USDC, poster.Address())
 
-	// 1. Create bounty: $5 reward, 1 hour deadline (auto-permit)
+	// 1. Create bounty: $5 reward, 1 hour deadline
 	deadline := time.Now().Unix() + 3600
+	// Explicit permit with $1 headroom (same pattern as TS/Python tests)
+	permit, err := poster.SignPermit(ctx, contracts.Bounty, 6.0)
+	if err != nil {
+		t.Fatalf("SignPermit for bounty: %v", err)
+	}
 	bounty, err := poster.CreateBounty(ctx,
 		decimal.NewFromFloat(5.0),
 		"Write a Go acceptance test",
 		deadline,
+		WithBountyPermit(permit),
 	)
 	if err != nil {
 		t.Fatalf("CreateBounty: %v", err)

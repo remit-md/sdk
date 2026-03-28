@@ -112,6 +112,7 @@ func createTestWallet(t *testing.T) *testWallet {
 		t.Fatalf("NewWallet: %v", err)
 	}
 
+	t.Logf("[ACCEPTANCE] wallet: %s (chain=84532)", wallet.Address())
 	return &testWallet{Wallet: wallet, key: key}
 }
 
@@ -188,11 +189,12 @@ func assertBalanceChange(t *testing.T, label string, before, after, expected flo
 
 func logTx(t *testing.T, flow, step, txHash string) {
 	t.Helper()
-	t.Logf("[TX] %s | %s | %s | https://sepolia.basescan.org/tx/%s", flow, step, txHash, txHash)
+	t.Logf("[ACCEPTANCE] %s | %s | tx=%s | https://sepolia.basescan.org/tx/%s", flow, step, txHash, txHash)
 }
 
 func fundTestWallet(t *testing.T, w *testWallet, amount float64) {
 	t.Helper()
+	t.Logf("[ACCEPTANCE] mint: %.1f USDC -> %s", amount, w.Address())
 	ctx := context.Background()
 	contracts := fetchContracts(t)
 	_, err := w.Mint(ctx, amount)

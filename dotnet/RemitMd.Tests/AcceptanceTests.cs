@@ -38,6 +38,7 @@ public class AcceptanceTests
 
         var wallet = new Wallet(hexKey, chain: "base", testnet: true, baseUrl: ApiUrl, routerAddress: routerAddress);
         var signer = new PrivateKeySigner(hexKey);
+        _output.WriteLine($"[ACCEPTANCE] wallet: {wallet.Address} (chain=84532)");
         return new TestWallet(wallet, signer);
     }
 
@@ -86,6 +87,7 @@ public class AcceptanceTests
 
     private async Task FundWallet(TestWallet tw, decimal amount)
     {
+        _output.WriteLine($"[ACCEPTANCE] mint: {amount} USDC -> {tw.Wallet.Address}");
         await tw.Wallet.MintAsync(amount);
         await WaitForBalanceChange(tw.Wallet.Address, 0);
     }
@@ -161,7 +163,7 @@ public class AcceptanceTests
     private void LogTx(string flow, string step, string? txHash)
     {
         if (string.IsNullOrEmpty(txHash)) return;
-        _output.WriteLine($"[TX] {flow} | {step} | {txHash} | https://sepolia.basescan.org/tx/{txHash}");
+        _output.WriteLine($"[ACCEPTANCE] {flow} | {step} | tx={txHash} | https://sepolia.basescan.org/tx/{txHash}");
     }
 
     // ─── Tests ──────────────────────────────────────────────────────────────

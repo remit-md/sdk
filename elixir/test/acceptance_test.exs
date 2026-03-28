@@ -41,6 +41,8 @@ defmodule RemitMd.AcceptanceTest do
       router_address: contracts["router"]
     )
 
+    IO.puts("[ACCEPTANCE] wallet: #{wallet.address} (chain=84532)")
+
     %{wallet: wallet, key_hex: key_hex}
   end
 
@@ -90,6 +92,10 @@ defmodule RemitMd.AcceptanceTest do
     end
   end
 
+  defp log_tx(flow, step, tx_hash) do
+    IO.puts("[ACCEPTANCE] #{flow} | #{step} | tx=#{tx_hash} | https://sepolia.basescan.org/tx/#{tx_hash}")
+  end
+
   defp assert_balance_change(label, before, after_val, expected) do
     actual = after_val - before
     tolerance = max(abs(expected) * 0.001, 0.02)
@@ -98,7 +104,9 @@ defmodule RemitMd.AcceptanceTest do
   end
 
   defp fund_wallet(tw, amount, usdc_address) do
-    {:ok, _} = Wallet.mint(tw.wallet, to_string(amount))
+    IO.puts("[ACCEPTANCE] mint: #{amount} USDC -> #{tw.wallet.address}")
+    {:ok, mint_resp} = Wallet.mint(tw.wallet, to_string(amount))
+    log_tx("mint", "mint", mint_resp.tx_hash)
     wait_for_balance_change(tw.wallet.address, 0, usdc_address)
   end
 
@@ -182,6 +190,7 @@ defmodule RemitMd.AcceptanceTest do
     {:ok, tx} = Wallet.pay(agent.wallet, provider.wallet.address, "1.000000",
       description: "elixir-sdk-acceptance", permit: permit)
     assert String.starts_with?(tx.tx_hash, "0x")
+    log_tx("direct", "pay", tx.tx_hash)
 
     agent_after = wait_for_balance_change(agent.wallet.address, agent_before, usdc_address)
     provider_after = get_usdc_balance(provider.wallet.address, usdc_address)
@@ -219,16 +228,19 @@ defmodule RemitMd.AcceptanceTest do
     {:ok, escrow} = Wallet.create_escrow(agent.wallet, provider.wallet.address, "5.000000",
       permit: permit)
     assert escrow.escrow_id != nil
+    if escrow.tx_hash, do: log_tx("escrow", "create", escrow.tx_hash)
 
     # Wait for on-chain lock
     wait_for_balance_change(agent.wallet.address, agent_before, usdc_address)
 
     # Provider claims start
-    {:ok, _} = Wallet.claim_start(provider.wallet, escrow.escrow_id)
+    {:ok, claim_tx} = Wallet.claim_start(provider.wallet, escrow.escrow_id)
+    log_tx("escrow", "claim_start", claim_tx.tx_hash)
     Process.sleep(5_000)
 
     # Agent releases
-    {:ok, _} = Wallet.release_escrow(agent.wallet, escrow.escrow_id)
+    {:ok, release_tx} = Wallet.release_escrow(agent.wallet, escrow.escrow_id)
+    log_tx("escrow", "release", release_tx.tx_hash)
 
     # Verify balances
     provider_after = wait_for_balance_change(provider.wallet.address, provider_before, usdc_address)
@@ -263,6 +275,7 @@ defmodule RemitMd.AcceptanceTest do
     {:ok, tab} = Wallet.create_tab(payer.wallet, provider.wallet.address,
       "10.000000", "0.100000", permit: permit)
     assert tab.tab_id != nil
+    IO.puts("[ACCEPTANCE] tab | create | tab_id=#{tab.tab_id}")
 
     # Wait for on-chain funding
     wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
@@ -272,6 +285,7 @@ defmodule RemitMd.AcceptanceTest do
       contracts["tab"], tab.tab_id, 100_000, 1)
     {:ok, charge} = Wallet.charge_tab(provider.wallet, tab.tab_id, 0.10, 0.10, 1, charge_sig)
     assert charge.tab_id == tab.tab_id
+    IO.puts("[ACCEPTANCE] tab | charge | tab_id=#{tab.tab_id}")
 
     # 3. Close tab with final settlement
     close_sig = Wallet.sign_tab_charge(provider.wallet,
@@ -279,6 +293,7 @@ defmodule RemitMd.AcceptanceTest do
     {:ok, closed} = Wallet.close_tab(payer.wallet, tab.tab_id,
       final_amount: 0.10, provider_sig: close_sig)
     assert closed.status != "open"
+    if closed.tx_hash, do: log_tx("tab", "close", closed.tx_hash)
 
     # 4. Verify: payer should have lost funds
     payer_after = wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
@@ -311,6 +326,7 @@ defmodule RemitMd.AcceptanceTest do
     {:ok, stream} = Wallet.create_stream(payer.wallet, payee.wallet.address,
       "0.01", "5.0", permit: permit)
     assert stream.stream_id != nil
+    IO.puts("[ACCEPTANCE] stream | create | stream_id=#{stream.stream_id}")
 
     # Wait for on-chain lock
     wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
@@ -321,6 +337,7 @@ defmodule RemitMd.AcceptanceTest do
     # 3. Close stream
     {:ok, closed} = Wallet.close_stream(payer.wallet, stream.stream_id)
     assert %RemitMd.Models.Transaction{} = closed
+    log_tx("stream", "close", closed.tx_hash)
 
     # 4. Conservation: payer should have lost some funds
     payer_after = wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
@@ -354,6 +371,7 @@ defmodule RemitMd.AcceptanceTest do
     {:ok, bounty} = Wallet.create_bounty(poster.wallet, "5.000000",
       "Write an Elixir acceptance test", bounty_deadline, permit: permit)
     assert bounty.bounty_id != nil
+    IO.puts("[ACCEPTANCE] bounty | create | bounty_id=#{bounty.bounty_id}")
 
     # Wait for on-chain lock
     wait_for_balance_change(poster.wallet.address, poster_before, usdc_address)
@@ -362,10 +380,12 @@ defmodule RemitMd.AcceptanceTest do
     evidence_hash = "0x" <> (RemitMd.Keccak.hex("elixir test evidence"))
     {:ok, sub} = Wallet.submit_bounty(submitter.wallet, bounty.bounty_id, evidence_hash)
     assert sub.bounty_id == bounty.bounty_id
+    IO.puts("[ACCEPTANCE] bounty | submit | submission_id=#{sub.id}")
 
     # 3. Award bounty (as poster)
     {:ok, awarded} = Wallet.award_bounty(poster.wallet, bounty.bounty_id, sub.id)
     assert %RemitMd.Models.Bounty{} = awarded
+    IO.puts("[ACCEPTANCE] bounty | award | bounty_id=#{awarded.bounty_id}")
 
     # 4. Verify: submitter should have received funds
     submitter_after = wait_for_balance_change(submitter.wallet.address, 0, usdc_address)
@@ -397,13 +417,15 @@ defmodule RemitMd.AcceptanceTest do
     {:ok, deposit} = Wallet.place_deposit(payer.wallet, provider.wallet.address, "5.000000",
       expires_in: 3600, permit: permit)
     assert deposit.deposit_id != nil
+    if deposit.tx_hash, do: log_tx("deposit", "place", deposit.tx_hash)
 
     # Wait for on-chain lock
     wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
     payer_after_deposit = get_usdc_balance(payer.wallet.address, usdc_address)
 
     # 2. Return deposit (by provider)
-    {:ok, _} = Wallet.return_deposit(provider.wallet, deposit.deposit_id)
+    {:ok, return_tx} = Wallet.return_deposit(provider.wallet, deposit.deposit_id)
+    log_tx("deposit", "return", return_tx.tx_hash)
 
     # 3. Verify full refund (deposits have no fee)
     payer_after_return = wait_for_balance_change(payer.wallet.address, payer_after_deposit, usdc_address)

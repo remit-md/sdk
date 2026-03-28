@@ -30,19 +30,22 @@ async function getContracts(): Promise<Record<string, string>> {
 export async function createWallet(): Promise<Wallet> {
   const key = generatePrivateKey();
   const contracts = await getContracts();
-  return new Wallet({
+  const wallet = new Wallet({
     privateKey: key,
     chain: "base-sepolia",
     apiUrl: API_URL,
     rpcUrl: RPC_URL,
     routerAddress: contracts.router,
   });
+  console.log(`[ACCEPTANCE] wallet: ${wallet.address} (chain=84532)`);
+  return wallet;
 }
 
 // ─── Funding ────────────────────────────────────────────────────────────────
 
 /** Mint testnet USDC and wait for on-chain confirmation. */
 export async function fundWallet(wallet: Wallet, amount = 100): Promise<void> {
+  console.log(`[ACCEPTANCE] mint: ${amount} USDC -> ${wallet.address}`);
   await wallet.mint(amount);
   // Wait for balance via RPC (doesn't require auth)
   await waitForBalanceChange(wallet.address, 0);
@@ -109,5 +112,5 @@ export function assertBalanceChange(
 
 /** Log a transaction hash with a basescan link. */
 export function logTx(flow: string, step: string, txHash: string): void {
-  console.log(`[TX] ${flow} | ${step} | ${txHash} | https://sepolia.basescan.org/tx/${txHash}`);
+  console.log(`[ACCEPTANCE] ${flow} | ${step} | tx=${txHash} | https://sepolia.basescan.org/tx/${txHash}`);
 }

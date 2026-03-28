@@ -46,12 +46,14 @@ async def create_wallet() -> Wallet:
     """Create a fresh wallet pointing at the live API."""
     key = "0x" + secrets.token_hex(32)
     router = await get_router()
-    return Wallet(
+    wallet = Wallet(
         private_key=key,
         chain="base-sepolia",
         api_url=API_URL,
         router_address=router,
     )
+    print(f"[ACCEPTANCE] wallet: {wallet.address} (chain=84532)")
+    return wallet
 
 
 async def get_usdc_balance(address: str) -> float:
@@ -110,10 +112,15 @@ def assert_balance_change(
 
 def log_tx(flow: str, step: str, tx_hash: str) -> None:
     """Log a transaction hash with a basescan link."""
-    print(f"[TX] {flow} | {step} | {tx_hash} | https://sepolia.basescan.org/tx/{tx_hash}")
+    print(
+        f"[ACCEPTANCE] {flow} | {step}"
+        f" | tx={tx_hash}"
+        f" | https://sepolia.basescan.org/tx/{tx_hash}"
+    )
 
 
 async def fund_wallet(wallet: Wallet, amount: float = 100) -> None:
     """Mint testnet USDC and wait for on-chain confirmation."""
+    print(f"[ACCEPTANCE] mint: {amount} USDC -> {wallet.address}")
     await wallet.mint(amount)
     await wait_for_balance_change(wallet.address, 0)

@@ -25,6 +25,11 @@ final class AcceptanceTests: XCTestCase {
         let signer: PrivateKeySigner
     }
 
+    func logTx(_ flow: String, _ step: String, txHash: String?) {
+        guard let hash = txHash else { return }
+        print("[ACCEPTANCE] \(flow) | \(step) | tx=\(hash) | https://sepolia.basescan.org/tx/\(hash)")
+    }
+
     func createTestWallet() async throws -> TestWallet {
         var keyBytes = [UInt8](repeating: 0, count: 32)
         #if canImport(Security)
@@ -42,6 +47,7 @@ final class AcceptanceTests: XCTestCase {
         let signer = try PrivateKeySigner(privateKey: hexKey)
         let wallet = try RemitWallet(privateKey: hexKey, chain: .baseSepolia,
                                      baseURL: Self.apiURL, routerAddress: routerAddress)
+        print("[ACCEPTANCE] wallet: \(wallet.address) (chain=84532)")
         return TestWallet(wallet: wallet, signer: signer)
     }
 
@@ -99,7 +105,9 @@ final class AcceptanceTests: XCTestCase {
     }
 
     func fundWallet(_ tw: TestWallet, amount: Double, usdcAddress: String) async throws {
-        _ = try await tw.wallet.mint(amount: amount)
+        print("[ACCEPTANCE] mint: \(amount) USDC -> \(tw.wallet.address)")
+        let mintResult = try await tw.wallet.mint(amount: amount)
+        logTx("mint", "mint", txHash: mintResult.txHash)
         _ = try await waitForBalanceChange(tw.wallet.address, before: 0, usdcAddress: usdcAddress)
     }
 
@@ -218,6 +226,7 @@ final class AcceptanceTests: XCTestCase {
 
         let tx = try await agent.wallet.pay(to: provider.wallet.address, amount: 1.0,
                                             memo: "swift-sdk-acceptance", permit: permit)
+        logTx("pay", "pay", txHash: tx.txHash)
         XCTAssertTrue(tx.txHash?.hasPrefix("0x") == true)
 
         let agentAfter = try await waitForBalanceChange(agent.wallet.address, before: agentBefore, usdcAddress: usdcAddr)
@@ -255,14 +264,17 @@ final class AcceptanceTests: XCTestCase {
 
         let escrow = try await agent.wallet.createEscrow(recipient: provider.wallet.address,
                                                           amount: 5.0, permit: permit)
+        logTx("escrow", "create", txHash: escrow.txHash)
         XCTAssertFalse(escrow.id.isEmpty)
 
         _ = try await waitForBalanceChange(agent.wallet.address, before: agentBefore, usdcAddress: usdcAddr)
 
-        _ = try await provider.wallet.claimStart(id: escrow.id)
+        let claimed = try await provider.wallet.claimStart(id: escrow.id)
+        logTx("escrow", "claimStart", txHash: claimed.txHash)
         try await Task.sleep(nanoseconds: 5_000_000_000)
 
-        _ = try await agent.wallet.releaseEscrow(id: escrow.id)
+        let released = try await agent.wallet.releaseEscrow(id: escrow.id)
+        logTx("escrow", "release", txHash: released.txHash)
 
         let providerAfter = try await waitForBalanceChange(provider.wallet.address, before: providerBefore, usdcAddress: usdcAddr)
         let agentAfter = try await getUsdcBalance(agent.wallet.address, usdcAddress: usdcAddr)
@@ -461,7 +473,8 @@ final class AcceptanceTests: XCTestCase {
         let payerAfterDeposit = try await getUsdcBalance(payer.wallet.address, usdcAddress: usdcAddr)
 
         // 2. Return deposit (by provider)
-        _ = try await provider.wallet.returnDeposit(id: deposit.id)
+        let returned = try await provider.wallet.returnDeposit(id: deposit.id)
+        logTx("deposit", "return", txHash: returned.txHash)
 
         // 3. Verify full refund (deposits have no fee)
         let payerAfterReturn = try await waitForBalanceChange(payer.wallet.address, before: payerAfterDeposit, usdcAddress: usdcAddr)

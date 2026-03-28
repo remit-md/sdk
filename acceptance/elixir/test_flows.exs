@@ -9,12 +9,6 @@
 #   mix deps.get
 #   ACCEPTANCE_API_URL=https://testnet.remit.md mix run test_flows.exs
 
-Mix.install([
-  {:remit, path: "../../elixir"},
-  {:jason, "~> 1.4"},
-  {:req, "~> 0.5"}
-])
-
 Application.ensure_all_started(:inets)
 Application.ensure_all_started(:ssl)
 Application.ensure_all_started(:crypto)

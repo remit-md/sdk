@@ -12,6 +12,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Nethereum.Signer;
+using Nethereum.Util;
 using RemitMd;
 
 // ─── Config ─────────────────────────────────────────────────────────────────────
@@ -105,28 +106,33 @@ async Task FundWallet(Wallet wallet, decimal amount)
     await WaitForBalanceChange(wallet.Address, 0);
 }
 
+// ─── Keccak256 helper (Eip712 is internal in the SDK) ───────────────────────────
+
+byte[] Keccak256(string text) => Keccak256Bytes(Encoding.UTF8.GetBytes(text));
+byte[] Keccak256Bytes(byte[] data) => new Sha3Keccack().CalculateHash(data);
+
 // ─── EIP-2612 Permit Signing ────────────────────────────────────────────────────
 
 PermitSignature SignUsdcPermit(PrivateKeySigner signer, string owner, string spender,
                                 long value, long nonce, long deadline)
 {
-    var domainTypeHash = Eip712.Keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    var nameHash = Eip712.Keccak256("USD Coin");
-    var versionHash = Eip712.Keccak256("2");
+    var domainTypeHash = Keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    var nameHash = Keccak256("USD Coin");
+    var versionHash = Keccak256("2");
     var domainData = ConcatBytes(domainTypeHash, nameHash, versionHash, PadUint256(CHAIN_ID), PadAddress(USDC_ADDRESS));
-    var domainSep = Eip712.Keccak256(domainData);
+    var domainSep = Keccak256Bytes(domainData);
 
-    var permitTypeHash = Eip712.Keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    var permitTypeHash = Keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     var structData = ConcatBytes(permitTypeHash, PadAddress(owner), PadAddress(spender),
                                  PadUint256(value), PadUint256(nonce), PadUint256(deadline));
-    var structHash = Eip712.Keccak256(structData);
+    var structHash = Keccak256Bytes(structData);
 
     var finalData = new byte[66];
     finalData[0] = 0x19;
     finalData[1] = 0x01;
     Buffer.BlockCopy(domainSep, 0, finalData, 2, 32);
     Buffer.BlockCopy(structHash, 0, finalData, 34, 32);
-    var digest = Eip712.Keccak256(finalData);
+    var digest = Keccak256Bytes(finalData);
 
     var sigHex = signer.Sign(digest);
     var sigBytes = Convert.FromHexString(sigHex.Replace("0x", ""));
@@ -330,24 +336,24 @@ async Task FlowX402Weather(Wallet agent, PrivateKeySigner agentSigner)
     var nonceHex = "0x" + Convert.ToHexString(nonceBytes).ToLowerInvariant();
 
     // EIP-712 domain: USD Coin / version 2
-    var domainTypeHash = Eip712.Keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    var dNameHash = Eip712.Keccak256("USD Coin");
-    var dVersionHash = Eip712.Keccak256("2");
+    var domainTypeHash = Keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    var dNameHash = Keccak256("USD Coin");
+    var dVersionHash = Keccak256("2");
     var domainData = ConcatBytes(domainTypeHash, dNameHash, dVersionHash, PadUint256(chainId), PadAddress(asset));
-    var domainSep = Eip712.Keccak256(domainData);
+    var domainSep = Keccak256Bytes(domainData);
 
     // TransferWithAuthorization struct
-    var typeHash = Eip712.Keccak256("TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)");
+    var typeHash = Keccak256("TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)");
     var structData = ConcatBytes(typeHash, PadAddress(agent.Address), PadAddress(payTo),
                                   PadUint256(amountRaw), PadUint256(0), PadUint256(validBefore), nonceBytes);
-    var structHash = Eip712.Keccak256(structData);
+    var structHash = Keccak256Bytes(structData);
 
     var payload = new byte[66];
     payload[0] = 0x19;
     payload[1] = 0x01;
     Buffer.BlockCopy(domainSep, 0, payload, 2, 32);
     Buffer.BlockCopy(structHash, 0, payload, 34, 32);
-    var digest = Eip712.Keccak256(payload);
+    var digest = Keccak256Bytes(payload);
 
     var signature = agentSigner.Sign(digest);
 

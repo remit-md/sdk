@@ -65,8 +65,8 @@ async def test_bounty_lifecycle() -> None:
     # Step 2: Provider submits evidence
     evidence_hash = "0x" + "ab" * 32
     submission = await provider.submit_bounty(bounty.id, evidence_hash=evidence_hash)
-    submission_id = submission.get("id")
-    assert submission_id is not None, "submission should have an id"
+    submission_id = submission.invoice_id
+    assert submission_id is not None, "submission should have an invoice_id"
 
     # Wait for submission tx
     await asyncio.sleep(5)

@@ -556,15 +556,10 @@ func TestTabLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CloseTab: %v", err)
 	}
-	if closed.Status == "open" {
-		t.Fatal("tab should not be open after close")
-	}
-	if closed.ClosedTxHash != "" {
-		logTx(t, "tab", "close", closed.ClosedTxHash)
-	} else if closed.TxHash != "" {
+	if closed.TxHash != "" {
 		logTx(t, "tab", "close", closed.TxHash)
 	}
-	t.Logf("Tab closed: status=%s", closed.Status)
+	t.Logf("Tab closed: tx=%s", closed.TxHash)
 
 	// 4. Verify balance: payer should have lost the charged amount (+ fee)
 	payerAfter := waitForBalanceChange(t, payer.Address(), payerBefore)
@@ -625,9 +620,9 @@ func TestStreamLifecycle(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	// 3. Close stream (retry for Ponder indexer lag - may take 30-90s)
-	var closed *remitmd.Stream
+	var closedTx *remitmd.Transaction
 	for attempt := 0; attempt < 20; attempt++ {
-		closed, err = payer.CloseStream(ctx, stream.ID)
+		closedTx, err = payer.CloseStream(ctx, stream.ID)
 		if err == nil {
 			break
 		}
@@ -639,9 +634,10 @@ func TestStreamLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CloseStream: %v", err)
 	}
-	if closed.Status != "closed" {
-		t.Logf("stream status after close: %s (expected closed)", closed.Status)
+	if closedTx.TxHash != "" {
+		logTx(t, "stream", "close", closedTx.TxHash)
 	}
+	t.Logf("Stream closed: tx=%s", closedTx.TxHash)
 	if closed.TxHash != "" {
 		logTx(t, "stream", "close", closed.TxHash)
 	}
@@ -719,13 +715,10 @@ func TestBountyLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AwardBounty: %v", err)
 	}
-	if awarded.Status != "awarded" {
-		t.Logf("bounty status after award: %s (expected awarded)", awarded.Status)
-	}
 	if awarded.TxHash != "" {
 		logTx(t, "bounty", "award", awarded.TxHash)
 	}
-	t.Logf("Bounty awarded: status=%s", awarded.Status)
+	t.Logf("Bounty awarded: tx=%s", awarded.TxHash)
 
 	// 4. Verify balances
 	submitterAfter := waitForBalanceChange(t, submitter.Address(), 0)

@@ -19,7 +19,8 @@ async def test_pay_direct_happy_path(wallet_pair):
 
     print(f"[COMPLIANCE] pay_direct: 5.0 USDC {payer.address} -> {payee_addr}")
     tx = await payer.pay_direct(payee_addr, 5.0, memo="compliance test")
-    print(f"[COMPLIANCE] pay: 5.0 USDC {payer.address} -> {payee_addr} tx={tx.tx_hash} invoice={tx.invoice_id}")
+    print(f"[COMPLIANCE] pay: 5.0 USDC {payer.address} -> {payee_addr}"
+          f" tx={tx.tx_hash} invoice={tx.invoice_id}")
 
     assert tx.tx_hash is not None, "tx_hash must be set"
     assert tx.invoice_id is not None, "invoice_id must be set"

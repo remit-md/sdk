@@ -215,7 +215,11 @@ mod compliance_tests {
         let payer = get_shared_payer(&client).await;
         let (_payee_key, payee_addr) = generate_wallet();
 
-        eprintln!("[COMPLIANCE] pay: 0.0001 USDC {} -> {} (expect error: below minimum)", payer.address(), payee_addr);
+        eprintln!(
+            "[COMPLIANCE] pay: 0.0001 USDC {} -> {} (expect error: below minimum)",
+            payer.address(),
+            payee_addr
+        );
         let result = payer
             .pay(&payee_addr, Decimal::from_str("0.0001").unwrap())
             .await;

@@ -32,7 +32,8 @@ async def test_tab_close_settles(wallet_pair):
 
     payer, payee, payee_addr = wallet_pair
 
-    print(f"[COMPLIANCE] tab open (for close): limit=50.0 per_unit=1.0 {payer.address} -> {payee_addr}")
+    print(f"[COMPLIANCE] tab open (for close): limit=50.0 per_unit=1.0"
+          f" {payer.address} -> {payee_addr}")
     tab = await payer.open_tab(payee_addr, limit=50.0, per_unit=1.0)
     print(f"[COMPLIANCE] tab opened: id={tab.id} status={tab.status}")
 

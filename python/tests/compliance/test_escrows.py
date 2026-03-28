@@ -26,7 +26,8 @@ async def test_escrow_create_returns_funded_invoice(wallet_pair):
 
     # Retrieve escrow - must be in funded state immediately after creation
     escrow = await payer.get_escrow(tx.invoice_id)
-    print(f"[COMPLIANCE] escrow get: id={escrow.invoice_id} status={escrow.status} amount={escrow.amount}")
+    print(f"[COMPLIANCE] escrow get: id={escrow.invoice_id}"
+          f" status={escrow.status} amount={escrow.amount}")
     assert escrow.invoice_id == tx.invoice_id
     assert escrow.status == EscrowStatus.funded
     assert escrow.amount == pytest.approx(10.0, abs=0.01)

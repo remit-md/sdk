@@ -698,23 +698,31 @@ public sealed class Wallet
     /// Auto-signs a permit for the given contract type and amount.
     /// Used internally by payment methods when no explicit permit is provided.
     /// </summary>
-    private async Task<PermitSignature> AutoPermitAsync(string contract, decimal amount)
+    private async Task<PermitSignature?> AutoPermitAsync(string contract, decimal amount)
     {
-        var contracts = await GetContractsAsync();
-        var spender = contract switch
+        try
         {
-            "router"  => contracts.Router,
-            "escrow"  => contracts.Escrow,
-            "tab"     => contracts.Tab,
-            "stream"  => contracts.Stream,
-            "bounty"  => contracts.Bounty,
-            "deposit" => contracts.Deposit,
-            "relayer" => contracts.Relayer,
-            _ => throw new ArgumentException($"Unknown contract type: {contract}", nameof(contract)),
-        };
-        if (string.IsNullOrEmpty(spender))
-            throw new RemitError(ErrorCodes.ServerError, $"No {contract} contract address available from /contracts endpoint.");
-        return await SignPermitAsync(spender, amount);
+            var contracts = await GetContractsAsync();
+            var spender = contract switch
+            {
+                "router"  => contracts.Router,
+                "escrow"  => contracts.Escrow,
+                "tab"     => contracts.Tab,
+                "stream"  => contracts.Stream,
+                "bounty"  => contracts.Bounty,
+                "deposit" => contracts.Deposit,
+                "relayer" => contracts.Relayer,
+                _ => null,
+            };
+            if (string.IsNullOrEmpty(spender))
+                return null;
+            return await SignPermitAsync(spender, amount);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[remitmd] auto-permit failed for {contract} (amount={amount}): {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>

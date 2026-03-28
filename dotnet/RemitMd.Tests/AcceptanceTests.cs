@@ -21,7 +21,7 @@ namespace RemitMd.Tests;
 [Trait("Category", "Acceptance")]
 public class AcceptanceTests
 {
-    private static readonly string ApiUrl = Environment.GetEnvironmentVariable("ACCEPTANCE_API_URL") ?? "https://remit.md";
+    private static readonly string ApiUrl = Environment.GetEnvironmentVariable("ACCEPTANCE_API_URL") ?? "https://testnet.remit.md";
     private static readonly string RpcUrl = Environment.GetEnvironmentVariable("ACCEPTANCE_RPC_URL") ?? "https://sepolia.base.org";
     private const string UsdcAddress = "0x2d846325766921935f37d5b4478196d3ef93707c";
     private const string FeeWallet = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";

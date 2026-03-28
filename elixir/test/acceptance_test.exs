@@ -13,7 +13,7 @@ defmodule RemitMd.AcceptanceTest do
 
   @moduletag :acceptance
 
-  @api_url System.get_env("ACCEPTANCE_API_URL", "https://remit.md")
+  @api_url System.get_env("ACCEPTANCE_API_URL", "https://testnet.remit.md")
   @rpc_url System.get_env("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
   @usdc_address "0x2d846325766921935f37d5b4478196d3ef93707c"
   @fee_wallet "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"

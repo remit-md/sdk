@@ -14,7 +14,7 @@ import httpx
 
 from remitmd.wallet import Wallet
 
-API_URL = os.environ.get("ACCEPTANCE_API_URL", "https://remit.md")
+API_URL = os.environ.get("ACCEPTANCE_API_URL", "https://testnet.remit.md")
 RPC_URL = os.environ.get("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
 USDC_ADDRESS = "0x2d846325766921935f37d5b4478196d3ef93707c"
 FEE_WALLET = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"

@@ -10,7 +10,7 @@ import { generatePrivateKey } from "viem/accounts";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-export const API_URL = process.env["ACCEPTANCE_API_URL"] ?? "https://remit.md/api/v1";
+export const API_URL = process.env["ACCEPTANCE_API_URL"] ?? "https://testnet.remit.md/api/v1";
 export const RPC_URL = process.env["ACCEPTANCE_RPC_URL"] ?? "https://sepolia.base.org";
 export const FEE_WALLET = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38";
 

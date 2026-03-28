@@ -36,7 +36,7 @@ import (
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 var (
-	acceptanceAPIURL = envOr("ACCEPTANCE_API_URL", "https://remit.md")
+	acceptanceAPIURL = envOr("ACCEPTANCE_API_URL", "https://testnet.remit.md")
 	acceptanceRPCURL = envOr("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
 	usdcAddress      = common.HexToAddress("0x2d846325766921935f37d5b4478196d3ef93707c")
 	feeWalletAddr    = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"

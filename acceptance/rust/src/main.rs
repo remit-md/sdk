@@ -394,6 +394,74 @@ fn sign_eip3009(
     (signature, nonce_hex)
 }
 
+// ─── EIP-712 API Auth ────────────────────────────────────────────────────────
+
+fn sign_api_auth(
+    key: &k256::ecdsa::SigningKey,
+    method: &str,
+    path: &str,
+    router_address: &str,
+) -> (String, String, String, String) {
+    // Domain: remit.md / 0.1
+    let domain_type_hash = keccak256(
+        b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+    );
+    let name_hash = keccak256(b"remit.md");
+    let version_hash = keccak256(b"0.1");
+
+    let mut domain_data = [0u8; 160];
+    domain_data[0..32].copy_from_slice(&domain_type_hash);
+    domain_data[32..64].copy_from_slice(&name_hash);
+    domain_data[64..96].copy_from_slice(&version_hash);
+    domain_data[96..128].copy_from_slice(&pad_u256(CHAIN_ID));
+    domain_data[128..160].copy_from_slice(&pad_address(router_address));
+    let domain_sep = keccak256(&domain_data);
+
+    // APIRequest struct — string fields are keccak256-hashed in EIP-712
+    let auth_type_hash = keccak256(
+        b"APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)",
+    );
+
+    let timestamp = now_unix();
+    let mut nonce_bytes = [0u8; 32];
+    getrandom::getrandom(&mut nonce_bytes).expect("generate auth nonce");
+
+    let method_hash = keccak256(method.as_bytes());
+    let path_hash = keccak256(path.as_bytes());
+
+    let mut struct_data = [0u8; 160];
+    struct_data[0..32].copy_from_slice(&auth_type_hash);
+    struct_data[32..64].copy_from_slice(&method_hash);
+    struct_data[64..96].copy_from_slice(&path_hash);
+    struct_data[96..128].copy_from_slice(&pad_u256(timestamp));
+    struct_data[128..160].copy_from_slice(&nonce_bytes);
+    let struct_hash = keccak256(&struct_data);
+
+    let mut final_data = [0u8; 66];
+    final_data[0] = 0x19;
+    final_data[1] = 0x01;
+    final_data[2..34].copy_from_slice(&domain_sep);
+    final_data[34..66].copy_from_slice(&struct_hash);
+    let digest = keccak256(&final_data);
+
+    use k256::ecdsa::signature::hazmat::PrehashSigner;
+    let (sig, recovery_id) = key.sign_prehash_recoverable(&digest).expect("sign api auth");
+    let mut sig_bytes = sig.to_bytes().to_vec();
+    sig_bytes.push(recovery_id.to_byte() + 27);
+
+    let verifying_key = key.verifying_key();
+    let pubkey_bytes = verifying_key.to_encoded_point(false);
+    let addr_hash = keccak256(&pubkey_bytes.as_bytes()[1..]);
+    let agent_addr = format!("0x{}", hex::encode(&addr_hash[12..]));
+
+    (
+        format!("0x{}", hex::encode(&sig_bytes)),
+        agent_addr,
+        timestamp.to_string(),
+        format!("0x{}", hex::encode(nonce_bytes)),
+    )
+}
+
 // ─── Flow 1: Direct Payment ─────────────────────────────────────────────────
 
 async fn flow_direct(
@@ -401,6 +469,7 @@ async fn flow_direct(
     provider: &TestWallet,
     contracts: &Contracts,
     results: &mut Results,
+    permit_nonce: &mut u64,
 ) {
     let flow = "1. Direct Payment";
     let permit = sign_usdc_permit(
@@ -408,9 +477,10 @@ async fn flow_direct(
         agent.wallet.address(),
         &contracts.router,
         2_000_000,
-        0,
+        *permit_nonce,
         now_unix() + 3600,
     );
+    *permit_nonce += 1;
 
     let tx = agent
         .wallet
@@ -438,6 +508,7 @@ async fn flow_escrow(
     provider: &TestWallet,
     contracts: &Contracts,
     results: &mut Results,
+    permit_nonce: &mut u64,
 ) {
     let flow = "2. Escrow";
     let permit = sign_usdc_permit(
@@ -445,9 +516,10 @@ async fn flow_escrow(
         agent.wallet.address(),
         &contracts.escrow,
         6_000_000,
-        0,
+        *permit_nonce,
         now_unix() + 3600,
     );
+    *permit_nonce += 1;
 
     let agent_before = get_usdc_balance(agent.wallet.address()).await;
 
@@ -496,6 +568,7 @@ async fn flow_tab(
     provider: &TestWallet,
     contracts: &Contracts,
     results: &mut Results,
+    permit_nonce: &mut u64,
 ) {
     let flow = "3. Metered Tab";
     let permit = sign_usdc_permit(
@@ -503,9 +576,10 @@ async fn flow_tab(
         agent.wallet.address(),
         &contracts.tab,
         11_000_000,
-        0,
+        *permit_nonce,
         now_unix() + 3600,
     );
+    *permit_nonce += 1;
 
     let agent_before = get_usdc_balance(agent.wallet.address()).await;
 
@@ -583,6 +657,7 @@ async fn flow_stream(
     provider: &TestWallet,
     contracts: &Contracts,
     results: &mut Results,
+    permit_nonce: &mut u64,
 ) {
     let flow = "4. Stream";
     let permit = sign_usdc_permit(
@@ -590,9 +665,10 @@ async fn flow_stream(
         agent.wallet.address(),
         &contracts.stream,
         6_000_000,
-        0,
+        *permit_nonce,
         now_unix() + 3600,
     );
+    *permit_nonce += 1;
 
     let stream = agent
         .wallet
@@ -630,6 +706,7 @@ async fn flow_bounty(
     provider: &TestWallet,
     contracts: &Contracts,
     results: &mut Results,
+    permit_nonce: &mut u64,
 ) {
     let flow = "5. Bounty";
     let permit = sign_usdc_permit(
@@ -637,9 +714,10 @@ async fn flow_bounty(
         agent.wallet.address(),
         &contracts.bounty,
         6_000_000,
-        0,
+        *permit_nonce,
         now_unix() + 3600,
     );
+    *permit_nonce += 1;
 
     let agent_before = get_usdc_balance(agent.wallet.address()).await;
     let deadline = now_unix() + 3600;
@@ -692,6 +770,7 @@ async fn flow_deposit(
     provider: &TestWallet,
     contracts: &Contracts,
     results: &mut Results,
+    permit_nonce: &mut u64,
 ) {
     let flow = "6. Deposit";
     let permit = sign_usdc_permit(
@@ -699,9 +778,10 @@ async fn flow_deposit(
         agent.wallet.address(),
         &contracts.deposit,
         6_000_000,
-        0,
+        *permit_nonce,
         now_unix() + 3600,
     );
+    *permit_nonce += 1;
 
     let agent_before = get_usdc_balance(agent.wallet.address()).await;
     let expiry = now_unix() + 3600;
@@ -841,8 +921,16 @@ async fn flow_x402_weather(agent: &TestWallet, results: &mut Results) {
         },
     });
 
+    let contracts = fetch_contracts().await;
+    let (auth_sig, auth_agent, auth_ts, auth_nonce) =
+        sign_api_auth(&agent.signing_key, "POST", "/api/v1/x402/settle", &contracts.router);
+
     let settle_resp = client
         .post(&format!("{base}/x402/settle"))
+        .header("X-Remit-Signature", &auth_sig)
+        .header("X-Remit-Agent", &auth_agent)
+        .header("X-Remit-Timestamp", &auth_ts)
+        .header("X-Remit-Nonce", &auth_nonce)
         .json(&settle_body)
         .send()
         .await
@@ -1085,17 +1173,20 @@ async fn main() {
     log_info(&format!("  Provider balance: ${bal2:.2}"));
     println!();
 
+    // Permit nonce counter — each permit consumed on-chain increments the nonce
+    let mut permit_nonce: u64 = 0;
+
     // Run flows sequentially
     // Each flow internally handles its own [PASS]/[FAIL] logging.
     // If a flow panics, it will abort the entire suite (acceptable for acceptance tests).
     // For graceful error handling within flows, each flow uses .expect() on
     // critical operations — failures are visible in the output.
-    flow_direct(&agent, &provider, &contracts, &mut results).await;
-    flow_escrow(&agent, &provider, &contracts, &mut results).await;
-    flow_tab(&agent, &provider, &contracts, &mut results).await;
-    flow_stream(&agent, &provider, &contracts, &mut results).await;
-    flow_bounty(&agent, &provider, &contracts, &mut results).await;
-    flow_deposit(&agent, &provider, &contracts, &mut results).await;
+    flow_direct(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    flow_escrow(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    flow_tab(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    flow_stream(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    flow_bounty(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
+    flow_deposit(&agent, &provider, &contracts, &mut results, &mut permit_nonce).await;
     flow_x402_weather(&agent, &mut results).await;
     flow_ap2_discovery(&mut results).await;
     flow_ap2_payment(&agent, &provider, &mut results).await;

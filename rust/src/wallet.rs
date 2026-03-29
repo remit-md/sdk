@@ -1046,6 +1046,72 @@ impl Wallet {
         self.post("/api/v1/webhooks", body).await
     }
 
+    /// List all registered webhooks for this wallet.
+    pub async fn list_webhooks(&self) -> Result<Vec<Webhook>, RemitError> {
+        let val = self.transport.get("/api/v1/webhooks").await?;
+        serde_json::from_value(val).map_err(|e| RemitError::new("PARSE_ERROR", e.to_string()))
+    }
+
+    /// Delete a webhook by ID.
+    pub async fn delete_webhook(&self, webhook_id: &str) -> Result<(), RemitError> {
+        self.transport
+            .delete(&format!("/api/v1/webhooks/{}", webhook_id))
+            .await?;
+        Ok(())
+    }
+
+    // ─── Aliases (canonical names) ───────────────────────────────────────────
+
+    /// Canonical name for `create_tab`.
+    pub async fn open_tab(
+        &self,
+        provider: &str,
+        limit: Decimal,
+        per_unit: Decimal,
+    ) -> Result<Tab, RemitError> {
+        self.create_tab(provider, limit, per_unit).await
+    }
+
+    /// Canonical name for `create_stream`.
+    pub async fn open_stream(
+        &self,
+        payee: &str,
+        rate_per_second: Decimal,
+        max_total: Decimal,
+    ) -> Result<Stream, RemitError> {
+        self.create_stream(payee, rate_per_second, max_total).await
+    }
+
+    /// Canonical name for `create_bounty`.
+    pub async fn post_bounty(
+        &self,
+        amount: Decimal,
+        task: &str,
+        deadline: u64,
+    ) -> Result<Bounty, RemitError> {
+        self.create_bounty(amount, task, deadline).await
+    }
+
+    /// Canonical name for `lock_deposit`.
+    pub async fn place_deposit(
+        &self,
+        provider: &str,
+        amount: Decimal,
+        expires_in_secs: u64,
+    ) -> Result<Deposit, RemitError> {
+        self.lock_deposit(provider, amount, expires_in_secs).await
+    }
+
+    /// Alias for propose_intent.
+    pub async fn express_intent(
+        &self,
+        to: &str,
+        amount: Decimal,
+        payment_type: &str,
+    ) -> Result<Intent, RemitError> {
+        self.propose_intent(to, amount, payment_type).await
+    }
+
     /// Generate a one-time URL for the operator to fund this wallet.
     pub async fn create_fund_link(&self) -> Result<LinkResponse, RemitError> {
         self.create_fund_link_with_options(None, None).await

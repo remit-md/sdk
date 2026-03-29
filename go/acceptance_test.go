@@ -510,13 +510,13 @@ func TestTab(t *testing.T) {
 		t.Fatalf("SignPermit: %v", err)
 	}
 
-	tab, err := agent.CreateTab(ctx, provider.Address(),
+	tab, err := agent.OpenTab(ctx, provider.Address(),
 		decimal.NewFromFloat(limit),
 		decimal.NewFromFloat(0.1),
 		remitmd.WithTabPermit(permit),
 	)
 	if err != nil {
-		t.Fatalf("CreateTab: %v", err)
+		t.Fatalf("OpenTab: %v", err)
 	}
 	if tab.ID == "" {
 		t.Fatal("tab ID should not be empty")
@@ -590,13 +590,13 @@ func TestStream(t *testing.T) {
 		t.Fatalf("SignPermit: %v", err)
 	}
 
-	stream, err := agent.CreateStream(ctx, provider.Address(),
+	stream, err := agent.OpenStream(ctx, provider.Address(),
 		decimal.NewFromFloat(rate),
 		decimal.NewFromFloat(maxTotal),
 		remitmd.WithStreamPermit(permit),
 	)
 	if err != nil {
-		t.Fatalf("CreateStream: %v", err)
+		t.Fatalf("OpenStream: %v", err)
 	}
 	if stream.ID == "" {
 		t.Fatal("stream ID should not be empty")
@@ -662,14 +662,14 @@ func TestBounty(t *testing.T) {
 		t.Fatalf("SignPermit: %v", err)
 	}
 
-	bounty, err := agent.CreateBounty(ctx,
+	bounty, err := agent.PostBounty(ctx,
 		decimal.NewFromFloat(amount),
 		"acceptance-bounty",
 		deadlineTs,
 		remitmd.WithBountyPermit(permit),
 	)
 	if err != nil {
-		t.Fatalf("CreateBounty: %v", err)
+		t.Fatalf("PostBounty: %v", err)
 	}
 	if bounty.ID == "" {
 		t.Fatal("bounty ID should not be empty")

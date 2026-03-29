@@ -480,9 +480,9 @@ func WithTabPermit(permit *PermitSignature) TabOption {
 	return func(o *TabOptions) { o.Permit = permit }
 }
 
-// CreateTab opens a metered payment tab. The payer pre-funds up to limit USDC;
+// OpenTab opens a metered payment tab. The payer pre-funds up to limit USDC;
 // the provider charges perUnit USDC per API call.
-func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.Decimal, perUnit decimal.Decimal, opts ...TabOption) (*Tab, error) {
+func (w *Wallet) OpenTab(ctx context.Context, provider string, limit decimal.Decimal, perUnit decimal.Decimal, opts ...TabOption) (*Tab, error) {
 	if err := validateAddress(provider); err != nil {
 		return nil, err
 	}
@@ -514,6 +514,12 @@ func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.D
 		return nil, err
 	}
 	return &tab, nil
+}
+
+// CreateTab is a deprecated alias for OpenTab.
+// Deprecated: Use OpenTab instead.
+func (w *Wallet) CreateTab(ctx context.Context, provider string, limit decimal.Decimal, perUnit decimal.Decimal, opts ...TabOption) (*Tab, error) {
+	return w.OpenTab(ctx, provider, limit, perUnit, opts...)
 }
 
 // Deprecated: Use ChargeTab instead. DebitTab will be removed in a future release.
@@ -610,8 +616,8 @@ func WithStreamPermit(permit *PermitSignature) StreamOption {
 	return func(o *StreamOptions) { o.Permit = permit }
 }
 
-// CreateStream starts a per-second USDC payment stream to a payee.
-func (w *Wallet) CreateStream(ctx context.Context, payee string, ratePerSecond decimal.Decimal, maxTotal decimal.Decimal, opts ...StreamOption) (*Stream, error) {
+// OpenStream starts a per-second USDC payment stream to a payee.
+func (w *Wallet) OpenStream(ctx context.Context, payee string, ratePerSecond decimal.Decimal, maxTotal decimal.Decimal, opts ...StreamOption) (*Stream, error) {
 	if err := validateAddress(payee); err != nil {
 		return nil, err
 	}
@@ -642,6 +648,12 @@ func (w *Wallet) CreateStream(ctx context.Context, payee string, ratePerSecond d
 		return nil, err
 	}
 	return &stream, nil
+}
+
+// CreateStream is a deprecated alias for OpenStream.
+// Deprecated: Use OpenStream instead.
+func (w *Wallet) CreateStream(ctx context.Context, payee string, ratePerSecond decimal.Decimal, maxTotal decimal.Decimal, opts ...StreamOption) (*Stream, error) {
+	return w.OpenStream(ctx, payee, ratePerSecond, maxTotal, opts...)
 }
 
 // CloseStream closes an active payment stream.
@@ -683,8 +695,8 @@ func WithBountyPermit(permit *PermitSignature) BountyOption {
 	return func(o *BountyOptions) { o.Permit = permit }
 }
 
-// CreateBounty posts a USDC bounty for task completion.
-func (w *Wallet) CreateBounty(ctx context.Context, amount decimal.Decimal, task string, deadline int64, opts ...BountyOption) (*Bounty, error) {
+// PostBounty posts a USDC bounty for task completion.
+func (w *Wallet) PostBounty(ctx context.Context, amount decimal.Decimal, task string, deadline int64, opts ...BountyOption) (*Bounty, error) {
 	if err := validateAmount(amount); err != nil {
 		return nil, err
 	}
@@ -716,6 +728,12 @@ func (w *Wallet) CreateBounty(ctx context.Context, amount decimal.Decimal, task 
 		return nil, err
 	}
 	return &bounty, nil
+}
+
+// CreateBounty is a deprecated alias for PostBounty.
+// Deprecated: Use PostBounty instead.
+func (w *Wallet) CreateBounty(ctx context.Context, amount decimal.Decimal, task string, deadline int64, opts ...BountyOption) (*Bounty, error) {
+	return w.PostBounty(ctx, amount, task, deadline, opts...)
 }
 
 // SubmitBounty submits evidence to claim a bounty.
@@ -1192,6 +1210,20 @@ func (w *Wallet) RegisterWebhook(ctx context.Context, url string, events []strin
 		return nil, err
 	}
 	return &wh, nil
+}
+
+// ListWebhooks returns all registered webhooks for this wallet.
+func (w *Wallet) ListWebhooks(ctx context.Context) ([]Webhook, error) {
+	var webhooks []Webhook
+	if err := w.http.get(ctx, "/api/v1/webhooks", &webhooks); err != nil {
+		return nil, err
+	}
+	return webhooks, nil
+}
+
+// DeleteWebhook removes a webhook by ID.
+func (w *Wallet) DeleteWebhook(ctx context.Context, webhookID string) error {
+	return w.http.delete(ctx, "/api/v1/webhooks/"+webhookID)
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────

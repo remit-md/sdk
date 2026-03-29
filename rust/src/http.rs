@@ -40,6 +40,7 @@ pub(crate) fn chain_config(chain_key: &str) -> Option<ChainConfig> {
 pub(crate) trait Transport: Send + Sync {
     async fn post(&self, path: &str, body: Option<Value>) -> Result<Value, RemitError>;
     async fn get(&self, path: &str) -> Result<Value, RemitError>;
+    async fn delete(&self, path: &str) -> Result<Value, RemitError>;
 }
 
 // ─── Real HTTP transport ──────────────────────────────────────────────────────
@@ -86,6 +87,10 @@ impl Transport for HttpTransport {
 
     async fn get(&self, path: &str) -> Result<Value, RemitError> {
         self.do_request("GET", path, None).await
+    }
+
+    async fn delete(&self, path: &str) -> Result<Value, RemitError> {
+        self.do_request("DELETE", path, None).await
     }
 }
 

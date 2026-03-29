@@ -179,6 +179,12 @@ public sealed class MockRemit
             return Task.FromResult(Reserialize<T>(result));
         }
 
+        public Task DeleteAsync(string path, CancellationToken ct)
+        {
+            // Mock delete - no-op
+            return Task.CompletedTask;
+        }
+
         // ── Permit ───────────────────────────────────────────────────────────
 
         private object HandlePermitsPrepare(object body)

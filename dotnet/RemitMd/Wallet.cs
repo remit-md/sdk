@@ -562,6 +562,49 @@ public sealed class Wallet
             chains = (chains ?? new[] { _chain }).ToList(),
         }, ct);
 
+    /// <summary>Lists all registered webhooks for this wallet.</summary>
+    public Task<Webhook[]> ListWebhooksAsync(CancellationToken ct = default)
+        => _transport.GetAsync<Webhook[]>("/api/v1/webhooks", ct);
+
+    /// <summary>Deletes a webhook by ID.</summary>
+    public Task DeleteWebhookAsync(string webhookId, CancellationToken ct = default)
+        => _transport.DeleteAsync($"/api/v1/webhooks/{webhookId}", ct);
+
+    // ─── Canonical name aliases ──────────────────────────────────────────────
+
+    /// <summary>Canonical name for CreateTabAsync.</summary>
+    public Task<Tab> OpenTabAsync(string provider, decimal limitAmount, decimal perUnit,
+        int expiresInSeconds = 86400, PermitSignature? permit = null, CancellationToken ct = default)
+        => CreateTabAsync(provider, limitAmount, perUnit, expiresInSeconds, permit, ct);
+
+    /// <summary>Canonical name for CreateStreamAsync.</summary>
+    public Task<Stream> OpenStreamAsync(string payee, decimal ratePerSecond, decimal maxTotal,
+        PermitSignature? permit = null, CancellationToken ct = default)
+        => CreateStreamAsync(payee, ratePerSecond, maxTotal, permit, ct);
+
+    /// <summary>Canonical name for CreateBountyAsync.</summary>
+    public Task<Bounty> PostBountyAsync(decimal amount, string taskDescription, int deadlineSecs = 86400,
+        int maxAttempts = 10, PermitSignature? permit = null, CancellationToken ct = default)
+        => CreateBountyAsync(amount, taskDescription, deadlineSecs, maxAttempts, permit, ct);
+
+    /// <summary>Canonical name for LockDepositAsync.</summary>
+    public Task<Deposit> PlaceDepositAsync(string provider, decimal amount, int expireSecs = 86400,
+        PermitSignature? permit = null, CancellationToken ct = default)
+        => LockDepositAsync(provider, amount, expireSecs, permit, ct);
+
+    /// <summary>Settle and close a tab.</summary>
+    public Task<Tab> SettleTabAsync(string tabId, CancellationToken ct = default)
+        => CloseTabAsync(tabId, ct: ct);
+
+    /// <summary>Claim all vested stream payments (callable by recipient).</summary>
+    public Task<Transaction> WithdrawStreamAsync(string streamId, CancellationToken ct = default)
+        => _transport.PostAsync<Transaction>($"/api/v1/streams/{streamId}/withdraw", new { }, ct);
+
+    /// <summary>Alias for ProposeIntentAsync.</summary>
+    public Task<Intent> ExpressIntentAsync(string to, decimal amount, string paymentType = "direct",
+        CancellationToken ct = default)
+        => ProposeIntentAsync(to, amount, paymentType, ct);
+
     // ─── One-time operator links ──────────────────────────────────────────────
 
     /// <summary>Generates a one-time URL for the operator to fund this wallet.

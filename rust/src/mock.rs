@@ -188,6 +188,10 @@ impl Transport for MockTransport {
     async fn get(&self, path: &str) -> Result<Value, RemitError> {
         self.dispatch("GET", path, None).await
     }
+
+    async fn delete(&self, path: &str) -> Result<Value, RemitError> {
+        self.dispatch("DELETE", path, None).await
+    }
 }
 
 impl MockTransport {
@@ -525,6 +529,23 @@ impl MockTransport {
                 Ok(serde_json::to_value(&*bounty).unwrap())
             }
 
+            // ─── Bounty submit ─────────────────────────────────────────────
+            (method, path)
+                if method == "POST" && path.ends_with("/submit") && path.contains("/bounties/") =>
+            {
+                let bounty_id = extract_id(path, "/api/v1/bounties/", "/submit");
+                let evidence = b["evidence_hash"].as_str().unwrap_or("").to_string();
+                Ok(json!({
+                    "id": 1i64,
+                    "bounty_id": bounty_id,
+                    "submitter": MOCK_WALLET,
+                    "evidence_hash": evidence,
+                    "accepted": null,
+                    "status": "pending",
+                    "submitted_at": Utc::now(),
+                }))
+            }
+
             // ─── Deposit ──────────────────────────────────────────────────
             ("POST", "/api/v1/deposits") => {
                 let provider = b["provider"]
@@ -577,6 +598,13 @@ impl MockTransport {
 
             // ─── Spending summary ─────────────────────────────────────────
             ("GET", path) if path.starts_with("/api/v1/wallet/spending") => {
+                let period = path
+                    .split("period=")
+                    .nth(1)
+                    .unwrap_or("month")
+                    .split('&')
+                    .next()
+                    .unwrap_or("month");
                 let s = self.state.lock().await;
                 let total: Decimal = s
                     .transactions
@@ -586,7 +614,7 @@ impl MockTransport {
                 let count = s.transactions.len() as u64;
                 Ok(json!({
                     "address": "0xMockWallet0000000000000000000000000001",
-                    "period": "month",
+                    "period": period,
                     "total_spent": total,
                     "total_fees": Decimal::new(1, 3) * Decimal::new(count as i64, 0),
                     "tx_count": count,
@@ -731,7 +759,7 @@ impl MockTransport {
                 let value = (amount_f64 * 1_000_000.0).round() as u64;
                 let deadline = Utc::now().timestamp() as u64 + 3600;
                 Ok(json!({
-                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+                    "hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567801",
                     "value": value.to_string(),
                     "deadline": deadline.to_string(),
                 }))
@@ -739,7 +767,7 @@ impl MockTransport {
 
             // ─── x402 prepare ────────────────────────────────────────────────
             ("POST", "/api/v1/x402/prepare") => Ok(json!({
-                "hash": "0x0000000000000000000000000000000000000000000000000000000000000002",
+                "hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567802",
                 "from": MOCK_WALLET,
                 "to": "0x0000000000000000000000000000000000000002",
                 "value": "100000",
@@ -747,6 +775,33 @@ impl MockTransport {
                 "validBefore": (Utc::now().timestamp() as u64 + 60).to_string(),
                 "nonce": format!("0x{}", mock_hash()),
             })),
+
+            // ─── Webhooks ─────────────────────────────────────────────────
+            ("POST", "/api/v1/webhooks") => {
+                let url = b["url"].as_str().unwrap_or("").to_string();
+                let events: Vec<String> = b["events"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                Ok(json!({
+                    "id": new_id("wh"),
+                    "wallet": MOCK_WALLET,
+                    "url": url,
+                    "events": events,
+                    "chains": ["base-sepolia"],
+                    "active": true,
+                    "created_at": Utc::now(),
+                    "updated_at": Utc::now(),
+                }))
+            }
+
+            ("GET", "/api/v1/webhooks") => Ok(json!([])),
+
+            ("DELETE", path) if path.starts_with("/api/v1/webhooks/") => Ok(Value::Null),
 
             // ─── Catch-all: return empty success ──────────────────────────
             _ => Ok(Value::Null),
@@ -1004,5 +1059,217 @@ mod tests {
         let err = wallet.pay(RECIPIENT, dec!(0.0000001)).await.unwrap_err();
         assert_eq!(err.code, codes::INVALID_AMOUNT);
         assert!(err.message.contains("minimum"));
+    }
+
+    // ─── Wallet alias tests ──────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn open_tab_creates_tab() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let tab = wallet
+            .open_tab(PAYEE, dec!(10.00), dec!(0.10))
+            .await
+            .unwrap();
+        assert_eq!(tab.status, TabStatus::Open);
+    }
+
+    #[tokio::test]
+    async fn open_stream_starts_stream() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let stream = wallet
+            .open_stream(RECIPIENT, dec!(0.001), dec!(50.00))
+            .await
+            .unwrap();
+        assert_eq!(stream.status, StreamStatus::Active);
+    }
+
+    #[tokio::test]
+    async fn post_bounty_creates_bounty() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let deadline = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600;
+        let bounty = wallet
+            .post_bounty(dec!(5.00), "test task", deadline)
+            .await
+            .unwrap();
+        assert_eq!(bounty.status, BountyStatus::Open);
+    }
+
+    #[tokio::test]
+    async fn place_deposit_locks_funds() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let deposit = wallet
+            .place_deposit(PAYEE, dec!(20.00), 86400)
+            .await
+            .unwrap();
+        assert_eq!(deposit.status, DepositStatus::Locked);
+        assert_eq!(mock.balance().await, dec!(9980.00));
+    }
+
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn settle_tab_closes_tab() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let tab = wallet
+            .create_tab(PAYEE, dec!(10.00), dec!(0.10))
+            .await
+            .unwrap();
+        let settled = wallet.settle_tab(&tab.id, 0.10, "0x00").await.unwrap();
+        assert_eq!(settled.status, TabStatus::Closed);
+    }
+
+    #[tokio::test]
+    async fn register_webhook_succeeds() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let wh = wallet
+            .register_webhook("https://example.com/wh", &["payment.sent"], None)
+            .await
+            .unwrap();
+        assert!(!wh.id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_webhooks_returns_empty() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let webhooks = wallet.list_webhooks().await.unwrap();
+        assert!(webhooks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn delete_webhook_succeeds() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        wallet.delete_webhook("wh-123").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn spending_summary_returns_data() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let summary = wallet.spending_summary("day").await.unwrap();
+        assert_eq!(summary.period, "day");
+    }
+
+    #[tokio::test]
+    async fn remaining_budget_returns_data() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let budget = wallet.remaining_budget().await.unwrap();
+        assert!(budget.daily_remaining >= Decimal::ZERO);
+    }
+
+    #[tokio::test]
+    async fn history_returns_empty_list() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let history = wallet.history(1, 20).await.unwrap();
+        assert!(history.items.is_empty());
+    }
+
+    // ─── Error module tests ──────────────────────────────────────────────
+
+    #[test]
+    fn error_codes_are_stable_strings() {
+        assert_eq!(codes::INVALID_ADDRESS, "INVALID_ADDRESS");
+        assert_eq!(codes::INSUFFICIENT_BALANCE, "INSUFFICIENT_BALANCE");
+        assert_eq!(codes::INSUFFICIENT_FUNDS, codes::INSUFFICIENT_BALANCE);
+        assert_eq!(codes::TAB_DEPLETED, "TAB_DEPLETED");
+        assert_eq!(codes::ESCROW_EXPIRED, "ESCROW_EXPIRED");
+        assert_eq!(codes::NETWORK_ERROR, "NETWORK_ERROR");
+    }
+
+    #[test]
+    fn error_display_includes_code_and_message() {
+        let err = RemitError::new("TEST_CODE", "test message");
+        let display = format!("{}", err);
+        assert!(display.contains("TEST_CODE"));
+        assert!(display.contains("test message"));
+    }
+
+    #[test]
+    fn error_with_context_stores_values() {
+        let err = RemitError::new("TEST", "msg")
+            .with_context("amount", "5.00")
+            .with_context("wallet", "0x1234");
+        assert_eq!(err.context.len(), 2);
+    }
+
+    #[test]
+    fn error_doc_url_includes_code() {
+        let err = RemitError::new("INVALID_ADDRESS", "bad addr");
+        assert!(err.doc_url.contains("INVALID_ADDRESS"));
+    }
+
+    // ─── x402 tests ─────────────────────────────────────────────────────
+
+    #[test]
+    fn allowance_exceeded_error_displays_amounts() {
+        use crate::x402::AllowanceExceededError;
+        let err = AllowanceExceededError {
+            amount_usdc: 1.5,
+            limit_usdc: 0.1,
+        };
+        let msg = format!("{}", err);
+        assert!(msg.contains("1.5"));
+        assert!(msg.contains("0.1"));
+    }
+
+    #[tokio::test]
+    async fn amount_above_maximum_rejected() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let err = wallet.pay(RECIPIENT, dec!(1000001.00)).await.unwrap_err();
+        assert_eq!(err.code, codes::INVALID_AMOUNT);
+        assert!(err.message.contains("maximum"));
+    }
+
+    #[tokio::test]
+    async fn express_intent_delegates_to_propose() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        // express_intent is an alias for propose_intent
+        let result = wallet
+            .express_intent(RECIPIENT, dec!(10.00), "direct")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn close_stream_works() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let stream = wallet
+            .create_stream(RECIPIENT, dec!(0.001), dec!(50.00))
+            .await
+            .unwrap();
+        let closed = wallet.close_stream(&stream.id).await.unwrap();
+        assert_eq!(closed.status, StreamStatus::Closed);
+    }
+
+    #[tokio::test]
+    async fn submit_bounty_works() {
+        let mock = MockRemit::new();
+        let wallet = mock.wallet();
+        let deadline = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600;
+        let bounty = wallet
+            .create_bounty(dec!(5.00), "task", deadline)
+            .await
+            .unwrap();
+        let sub = wallet.submit_bounty(&bounty.id, "0xhash123").await;
+        assert!(sub.is_ok());
     }
 }

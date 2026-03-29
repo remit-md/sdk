@@ -581,6 +581,42 @@ public final class RemitWallet: @unchecked Sendable {
         )
     }
 
+    /// List all registered webhooks for this wallet.
+    public func listWebhooks() async throws -> [Webhook] {
+        return try await transport.request(method: "GET", path: "/api/v1/webhooks", body: nil as EmptyObject?)
+    }
+
+    /// Delete a webhook by ID.
+    public func deleteWebhook(id: String) async throws {
+        let _: EmptyResponse = try await transport.request(method: "DELETE", path: "/api/v1/webhooks/\(id)", body: nil as EmptyObject?)
+    }
+
+    // MARK: - Canonical name aliases
+
+    /// Canonical name for startStream.
+    public func openStream(payee: String, ratePerSecond: Double, maxTotal: Double,
+                           permit: PermitSignature? = nil) async throws -> Stream {
+        return try await startStream(payee: payee, ratePerSecond: ratePerSecond, maxTotal: maxTotal, permit: permit)
+    }
+
+    /// Settle and close a tab (alias for closeTab with defaults).
+    public func settleTab(id: String) async throws -> Tab {
+        return try await closeTab(id: id)
+    }
+
+    /// Alias for expressIntent.
+    public func proposeIntent(to recipient: String, amount: Double, model: String = "direct") async throws -> Intent {
+        return try await expressIntent(to: recipient, amount: amount, model: model)
+    }
+
+    /// Claim all vested stream payments (callable by recipient).
+    public func withdrawStream(id: String) async throws -> Transaction {
+        return try await transport.request(
+            method: "POST", path: "/api/v1/streams/\(id)/withdraw",
+            body: nil as EmptyObject?
+        )
+    }
+
     // MARK: - One-time operator links
 
     /// Generate a one-time URL for the operator to fund this wallet.
@@ -657,6 +693,7 @@ public final class RemitWallet: @unchecked Sendable {
 
 private struct EmptyBody: Codable {}
 private struct EmptyObject: Codable {}
+private struct EmptyResponse: Codable {}
 
 // StatusResponse is now replaced by the public WalletStatus model.
 

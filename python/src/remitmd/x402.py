@@ -151,9 +151,7 @@ class X402Client:
                 },
             },
         }
-        payment_header = base64.b64encode(
-            json.dumps(payment_payload).encode()
-        ).decode()
+        payment_header = base64.b64encode(json.dumps(payment_payload).encode()).decode()
 
         # 7. Retry with PAYMENT-SIGNATURE header.
         headers: dict[str, str] = dict(kwargs.pop("headers", {}))

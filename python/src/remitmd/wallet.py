@@ -324,9 +324,7 @@ class Wallet(RemitClient):
             s=s,
         )
 
-    async def _auto_permit(
-        self, contract: str, amount: float
-    ) -> PermitSignature | None:
+    async def _auto_permit(self, contract: str, amount: float) -> PermitSignature | None:
         """Internal: auto-sign a permit via /permits/prepare.
 
         Maps the contract name to a flow and calls sign_permit().

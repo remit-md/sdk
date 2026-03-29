@@ -248,7 +248,10 @@ impl Wallet {
         if sig_raw.len() != 130 {
             return Err(remit_err(
                 codes::INVALID_SIGNATURE,
-                format!("expected 65-byte signature (130 hex chars), got {}", sig_raw.len()),
+                format!(
+                    "expected 65-byte signature (130 hex chars), got {}",
+                    sig_raw.len()
+                ),
             ));
         }
         let r = format!("0x{}", &sig_raw[..64]);
@@ -258,12 +261,24 @@ impl Wallet {
         let value = data["value"]
             .as_str()
             .or_else(|| data["value"].as_u64().map(|_| ""))
-            .and_then(|s| if s.is_empty() { data["value"].as_u64() } else { s.parse::<u64>().ok() })
+            .and_then(|s| {
+                if s.is_empty() {
+                    data["value"].as_u64()
+                } else {
+                    s.parse::<u64>().ok()
+                }
+            })
             .unwrap_or(0);
         let deadline = data["deadline"]
             .as_str()
             .or_else(|| data["deadline"].as_u64().map(|_| ""))
-            .and_then(|s| if s.is_empty() { data["deadline"].as_u64() } else { s.parse::<u64>().ok() })
+            .and_then(|s| {
+                if s.is_empty() {
+                    data["deadline"].as_u64()
+                } else {
+                    s.parse::<u64>().ok()
+                }
+            })
             .unwrap_or(0);
 
         Ok(PermitSignature {

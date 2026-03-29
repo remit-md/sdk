@@ -88,6 +88,31 @@ class CliSigner(Signer):
             raise RuntimeError(f"CliSigner: invalid signature from CLI: {sig}")
         return sig
 
+    async def sign_hash(self, hash_bytes: bytes) -> str:
+        """Sign a raw 32-byte hash via the CLI's --digest flag."""
+        digest_hex = hash_bytes.hex()
+        proc = await asyncio.create_subprocess_exec(
+            self._cli_path,
+            "sign",
+            "--digest",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(digest_hex.encode()), timeout=_CLI_TIMEOUT
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"CliSigner: sign_hash failed: {stderr.decode().strip()}"
+            )
+        sig = stdout.decode().strip()
+        if not sig.startswith("0x") or len(sig) != 132:
+            raise RuntimeError(
+                f"CliSigner: invalid signature from CLI: {sig}"
+            )
+        return sig
+
     @staticmethod
     def is_available(cli_path: str = "remit") -> bool:
         """Check conditions for CliSigner activation.

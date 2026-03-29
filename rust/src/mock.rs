@@ -739,17 +739,15 @@ impl MockTransport {
             }
 
             // ─── x402 prepare ────────────────────────────────────────────────
-            ("POST", "/api/v1/x402/prepare") => {
-                Ok(json!({
-                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000002",
-                    "from": MOCK_WALLET,
-                    "to": "0x0000000000000000000000000000000000000002",
-                    "value": "100000",
-                    "validAfter": "0",
-                    "validBefore": (Utc::now().timestamp() as u64 + 60).to_string(),
-                    "nonce": format!("0x{}", mock_hash()),
-                }))
-            }
+            ("POST", "/api/v1/x402/prepare") => Ok(json!({
+                "hash": "0x0000000000000000000000000000000000000000000000000000000000000002",
+                "from": MOCK_WALLET,
+                "to": "0x0000000000000000000000000000000000000002",
+                "value": "100000",
+                "validAfter": "0",
+                "validBefore": (Utc::now().timestamp() as u64 + 60).to_string(),
+                "nonce": format!("0x{}", mock_hash()),
+            })),
 
             // ─── Catch-all: return empty success ──────────────────────────
             _ => Ok(Value::Null),

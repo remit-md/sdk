@@ -498,6 +498,20 @@ class Wallet(RemitClient):
         )
         return TabCharge.model_validate(data)
 
+    async def settle_tab(self, tab_id: str) -> Transaction:
+        """Settle and close a tab (alias for close_tab with defaults)."""
+        return await self.close_tab(tab_id)
+
+    async def debit_tab(self, tab_id: str, amount: float, memo: str = "") -> dict[str, Any]:
+        """Charge the given amount from an open tab (off-chain, signed).
+
+        Deprecated: Use charge_tab instead. Kept for backward compatibility.
+        """
+        return await self._http.post(
+            f"/api/v1/tabs/{tab_id}/debit",
+            {"tab_id": tab_id, "amount": amount, "memo": memo},
+        )
+
     async def close_tab(
         self,
         tab_id: str,
@@ -584,6 +598,11 @@ class Wallet(RemitClient):
         data = await self._http.post(f"/api/v1/streams/{stream_id}/close")
         return Transaction.model_validate(data)
 
+    async def withdraw_stream(self, stream_id: str) -> Transaction:
+        """Claim all vested stream payments (callable by recipient)."""
+        data = await self._http.post(f"/api/v1/streams/{stream_id}/withdraw")
+        return Transaction.model_validate(data)
+
     # ─── Bounties ─────────────────────────────────────────────────────────────
 
     async def post_bounty(
@@ -657,6 +676,23 @@ class Wallet(RemitClient):
         """Provider returns a deposit (full refund to depositor, no fee)."""
         data = await self._http.post(f"/api/v1/deposits/{deposit_id}/return", {})
         return Transaction.model_validate(data)
+
+    # ─── Intent Negotiation ──────────────────────────────────────────────────
+
+    async def propose_intent(
+        self, to: str, amount: float, payment_type: str = "direct"
+    ) -> dict[str, Any]:
+        """Propose a payment intent for negotiation (agent-to-agent)."""
+        return await self._http.post(
+            "/api/v1/intents",
+            {"to": to, "amount": str(amount), "type": payment_type},
+        )
+
+    async def express_intent(
+        self, to: str, amount: float, payment_type: str = "direct"
+    ) -> dict[str, Any]:
+        """Alias for propose_intent."""
+        return await self.propose_intent(to, amount, payment_type)
 
     # ─── Events ───────────────────────────────────────────────────────────────
 
@@ -743,6 +779,36 @@ class Wallet(RemitClient):
         body["chains"] = chains if chains is not None else [self.chain]
         data = await self._http.post("/api/v1/webhooks", body)
         return Webhook.model_validate(data)
+
+    async def list_webhooks(self) -> list[Webhook]:
+        """List all registered webhooks for this wallet."""
+        data = await self._http.get("/api/v1/webhooks")
+        return [Webhook.model_validate(w) for w in data]
+
+    async def delete_webhook(self, webhook_id: str) -> None:
+        """Delete a webhook by ID."""
+        await self._http.delete(f"/api/v1/webhooks/{webhook_id}")
+
+    # ─── Analytics ────────────────────────────────────────────────────────────
+
+    async def history(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
+        """Return paginated transaction history."""
+        return await self._http.get(
+            f"/api/v1/wallet/history?page={page}&per_page={per_page}"
+        )
+
+    async def reputation(self, address: str | None = None) -> dict[str, Any]:
+        """Return on-chain reputation for the given address (defaults to self)."""
+        addr = address or self.address
+        return await self._http.get(f"/api/v1/reputation/{addr}")
+
+    async def spending_summary(self, period: str = "day") -> dict[str, Any]:
+        """Return spending analytics for a given period (day/week/month/all)."""
+        return await self._http.get(f"/api/v1/wallet/spending?period={period}")
+
+    async def remaining_budget(self) -> dict[str, Any]:
+        """Return how much the agent can still spend under operator limits."""
+        return await self._http.get("/api/v1/wallet/budget")
 
     # ─── Testnet ──────────────────────────────────────────────────────────────
 

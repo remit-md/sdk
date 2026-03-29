@@ -57,6 +57,12 @@ internal sealed class ApiClient : IDisposable
         return await DeserializeAsync<T>(response);
     }
 
+    internal async Task DeleteAsync(string path, CancellationToken ct)
+    {
+        await ExecuteWithRetryAsync(
+            () => SendSignedAsync(HttpMethod.Delete, path, body: null, idempotencyKey: null, ct), ct);
+    }
+
     private async Task<HttpResponseMessage> SendSignedAsync(
         HttpMethod method,
         string path,
@@ -199,6 +205,7 @@ public interface IRemitTransport
 {
     Task<T> GetAsync<T>(string path, CancellationToken ct);
     Task<T> PostAsync<T>(string path, object body, CancellationToken ct);
+    Task DeleteAsync(string path, CancellationToken ct);
 }
 
 /// <summary>
@@ -238,5 +245,6 @@ internal sealed class HttpTransport : IRemitTransport, IDisposable
 
     public Task<T> GetAsync<T>(string path, CancellationToken ct)   => _client.GetAsync<T>(path, ct);
     public Task<T> PostAsync<T>(string path, object body, CancellationToken ct) => _client.PostAsync<T>(path, body, ct);
+    public Task DeleteAsync(string path, CancellationToken ct) => _client.DeleteAsync(path, ct);
     public void Dispose() => _client.Dispose();
 }

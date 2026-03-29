@@ -14,6 +14,7 @@ import type {
   WalletStatus,
   Webhook,
   LinkResponse,
+  Reputation,
 } from "./models/index.js";
 import type { Invoice } from "./models/invoice.js";
 import type { Escrow } from "./models/escrow.js";
@@ -498,6 +499,20 @@ export class Wallet extends RemitClient {
     });
   }
 
+  /** Settle and close a tab (alias for closeTab with defaults). */
+  settleTab(tabId: string): Promise<Transaction> {
+    return this.closeTab(tabId);
+  }
+
+  /** @deprecated Use chargeTab instead. */
+  debitTab(tabId: string, amount: number, memo = ""): Promise<Record<string, unknown>> {
+    return this.#auth.post<Record<string, unknown>>(`/tabs/${tabId}/debit`, {
+      tab_id: tabId,
+      amount,
+      memo,
+    });
+  }
+
   // ─── Streaming ──────────────────────────────────────────────────────────────
 
   async openStream(options: OpenStreamOptions): Promise<Stream> {
@@ -517,7 +532,12 @@ export class Wallet extends RemitClient {
     return this.#auth.post<Transaction>(`/streams/${streamId}/close`);
   }
 
-  // ─── Bounties ───────────────────────────────────────────────────────────────
+  /** Claim all vested stream payments (callable by recipient). */
+  withdrawStream(streamId: string): Promise<Transaction> {
+    return this.#auth.post<Transaction>(`/streams/${streamId}/withdraw`);
+  }
+
+  // �─── Bounties ───────────────────────────────────────────────────────────────
 
   async postBounty(options: PostBountyOptions): Promise<Bounty> {
     const permit = options.permit ?? await this.#autoPermit("bounty", options.amount);
@@ -559,6 +579,22 @@ export class Wallet extends RemitClient {
     return this.#auth.post<Transaction>(`/deposits/${depositId}/return`, {});
   }
 
+  // ─── Intent Negotiation ──────────────────────────────────────────────────
+
+  /** Propose a payment intent for negotiation (agent-to-agent). */
+  proposeIntent(to: string, amount: number, paymentType = "direct"): Promise<Record<string, unknown>> {
+    return this.#auth.post<Record<string, unknown>>("/intents", {
+      to,
+      amount: String(amount),
+      type: paymentType,
+    });
+  }
+
+  /** Alias for proposeIntent. */
+  expressIntent(to: string, amount: number, paymentType = "direct"): Promise<Record<string, unknown>> {
+    return this.proposeIntent(to, amount, paymentType);
+  }
+
   // ─── Authenticated reads (override unauthenticated base class versions) ──────
 
   /** GET /escrows/{id} - authenticated; server requires auth to access escrow details. */
@@ -580,6 +616,28 @@ export class Wallet extends RemitClient {
   async balance(): Promise<number> {
     const s = await this.status();
     return parseFloat(s.balance);
+  }
+
+  // ─── Analytics ─────────────────────────────────────────────────────────────
+
+  /** Return paginated transaction history. */
+  history(page = 1, perPage = 20): Promise<Record<string, unknown>> {
+    return this.#auth.get<Record<string, unknown>>(`/wallet/history?page=${page}&per_page=${perPage}`);
+  }
+
+  /** Return on-chain reputation for the given address (defaults to self). */
+  reputation(address?: string): Promise<Reputation> {
+    return this.#auth.get<Reputation>(`/reputation/${address ?? this.address}`);
+  }
+
+  /** Return spending analytics for a given period (day/week/month/all). */
+  spendingSummary(period = "day"): Promise<Record<string, unknown>> {
+    return this.#auth.get<Record<string, unknown>>(`/wallet/spending?period=${period}`);
+  }
+
+  /** Return how much the agent can still spend under operator limits. */
+  remainingBudget(): Promise<Record<string, unknown>> {
+    return this.#auth.get<Record<string, unknown>>("/wallet/budget");
   }
 
   // ─── Webhooks ───────────────────────────────────────────────────────────────

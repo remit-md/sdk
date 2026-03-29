@@ -130,6 +130,10 @@ module Remitmd
       dispatch("POST", path, body)
     end
 
+    def delete(path)
+      dispatch("DELETE", path, nil)
+    end
+
     private
 
     def dispatch(method, path, body)

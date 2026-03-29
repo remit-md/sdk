@@ -26,6 +26,7 @@ const (
 type remitTransport interface {
 	post(ctx context.Context, path string, body any, dst any) error
 	get(ctx context.Context, path string, dst any) error
+	delete(ctx context.Context, path string) error
 }
 
 // chainConfig maps chain identifiers to their API endpoints.
@@ -68,6 +69,11 @@ func (c *httpClient) post(ctx context.Context, path string, body any, dst any) e
 // get sends an authenticated GET request and decodes the JSON response into dst.
 func (c *httpClient) get(ctx context.Context, path string, dst any) error {
 	return c.do(ctx, http.MethodGet, path, nil, dst)
+}
+
+// delete sends an authenticated DELETE request.
+func (c *httpClient) delete(ctx context.Context, path string) error {
+	return c.do(ctx, http.MethodDelete, path, nil, nil)
 }
 
 func (c *httpClient) do(ctx context.Context, method, path string, body any, dst any) error {

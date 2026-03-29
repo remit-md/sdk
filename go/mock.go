@@ -149,6 +149,10 @@ func (t *mockTransport) get(ctx context.Context, path string, dst any) error {
 	return t.dispatch(ctx, "GET", path, nil, dst)
 }
 
+func (t *mockTransport) delete(ctx context.Context, path string) error {
+	return t.dispatch(ctx, "DELETE", path, nil, nil)
+}
+
 func (t *mockTransport) dispatch(_ context.Context, method, path string, body any, dst any) error {
 	m := t.mock
 
@@ -263,6 +267,21 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 			"valid_before": "9999999999",
 			"nonce":        "0x" + strings.Repeat("ef", 32),
 		})
+
+	case method == "POST" && path == "/api/v1/webhooks":
+		b := mustBody(body)
+		wh := Webhook{
+			ID:     newID("wh"),
+			URL:    b["url"].(string),
+			Events: toStringSlice(b["events"]),
+		}
+		return t.respond(dst, &wh)
+
+	case method == "GET" && path == "/api/v1/webhooks":
+		return t.respond(dst, []Webhook{})
+
+	case method == "DELETE" && strings.HasPrefix(path, "/api/v1/webhooks/"):
+		return nil
 
 	default:
 		// Unhandled routes succeed with an empty response (permissive mock)
@@ -525,6 +544,18 @@ func mustDecimal(v any) decimal.Decimal {
 	default:
 		return decimal.Zero
 	}
+}
+
+func toStringSlice(v any) []string {
+	raw, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, len(raw))
+	for i, item := range raw {
+		out[i], _ = item.(string)
+	}
+	return out
 }
 
 func extractID(path, prefix, suffix string) string {

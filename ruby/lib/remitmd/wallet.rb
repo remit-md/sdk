@@ -537,6 +537,39 @@ module Remitmd
       Webhook.new(@transport.post("/webhooks", body))
     end
 
+    # List all registered webhooks for this wallet.
+    def list_webhooks
+      @transport.get("/webhooks").map { |w| Webhook.new(w) }
+    end
+
+    # Delete a webhook by ID.
+    def delete_webhook(webhook_id)
+      @transport.delete("/webhooks/#{webhook_id}")
+      nil
+    end
+
+    # ─── Canonical name aliases ──────────────────────────────────────────────
+
+    # Canonical name for create_tab.
+    def open_tab(provider, limit_amount, per_unit = 0.0, expires_in_secs: 86_400, permit: nil)
+      create_tab(provider, limit_amount, per_unit, expires_in_secs: expires_in_secs, permit: permit)
+    end
+
+    # Canonical name for create_stream.
+    def open_stream(payee, rate_per_second, max_total, permit: nil)
+      create_stream(payee, rate_per_second, max_total, permit: permit)
+    end
+
+    # Canonical name for create_bounty.
+    def post_bounty(amount, task_description, deadline, max_attempts: 10, permit: nil)
+      create_bounty(amount, task_description, deadline, max_attempts: max_attempts, permit: permit)
+    end
+
+    # Alias for propose_intent.
+    def express_intent(to, amount, type: "direct")
+      propose_intent(to, amount, type: type)
+    end
+
     # ─── One-time operator links ───────────────────────────────────────────────
 
     # Generate a one-time URL for the operator to fund this wallet.

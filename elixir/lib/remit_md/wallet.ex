@@ -761,6 +761,72 @@ defmodule RemitMd.Wallet do
     end
   end
 
+  @doc "List all registered webhooks for this wallet."
+  def list_webhooks(%__MODULE__{} = w) do
+    case do_call(w, :get, "/webhooks", nil) do
+      {:ok, data} when is_list(data) -> {:ok, Enum.map(data, &Webhook.from_map/1)}
+      {:ok, _} -> {:ok, []}
+      err -> err
+    end
+  end
+
+  @doc "Delete a webhook by ID."
+  def delete_webhook(%__MODULE__{} = w, webhook_id) do
+    do_call(w, :delete, "/webhooks/#{webhook_id}", nil)
+  end
+
+  # ─── Tab aliases / missing methods ─────────────────────────────────
+
+  @doc "Canonical name for `create_tab`."
+  def open_tab(%__MODULE__{} = w, provider, limit_amount, per_unit, opts \\ []) do
+    create_tab(w, provider, limit_amount, per_unit, opts)
+  end
+
+  @doc "Settle and close a tab (alias for close_tab with defaults)."
+  def settle_tab(%__MODULE__{} = w, tab_id) do
+    close_tab(w, tab_id)
+  end
+
+  @doc "Charge the given amount from an open tab (off-chain, signed). Deprecated: use charge_tab."
+  def debit_tab(%__MODULE__{} = w, tab_id, amount, memo \\ "") do
+    body = %{tab_id: tab_id, amount: amount, memo: memo}
+    do_call(w, :post, "/tabs/#{tab_id}/debit", body)
+  end
+
+  # ��── Stream aliases / missing methods ──────────────────────────────
+
+  @doc "Canonical name for `create_stream`."
+  def open_stream(%__MODULE__{} = w, payee, rate_per_second, max_total, opts \\ []) do
+    create_stream(w, payee, rate_per_second, max_total, opts)
+  end
+
+  @doc "Claim all vested stream payments (callable by recipient)."
+  def withdraw_stream(%__MODULE__{} = w, stream_id) do
+    with {:ok, data} <- do_call(w, :post, "/streams/#{stream_id}/withdraw", %{}) do
+      {:ok, data}
+    end
+  end
+
+  # ─── Bounty aliases ────────────────────────────────────────────────
+
+  @doc "Canonical name for `create_bounty`."
+  def post_bounty(%__MODULE__{} = w, amount, task_description, deadline, opts \\ []) do
+    create_bounty(w, amount, task_description, deadline, opts)
+  end
+
+  # ─���─ Intent Negotiation ────────────────────────────────────────────
+
+  @doc "Propose a payment intent for negotiation (agent-to-agent)."
+  def propose_intent(%__MODULE__{} = w, to, amount, type \\ "direct") do
+    body = %{to: to, amount: to_string(amount), type: type}
+    do_call(w, :post, "/intents", body)
+  end
+
+  @doc "Alias for propose_intent."
+  def express_intent(%__MODULE__{} = w, to, amount, type \\ "direct") do
+    propose_intent(w, to, amount, type)
+  end
+
   @doc """
   Generate a one-time URL for the operator to fund this wallet.
 
@@ -933,8 +999,9 @@ defmodule RemitMd.Wallet do
     try do
       result =
         case method do
-          :get  -> Http.get(t, path)
-          :post -> Http.post(t, path, body)
+          :get    -> Http.get(t, path)
+          :post   -> Http.post(t, path, body)
+          :delete -> Http.delete(t, path)
         end
       {:ok, result}
     rescue

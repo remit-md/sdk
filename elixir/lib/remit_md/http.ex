@@ -49,6 +49,10 @@ defmodule RemitMd.Http do
     request(t, :post, path, body, 1, idempotency_key)
   end
 
+  def delete(%__MODULE__{} = t, path) do
+    request(t, :delete, path, nil, 1, nil)
+  end
+
   # ─── EIP-712 hash (exposed for golden-vector testing) ──────────────────
 
   @doc false
@@ -147,6 +151,9 @@ defmodule RemitMd.Http do
             http_opts(),
             []
           )
+
+        :delete ->
+          :httpc.request(:delete, {url_charlist, headers}, http_opts(), [])
       end
 
     case result do
@@ -256,6 +263,7 @@ defmodule RemitMd.Http do
 
   defp method_string(:get), do: "GET"
   defp method_string(:post), do: "POST"
+  defp method_string(:delete), do: "DELETE"
 
   defp http_opts do
     [timeout: 10_000, connect_timeout: 5_000]

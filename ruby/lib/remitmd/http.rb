@@ -38,6 +38,10 @@ module Remitmd
       request(:post, path, body)
     end
 
+    def delete(path)
+      request(:delete, path, nil)
+    end
+
     private
 
     def request(method, path, body)
@@ -65,8 +69,9 @@ module Remitmd
     def build_request(method, path, body, idempotency_key = nil)
       full_path = "#{@uri.path}#{path}"
       req = case method
-            when :get  then Net::HTTP::Get.new(full_path)
-            when :post then Net::HTTP::Post.new(full_path)
+            when :get    then Net::HTTP::Get.new(full_path)
+            when :post   then Net::HTTP::Post.new(full_path)
+            when :delete then Net::HTTP::Delete.new(full_path)
             end
 
       # Generate 32-byte random nonce and Unix timestamp.

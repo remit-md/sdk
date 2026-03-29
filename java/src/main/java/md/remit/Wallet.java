@@ -313,6 +313,36 @@ public class Wallet {
         return client.post("/api/v1/tabs", body, Tab.class);
     }
 
+    /** Canonical name for createTab. */
+    public Tab openTab(String provider, BigDecimal limitAmount, BigDecimal perUnit) {
+        return createTab(provider, limitAmount, perUnit);
+    }
+
+    /** Canonical name for createTab with expiry. */
+    public Tab openTab(String provider, BigDecimal limitAmount, BigDecimal perUnit, int expiresInSeconds) {
+        return createTab(provider, limitAmount, perUnit, expiresInSeconds);
+    }
+
+    /** Canonical name for createTab with permit. */
+    public Tab openTab(String provider, BigDecimal limitAmount, BigDecimal perUnit, int expiresInSeconds, PermitSignature permit) {
+        return createTab(provider, limitAmount, perUnit, expiresInSeconds, permit);
+    }
+
+    /** Settle and close a tab (alias for closeTab with default amounts). */
+    public Transaction settleTab(String tabId) {
+        return closeTab(tabId, BigDecimal.ZERO, "0x");
+    }
+
+    /** @deprecated Use chargeTab instead. */
+    @Deprecated
+    public Map<String, Object> debitTab(String tabId, BigDecimal amount, String memo) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("tab_id", tabId);
+        body.put("amount", amount.toPlainString());
+        body.put("memo", memo);
+        return client.post("/api/v1/tabs/" + tabId + "/debit", body, Map.class);
+    }
+
     /**
      * Charges a tab with an EIP-712 TabCharge signature (provider-side).
      *
@@ -426,6 +456,16 @@ public class Wallet {
         return client.post("/api/v1/streams", body, Stream.class);
     }
 
+    /** Canonical name for createStream. */
+    public Stream openStream(String payee, BigDecimal ratePerSecond, BigDecimal maxTotal) {
+        return createStream(payee, ratePerSecond, maxTotal);
+    }
+
+    /** Canonical name for createStream with permit. */
+    public Stream openStream(String payee, BigDecimal ratePerSecond, BigDecimal maxTotal, PermitSignature permit) {
+        return createStream(payee, ratePerSecond, maxTotal, permit);
+    }
+
     /** Closes a stream and settles on-chain (payer only). */
     public Transaction closeStream(String streamId) {
         return client.post("/api/v1/streams/" + streamId + "/close", Map.of(), Transaction.class);
@@ -466,6 +506,16 @@ public class Wallet {
         body.put("max_attempts", maxAttempts);
         if (p != null) body.put("permit", p);
         return client.post("/api/v1/bounties", body, Bounty.class);
+    }
+
+    /** Canonical name for createBounty. */
+    public Bounty postBounty(BigDecimal amount, String taskDescription, long deadline) {
+        return createBounty(amount, taskDescription, deadline);
+    }
+
+    /** Canonical name for createBounty with permit. */
+    public Bounty postBounty(BigDecimal amount, String taskDescription, long deadline, PermitSignature permit) {
+        return createBounty(amount, taskDescription, deadline, permit);
     }
 
     /**
@@ -542,6 +592,16 @@ public class Wallet {
         return client.post("/api/v1/deposits", body, Deposit.class);
     }
 
+    /** Canonical name for lockDeposit. */
+    public Deposit placeDeposit(String provider, BigDecimal amount, int expiresIn) {
+        return lockDeposit(provider, amount, expiresIn);
+    }
+
+    /** Canonical name for lockDeposit with permit. */
+    public Deposit placeDeposit(String provider, BigDecimal amount, int expiresIn, PermitSignature permit) {
+        return lockDeposit(provider, amount, expiresIn, permit);
+    }
+
     /** Returns a deposit (provider-side, full refund to depositor). */
     public Transaction returnDeposit(String depositId) {
         return client.post("/api/v1/deposits/" + depositId + "/return", Map.of(), Transaction.class);
@@ -561,6 +621,24 @@ public class Wallet {
     /** Returns how much the agent can still spend under operator-set limits. */
     public Budget remainingBudget() {
         return client.get("/api/v1/wallet/budget", Budget.class);
+    }
+
+    // ─── Intent Negotiation ────────────────────────────────────────────────────
+
+    /** Proposes a payment intent for negotiation (agent-to-agent). */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> proposeIntent(String to, BigDecimal amount, String paymentType) {
+        validateAddress(to);
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("to", to);
+        body.put("amount", amount.toPlainString());
+        body.put("type", paymentType);
+        return client.post("/api/v1/intents", body, Map.class);
+    }
+
+    /** Alias for proposeIntent. */
+    public Map<String, Object> expressIntent(String to, BigDecimal amount, String paymentType) {
+        return proposeIntent(to, amount, paymentType);
     }
 
     // ─── Contracts ─────────────────────────────────────────────────────────────
@@ -626,6 +704,18 @@ public class Wallet {
     /** Registers a webhook for the current chain. */
     public Webhook registerWebhook(String url, List<String> events) {
         return registerWebhook(url, events, List.of(chain));
+    }
+
+    /** Lists all registered webhooks for this wallet. */
+    @SuppressWarnings("unchecked")
+    public List<Webhook> listWebhooks() {
+        Webhook[] arr = client.get("/api/v1/webhooks", Webhook[].class);
+        return arr != null ? List.of(arr) : List.of();
+    }
+
+    /** Deletes a webhook by ID. */
+    public void deleteWebhook(String webhookId) {
+        client.delete("/api/v1/webhooks/" + webhookId);
     }
 
     // ─── One-time operator links ──────────────────────────────────────────────

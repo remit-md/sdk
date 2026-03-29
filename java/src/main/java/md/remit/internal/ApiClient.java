@@ -61,6 +61,10 @@ public class ApiClient {
         return executeWithRetry(() -> doPost(path, body, responseType, idempotencyKey));
     }
 
+    public void delete(String path) {
+        executeWithRetry(() -> doDelete(path));
+    }
+
     private <T> T doGet(String path, Class<T> responseType) throws Exception {
         byte[] nonce = generateNonce();
         String nonceHex = "0x" + HexFormat.of().formatHex(nonce);
@@ -111,6 +115,29 @@ public class ApiClient {
 
         HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
         return handleResponse(resp, responseType);
+    }
+
+    private Void doDelete(String path) throws Exception {
+        byte[] nonce = generateNonce();
+        String nonceHex = "0x" + HexFormat.of().formatHex(nonce);
+        long timestamp = Instant.now().getEpochSecond();
+        String signPath = path.contains("?") ? path.substring(0, path.indexOf("?")) : path;
+        String signature = signEip712("DELETE", signPath, timestamp, nonce);
+
+        HttpRequest req = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + path))
+            .header("Accept", "application/json")
+            .header("X-Remit-Agent", signer.address())
+            .header("X-Remit-Nonce", nonceHex)
+            .header("X-Remit-Timestamp", String.valueOf(timestamp))
+            .header("X-Remit-Signature", signature)
+            .timeout(Duration.ofSeconds(30))
+            .DELETE()
+            .build();
+
+        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        handleResponse(resp, Void.class);
+        return null;
     }
 
     private <T> T handleResponse(HttpResponse<String> resp, Class<T> responseType) throws Exception {

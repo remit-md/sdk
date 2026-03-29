@@ -39,6 +39,7 @@ pub(crate) fn chain_config(chain_key: &str) -> Option<ChainConfig> {
 #[async_trait]
 pub(crate) trait Transport: Send + Sync {
     async fn post(&self, path: &str, body: Option<Value>) -> Result<Value, RemitError>;
+    async fn patch(&self, path: &str, body: Option<Value>) -> Result<Value, RemitError>;
     async fn get(&self, path: &str) -> Result<Value, RemitError>;
     async fn delete(&self, path: &str) -> Result<Value, RemitError>;
 }
@@ -83,6 +84,10 @@ impl HttpTransport {
 impl Transport for HttpTransport {
     async fn post(&self, path: &str, body: Option<Value>) -> Result<Value, RemitError> {
         self.do_request("POST", path, body).await
+    }
+
+    async fn patch(&self, path: &str, body: Option<Value>) -> Result<Value, RemitError> {
+        self.do_request("PATCH", path, body).await
     }
 
     async fn get(&self, path: &str) -> Result<Value, RemitError> {
@@ -167,12 +172,17 @@ impl HttpTransport {
         let sig = self.signer.sign(&digest)?;
         let sig_hex = format!("0x{}", hex::encode(&sig));
 
-        let mut req = if method == "POST" {
-            self.client
+        let mut req = match method {
+            "POST" => self
+                .client
                 .post(url)
-                .header("Content-Type", "application/json")
-        } else {
-            self.client.get(url)
+                .header("Content-Type", "application/json"),
+            "PATCH" => self
+                .client
+                .patch(url)
+                .header("Content-Type", "application/json"),
+            "DELETE" => self.client.delete(url),
+            _ => self.client.get(url),
         };
 
         req = req

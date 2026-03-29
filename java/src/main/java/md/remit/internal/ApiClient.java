@@ -61,6 +61,13 @@ public class ApiClient {
         return executeWithRetry(() -> doPost(path, body, responseType, idempotencyKey));
     }
 
+    public <T> T patch(String path, Object body, Class<T> responseType) {
+        byte[] keyBytes = new byte[16];
+        new SecureRandom().nextBytes(keyBytes);
+        String idempotencyKey = HexFormat.of().formatHex(keyBytes);
+        return executeWithRetry(() -> doPatch(path, body, responseType, idempotencyKey));
+    }
+
     public void delete(String path) {
         executeWithRetry(() -> doDelete(path));
     }
@@ -111,6 +118,36 @@ public class ApiClient {
 
         HttpRequest req = builder
             .POST(HttpRequest.BodyPublishers.ofString(bodyJson))
+            .build();
+
+        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        return handleResponse(resp, responseType);
+    }
+
+    private <T> T doPatch(String path, Object body, Class<T> responseType, String idempotencyKey) throws Exception {
+        String bodyJson = body != null ? MAPPER.writeValueAsString(body) : "{}";
+        byte[] nonce = generateNonce();
+        String nonceHex = "0x" + HexFormat.of().formatHex(nonce);
+        long timestamp = Instant.now().getEpochSecond();
+        String signPath = path.contains("?") ? path.substring(0, path.indexOf("?")) : path;
+        String signature = signEip712("PATCH", signPath, timestamp, nonce);
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + path))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .header("X-Remit-Agent", signer.address())
+            .header("X-Remit-Nonce", nonceHex)
+            .header("X-Remit-Timestamp", String.valueOf(timestamp))
+            .header("X-Remit-Signature", signature)
+            .timeout(Duration.ofSeconds(30));
+
+        if (idempotencyKey != null) {
+            builder.header("X-Idempotency-Key", idempotencyKey);
+        }
+
+        HttpRequest req = builder
+            .method("PATCH", HttpRequest.BodyPublishers.ofString(bodyJson))
             .build();
 
         HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());

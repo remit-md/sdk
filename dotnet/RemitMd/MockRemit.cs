@@ -168,10 +168,14 @@ public sealed class MockRemit
                                                        => HandleBountySubmit(p, body, id),
                 var p when p.StartsWith("/api/v1/bounties/") && p.EndsWith("/award")
                                                        => HandleBountyAward(p, body, id, now),
+                var p when p.StartsWith("/api/v1/bounties/") && p.EndsWith("/reclaim")
+                                                       => HandleBountyReclaim(p, id, now),
 
                 "/api/v1/deposits"                     => HandleCreateDeposit(body, id, now),
                 var p when p.StartsWith("/api/v1/deposits/") && p.EndsWith("/return")
                                                        => HandleDepositReturn(p, id, now),
+                var p when p.StartsWith("/api/v1/deposits/") && p.EndsWith("/forfeit")
+                                                       => HandleDepositForfeit(p, id, now),
 
                 _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled POST {path}"),
             };
@@ -183,6 +187,20 @@ public sealed class MockRemit
         {
             // Mock delete - no-op
             return Task.CompletedTask;
+        }
+
+        public Task<T> PatchAsync<T>(string path, object body, CancellationToken ct)
+        {
+            object result = path switch
+            {
+                var p when p.StartsWith("/api/v1/webhooks/") =>
+                    (object)new Webhook("mock-wh", MockAddress, "https://example.com/webhook",
+                        new[] { "payment.sent" }, new[] { "mock" }, true, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow),
+                "/api/v1/wallet/settings" =>
+                    (object)new WalletSettings(MockAddress, "test-agent"),
+                _ => throw new RemitError(ErrorCodes.ServerError, $"Mock: unhandled PATCH {path}"),
+            };
+            return Task.FromResult(Reserialize<T>(result));
         }
 
         // ── Permit ───────────────────────────────────────────────────────────
@@ -483,15 +501,33 @@ public sealed class MockRemit
             }
         }
 
-        // ── Intent ───────────────────────────────────────────────────────────
-
-        private Intent HandleCreateIntent(object body, string id, DateTimeOffset now)
+        private Transaction HandleBountyReclaim(string path, string id, DateTimeOffset now)
         {
-            var d   = Deserialize(body);
-            var to  = d.GetValueOrDefault("to")?.ToString() ?? "0x0";
-            var amt = decimal.Parse(d.GetValueOrDefault("amount")?.ToString() ?? "0");
-            var typ = d.GetValueOrDefault("type")?.ToString() ?? "direct";
-            return new Intent(id, MockAddress, to, amt, typ, now.AddMinutes(5), now);
+            var bountyId = PathId(path.Replace("/reclaim", ""));
+            lock (_mock._lock)
+            {
+                if (!_mock._bounties.TryGetValue(bountyId, out var bounty))
+                    throw new RemitError(ErrorCodes.BountyNotFound, $"Bounty not found: {bountyId}");
+                if (bounty.Status != BountyStatus.Open)
+                    throw new RemitError(ErrorCodes.BountyAlreadyClosed, $"Bounty {bountyId} is not open.");
+                _mock._balance += bounty.Amount;
+                _mock._bounties[bountyId] = bounty with { Status = BountyStatus.Cancelled };
+                return new Transaction(id, "0x" + id, MockAddress, MockAddress,
+                    bounty.Amount, 0m, "bounty reclaim", ChainId.BaseSepolia, 1_000_006ul, now);
+            }
+        }
+
+        private Transaction HandleDepositForfeit(string path, string id, DateTimeOffset now)
+        {
+            var depositId = PathId(path.Replace("/forfeit", ""));
+            lock (_mock._lock)
+            {
+                if (!_mock._deposits.TryGetValue(depositId, out var deposit))
+                    throw new RemitError(ErrorCodes.ServerError, $"Deposit not found: {depositId}");
+                _mock._deposits[depositId] = deposit with { Status = DepositStatus.Forfeited };
+                return new Transaction(id, "0x" + id, MockAddress, deposit.Payee,
+                    deposit.Amount, 0m, "deposit forfeit", ChainId.BaseSepolia, 1_000_007ul, now);
+            }
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

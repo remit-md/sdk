@@ -650,6 +650,11 @@ class Wallet(RemitClient):
         )
         return Transaction.model_validate(data)
 
+    async def reclaim_bounty(self, bounty_id: str) -> Transaction:
+        """Reclaim a bounty's funds (poster-only, bounty must be expired/open)."""
+        data = await self._http.post(f"/api/v1/bounties/{bounty_id}/reclaim", {})
+        return Transaction.model_validate(data)
+
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
     async def place_deposit(
@@ -677,22 +682,10 @@ class Wallet(RemitClient):
         data = await self._http.post(f"/api/v1/deposits/{deposit_id}/return", {})
         return Transaction.model_validate(data)
 
-    # ─── Intent Negotiation ──────────────────────────────────────────────────
-
-    async def propose_intent(
-        self, to: str, amount: float, payment_type: str = "direct"
-    ) -> dict[str, Any]:
-        """Propose a payment intent for negotiation (agent-to-agent)."""
-        return await self._http.post(  # type: ignore[no-any-return]
-            "/api/v1/intents",
-            {"to": to, "amount": str(amount), "type": payment_type},
-        )
-
-    async def express_intent(
-        self, to: str, amount: float, payment_type: str = "direct"
-    ) -> dict[str, Any]:
-        """Alias for propose_intent."""
-        return await self.propose_intent(to, amount, payment_type)
+    async def forfeit_deposit(self, deposit_id: str) -> Transaction:
+        """Depositor forfeits a deposit (provider keeps the funds)."""
+        data = await self._http.post(f"/api/v1/deposits/{deposit_id}/forfeit", {})
+        return Transaction.model_validate(data)
 
     # ─── Events ───────────────────────────────────────────────────────────────
 
@@ -788,6 +781,36 @@ class Wallet(RemitClient):
     async def delete_webhook(self, webhook_id: str) -> None:
         """Delete a webhook by ID."""
         await self._http.delete(f"/api/v1/webhooks/{webhook_id}")
+
+    async def update_webhook(
+        self,
+        webhook_id: str,
+        url: str | None = None,
+        events: list[str] | None = None,
+        active: bool | None = None,
+    ) -> Webhook:
+        """Update an existing webhook's URL, events, or active status."""
+        body: dict[str, Any] = {}
+        if url is not None:
+            body["url"] = url
+        if events is not None:
+            body["events"] = events
+        if active is not None:
+            body["active"] = active
+        data = await self._http.patch(f"/api/v1/webhooks/{webhook_id}", body)
+        return Webhook.model_validate(data)
+
+    # ─── Wallet settings ─────────────────────────────────────────────────────
+
+    async def update_wallet_settings(
+        self,
+        display_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Update wallet display settings."""
+        body: dict[str, Any] = {}
+        if display_name is not None:
+            body["display_name"] = display_name
+        return await self._http.patch("/api/v1/wallet/settings", body)  # type: ignore[no-any-return]
 
     # ─── Analytics ────────────────────────────────────────────────────────────
 

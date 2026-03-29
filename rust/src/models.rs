@@ -397,18 +397,29 @@ pub struct Deposit {
     pub created_at: DateTime<Utc>,
 }
 
-/// A proposed payment awaiting negotiation.
+/// Wallet display settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Intent {
-    pub id: String,
-    pub from: String,
-    pub to: String,
-    #[serde(with = "rust_decimal::serde::float")]
-    pub amount: Decimal,
-    #[serde(rename = "type")]
-    pub payment_type: String,
-    pub expires_at: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
+pub struct WalletSettings {
+    pub wallet: String,
+    pub display_name: Option<String>,
+}
+
+/// Parameters for updating wallet settings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateWalletSettingsParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+}
+
+/// Parameters for updating a webhook.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateWebhookParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub events: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active: Option<bool>,
 }
 
 /// Spending analytics for a wallet.

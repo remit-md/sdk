@@ -185,6 +185,10 @@ impl Transport for MockTransport {
         self.dispatch("POST", path, body).await
     }
 
+    async fn patch(&self, path: &str, body: Option<Value>) -> Result<Value, RemitError> {
+        self.dispatch("PATCH", path, body).await
+    }
+
     async fn get(&self, path: &str) -> Result<Value, RemitError> {
         self.dispatch("GET", path, None).await
     }
@@ -646,22 +650,6 @@ impl MockTransport {
                 }))
             }
 
-            // ─── Intents ──────────────────────────────────────────────────
-            ("POST", "/api/v1/intents") => {
-                let to = str_field(&b, "to")?;
-                let amount = decimal_field(&b, "amount")?;
-                let payment_type = b["type"].as_str().unwrap_or("direct").to_string();
-                Ok(json!({
-                    "id": new_id("int"),
-                    "from": "0xMockWallet0000000000000000000000000001",
-                    "to": to,
-                    "amount": amount.to_string(),
-                    "type": payment_type,
-                    "expires_at": Utc::now(),
-                    "created_at": Utc::now(),
-                }))
-            }
-
             // ─── Tab debit ────────────────────────────────────────────────
             (method, path) if method == "POST" && path.ends_with("/debit") => {
                 let amount = decimal_field(&b, "amount")?;
@@ -802,6 +790,86 @@ impl MockTransport {
             ("GET", "/api/v1/webhooks") => Ok(json!([])),
 
             ("DELETE", path) if path.starts_with("/api/v1/webhooks/") => Ok(Value::Null),
+
+            // ─── Webhook update ──────────────────────────────────────────
+            ("PATCH", path) if path.starts_with("/api/v1/webhooks/") => {
+                let webhook_id = path.trim_start_matches("/api/v1/webhooks/");
+                let url = b["url"]
+                    .as_str()
+                    .unwrap_or("https://example.com/hook")
+                    .to_string();
+                let events: Vec<String> = b["events"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                Ok(json!({
+                    "id": webhook_id,
+                    "wallet": MOCK_WALLET,
+                    "url": url,
+                    "events": events,
+                    "chains": ["base-sepolia"],
+                    "active": true,
+                    "created_at": Utc::now(),
+                    "updated_at": Utc::now(),
+                }))
+            }
+
+            // ─── Wallet settings update ──────────────────────────────────
+            ("PATCH", "/api/v1/wallet/settings") => {
+                let display_name = b["display_name"].as_str().map(String::from);
+                Ok(json!({
+                    "wallet": MOCK_WALLET,
+                    "display_name": display_name,
+                }))
+            }
+
+            // ─── Deposit forfeit ─────────────────────────────────────────
+            (method, path)
+                if method == "POST"
+                    && path.contains("/deposits/")
+                    && path.ends_with("/forfeit") =>
+            {
+                let tx = Transaction {
+                    id: new_id("tx"),
+                    tx_hash: format!("0x{}", mock_hash()),
+                    from: Some(MOCK_WALLET.to_string()),
+                    to: None,
+                    amount: None,
+                    fee: Some(Decimal::ZERO),
+                    memo: Some("deposit forfeited".to_string()),
+                    chain_id: ChainId::BASE_SEPOLIA,
+                    block_number: Some(0),
+                    created_at: Utc::now(),
+                    invoice_id: None,
+                };
+                Ok(serde_json::to_value(&tx).unwrap())
+            }
+
+            // ─── Bounty reclaim ──────────────────────────────────────────
+            (method, path)
+                if method == "POST"
+                    && path.contains("/bounties/")
+                    && path.ends_with("/reclaim") =>
+            {
+                let tx = Transaction {
+                    id: new_id("tx"),
+                    tx_hash: format!("0x{}", mock_hash()),
+                    from: Some(MOCK_WALLET.to_string()),
+                    to: None,
+                    amount: None,
+                    fee: Some(Decimal::ZERO),
+                    memo: Some("bounty reclaimed".to_string()),
+                    chain_id: ChainId::BASE_SEPOLIA,
+                    block_number: Some(0),
+                    created_at: Utc::now(),
+                    invoice_id: None,
+                };
+                Ok(serde_json::to_value(&tx).unwrap())
+            }
 
             // ─── Catch-all: return empty success ──────────────────────────
             _ => Ok(Value::Null),
@@ -1231,17 +1299,6 @@ mod tests {
         let err = wallet.pay(RECIPIENT, dec!(1000001.00)).await.unwrap_err();
         assert_eq!(err.code, codes::INVALID_AMOUNT);
         assert!(err.message.contains("maximum"));
-    }
-
-    #[tokio::test]
-    async fn express_intent_delegates_to_propose() {
-        let mock = MockRemit::new();
-        let wallet = mock.wallet();
-        // express_intent is an alias for propose_intent
-        let result = wallet
-            .express_intent(RECIPIENT, dec!(10.00), "direct")
-            .await;
-        assert!(result.is_ok());
     }
 
     #[tokio::test]

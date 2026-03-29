@@ -349,21 +349,14 @@ module Remitmd
     private :decimal, :parse_time
   end
 
-  class Intent < Model
+  class WalletSettings < Model
     def initialize(attrs)
       h = attrs.transform_keys(&:to_s)
-      @id         = h["id"]
-      @from       = h["from"]
-      @to         = h["to"]
-      @amount     = decimal(h["amount"])
-      @type       = h["type"]
-      @expires_at = parse_time(h["expires_at"])
-      @created_at = parse_time(h["created_at"])
+      @wallet       = h["wallet"]
+      @display_name = h["display_name"]
     end
 
-    attr_reader :id, :from, :to, :amount, :type, :expires_at, :created_at
-
-    private :decimal, :parse_time
+    attr_reader :wallet, :display_name
   end
 
   class Budget < Model

@@ -459,6 +459,13 @@ module Remitmd
       Bounty.new(@transport.post("/bounties/#{bounty_id}/award", { submission_id: submission_id }))
     end
 
+    # Reclaim an expired or cancelled bounty (called by the poster).
+    # @param bounty_id [String]
+    # @return [Transaction]
+    def reclaim_bounty(bounty_id)
+      Transaction.new(@transport.post("/bounties/#{bounty_id}/reclaim", {}))
+    end
+
     # List bounties with optional filters.
     # @param status [String, nil] filter by status (open, claimed, awarded, expired)
     # @param poster [String, nil] filter by poster wallet address
@@ -504,24 +511,17 @@ module Remitmd
       Transaction.new(@transport.post("/deposits/#{deposit_id}/return", {}))
     end
 
+    # Forfeit a deposit (called by the depositor to surrender their deposit).
+    # @param deposit_id [String]
+    # @return [Transaction]
+    def forfeit_deposit(deposit_id)
+      Transaction.new(@transport.post("/deposits/#{deposit_id}/forfeit", {}))
+    end
+
     # Lock a security deposit.
     # @deprecated Use {#place_deposit} instead
     def lock_deposit(provider, amount, expires_in_secs, permit: nil)
       place_deposit(provider, amount, expires_in_secs: expires_in_secs, permit: permit)
-    end
-
-    # ─── Payment Intents ─────────────────────────────────────────────────────
-
-    # Propose a payment intent for counterpart approval before execution.
-    # @param to [String] 0x-prefixed address
-    # @param amount [Numeric] amount in USDC
-    # @param type [String] payment type - "direct", "escrow", "tab"
-    # @return [Intent]
-    def propose_intent(to, amount, type: "direct")
-      validate_address!(to)
-      validate_amount!(amount)
-      body = { to: to, amount: amount.to_s, type: type }
-      Intent.new(@transport.post("/intents", body))
     end
 
     # ─── Webhooks ─────────────────────────────────────────────────────────────
@@ -548,6 +548,29 @@ module Remitmd
       nil
     end
 
+    # Update an existing webhook's URL, events, or active status.
+    # @param webhook_id [String]
+    # @param url [String, nil] new URL
+    # @param events [Array<String>, nil] new event types
+    # @param active [Boolean, nil] new active status
+    # @return [Webhook]
+    def update_webhook(webhook_id, url: nil, events: nil, active: nil)
+      body = {}
+      body[:url] = url unless url.nil?
+      body[:events] = events unless events.nil?
+      body[:active] = active unless active.nil?
+      Webhook.new(@transport.patch("/webhooks/#{webhook_id}", body))
+    end
+
+    # Update wallet display settings.
+    # @param display_name [String, nil] new display name
+    # @return [WalletSettings]
+    def update_wallet_settings(display_name: nil)
+      body = {}
+      body[:display_name] = display_name unless display_name.nil?
+      WalletSettings.new(@transport.patch("/wallet/settings", body))
+    end
+
     # ─── Canonical name aliases ──────────────────────────────────────────────
 
     # Canonical name for create_tab.
@@ -563,11 +586,6 @@ module Remitmd
     # Canonical name for create_bounty.
     def post_bounty(amount, task_description, deadline, max_attempts: 10, permit: nil)
       create_bounty(amount, task_description, deadline, max_attempts: max_attempts, permit: permit)
-    end
-
-    # Alias for propose_intent.
-    def express_intent(to, amount, type: "direct")
-      propose_intent(to, amount, type: type)
     end
 
     # ─── One-time operator links ───────────────────────────────────────────────

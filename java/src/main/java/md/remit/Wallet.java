@@ -542,6 +542,11 @@ public class Wallet {
             Map.of("submission_id", submissionId), Transaction.class);
     }
 
+    /** Reclaims an expired or unclaimed bounty (poster-only). */
+    public Transaction reclaimBounty(String bountyId) {
+        return client.post("/api/v1/bounties/" + bountyId + "/reclaim", Map.of(), Transaction.class);
+    }
+
     /**
      * Lists bounties, optionally filtering by status, poster, or submitter.
      *
@@ -607,6 +612,11 @@ public class Wallet {
         return client.post("/api/v1/deposits/" + depositId + "/return", Map.of(), Transaction.class);
     }
 
+    /** Forfeits a deposit (depositor-side, provider keeps the funds). */
+    public Transaction forfeitDeposit(String depositId) {
+        return client.post("/api/v1/deposits/" + depositId + "/forfeit", Map.of(), Transaction.class);
+    }
+
     // ─── Analytics ────────────────────────────────────────────────────────────
 
     /**
@@ -621,24 +631,6 @@ public class Wallet {
     /** Returns how much the agent can still spend under operator-set limits. */
     public Budget remainingBudget() {
         return client.get("/api/v1/wallet/budget", Budget.class);
-    }
-
-    // ─── Intent Negotiation ────────────────────────────────────────────────────
-
-    /** Proposes a payment intent for negotiation (agent-to-agent). */
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> proposeIntent(String to, BigDecimal amount, String paymentType) {
-        validateAddress(to);
-        Map<String, Object> body = new java.util.HashMap<>();
-        body.put("to", to);
-        body.put("amount", amount.toPlainString());
-        body.put("type", paymentType);
-        return client.post("/api/v1/intents", body, Map.class);
-    }
-
-    /** Alias for proposeIntent. */
-    public Map<String, Object> expressIntent(String to, BigDecimal amount, String paymentType) {
-        return proposeIntent(to, amount, paymentType);
     }
 
     // ─── Contracts ─────────────────────────────────────────────────────────────
@@ -716,6 +708,27 @@ public class Wallet {
     /** Deletes a webhook by ID. */
     public void deleteWebhook(String webhookId) {
         client.delete("/api/v1/webhooks/" + webhookId);
+    }
+
+    /**
+     * Updates a webhook's URL, events, or active status.
+     *
+     * @param webhookId the webhook UUID
+     * @param opts      map with optional keys: "url", "events", "active"
+     */
+    public Webhook updateWebhook(String webhookId, Map<String, Object> opts) {
+        return client.patch("/api/v1/webhooks/" + webhookId, opts, Webhook.class);
+    }
+
+    // ─── Wallet Settings ──────────────────────────────────────────────────────
+
+    /**
+     * Updates wallet display settings.
+     *
+     * @param opts map with optional keys: "display_name"
+     */
+    public WalletSettings updateWalletSettings(Map<String, Object> opts) {
+        return client.patch("/api/v1/wallet/settings", opts, WalletSettings.class);
     }
 
     // ─── One-time operator links ──────────────────────────────────────────────

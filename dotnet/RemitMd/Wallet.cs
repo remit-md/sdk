@@ -455,6 +455,10 @@ public sealed class Wallet
         _transport.PostAsync<Bounty>($"/api/v1/bounties/{bountyId}/award",
             new Dictionary<string, object?> { ["submission_id"] = submissionId }, ct);
 
+    /// <summary>Reclaims a bounty's funds (poster-only, bounty must be expired/open).</summary>
+    public Task<Transaction> ReclaimBountyAsync(string bountyId, CancellationToken ct = default) =>
+        _transport.PostAsync<Transaction>($"/api/v1/bounties/{bountyId}/reclaim", new { }, ct);
+
     /// <summary>Lists bounties, optionally filtered by status, poster, or submitter.</summary>
     /// <param name="status">Filter by status (open, claimed, awarded, expired).</param>
     /// <param name="poster">Filter by poster wallet address.</param>
@@ -515,6 +519,10 @@ public sealed class Wallet
     public Task<Transaction> ReturnDepositAsync(string depositId, CancellationToken ct = default) =>
         _transport.PostAsync<Transaction>($"/api/v1/deposits/{depositId}/return", new { }, ct);
 
+    /// <summary>Forfeits a deposit (provider keeps the funds).</summary>
+    public Task<Transaction> ForfeitDepositAsync(string depositId, CancellationToken ct = default) =>
+        _transport.PostAsync<Transaction>($"/api/v1/deposits/{depositId}/forfeit", new { }, ct);
+
     // ─── Analytics & budget ───────────────────────────────────────────────────
 
     /// <summary>Returns spending analytics for the given period.</summary>
@@ -525,23 +533,6 @@ public sealed class Wallet
     /// <summary>Returns remaining spending capacity under operator-set budget limits.</summary>
     public Task<Budget> RemainingBudgetAsync(CancellationToken ct = default) =>
         _transport.GetAsync<Budget>($"/api/v1/status/{Address}", ct);
-
-    /// <summary>Proposes a payment intent for negotiation with a counterpart.</summary>
-    public Task<Intent> ProposeIntentAsync(
-        string to,
-        decimal amount,
-        string type = "direct",
-        CancellationToken ct = default)
-    {
-        ValidateAddress(to, nameof(to));
-        ValidateAmount(amount);
-        return _transport.PostAsync<Intent>("/api/v1/invoices", new
-        {
-            to,
-            amount = (object)amount,
-            type,
-        }, ct);
-    }
 
     // ─── Webhooks ─────────────────────────────────────────────────────────────
 
@@ -569,6 +560,33 @@ public sealed class Wallet
     /// <summary>Deletes a webhook by ID.</summary>
     public Task DeleteWebhookAsync(string webhookId, CancellationToken ct = default)
         => _transport.DeleteAsync($"/api/v1/webhooks/{webhookId}", ct);
+
+    /// <summary>Updates an existing webhook's URL, events, or active status.</summary>
+    public Task<Webhook> UpdateWebhookAsync(
+        string webhookId,
+        string? url = null,
+        IEnumerable<string>? events = null,
+        bool? active = null,
+        CancellationToken ct = default)
+    {
+        var body = new Dictionary<string, object?>();
+        if (url is not null) body["url"] = url;
+        if (events is not null) body["events"] = events.ToList();
+        if (active is not null) body["active"] = active;
+        return _transport.PatchAsync<Webhook>($"/api/v1/webhooks/{webhookId}", body, ct);
+    }
+
+    // ─── Wallet settings ─────────────────────────────────────────────────────
+
+    /// <summary>Updates wallet display settings.</summary>
+    public Task<WalletSettings> UpdateWalletSettingsAsync(
+        string? displayName = null,
+        CancellationToken ct = default)
+    {
+        var body = new Dictionary<string, object?>();
+        if (displayName is not null) body["display_name"] = displayName;
+        return _transport.PatchAsync<WalletSettings>("/api/v1/wallet/settings", body, ct);
+    }
 
     // ─── Canonical name aliases ──────────────────────────────────────────────
 
@@ -599,11 +617,6 @@ public sealed class Wallet
     /// <summary>Claim all vested stream payments (callable by recipient).</summary>
     public Task<Transaction> WithdrawStreamAsync(string streamId, CancellationToken ct = default)
         => _transport.PostAsync<Transaction>($"/api/v1/streams/{streamId}/withdraw", new { }, ct);
-
-    /// <summary>Alias for ProposeIntentAsync.</summary>
-    public Task<Intent> ExpressIntentAsync(string to, decimal amount, string paymentType = "direct",
-        CancellationToken ct = default)
-        => ProposeIntentAsync(to, amount, paymentType, ct);
 
     // ─── One-time operator links ──────────────────────────────────────────────
 

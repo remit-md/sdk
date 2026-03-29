@@ -433,6 +433,18 @@ class MockWallet:
         bounty.status = BountyStatus.awarded
         return self._mock._make_tx()
 
+    async def reclaim_bounty(self, bounty_id: str) -> Transaction:
+        """Poster reclaims an expired/open bounty's funds."""
+        self._mock._check_forced_error(self.address)
+        bounty = self._mock._state.bounties.get(bounty_id)
+        if bounty is None:
+            raise BountyNotFound(f"Bounty {bounty_id!r} not found")
+        if bounty.status != BountyStatus.open:
+            raise InvalidState(f"Bounty is {bounty.status}")
+        self._mock._credit(self.address, bounty.amount)
+        bounty.status = BountyStatus.cancelled
+        return self._mock._make_tx()
+
     # ─── Deposits ─────────────────────────────────────────────────────────────
 
     async def place_deposit(self, to: str, amount: float, expires: int) -> Deposit:
@@ -497,6 +509,29 @@ class MockWallet:
             active=True,
             created_at=self._mock.now(),
         )
+
+    async def update_webhook(
+        self,
+        webhook_id: str,
+        url: str | None = None,
+        events: list[str] | None = None,
+        active: bool | None = None,
+    ) -> Webhook:
+        return Webhook(
+            id=webhook_id,
+            wallet=self.address,
+            url=url or "https://example.com/webhook",
+            events=events or ["payment.sent"],
+            chains=["mock"],
+            active=active if active is not None else True,
+            created_at=self._mock.now(),
+        )
+
+    async def update_wallet_settings(
+        self,
+        display_name: str | None = None,
+    ) -> dict[str, Any]:
+        return {"display_name": display_name or ""}
 
     # ─── One-time operator links ───────────────────────────────────────────────
 

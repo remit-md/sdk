@@ -178,6 +178,20 @@ impl Wallet {
             )
         })
     }
+
+    async fn patch<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        body: Value,
+    ) -> Result<T, RemitError> {
+        let v = self.transport.patch(path, Some(body)).await?;
+        serde_json::from_value(v).map_err(|e| {
+            remit_err(
+                codes::SERVER_ERROR,
+                format!("failed to deserialize response: {e}"),
+            )
+        })
+    }
 }
 
 // ─── EIP-2612 Permit (via /permits/prepare) ─────────────────────────────────
@@ -894,6 +908,12 @@ impl Wallet {
         .await
     }
 
+    /// Reclaim an expired or cancelled bounty (called by the poster).
+    pub async fn reclaim_bounty(&self, bounty_id: &str) -> Result<Transaction, RemitError> {
+        self.post(&format!("/api/v1/bounties/{bounty_id}/reclaim"), json!({}))
+            .await
+    }
+
     /// List bounties with optional filters.
     ///
     /// # Arguments
@@ -997,25 +1017,10 @@ impl Wallet {
             .await
     }
 
-    // ─── Intent negotiation ──────────────────────────────────────────────────
-
-    /// Propose a payment intent for negotiation (agent-to-agent).
-    pub async fn propose_intent(
-        &self,
-        to: &str,
-        amount: Decimal,
-        payment_type: &str,
-    ) -> Result<Intent, RemitError> {
-        validate_address(to)?;
-        self.post(
-            "/api/v1/intents",
-            json!({
-                "to": to,
-                "amount": amount.to_string(),
-                "type": payment_type,
-            }),
-        )
-        .await
+    /// Forfeit a deposit (called by the depositor to surrender their deposit).
+    pub async fn forfeit_deposit(&self, deposit_id: &str) -> Result<Transaction, RemitError> {
+        self.post(&format!("/api/v1/deposits/{deposit_id}/forfeit"), json!({}))
+            .await
     }
 
     // ─── One-time operator links ──────────────────────────────────────────────
@@ -1060,6 +1065,26 @@ impl Wallet {
         Ok(())
     }
 
+    /// Update an existing webhook's URL, events, or active status.
+    pub async fn update_webhook(
+        &self,
+        webhook_id: &str,
+        params: UpdateWebhookParams,
+    ) -> Result<Webhook, RemitError> {
+        let body = serde_json::to_value(&params).unwrap();
+        self.patch(&format!("/api/v1/webhooks/{webhook_id}"), body)
+            .await
+    }
+
+    /// Update wallet display settings.
+    pub async fn update_wallet_settings(
+        &self,
+        params: UpdateWalletSettingsParams,
+    ) -> Result<WalletSettings, RemitError> {
+        let body = serde_json::to_value(&params).unwrap();
+        self.patch("/api/v1/wallet/settings", body).await
+    }
+
     // ─── Aliases (canonical names) ───────────────────────────────────────────
 
     /// Canonical name for `create_tab`.
@@ -1100,16 +1125,6 @@ impl Wallet {
         expires_in_secs: u64,
     ) -> Result<Deposit, RemitError> {
         self.lock_deposit(provider, amount, expires_in_secs).await
-    }
-
-    /// Alias for propose_intent.
-    pub async fn express_intent(
-        &self,
-        to: &str,
-        amount: Decimal,
-        payment_type: &str,
-    ) -> Result<Intent, RemitError> {
-        self.propose_intent(to, amount, payment_type).await
     }
 
     /// Generate a one-time URL for the operator to fund this wallet.

@@ -316,6 +316,14 @@ public final class RemitWallet: @unchecked Sendable {
         )
     }
 
+    /// Reclaim an expired or unclaimed bounty (poster-only).
+    public func reclaimBounty(id: String) async throws -> Bounty {
+        return try await transport.request(
+            method: "POST", path: "/api/v1/bounties/\(id)/reclaim",
+            body: EmptyObject()
+        )
+    }
+
     public func listBounties(
         status: String? = "open",
         poster: String? = nil,
@@ -365,14 +373,11 @@ public final class RemitWallet: @unchecked Sendable {
         )
     }
 
-    // MARK: - Intent
-
-    public func expressIntent(to recipient: String, amount: Double, model: String = "direct") async throws -> Intent {
-        try validateAddress(recipient)
-        try validateAmount(amount)
+    /// Forfeit a deposit (depositor-side, provider keeps the funds).
+    public func forfeitDeposit(id: String) async throws -> Transaction {
         return try await transport.request(
-            method: "POST", path: "/api/v1/intent",
-            body: IntentBody(to: recipient, amount: amount, model: model)
+            method: "POST", path: "/api/v1/deposits/\(id)/forfeit",
+            body: EmptyObject()
         )
     }
 
@@ -591,6 +596,24 @@ public final class RemitWallet: @unchecked Sendable {
         let _: EmptyResponse = try await transport.request(method: "DELETE", path: "/api/v1/webhooks/\(id)", body: nil as EmptyObject?)
     }
 
+    /// Update a webhook's URL, events, or active status.
+    public func updateWebhook(id: String, url: String? = nil, events: [String]? = nil, active: Bool? = nil) async throws -> Webhook {
+        return try await transport.request(
+            method: "PATCH", path: "/api/v1/webhooks/\(id)",
+            body: UpdateWebhookBody(url: url, events: events, active: active)
+        )
+    }
+
+    // MARK: - Wallet Settings
+
+    /// Update wallet display settings.
+    public func updateWalletSettings(displayName: String? = nil) async throws -> WalletSettings {
+        return try await transport.request(
+            method: "PATCH", path: "/api/v1/wallet/settings",
+            body: UpdateWalletSettingsBody(display_name: displayName)
+        )
+    }
+
     // MARK: - Canonical name aliases
 
     /// Canonical name for startStream.
@@ -602,11 +625,6 @@ public final class RemitWallet: @unchecked Sendable {
     /// Settle and close a tab (alias for closeTab with defaults).
     public func settleTab(id: String) async throws -> Tab {
         return try await closeTab(id: id)
-    }
-
-    /// Alias for expressIntent.
-    public func proposeIntent(to recipient: String, amount: Double, model: String = "direct") async throws -> Intent {
-        return try await expressIntent(to: recipient, amount: amount, model: model)
     }
 
     /// Claim all vested stream payments (callable by recipient).
@@ -749,8 +767,9 @@ private struct DepositBody: Codable {
     let chain: String; let provider: String; let amount: Double
     let expiry: Int; let permit: PermitSignature?
 }
-private struct IntentBody: Codable { let to: String; let amount: Double; let model: String }
 private struct WebhookBody: Codable { let url: String; let events: [String]; let chains: [String]? }
+private struct UpdateWebhookBody: Codable { let url: String?; let events: [String]?; let active: Bool? }
+private struct UpdateWalletSettingsBody: Codable { let display_name: String? }
 private struct MintBody: Codable { let wallet: String; let amount: Double }
 
 /// Response from POST /mint.

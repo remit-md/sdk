@@ -3,6 +3,7 @@ package remitmd_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/remit-md/sdk/go"
 	"github.com/shopspring/decimal"
@@ -239,5 +240,83 @@ func TestMockGetEscrow(t *testing.T) {
 	}
 	if fetched.InvoiceID != escrow.InvoiceID {
 		t.Errorf("expected ID %s, got %s", escrow.InvoiceID, fetched.InvoiceID)
+	}
+}
+
+func TestMockForfeitDeposit(t *testing.T) {
+	mock := remitmd.NewMockRemit()
+	wallet := mock.Wallet()
+	ctx := context.Background()
+
+	deposit, err := wallet.LockDeposit(ctx, "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", decimal.NewFromFloat(50.00), 3600*time.Second)
+	if err != nil {
+		t.Fatalf("LockDeposit failed: %v", err)
+	}
+
+	tx, err := wallet.ForfeitDeposit(ctx, deposit.ID)
+	if err != nil {
+		t.Fatalf("ForfeitDeposit failed: %v", err)
+	}
+	if tx.TxHash == "" {
+		t.Error("expected non-empty TxHash after ForfeitDeposit")
+	}
+}
+
+func TestMockReclaimBounty(t *testing.T) {
+	mock := remitmd.NewMockRemit()
+	wallet := mock.Wallet()
+	ctx := context.Background()
+
+	bounty, err := wallet.CreateBounty(ctx, decimal.NewFromFloat(25.00), "test task", 9999999999)
+	if err != nil {
+		t.Fatalf("CreateBounty failed: %v", err)
+	}
+
+	tx, err := wallet.ReclaimBounty(ctx, bounty.ID)
+	if err != nil {
+		t.Fatalf("ReclaimBounty failed: %v", err)
+	}
+	if tx.TxHash == "" {
+		t.Error("expected non-empty TxHash after ReclaimBounty")
+	}
+}
+
+func TestMockUpdateWebhook(t *testing.T) {
+	mock := remitmd.NewMockRemit()
+	wallet := mock.Wallet()
+	ctx := context.Background()
+
+	wh, err := wallet.RegisterWebhook(ctx, "https://example.com/hook", []string{"payment.sent"})
+	if err != nil {
+		t.Fatalf("RegisterWebhook failed: %v", err)
+	}
+
+	newURL := "https://example.com/hook-v2"
+	updated, err := wallet.UpdateWebhook(ctx, wh.ID, remitmd.UpdateWebhookParams{
+		URL:    &newURL,
+		Events: []string{"payment.sent", "escrow.funded"},
+	})
+	if err != nil {
+		t.Fatalf("UpdateWebhook failed: %v", err)
+	}
+	if updated.ID != wh.ID {
+		t.Errorf("expected webhook ID %s, got %s", wh.ID, updated.ID)
+	}
+}
+
+func TestMockUpdateWalletSettings(t *testing.T) {
+	mock := remitmd.NewMockRemit()
+	wallet := mock.Wallet()
+	ctx := context.Background()
+
+	name := "TestAgent"
+	ws, err := wallet.UpdateWalletSettings(ctx, remitmd.UpdateWalletSettingsParams{
+		DisplayName: &name,
+	})
+	if err != nil {
+		t.Fatalf("UpdateWalletSettings failed: %v", err)
+	}
+	if ws.DisplayName == nil || *ws.DisplayName != name {
+		t.Errorf("expected display name %q, got %v", name, ws.DisplayName)
 	}
 }

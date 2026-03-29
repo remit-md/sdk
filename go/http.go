@@ -25,6 +25,7 @@ const (
 // httpClient implements it for real requests; mockTransport for tests.
 type remitTransport interface {
 	post(ctx context.Context, path string, body any, dst any) error
+	patch(ctx context.Context, path string, body any, dst any) error
 	get(ctx context.Context, path string, dst any) error
 	delete(ctx context.Context, path string) error
 }
@@ -64,6 +65,11 @@ func newHTTPClient(baseURL string, chainID ChainID, routerAddress common.Address
 // post sends an authenticated POST request and decodes the JSON response into dst.
 func (c *httpClient) post(ctx context.Context, path string, body any, dst any) error {
 	return c.do(ctx, http.MethodPost, path, body, dst)
+}
+
+// patch sends an authenticated PATCH request and decodes the JSON response into dst.
+func (c *httpClient) patch(ctx context.Context, path string, body any, dst any) error {
+	return c.do(ctx, http.MethodPatch, path, body, dst)
 }
 
 // get sends an authenticated GET request and decodes the JSON response into dst.

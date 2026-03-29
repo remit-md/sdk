@@ -507,7 +507,7 @@ class Wallet(RemitClient):
 
         Deprecated: Use charge_tab instead. Kept for backward compatibility.
         """
-        return await self._http.post(
+        return await self._http.post(  # type: ignore[no-any-return]
             f"/api/v1/tabs/{tab_id}/debit",
             {"tab_id": tab_id, "amount": amount, "memo": memo},
         )
@@ -683,7 +683,7 @@ class Wallet(RemitClient):
         self, to: str, amount: float, payment_type: str = "direct"
     ) -> dict[str, Any]:
         """Propose a payment intent for negotiation (agent-to-agent)."""
-        return await self._http.post(
+        return await self._http.post(  # type: ignore[no-any-return]
             "/api/v1/intents",
             {"to": to, "amount": str(amount), "type": payment_type},
         )
@@ -793,20 +793,20 @@ class Wallet(RemitClient):
 
     async def history(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
         """Return paginated transaction history."""
-        return await self._http.get(f"/api/v1/wallet/history?page={page}&per_page={per_page}")
+        return await self._http.get(f"/api/v1/wallet/history?page={page}&per_page={per_page}")  # type: ignore[no-any-return]
 
     async def reputation(self, address: str | None = None) -> dict[str, Any]:
         """Return on-chain reputation for the given address (defaults to self)."""
         addr = address or self.address
-        return await self._http.get(f"/api/v1/reputation/{addr}")
+        return await self._http.get(f"/api/v1/reputation/{addr}")  # type: ignore[no-any-return]
 
     async def spending_summary(self, period: str = "day") -> dict[str, Any]:
         """Return spending analytics for a given period (day/week/month/all)."""
-        return await self._http.get(f"/api/v1/wallet/spending?period={period}")
+        return await self._http.get(f"/api/v1/wallet/spending?period={period}")  # type: ignore[no-any-return]
 
     async def remaining_budget(self) -> dict[str, Any]:
         """Return how much the agent can still spend under operator limits."""
-        return await self._http.get("/api/v1/wallet/budget")
+        return await self._http.get("/api/v1/wallet/budget")  # type: ignore[no-any-return]
 
     # ─── Testnet ──────────────────────────────────────────────────────────────
 

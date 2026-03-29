@@ -75,7 +75,10 @@ async def test_01_direct(wallets) -> None:
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change(
-        "provider", provider_before, provider_after, amount * 0.99,
+        "provider",
+        provider_before,
+        provider_after,
+        amount * 0.99,
     )
 
 
@@ -110,13 +113,17 @@ async def test_02_escrow(wallets) -> None:
         log_tx("escrow", "release", release.tx_hash)
 
     provider_after = await wait_for_balance_change(
-        provider.address, provider_before,
+        provider.address,
+        provider_before,
     )
     agent_after = await get_usdc_balance(agent.address)
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change(
-        "provider", provider_before, provider_after, amount * 0.99,
+        "provider",
+        provider_before,
+        provider_after,
+        amount * 0.99,
     )
 
 
@@ -138,7 +145,10 @@ async def test_03_tab(wallets) -> None:
 
     permit = await agent.sign_permit("tab", limit)
     tab = await agent.open_tab(
-        to=provider.address, limit=limit, per_unit=0.1, permit=permit,
+        to=provider.address,
+        limit=limit,
+        per_unit=0.1,
+        permit=permit,
     )
     assert tab.id
     if tab.tx_hash:
@@ -177,7 +187,8 @@ async def test_03_tab(wallets) -> None:
     log_tx("tab", "close", closed.tx_hash)
 
     provider_after = await wait_for_balance_change(
-        provider.address, provider_before,
+        provider.address,
+        provider_before,
     )
     agent_after = await get_usdc_balance(agent.address)
 
@@ -204,7 +215,10 @@ async def test_04_stream(wallets) -> None:
 
     permit = await agent.sign_permit("stream", max_total)
     stream = await agent.open_stream(
-        to=provider.address, rate=rate, max_total=max_total, permit=permit,
+        to=provider.address,
+        rate=rate,
+        max_total=max_total,
+        permit=permit,
     )
     assert stream.id
     if stream.tx_hash:
@@ -219,7 +233,8 @@ async def test_04_stream(wallets) -> None:
         log_tx("stream", "close", closed.tx_hash)
 
     provider_after = await wait_for_balance_change(
-        provider.address, provider_before,
+        provider.address,
+        provider_before,
     )
     agent_after = await get_usdc_balance(agent.address)
 
@@ -277,13 +292,17 @@ async def test_05_bounty(wallets) -> None:
         log_tx("bounty", "award", awarded.tx_hash)
 
     provider_after = await wait_for_balance_change(
-        provider.address, provider_before,
+        provider.address,
+        provider_before,
     )
     agent_after = await get_usdc_balance(agent.address)
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change(
-        "provider", provider_before, provider_after, amount * 0.99,
+        "provider",
+        provider_before,
+        provider_after,
+        amount * 0.99,
     )
 
 
@@ -299,7 +318,10 @@ async def test_06_deposit(wallets) -> None:
 
     permit = await agent.sign_permit("deposit", amount)
     deposit = await agent.place_deposit(
-        to=provider.address, amount=amount, expires=3600, permit=permit,
+        to=provider.address,
+        amount=amount,
+        expires=3600,
+        permit=permit,
     )
     assert deposit.id
     if deposit.tx_hash:
@@ -362,8 +384,7 @@ async def test_07_x402_prepare(wallets) -> None:
     assert "value" in data
 
     print(
-        f"[ACCEPTANCE] x402 | prepare | hash={data['hash'][:18]}..."
-        f" | from={data['from'][:10]}..."
+        f"[ACCEPTANCE] x402 | prepare | hash={data['hash'][:18]}... | from={data['from'][:10]}..."
     )
 
 
@@ -419,5 +440,8 @@ async def test_09_ap2_payment(wallets) -> None:
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
     assert_balance_change(
-        "provider", provider_before, provider_after, amount * 0.99,
+        "provider",
+        provider_before,
+        provider_after,
+        amount * 0.99,
     )

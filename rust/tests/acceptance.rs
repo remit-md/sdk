@@ -96,10 +96,7 @@ fn create_test_wallet(router: &str) -> TestWallet {
         .build()
         .expect("build wallet");
 
-    eprintln!(
-        "[ACCEPTANCE] wallet: {} (chain=84532)",
-        wallet.address()
-    );
+    eprintln!("[ACCEPTANCE] wallet: {} (chain=84532)", wallet.address());
     TestWallet {
         wallet,
         signing_key,
@@ -290,9 +287,8 @@ fn compute_api_eip712_hash(
     domain_data[128..160].copy_from_slice(&pad_address(router_address));
     let domain_sep = keccak256(&domain_data);
 
-    let struct_type_hash = keccak256(
-        b"APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)",
-    );
+    let struct_type_hash =
+        keccak256(b"APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)");
     let method_hash = keccak256(method.as_bytes());
     let path_hash = keccak256(path.as_bytes());
 
@@ -375,7 +371,12 @@ async fn acceptance_01_direct() {
     let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
     let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
-    let permit = w.agent.wallet.sign_permit("direct", 2.0).await.expect("sign_permit direct");
+    let permit = w
+        .agent
+        .wallet
+        .sign_permit("direct", 2.0)
+        .await
+        .expect("sign_permit direct");
     let tx = w
         .agent
         .wallet
@@ -393,8 +394,7 @@ async fn acceptance_01_direct() {
 
     let agent_after =
         wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
-    let provider_after =
-        get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
+    let provider_after = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
     assert_balance_change("provider", provider_before, provider_after, amount * 0.99);
@@ -410,7 +410,12 @@ async fn acceptance_02_escrow() {
     let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
     let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
-    let permit = w.agent.wallet.sign_permit("escrow", 3.0).await.expect("sign_permit escrow");
+    let permit = w
+        .agent
+        .wallet
+        .sign_permit("escrow", 3.0)
+        .await
+        .expect("sign_permit escrow");
     let escrow = w
         .agent
         .wallet
@@ -444,9 +449,12 @@ async fn acceptance_02_escrow() {
         .expect("release_escrow");
     log_tx("escrow", "release", &released.tx_hash);
 
-    let provider_after =
-        wait_for_balance_change(w.provider.wallet.address(), provider_before, &w.contracts.usdc)
-            .await;
+    let provider_after = wait_for_balance_change(
+        w.provider.wallet.address(),
+        provider_before,
+        &w.contracts.usdc,
+    )
+    .await;
     let agent_after = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
@@ -465,7 +473,12 @@ async fn acceptance_03_tab() {
     let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
     let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
-    let permit = w.agent.wallet.sign_permit("tab", limit + 1.0).await.expect("sign_permit tab");
+    let permit = w
+        .agent
+        .wallet
+        .sign_permit("tab", limit + 1.0)
+        .await
+        .expect("sign_permit tab");
     let tab = w
         .agent
         .wallet
@@ -496,7 +509,13 @@ async fn acceptance_03_tab() {
     let charge = w
         .provider
         .wallet
-        .charge_tab(&tab.id, charge_amount, charge_amount, call_count, &charge_sig)
+        .charge_tab(
+            &tab.id,
+            charge_amount,
+            charge_amount,
+            call_count,
+            &charge_sig,
+        )
         .await
         .expect("charge_tab");
     assert_eq!(charge.tab_id, tab.id, "charge tab_id mismatch");
@@ -523,9 +542,12 @@ async fn acceptance_03_tab() {
     );
     log_tx("tab", "close", &closed.tx_hash);
 
-    let provider_after =
-        wait_for_balance_change(w.provider.wallet.address(), provider_before, &w.contracts.usdc)
-            .await;
+    let provider_after = wait_for_balance_change(
+        w.provider.wallet.address(),
+        provider_before,
+        &w.contracts.usdc,
+    )
+    .await;
     let agent_after = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -charge_amount);
@@ -585,9 +607,12 @@ async fn acceptance_04_stream() {
         .expect("close_stream");
     log_tx("stream", "close", &closed.tx_hash);
 
-    let provider_after =
-        wait_for_balance_change(w.provider.wallet.address(), provider_before, &w.contracts.usdc)
-            .await;
+    let provider_after = wait_for_balance_change(
+        w.provider.wallet.address(),
+        provider_before,
+        &w.contracts.usdc,
+    )
+    .await;
     let agent_after = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
     let agent_loss = agent_before - agent_after;
@@ -655,12 +680,7 @@ async fn acceptance_05_bounty() {
     let mut awarded = None;
     for attempt in 0..15 {
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-        match w
-            .agent
-            .wallet
-            .award_bounty(&bounty.id, submission.id)
-            .await
-        {
+        match w.agent.wallet.award_bounty(&bounty.id, submission.id).await {
             Ok(b) => {
                 awarded = Some(b);
                 break;
@@ -677,9 +697,12 @@ async fn acceptance_05_bounty() {
     let awarded = awarded.expect("bounty should be awarded");
     log_tx("bounty", "award", &awarded.tx_hash);
 
-    let provider_after =
-        wait_for_balance_change(w.provider.wallet.address(), provider_before, &w.contracts.usdc)
-            .await;
+    let provider_after = wait_for_balance_change(
+        w.provider.wallet.address(),
+        provider_before,
+        &w.contracts.usdc,
+    )
+    .await;
     let agent_after = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
@@ -778,7 +801,10 @@ async fn acceptance_07_x402_prepare() {
     assert_eq!(hash.len(), 66, "hash should be 66 chars (0x + 64 hex)");
     assert!(data["from"].is_string(), "missing from field");
     assert!(data["to"].is_string(), "missing to field");
-    assert!(data["value"].is_string() || data["value"].is_number(), "missing value field");
+    assert!(
+        data["value"].is_string() || data["value"].is_number(),
+        "missing value field"
+    );
 
     eprintln!(
         "[ACCEPTANCE] x402 | prepare | hash={}... | from={}...",
@@ -797,10 +823,7 @@ async fn acceptance_08_ap2_discovery() {
 
     assert!(!card.name.is_empty(), "agent card should have a name");
     assert!(!card.url.is_empty(), "agent card should have a URL");
-    assert!(
-        !card.skills.is_empty(),
-        "agent card should have skills"
-    );
+    assert!(!card.skills.is_empty(), "agent card should have skills");
     // x402 field is always present (struct field, not Option)
     assert!(
         !card.x402.settle_endpoint.is_empty(),
@@ -828,11 +851,14 @@ async fn acceptance_09_ap2_payment() {
         .await
         .expect("agent card discovery");
 
-    let permit = w.agent.wallet.sign_permit("direct", 2.0).await.expect("sign_permit direct");
+    let permit = w
+        .agent
+        .wallet
+        .sign_permit("direct", 2.0)
+        .await
+        .expect("sign_permit direct");
 
-    let signer = Arc::new(
-        PrivateKeySigner::new(&w.agent.hex_key).expect("create signer"),
-    );
+    let signer = Arc::new(PrivateKeySigner::new(&w.agent.hex_key).expect("create signer"));
     let a2a = A2AClient::from_card(&card, signer);
 
     let task = a2a
@@ -858,8 +884,7 @@ async fn acceptance_09_ap2_payment() {
 
     let agent_after =
         wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
-    let provider_after =
-        get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
+    let provider_after = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
     assert_balance_change("provider", provider_before, provider_after, amount * 0.99);

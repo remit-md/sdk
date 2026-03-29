@@ -7,7 +7,6 @@ and conservation-of-funds checks rather than exact delta assertions.
 """
 
 import asyncio
-import time
 
 import pytest
 
@@ -34,17 +33,7 @@ async def test_stream_lifecycle() -> None:
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
     # Step 1: Open stream with permit for Stream contract
-    contracts = await agent.get_contracts()
-    stream_contract = contracts["stream"]
-
-    deadline = int(time.time()) + 3600
-    raw_amount = int((max_total + 1) * 1_000_000)
-    permit = await agent.sign_usdc_permit(
-        spender=stream_contract,
-        value=raw_amount,
-        deadline=deadline,
-        nonce=0,
-    )
+    permit = await agent.sign_permit("stream", max_total)
 
     stream = await agent.open_stream(
         to=provider.address,

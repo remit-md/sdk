@@ -26,6 +26,11 @@ class Signer(ABC):
         ...
 
     @abstractmethod
+    async def sign_hash(self, hash_bytes: bytes) -> str:
+        """Sign a 32-byte hash and return the 0x-prefixed hex signature (65 bytes: r+s+v)."""
+        ...
+
+    @abstractmethod
     def get_address(self) -> str:
         """Return the checksummed Ethereum address for this signer."""
         ...
@@ -50,6 +55,10 @@ class PrivateKeySigner(Signer):
     ) -> str:
         structured = encode_typed_data(domain_data=domain, message_types=types, message_data=value)
         signed = self._account.sign_message(structured)
+        return str("0x" + signed.signature.hex())
+
+    async def sign_hash(self, hash_bytes: bytes) -> str:
+        signed = self._account.unsafe_sign_hash(hash_bytes)
         return str("0x" + signed.signature.hex())
 
     def get_address(self) -> str:

@@ -37,17 +37,8 @@ async def test_bounty_lifecycle() -> None:
     poster_before = await get_usdc_balance(poster.address)
     provider_before = await get_usdc_balance(provider.address)
     # Step 1: Post bounty with permit for Bounty contract
-    contracts = await poster.get_contracts()
-    bounty_contract = contracts["bounty"]
-
     deadline_ts = int(time.time()) + 3600
-    raw_amount = int((amount + 1) * 1_000_000)
-    permit = await poster.sign_usdc_permit(
-        spender=bounty_contract,
-        value=raw_amount,
-        deadline=deadline_ts,
-        nonce=0,
-    )
+    permit = await poster.sign_permit("bounty", amount)
 
     bounty = await poster.post_bounty(
         amount=amount,

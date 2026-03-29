@@ -80,6 +80,9 @@ class AuthenticatedClient:
     async def put(self, path: str, body: dict[str, Any] | None = None) -> Any:
         return await self._request("PUT", path, json=body)
 
+    async def patch(self, path: str, body: dict[str, Any] | None = None) -> Any:
+        return await self._request("PATCH", path, json=body)
+
     async def delete(self, path: str) -> Any:
         return await self._request("DELETE", path)
 
@@ -93,7 +96,7 @@ class AuthenticatedClient:
         # Idempotency key is fixed for all retries of the same logical operation.
         # Auth headers (including nonce) are regenerated on each attempt so that
         # a retry after a 5xx does not hit NONCE_REUSED on the server.
-        idempotency_key = secrets.token_hex(16) if method in ("POST", "PUT") else None
+        idempotency_key = secrets.token_hex(16) if method in ("POST", "PUT", "PATCH") else None
 
         last_exc: Exception | None = None
         for attempt in range(_MAX_RETRIES + 1):

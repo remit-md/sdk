@@ -448,19 +448,13 @@ public struct Deposit: Codable, Sendable {
     }
 }
 
-public struct Intent: Codable, Sendable {
-    public let id: String
-    public let from: String
-    public let to: String
-    public let amount: Double
-    public let currency: String
-    public let model: String
-    public let status: String
-    public let expiresAt: Double
+public struct WalletSettings: Codable, Sendable {
+    public let wallet: String
+    public let displayName: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, from, to, amount, currency, model, status
-        case expiresAt = "expires_at"
+        case wallet
+        case displayName = "display_name"
     }
 }
 

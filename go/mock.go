@@ -149,6 +149,10 @@ func (t *mockTransport) get(ctx context.Context, path string, dst any) error {
 	return t.dispatch(ctx, "GET", path, nil, dst)
 }
 
+func (t *mockTransport) patch(ctx context.Context, path string, body any, dst any) error {
+	return t.dispatch(ctx, "PATCH", path, body, dst)
+}
+
 func (t *mockTransport) delete(ctx context.Context, path string) error {
 	return t.dispatch(ctx, "DELETE", path, nil, nil)
 }
@@ -282,6 +286,47 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 
 	case method == "DELETE" && strings.HasPrefix(path, "/api/v1/webhooks/"):
 		return nil
+
+	case method == "PATCH" && strings.HasPrefix(path, "/api/v1/webhooks/"):
+		b := mustBody(body)
+		urlVal, _ := b["url"].(string)
+		if urlVal == "" {
+			urlVal = "https://example.com/hook"
+		}
+		wh := Webhook{
+			ID:     extractID(path, "/api/v1/webhooks/", ""),
+			URL:    urlVal,
+			Events: toStringSlice(b["events"]),
+			Active: true,
+		}
+		return t.respond(dst, &wh)
+
+	case method == "PATCH" && path == "/api/v1/wallet/settings":
+		b := mustBody(body)
+		dn, _ := b["display_name"].(string)
+		ws := WalletSettings{
+			Wallet:      "0xMockWallet0000000000000000000000000000001",
+			DisplayName: &dn,
+		}
+		return t.respond(dst, &ws)
+
+	case method == "POST" && strings.Contains(path, "/deposits/") && strings.HasSuffix(path, "/forfeit"):
+		tx := Transaction{
+			ID:        newID("tx"),
+			TxHash:    "0x" + randomHex(32),
+			ChainID:   ChainBaseSep,
+			CreatedAt: time.Now(),
+		}
+		return t.respond(dst, &tx)
+
+	case method == "POST" && strings.Contains(path, "/bounties/") && strings.HasSuffix(path, "/reclaim"):
+		tx := Transaction{
+			ID:        newID("tx"),
+			TxHash:    "0x" + randomHex(32),
+			ChainID:   ChainBaseSep,
+			CreatedAt: time.Now(),
+		}
+		return t.respond(dst, &tx)
 
 	default:
 		// Unhandled routes succeed with an empty response (permissive mock)

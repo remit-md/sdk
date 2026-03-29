@@ -763,6 +763,15 @@ func (w *Wallet) AwardBounty(ctx context.Context, bountyID string, submissionID 
 	return &tx, nil
 }
 
+// ReclaimBounty reclaims an expired or cancelled bounty (called by the poster).
+func (w *Wallet) ReclaimBounty(ctx context.Context, bountyID string) (*Transaction, error) {
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v1/bounties/"+bountyID+"/reclaim", map[string]any{}, &tx); err != nil {
+		return nil, err
+	}
+	return &tx, nil
+}
+
 // BountyListOptions controls filtering for ListBounties.
 type BountyListOptions struct {
 	Status    string // Filter by status (open, claimed, awarded, expired).
@@ -873,6 +882,15 @@ func (w *Wallet) ReturnDeposit(ctx context.Context, depositID string) (*Transact
 	return &tx, nil
 }
 
+// ForfeitDeposit forfeits a deposit (called by the depositor to surrender their deposit).
+func (w *Wallet) ForfeitDeposit(ctx context.Context, depositID string) (*Transaction, error) {
+	var tx Transaction
+	if err := w.http.post(ctx, "/api/v1/deposits/"+depositID+"/forfeit", map[string]any{}, &tx); err != nil {
+		return nil, err
+	}
+	return &tx, nil
+}
+
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 // SpendingSummary returns spending analytics for a given period.
@@ -892,25 +910,6 @@ func (w *Wallet) RemainingBudget(ctx context.Context) (*Budget, error) {
 		return nil, err
 	}
 	return &budget, nil
-}
-
-// ─── Intent Negotiation ───────────────────────────────────────────────────────
-
-// ProposeIntent proposes a payment intent for negotiation (agent-to-agent).
-func (w *Wallet) ProposeIntent(ctx context.Context, to string, amount decimal.Decimal, paymentType string) (*Intent, error) {
-	if err := validateAddress(to); err != nil {
-		return nil, err
-	}
-	body := map[string]any{
-		"to":     to,
-		"amount": amount.String(),
-		"type":   paymentType,
-	}
-	var intent Intent
-	if err := w.http.post(ctx, "/api/v1/intents", body, &intent); err != nil {
-		return nil, err
-	}
-	return &intent, nil
 }
 
 // ─── Contracts ────────────────────────────────────────────────────────────────
@@ -1224,6 +1223,31 @@ func (w *Wallet) ListWebhooks(ctx context.Context) ([]Webhook, error) {
 // DeleteWebhook removes a webhook by ID.
 func (w *Wallet) DeleteWebhook(ctx context.Context, webhookID string) error {
 	return w.http.delete(ctx, "/api/v1/webhooks/"+webhookID)
+}
+
+// UpdateWebhookParams configures UpdateWebhook.
+type UpdateWebhookParams struct {
+	URL    *string  `json:"url,omitempty"`
+	Events []string `json:"events,omitempty"`
+	Active *bool    `json:"active,omitempty"`
+}
+
+// UpdateWebhook updates an existing webhook's URL, events, or active status.
+func (w *Wallet) UpdateWebhook(ctx context.Context, webhookID string, params UpdateWebhookParams) (*Webhook, error) {
+	var wh Webhook
+	if err := w.http.patch(ctx, "/api/v1/webhooks/"+webhookID, params, &wh); err != nil {
+		return nil, err
+	}
+	return &wh, nil
+}
+
+// UpdateWalletSettings updates wallet display settings.
+func (w *Wallet) UpdateWalletSettings(ctx context.Context, params UpdateWalletSettingsParams) (*WalletSettings, error) {
+	var ws WalletSettings
+	if err := w.http.patch(ctx, "/api/v1/wallet/settings", params, &ws); err != nil {
+		return nil, err
+	}
+	return &ws, nil
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────

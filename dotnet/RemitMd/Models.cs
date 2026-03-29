@@ -185,15 +185,10 @@ public record Deposit(
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
 );
 
-/// <summary>Intent - a proposed payment awaiting negotiation.</summary>
-public record Intent(
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("from")] string From,
-    [property: JsonPropertyName("to")] string To,
-    [property: JsonPropertyName("amount")] decimal Amount,
-    [property: JsonPropertyName("type")] string Type,
-    [property: JsonPropertyName("expires_at")] DateTimeOffset ExpiresAt,
-    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt
+/// <summary>Wallet display settings.</summary>
+public record WalletSettings(
+    [property: JsonPropertyName("wallet")]       string? Wallet,
+    [property: JsonPropertyName("display_name")] string? DisplayName
 );
 
 /// <summary>Spending analytics for a wallet address.</summary>

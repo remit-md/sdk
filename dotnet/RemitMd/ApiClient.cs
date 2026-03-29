@@ -57,6 +57,16 @@ internal sealed class ApiClient : IDisposable
         return await DeserializeAsync<T>(response);
     }
 
+    /// <summary>Makes a PATCH request with a JSON body and deserializes the response.</summary>
+    internal async Task<T> PatchAsync<T>(string path, object body, CancellationToken ct)
+    {
+        var keyBytes = RandomNumberGenerator.GetBytes(16);
+        var idempotencyKey = Convert.ToHexString(keyBytes).ToLowerInvariant();
+        var response = await ExecuteWithRetryAsync(
+            () => SendSignedAsync(HttpMethod.Patch, path, body, idempotencyKey, ct), ct);
+        return await DeserializeAsync<T>(response);
+    }
+
     internal async Task DeleteAsync(string path, CancellationToken ct)
     {
         await ExecuteWithRetryAsync(
@@ -205,6 +215,7 @@ public interface IRemitTransport
 {
     Task<T> GetAsync<T>(string path, CancellationToken ct);
     Task<T> PostAsync<T>(string path, object body, CancellationToken ct);
+    Task<T> PatchAsync<T>(string path, object body, CancellationToken ct);
     Task DeleteAsync(string path, CancellationToken ct);
 }
 
@@ -245,6 +256,7 @@ internal sealed class HttpTransport : IRemitTransport, IDisposable
 
     public Task<T> GetAsync<T>(string path, CancellationToken ct)   => _client.GetAsync<T>(path, ct);
     public Task<T> PostAsync<T>(string path, object body, CancellationToken ct) => _client.PostAsync<T>(path, body, ct);
+    public Task<T> PatchAsync<T>(string path, object body, CancellationToken ct) => _client.PatchAsync<T>(path, body, ct);
     public Task DeleteAsync(string path, CancellationToken ct) => _client.DeleteAsync(path, ct);
     public void Dispose() => _client.Dispose();
 }

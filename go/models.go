@@ -257,15 +257,15 @@ type Deposit struct {
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
-// Intent represents a proposed payment awaiting negotiation.
-type Intent struct {
-	ID          string          `json:"id"`
-	From        string          `json:"from"`
-	To          string          `json:"to"`
-	Amount      decimal.Decimal `json:"amount"`
-	Type        string          `json:"type"` // "direct", "escrow", "tab", etc.
-	ExpiresAt   time.Time       `json:"expires_at"`
-	CreatedAt   time.Time       `json:"created_at"`
+// WalletSettings holds wallet display preferences.
+type WalletSettings struct {
+	Wallet      string  `json:"wallet"`
+	DisplayName *string `json:"display_name,omitempty"`
+}
+
+// UpdateWalletSettingsParams configures UpdateWalletSettings.
+type UpdateWalletSettingsParams struct {
+	DisplayName *string `json:"display_name,omitempty"`
 }
 
 // SpendingSummary provides spending analytics for a wallet.

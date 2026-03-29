@@ -49,6 +49,11 @@ defmodule RemitMd.Http do
     request(t, :post, path, body, 1, idempotency_key)
   end
 
+  def patch(%__MODULE__{} = t, path, body) do
+    idempotency_key = Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
+    request(t, :patch, path, body, 1, idempotency_key)
+  end
+
   def delete(%__MODULE__{} = t, path) do
     request(t, :delete, path, nil, 1, nil)
   end
@@ -147,6 +152,16 @@ defmodule RemitMd.Http do
 
           :httpc.request(
             :post,
+            {url_charlist, headers, ~c"application/json", body_charlist},
+            http_opts(),
+            []
+          )
+
+        :patch ->
+          body_charlist = String.to_charlist(body_json)
+
+          :httpc.request(
+            :patch,
             {url_charlist, headers, ~c"application/json", body_charlist},
             http_opts(),
             []
@@ -263,6 +278,7 @@ defmodule RemitMd.Http do
 
   defp method_string(:get), do: "GET"
   defp method_string(:post), do: "POST"
+  defp method_string(:patch), do: "PATCH"
   defp method_string(:delete), do: "DELETE"
 
   defp http_opts do

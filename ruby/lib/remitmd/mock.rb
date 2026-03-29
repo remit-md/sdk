@@ -130,6 +130,10 @@ module Remitmd
       dispatch("POST", path, body)
     end
 
+    def patch(path, body = nil)
+      dispatch("PATCH", path, body)
+    end
+
     def delete(path)
       dispatch("DELETE", path, nil)
     end
@@ -414,18 +418,43 @@ module Remitmd
           "has_more" => false,
         }
 
-      # Intents
-      in ["POST", "/intents"]
-        to     = fetch!(b, :to)
-        amount = decimal!(b, :amount)
+      # Deposit forfeit
+      in ["POST", path] if path.end_with?("/forfeit") && path.include?("/deposits/")
         {
-          "id"         => new_id("int"),
-          "from"       => MockRemit::MOCK_ADDRESS,
-          "to"         => to,
-          "amount"     => amount.to_s("F"),
-          "type"       => b[:type] || "direct",
-          "expires_at" => now,
+          "id"         => new_id("tx"),
+          "tx_hash"    => "0x#{SecureRandom.hex(32)}",
+          "chain_id"   => ChainId::BASE_SEPOLIA,
           "created_at" => now,
+        }
+
+      # Bounty reclaim
+      in ["POST", path] if path.end_with?("/reclaim") && path.include?("/bounties/")
+        {
+          "id"         => new_id("tx"),
+          "tx_hash"    => "0x#{SecureRandom.hex(32)}",
+          "chain_id"   => ChainId::BASE_SEPOLIA,
+          "created_at" => now,
+        }
+
+      # Webhook update
+      in ["PATCH", path] if path.start_with?("/webhooks/")
+        webhook_id = path.split("/").last
+        {
+          "id"         => webhook_id,
+          "wallet"     => MockRemit::MOCK_ADDRESS,
+          "url"        => b[:url] || "https://example.com/hook",
+          "events"     => b[:events] || [],
+          "chains"     => ["base-sepolia"],
+          "active"     => b.key?(:active) ? b[:active] : true,
+          "created_at" => now,
+          "updated_at" => now,
+        }
+
+      # Wallet settings update
+      in ["PATCH", "/wallet/settings"]
+        {
+          "wallet"       => MockRemit::MOCK_ADDRESS,
+          "display_name" => b[:display_name],
         }
 
       else

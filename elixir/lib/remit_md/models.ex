@@ -440,6 +440,19 @@ defmodule RemitMd.Models do
     end
   end
 
+  defmodule WalletSettings do
+    @moduledoc "Wallet display settings."
+    defstruct [:wallet, :display_name]
+
+    @doc false
+    def from_map(m) do
+      %__MODULE__{
+        wallet:       Map.get(m, "wallet"),
+        display_name: Map.get(m, "display_name") || Map.get(m, "displayName")
+      }
+    end
+  end
+
   defmodule MintResponse do
     @moduledoc "Result of a testnet mint operation."
     @enforce_keys [:tx_hash, :balance]

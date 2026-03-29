@@ -38,6 +38,10 @@ module Remitmd
       request(:post, path, body)
     end
 
+    def patch(path, body = nil)
+      request(:patch, path, body)
+    end
+
     def delete(path)
       request(:delete, path, nil)
     end
@@ -71,6 +75,7 @@ module Remitmd
       req = case method
             when :get    then Net::HTTP::Get.new(full_path)
             when :post   then Net::HTTP::Post.new(full_path)
+            when :patch  then Net::HTTP::Patch.new(full_path)
             when :delete then Net::HTTP::Delete.new(full_path)
             end
 

@@ -22,7 +22,7 @@ defmodule RemitMd.Wallet do
   alias RemitMd.Models.{
     Balance, Bounty, BountySubmission, Budget, ContractAddresses, Deposit, Escrow,
     MintResponse, PermitSignature, Reputation, SpendingSummary, Stream, Tab, TabCharge,
-    Transaction, TransactionList, WalletStatus, Webhook
+    Transaction, TransactionList, WalletSettings, WalletStatus, Webhook
   }
 
   @min_amount Decimal.new("0.000001")
@@ -706,6 +706,15 @@ defmodule RemitMd.Wallet do
   end
 
   @doc """
+  Reclaim an expired or unclaimed bounty (poster-only).
+  """
+  def reclaim_bounty(%__MODULE__{} = w, bounty_id) do
+    with {:ok, data} <- do_call(w, :post, "/bounties/#{bounty_id}/reclaim", %{}) do
+      {:ok, Bounty.from_map(data)}
+    end
+  end
+
+  @doc """
   List bounties with optional filters.
 
   ## Options
@@ -775,6 +784,26 @@ defmodule RemitMd.Wallet do
     do_call(w, :delete, "/webhooks/#{webhook_id}", nil)
   end
 
+  @doc """
+  Update a webhook's URL, events, or active status.
+
+  ## Options
+
+  - `:url` - new webhook URL
+  - `:events` - new list of event types
+  - `:active` - boolean to enable/disable the webhook
+  """
+  def update_webhook(%__MODULE__{} = w, webhook_id, opts \\ []) do
+    body = %{}
+    body = if url = Keyword.get(opts, :url), do: Map.put(body, :url, url), else: body
+    body = if events = Keyword.get(opts, :events), do: Map.put(body, :events, events), else: body
+    body = if Keyword.has_key?(opts, :active), do: Map.put(body, :active, Keyword.get(opts, :active)), else: body
+
+    with {:ok, data} <- do_call(w, :patch, "/webhooks/#{webhook_id}", body) do
+      {:ok, Webhook.from_map(data)}
+    end
+  end
+
   # ─── Tab aliases / missing methods ─────────────────────────────────
 
   @doc "Canonical name for `create_tab`."
@@ -814,19 +843,6 @@ defmodule RemitMd.Wallet do
     create_bounty(w, amount, task_description, deadline, opts)
   end
 
-  # ─���─ Intent Negotiation ────────────────────────────────────────────
-
-  @doc "Propose a payment intent for negotiation (agent-to-agent)."
-  def propose_intent(%__MODULE__{} = w, to, amount, type \\ "direct") do
-    body = %{to: to, amount: to_string(amount), type: type}
-    do_call(w, :post, "/intents", body)
-  end
-
-  @doc "Alias for propose_intent."
-  def express_intent(%__MODULE__{} = w, to, amount, type \\ "direct") do
-    propose_intent(w, to, amount, type)
-  end
-
   @doc """
   Generate a one-time URL for the operator to fund this wallet.
 
@@ -864,6 +880,24 @@ defmodule RemitMd.Wallet do
     body = if permit, do: Map.put(body, :permit, PermitSignature.to_map(permit)), else: body
     with {:ok, data} <- do_call(w, :post, "/links/withdraw", body) do
       {:ok, RemitMd.Models.LinkResponse.from_map(data)}
+    end
+  end
+
+  # ─── Wallet Settings ──────────────────────────────────────────────────
+
+  @doc """
+  Update wallet display settings.
+
+  ## Options
+
+  - `:display_name` - new display name for the wallet
+  """
+  def update_wallet_settings(%__MODULE__{} = w, opts \\ []) do
+    body = %{}
+    body = if name = Keyword.get(opts, :display_name), do: Map.put(body, :display_name, name), else: body
+
+    with {:ok, data} <- do_call(w, :patch, "/wallet/settings", body) do
+      {:ok, WalletSettings.from_map(data)}
     end
   end
 
@@ -912,6 +946,15 @@ defmodule RemitMd.Wallet do
   """
   def return_deposit(%__MODULE__{} = w, deposit_id) do
     with {:ok, data} <- do_call(w, :post, "/deposits/#{deposit_id}/return", %{}) do
+      {:ok, Transaction.from_map(data)}
+    end
+  end
+
+  @doc """
+  Forfeit a deposit (depositor-side). Provider keeps the funds.
+  """
+  def forfeit_deposit(%__MODULE__{} = w, deposit_id) do
+    with {:ok, data} <- do_call(w, :post, "/deposits/#{deposit_id}/forfeit", %{}) do
       {:ok, Transaction.from_map(data)}
     end
   end
@@ -1001,6 +1044,7 @@ defmodule RemitMd.Wallet do
         case method do
           :get    -> Http.get(t, path)
           :post   -> Http.post(t, path, body)
+          :patch  -> Http.patch(t, path, body)
           :delete -> Http.delete(t, path)
         end
       {:ok, result}

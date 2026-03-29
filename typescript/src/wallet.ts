@@ -81,6 +81,20 @@ export interface PostBountyOptions {
   permit?: PermitSignature;
 }
 
+export interface UpdateWebhookOptions {
+  url?: string;
+  events?: string[];
+  active?: boolean;
+}
+
+export interface UpdateWalletSettingsOptions {
+  display_name?: string;
+}
+
+export interface WalletSettings {
+  displayName: string;
+}
+
 export interface PlaceDepositOptions {
   to: string;
   amount: number;
@@ -579,20 +593,14 @@ export class Wallet extends RemitClient {
     return this.#auth.post<Transaction>(`/deposits/${depositId}/return`, {});
   }
 
-  // ─── Intent Negotiation ──────────────────────────────────────────────────
-
-  /** Propose a payment intent for negotiation (agent-to-agent). */
-  proposeIntent(to: string, amount: number, paymentType = "direct"): Promise<Record<string, unknown>> {
-    return this.#auth.post<Record<string, unknown>>("/intents", {
-      to,
-      amount: String(amount),
-      type: paymentType,
-    });
+  forfeitDeposit(depositId: string): Promise<Transaction> {
+    return this.#auth.post<Transaction>(`/deposits/${depositId}/forfeit`, {});
   }
 
-  /** Alias for proposeIntent. */
-  expressIntent(to: string, amount: number, paymentType = "direct"): Promise<Record<string, unknown>> {
-    return this.proposeIntent(to, amount, paymentType);
+  // ─── Bounty reclaim ────────────────────────────────────────────────────────
+
+  reclaimBounty(bountyId: string): Promise<Transaction> {
+    return this.#auth.post<Transaction>(`/bounties/${bountyId}/reclaim`, {});
   }
 
   // ─── Authenticated reads (override unauthenticated base class versions) ──────
@@ -660,6 +668,16 @@ export class Wallet extends RemitClient {
 
   deleteWebhook(id: string): Promise<void> {
     return this.#auth.delete<void>(`/webhooks/${id}`);
+  }
+
+  updateWebhook(id: string, options: UpdateWebhookOptions): Promise<Webhook> {
+    return this.#auth.patch<Webhook>(`/webhooks/${id}`, options);
+  }
+
+  // ─── Wallet settings ────────────────────────────────────────────────────────
+
+  updateWalletSettings(options: UpdateWalletSettingsOptions): Promise<WalletSettings> {
+    return this.#auth.patch<WalletSettings>("/wallet/settings", options);
   }
 
   // ─── One-time operator links ─────────────────────────────────────────────────

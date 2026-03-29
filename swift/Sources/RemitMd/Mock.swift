@@ -165,9 +165,6 @@ public final class MockRemit: @unchecked Sendable {
         if path.hasPrefix("/api/v1/budget/") {
             return try cast(handleBudget(address: parts.last ?? walletAddress))
         }
-        if path == "/api/v1/intent" && method == "POST" {
-            return try cast(handleIntent(body: body))
-        }
         throw RemitError(RemitError.serverError, "MockRemit: unhandled route \(method) \(path)")
     }
 
@@ -437,16 +434,6 @@ public final class MockRemit: @unchecked Sendable {
                       remaining: 476.50, currency: "USDC")
     }
 
-    private func handleIntent(body: (any Encodable)?) throws -> Intent {
-        let b = try jsonDecode(IntentBody.self, from: body)
-        try validate(address: b.to)
-        try validate(amount: b.amount)
-        return Intent(id: newID("intent"), from: walletAddress, to: b.to,
-                      amount: b.amount, currency: "USDC", model: b.model,
-                      status: "pending",
-                      expiresAt: Date().timeIntervalSince1970 + 300)
-    }
-
     // MARK: - Helpers
 
     private var _counter = 0
@@ -491,7 +478,6 @@ private struct StreamBody: Codable { let payee: String; let rate_per_second: Dou
 private struct BountyBody: Codable { let amount: Double; let task_description: String; let deadline: Int?; let max_attempts: Int? }
 private struct AwardBody: Codable { let submission_id: Int }
 private struct DepositBody: Codable { let provider: String; let amount: Double; let expiry: Int? }
-private struct IntentBody: Codable { let to: String; let amount: Double; let model: String }
 
 extension NSLock {
     /// Acquire the lock, run body, release. Named `remitLock` to avoid conflict with

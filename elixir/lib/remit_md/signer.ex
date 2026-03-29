@@ -27,6 +27,14 @@ defmodule RemitMd.Signer do
   @callback sign(signer :: term(), digest :: binary()) :: String.t()
 
   @doc """
+  Sign a raw 32-byte hash. Returns a 0x-prefixed 65-byte hex signature (r+s+v).
+
+  Used by server-side signing flows (`/permits/prepare`, `/x402/prepare`)
+  where the server computes the EIP-712 hash and the SDK only signs it.
+  """
+  @callback sign_hash(signer :: term(), hash :: binary()) :: String.t()
+
+  @doc """
   Return the Ethereum address (0x-prefixed, 40 hex chars) for this signer.
 
   The argument is the signer struct.
@@ -48,6 +56,9 @@ defmodule RemitMd.MockSigner do
 
   @impl true
   def sign(_signer, _message), do: "0x" <> String.duplicate("ab", 65)
+
+  @impl true
+  def sign_hash(_signer, _hash), do: "0x" <> String.duplicate("ab", 65)
 
   @impl true
   def address(%{address: addr}), do: addr
@@ -113,6 +124,12 @@ defmodule RemitMd.PrivateKeySigner do
     # Build 65-byte Ethereum signature: r(32) || s(32) || v(1)
     sig = <<r::unsigned-big-integer-size(256), s::unsigned-big-integer-size(256), v>>
     "0x" <> Base.encode16(sig, case: :lower)
+  end
+
+  @impl true
+  def sign_hash(%__MODULE__{} = signer, hash)
+      when is_binary(hash) and byte_size(hash) == 32 do
+    sign(signer, hash)
   end
 
   @impl true

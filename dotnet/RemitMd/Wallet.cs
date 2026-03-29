@@ -16,8 +16,6 @@ public sealed class Wallet
     private readonly IRemitSigner _signer;
     private readonly long _chainId;
     private readonly string _chain;
-    private readonly string _chainKey;
-    private readonly bool _isMock;
     private ContractAddresses? _cachedContracts;
 
     // Chain → API base URL map
@@ -27,12 +25,16 @@ public sealed class Wallet
         ["base-sepolia"]       = (84532, "https://testnet.remit.md"),
     };
 
-    // Chain → USDC contract address
-    private static readonly Dictionary<string, string> UsdcAddresses = new()
+    // Contract name → flow name for /permits/prepare.
+    private static readonly Dictionary<string, string> ContractToFlow = new()
     {
-        ["base-sepolia"] = "0x2d846325766921935f37d5b4478196d3ef93707c",
-        ["base"]         = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        ["localhost"]    = "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        ["router"]  = "direct",
+        ["escrow"]  = "escrow",
+        ["tab"]     = "tab",
+        ["stream"]  = "stream",
+        ["bounty"]  = "bounty",
+        ["deposit"] = "deposit",
+        ["relayer"] = "direct",
     };
 
     // ─── Constructors ─────────────────────────────────────────────────────────
@@ -68,8 +70,6 @@ public sealed class Wallet
         _signer = signer;
         _chainId = cc.ChainId;
         _chain = key;
-        _chainKey = key;
-        _isMock = false;
         var envUrl = Environment.GetEnvironmentVariable("REMITMD_API_URL");
         _transport = new HttpTransport(signer, cc.ChainId, routerAddress ?? string.Empty, baseUrl ?? envUrl ?? cc.ApiUrl);
     }
@@ -117,8 +117,6 @@ public sealed class Wallet
         _signer = signer;
         _chainId = chainId;
         _chain = "base";
-        _chainKey = "base";
-        _isMock = true;
     }
 
     // ─── Direct payments ──────────────────────────────────────────────────────
@@ -620,137 +618,64 @@ public sealed class Wallet
         }, ct);
     }
 
-    // ─── EIP-2612 Permit ──────────────────────────────────────────────────────
+    // ─── EIP-2612 Permit (via /permits/prepare) ────────────────────────────────
 
     /// <summary>
-    /// Signs an EIP-2612 permit for USDC approval with explicit parameters.
+    /// Signs a USDC permit via the server's <c>/permits/prepare</c> endpoint.
+    ///
+    /// The server computes the EIP-712 hash, manages nonces, and resolves
+    /// contract addresses. The SDK only signs the returned hash.
     /// </summary>
-    /// <param name="spender">Contract address that will call transferFrom.</param>
-    /// <param name="value">Raw USDC amount in base units (6 decimals, e.g. 1_000_000 = $1).</param>
-    /// <param name="nonce">Current EIP-2612 nonce for this wallet on the USDC contract.</param>
-    /// <param name="deadline">Unix timestamp after which the permit expires.</param>
-    /// <param name="usdcAddress">Optional USDC contract address override.</param>
-    public PermitSignature SignUsdcPermit(string spender, long value, long nonce, long deadline, string? usdcAddress = null)
+    /// <param name="flow">Payment flow: "direct", "escrow", "tab", "stream", "bounty", "deposit".</param>
+    /// <param name="amount">Amount in USDC (e.g. 5.0 for $5.00).</param>
+    public async Task<PermitSignature> SignPermitAsync(string flow, decimal amount)
     {
-        var usdc = usdcAddress ?? (UsdcAddresses.TryGetValue(_chainKey, out var addr) ? addr : null)
-            ?? throw new RemitError(ErrorCodes.InvalidChain,
-                $"No USDC address for chain '{_chainKey}'. Supported: {string.Join(", ", UsdcAddresses.Keys)}. Pass usdcAddress explicitly.");
+        var data = await _transport.PostAsync<System.Text.Json.JsonElement>(
+            "/api/v1/permits/prepare",
+            new { flow, amount = amount.ToString("G"), owner = Address },
+            CancellationToken.None);
 
-        // EIP-712 domain: name="USD Coin", version="2", chainId, verifyingContract=USDC
-        var domainTypeHash = Eip712.Keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-        var nameHash = Eip712.Keccak256("USD Coin");
-        var versionHash = Eip712.Keccak256("2");
-        var domainData = ConcatBytes(domainTypeHash, nameHash, versionHash,
-            PadUint256Long(_chainId), PadAddressBytes(usdc));
-        var domainSep = Eip712.Keccak256(domainData);
+        var hashHex = data.GetProperty("hash").GetString()
+            ?? throw new RemitError(ErrorCodes.ServerError, "permits/prepare returned no hash");
+        var hashBytes = Convert.FromHexString(hashHex.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? hashHex[2..] : hashHex);
 
-        // Permit struct hash
-        var typeHash = Eip712.Keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-        var structData = ConcatBytes(typeHash,
-            PadAddressBytes(Address),
-            PadAddressBytes(spender),
-            PadUint256Long(value),
-            PadUint256Long(nonce),
-            PadUint256Long(deadline));
-        var structHash = Eip712.Keccak256(structData);
+        var sig = _signer.Sign(hashBytes);
 
-        // Final EIP-712 digest: "\x19\x01" || domainSeparator || structHash
-        var payload = new byte[66];
-        payload[0] = 0x19;
-        payload[1] = 0x01;
-        Buffer.BlockCopy(domainSep, 0, payload, 2, 32);
-        Buffer.BlockCopy(structHash, 0, payload, 34, 32);
-        var digest = Eip712.Keccak256(payload);
-
-        var sig = _signer.Sign(digest);
-
-        // Parse r, s, v from the 65-byte signature
+        // Parse r, s, v from the 65-byte signature.
         var sigHex = sig.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? sig[2..] : sig;
         var sigBytes = Convert.FromHexString(sigHex);
         var r = "0x" + Convert.ToHexString(sigBytes, 0, 32).ToLowerInvariant();
         var s = "0x" + Convert.ToHexString(sigBytes, 32, 32).ToLowerInvariant();
         var v = (int)sigBytes[64];
 
+        var value = data.GetProperty("value").GetInt64();
+        var deadline = data.GetProperty("deadline").GetInt64();
+
         return new PermitSignature(value, deadline, v, r, s);
     }
 
     /// <summary>
-    /// Signs a USDC permit for <paramref name="spender"/> with automatic nonce fetching.
-    /// </summary>
-    /// <param name="spender">Contract address that will call transferFrom (e.g. Router, Escrow).</param>
-    /// <param name="amount">Amount in USDC (e.g. 1.50 for $1.50).</param>
-    /// <param name="deadline">Optional Unix timestamp. Defaults to 1 hour from now.</param>
-    public async Task<PermitSignature> SignPermitAsync(string spender, decimal amount, long? deadline = null, string? usdcAddress = null)
-    {
-        var usdcAddr = usdcAddress;
-        if (string.IsNullOrEmpty(usdcAddr))
-            usdcAddr = UsdcAddresses.TryGetValue(_chainKey, out var a) ? a : null;
-        if (string.IsNullOrEmpty(usdcAddr))
-            throw new RemitError(ErrorCodes.InvalidChain,
-                $"No USDC address for chain '{_chainKey}'. Supported: {string.Join(", ", UsdcAddresses.Keys)}. Use SignUsdcPermit() with explicit address.");
-        var nonce = await FetchPermitNonceAsync(usdcAddr);
-        var dl = deadline ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var rawAmount = (long)(amount * 1_000_000m);
-        return SignUsdcPermit(spender, rawAmount, nonce, dl, usdcAddr);
-    }
-
-    /// <summary>
     /// Auto-signs a permit for the given contract type and amount.
-    /// Used internally by payment methods when no explicit permit is provided.
+    /// Maps the contract name to a flow and calls <see cref="SignPermitAsync(string, decimal)"/>.
+    /// Returns null on failure so callers degrade gracefully.
     /// </summary>
     private async Task<PermitSignature?> AutoPermitAsync(string contract, decimal amount)
     {
+        var flow = ContractToFlow.GetValueOrDefault(contract);
+        if (string.IsNullOrEmpty(flow))
+        {
+            Console.Error.WriteLine($"[remitmd] unknown contract for permit: {contract}");
+            return null;
+        }
         try
         {
-            var contracts = await GetContractsAsync();
-            var spender = contract switch
-            {
-                "router"  => contracts.Router,
-                "escrow"  => contracts.Escrow,
-                "tab"     => contracts.Tab,
-                "stream"  => contracts.Stream,
-                "bounty"  => contracts.Bounty,
-                "deposit" => contracts.Deposit,
-                "relayer" => contracts.Relayer,
-                _ => null,
-            };
-            if (string.IsNullOrEmpty(spender))
-                return null;
-            return await SignPermitAsync(spender, amount, usdcAddress: contracts.Usdc);
+            return await SignPermitAsync(flow, amount);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[remitmd] auto-permit failed for {contract} (amount={amount}): {ex.Message}");
             return null;
         }
-    }
-
-    /// <summary>
-    /// Fetches the EIP-2612 permit nonce from the API.
-    /// </summary>
-    private async Task<long> FetchPermitNonceAsync(string usdcAddress)
-    {
-        // Mock mode: return 0 directly (used by MockRemit)
-        if (_isMock)
-            return 0;
-
-        var status = await _transport.GetAsync<System.Text.Json.JsonElement>(
-            $"/api/v1/status/{Address}", CancellationToken.None);
-        if (status.TryGetProperty("permit_nonce", out var nonceElem))
-        {
-            if (nonceElem.ValueKind == System.Text.Json.JsonValueKind.Number)
-                return nonceElem.GetInt64();
-            if (nonceElem.ValueKind == System.Text.Json.JsonValueKind.String)
-            {
-                var s = nonceElem.GetString();
-                if (s is not null && long.TryParse(s, out var parsed))
-                    return parsed;
-            }
-        }
-        throw new RemitError(ErrorCodes.ServerError,
-            $"permit_nonce not available from /status API for {Address}");
     }
 
     // ─── Validation helpers ───────────────────────────────────────────────────

@@ -82,6 +82,11 @@ public final class CliSigner: Signer, @unchecked Sendable {
         return sig
     }
 
+    /// Sign a raw 32-byte hash (delegates to sign(digest:)).
+    public func signHash(_ hash: Data) async throws -> String {
+        return try sign(digest: hash)
+    }
+
     // MARK: - Availability check
 
     /// Check conditions for CliSigner activation:

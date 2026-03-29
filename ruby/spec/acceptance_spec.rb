@@ -95,59 +95,6 @@ def fund_wallet(tw, amount)
   wait_for_balance_change(tw[:wallet].address, 0)
 end
 
-# ─── EIP-2612 Permit Signing ────────────────────────────────────────────────
-
-def keccak256(data)
-  [Remitmd::Keccak.hexdigest(data)].pack("H*")
-end
-
-def pad_address(addr)
-  hex = addr.delete_prefix("0x")
-  [hex.rjust(64, "0")].pack("H*")
-end
-
-def pad_uint256(value)
-  hex = value.to_s(16).rjust(64, "0")
-  [hex].pack("H*")
-end
-
-def sign_usdc_permit(key_hex, owner, spender, value, nonce, deadline)
-  contracts = fetch_contracts
-  usdc_address = contracts["usdc"]
-  chain_id = contracts["chain_id"]
-
-  # Domain separator
-  domain_type_hash = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-  name_hash = keccak256("USD Coin")
-  version_hash = keccak256("2")
-  usdc_padded = pad_address(usdc_address)
-
-  domain_data = domain_type_hash + name_hash + version_hash + pad_uint256(chain_id) + usdc_padded
-  domain_sep = keccak256(domain_data)
-
-  # Permit struct hash
-  permit_type_hash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
-  struct_data = permit_type_hash + pad_address(owner) + pad_address(spender) +
-                pad_uint256(value) + pad_uint256(nonce) + pad_uint256(deadline)
-  struct_hash = keccak256(struct_data)
-
-  # EIP-712 digest
-  final_data = "\x19\x01".b + domain_sep + struct_hash
-  digest = keccak256(final_data)
-
-  # Sign using the SDK's signer
-  signer = Remitmd::PrivateKeySigner.new("0x#{key_hex}")
-  sig_hex = signer.sign(digest)
-
-  # Parse r, s, v from the 65-byte hex signature
-  sig_bytes = [sig_hex.delete_prefix("0x")].pack("H*")
-  r = "0x#{sig_bytes[0, 32].unpack1("H*")}"
-  s = "0x#{sig_bytes[32, 32].unpack1("H*")}"
-  v = sig_bytes[64].ord
-
-  Remitmd::PermitSignature.new(value: value, deadline: deadline, v: v, r: r, s: s)
-end
-
 # ─── Tests ────────────────────────────────────────────────────────────────────
 
 RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLength
@@ -164,13 +111,8 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       agent_before = get_usdc_balance(agent[:wallet].address)
       provider_before = get_usdc_balance(provider[:wallet].address)
 
-      # Sign EIP-2612 permit for Router
-      contracts = fetch_contracts
-      deadline = Time.now.to_i + 3600
-      permit = sign_usdc_permit(
-        agent[:key_hex], agent[:wallet].address, contracts["router"],
-        2_000_000, 0, deadline
-      )
+      # Sign permit via server-side /permits/prepare
+      permit = agent[:wallet].sign_permit("direct", 2.0)
 
       tx = agent[:wallet].pay(provider[:wallet].address, 1.0,
                               memo: "ruby-sdk-acceptance", permit: permit)
@@ -198,13 +140,8 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       agent_before = get_usdc_balance(agent[:wallet].address)
       provider_before = get_usdc_balance(provider[:wallet].address)
 
-      # Sign EIP-2612 permit for Escrow contract
-      contracts = fetch_contracts
-      deadline = Time.now.to_i + 3600
-      permit = sign_usdc_permit(
-        agent[:key_hex], agent[:wallet].address, contracts["escrow"],
-        6_000_000, 0, deadline
-      )
+      # Sign permit via server-side /permits/prepare
+      permit = agent[:wallet].sign_permit("escrow", 6.0)
 
       escrow = agent[:wallet].create_escrow(provider[:wallet].address, 5.0, permit: permit)
       expect(escrow.id).not_to be_nil
@@ -238,12 +175,8 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
 
       contracts = fetch_contracts
 
-      # Sign permit for the Tab contract
-      deadline = Time.now.to_i + 3600
-      permit = sign_usdc_permit(
-        payer[:key_hex], payer[:wallet].address, contracts["tab"],
-        20_000_000, 0, deadline
-      )
+      # Sign permit via server-side /permits/prepare
+      permit = payer[:wallet].sign_permit("tab", 20.0)
 
       payer_before = get_usdc_balance(payer[:wallet].address)
 
@@ -293,14 +226,8 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       payee = create_test_wallet
       fund_wallet(payer, 100)
 
-      contracts = fetch_contracts
-
-      # Sign permit for the Stream contract
-      deadline = Time.now.to_i + 3600
-      permit = sign_usdc_permit(
-        payer[:key_hex], payer[:wallet].address, contracts["stream"],
-        10_000_000, 0, deadline
-      )
+      # Sign permit via server-side /permits/prepare
+      permit = payer[:wallet].sign_permit("stream", 10.0)
 
       payer_before = get_usdc_balance(payer[:wallet].address)
 
@@ -339,14 +266,8 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       submitter = create_test_wallet
       fund_wallet(poster, 100)
 
-      contracts = fetch_contracts
-
-      # Sign permit for the Bounty contract
-      deadline_permit = Time.now.to_i + 3600
-      permit = sign_usdc_permit(
-        poster[:key_hex], poster[:wallet].address, contracts["bounty"],
-        10_000_000, 0, deadline_permit
-      )
+      # Sign permit via server-side /permits/prepare
+      permit = poster[:wallet].sign_permit("bounty", 10.0)
 
       poster_before = get_usdc_balance(poster[:wallet].address)
 
@@ -385,14 +306,8 @@ RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLengt
       provider = create_test_wallet
       fund_wallet(payer, 100)
 
-      contracts = fetch_contracts
-
-      # Sign permit for the Deposit contract
-      deadline = Time.now.to_i + 3600
-      permit = sign_usdc_permit(
-        payer[:key_hex], payer[:wallet].address, contracts["deposit"],
-        10_000_000, 0, deadline
-      )
+      # Sign permit via server-side /permits/prepare
+      permit = payer[:wallet].sign_permit("deposit", 10.0)
 
       payer_before = get_usdc_balance(payer[:wallet].address)
 

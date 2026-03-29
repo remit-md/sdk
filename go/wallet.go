@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -18,12 +17,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// usdcAddresses maps chain keys to the USDC contract address on that chain.
-var usdcAddresses = map[string]string{
-	"base-sepolia": "0x2d846325766921935f37d5b4478196d3ef93707c",
-	"base":         "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-	"localhost":    "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-}
 
 // Wallet is the primary remit.md client for agents that send payments.
 // All payment operations are methods on Wallet.
@@ -1106,132 +1099,79 @@ func (w *Wallet) CreateWithdrawLink(ctx context.Context, opts ...LinkOption) (*L
 
 // ─── Permit ───────────────────────────────────────────────────────────────────
 
-// SignPermit signs an EIP-2612 permit for USDC approval.
-// Auto-fetches the on-chain nonce and sets a default deadline of 1 hour.
-// The spender is the contract that will call transferFrom (e.g., Router, Escrow).
-// Amount is in USDC (e.g., 5.0 for $5.00).
-// An optional deadline Unix timestamp can be provided; defaults to 1 hour from now.
-func (w *Wallet) SignPermit(ctx context.Context, spender string, amount float64, deadline ...int64) (*PermitSignature, error) {
-	usdcAddr, ok := usdcAddresses[w.chainKey]
-	if !ok {
-		return nil, remitErr("UNSUPPORTED_CHAIN",
-			fmt.Sprintf("no USDC address configured for chain %q", w.chainKey),
-			map[string]any{"chain": w.chainKey},
-		)
-	}
-	var dl int64
-	if len(deadline) > 0 && deadline[0] > 0 {
-		dl = deadline[0]
-	}
-	return w.signPermitWithUSDC(ctx, spender, amount, usdcAddr, dl)
+// contractToFlow maps contract names to flow names for /permits/prepare.
+var contractToFlow = map[string]string{
+	"router":  "direct",
+	"escrow":  "escrow",
+	"tab":     "tab",
+	"stream":  "stream",
+	"bounty":  "bounty",
+	"deposit": "deposit",
+	"relayer": "direct",
 }
 
-// signPermitWithUSDC is the internal implementation that accepts an explicit USDC address.
-func (w *Wallet) signPermitWithUSDC(ctx context.Context, spender string, amount float64, usdcAddr string, deadline int64) (*PermitSignature, error) {
-	nonce, err := w.fetchPermitNonce(ctx, usdcAddr)
-	if err != nil {
+// SignPermit signs a USDC permit via the server's /permits/prepare endpoint.
+//
+// The server computes the EIP-712 hash, manages nonces, and resolves
+// contract addresses. The SDK only signs the returned hash.
+//
+// flow: Payment flow (direct, escrow, tab, stream, bounty, deposit).
+// amount: Amount in USDC (e.g. 5.0 for $5.00).
+func (w *Wallet) SignPermit(ctx context.Context, flow string, amount float64) (*PermitSignature, error) {
+	var data struct {
+		Hash     string `json:"hash"`
+		Value    int64  `json:"value"`
+		Deadline int64  `json:"deadline"`
+	}
+	if err := w.http.post(ctx, "/api/v1/permits/prepare", map[string]any{
+		"flow":   flow,
+		"amount": fmt.Sprintf("%g", amount),
+		"owner":  w.Address(),
+	}, &data); err != nil {
 		return nil, err
 	}
 
-	dl := deadline
-	if dl <= 0 {
-		dl = time.Now().Unix() + 3600
-	}
-
-	// Convert USDC amount to base units (6 decimals) using integer math
-	amountDec := decimal.NewFromFloat(amount)
-	rawAmount := amountDec.Mul(decimal.NewFromInt(1_000_000)).BigInt()
-	chainID := new(big.Int).SetUint64(uint64(w.chainID))
-
-	digest := computePermitDigest(
-		chainID,
-		common.HexToAddress(usdcAddr),
-		w.signer.Address(),
-		common.HexToAddress(spender),
-		rawAmount,
-		new(big.Int).SetUint64(nonce),
-		new(big.Int).SetInt64(dl),
-	)
-
-	sig, err := w.signer.Sign(digest)
+	hashHex := strings.TrimPrefix(data.Hash, "0x")
+	hashBytes, err := hex.DecodeString(hashHex)
 	if err != nil {
-		return nil, fmt.Errorf("sign permit: %w", err)
+		return nil, fmt.Errorf("permits/prepare: invalid hash hex: %w", err)
 	}
 
-	// Split signature into v, r, s
-	r := "0x" + hex.EncodeToString(sig[0:32])
-	s := "0x" + hex.EncodeToString(sig[32:64])
-	v := int(sig[64])
+	sigHex, err := w.signer.SignHash(hashBytes)
+	if err != nil {
+		return nil, fmt.Errorf("sign permit hash: %w", err)
+	}
+	sigRaw := strings.TrimPrefix(sigHex, "0x")
+	if len(sigRaw) < 130 {
+		return nil, fmt.Errorf("permits/prepare: signature too short: %d chars", len(sigRaw))
+	}
+	r := "0x" + sigRaw[:64]
+	s := "0x" + sigRaw[64:128]
+	vStr := sigRaw[128:130]
+	vBytes, _ := hex.DecodeString(vStr)
+	v := int(vBytes[0])
 
 	return &PermitSignature{
-		Value:    rawAmount.Int64(),
-		Deadline: dl,
+		Value:    data.Value,
+		Deadline: data.Deadline,
 		V:        v,
 		R:        r,
 		S:        s,
 	}, nil
 }
 
-// fetchPermitNonce fetches the current EIP-2612 permit nonce for this wallet from the API.
-func (w *Wallet) fetchPermitNonce(ctx context.Context, usdcAddr string) (uint64, error) {
-	var status WalletStatus
-	err := w.http.get(ctx, "/api/v1/status/"+strings.ToLower(w.Address()), &status)
-	if err != nil {
-		return 0, fmt.Errorf("permit nonce API lookup failed: %w", err)
-	}
-	if status.PermitNonce != nil {
-		return uint64(*status.PermitNonce), nil
-	}
-	return 0, fmt.Errorf("permit_nonce not available from API for %s", w.Address())
-}
-
 // autoPermit signs a permit for the given contract type and amount.
 // Used internally by payment methods when no explicit permit is provided.
 func (w *Wallet) autoPermit(ctx context.Context, contract string, amount float64) (*PermitSignature, error) {
-	contracts, err := w.GetContracts(ctx)
-	if err != nil {
-		log.Printf("[remitmd] auto-permit: GetContracts failed for %s (amount=%.2f): %v", contract, amount, err)
-		return nil, nil // graceful: proceed without permit
-	}
-
-	var spender string
-	switch contract {
-	case "router":
-		spender = contracts.Router
-	case "escrow":
-		spender = contracts.Escrow
-	case "tab":
-		spender = contracts.Tab
-	case "stream":
-		spender = contracts.Stream
-	case "bounty":
-		spender = contracts.Bounty
-	case "deposit":
-		spender = contracts.Deposit
-	case "relayer":
-		spender = contracts.Relayer
-	default:
+	flow, ok := contractToFlow[contract]
+	if !ok {
 		log.Printf("[remitmd] auto-permit: unknown contract type %q", contract)
 		return nil, nil
 	}
-	if spender == "" {
-		log.Printf("[remitmd] auto-permit: empty spender for contract %q", contract)
-		return nil, nil // graceful: contract not available
-	}
-	usdcAddr := contracts.USDC
-	if usdcAddr == "" {
-		log.Printf("[remitmd] auto-permit: no USDC address from API, falling back to hardcoded map")
-		p, err := w.SignPermit(ctx, spender, amount)
-		if err != nil {
-			log.Printf("[remitmd] auto-permit: SignPermit failed for %s (amount=%.2f): %v", contract, amount, err)
-			return nil, nil
-		}
-		return p, nil
-	}
-	p, err := w.signPermitWithUSDC(ctx, spender, amount, usdcAddr, 0)
+	p, err := w.SignPermit(ctx, flow, amount)
 	if err != nil {
 		log.Printf("[remitmd] auto-permit: SignPermit failed for %s (amount=%.2f): %v", contract, amount, err)
-		return nil, nil // graceful: RPC unreachable
+		return nil, nil // graceful: proceed without permit
 	}
 	return p, nil
 }

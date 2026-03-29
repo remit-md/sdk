@@ -75,6 +75,12 @@ defmodule RemitMd.CliSigner do
   end
 
   @impl true
+  def sign_hash(%__MODULE__{} = signer, hash)
+      when is_binary(hash) and byte_size(hash) == 32 do
+    sign(signer, hash)
+  end
+
+  @impl true
   def address(%__MODULE__{address: addr}), do: addr
 
   @doc """

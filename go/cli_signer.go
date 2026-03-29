@@ -118,6 +118,20 @@ func (c *CliSigner) Sign(digest [32]byte) ([]byte, error) {
 	return sigBytes, nil
 }
 
+// SignHash signs a raw 32-byte hash and returns a 0x-prefixed hex signature string.
+func (c *CliSigner) SignHash(hash []byte) (string, error) {
+	if len(hash) != 32 {
+		return "", fmt.Errorf("CliSigner: hash must be exactly 32 bytes, got %d", len(hash))
+	}
+	var digest [32]byte
+	copy(digest[:], hash)
+	sig, err := c.Sign(digest)
+	if err != nil {
+		return "", err
+	}
+	return "0x" + hex.EncodeToString(sig), nil
+}
+
 // Address returns the cached Ethereum address of the signing key.
 func (c *CliSigner) Address() common.Address {
 	return c.address

@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalLong;
 
 /**
  * Primary remit.md client for agents that send and receive payments.
@@ -27,10 +26,15 @@ import java.util.OptionalLong;
  */
 public class Wallet {
 
-    private static final Map<String, String> USDC_ADDRESSES = Map.of(
-        "base-sepolia", "0x2d846325766921935f37d5b4478196d3ef93707c",
-        "base", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        "localhost", "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    // Contract name → flow name for /permits/prepare.
+    private static final Map<String, String> CONTRACT_TO_FLOW = Map.of(
+        "router",  "direct",
+        "escrow",  "escrow",
+        "tab",     "tab",
+        "stream",  "stream",
+        "bounty",  "bounty",
+        "deposit", "deposit",
+        "relayer", "direct"
     );
 
     private final ApiClient client;
@@ -54,6 +58,11 @@ public class Wallet {
     /** Package-private accessor for the signer (used by X402Client). */
     Signer signer() {
         return signer;
+    }
+
+    /** Package-private accessor for the API client (used by X402Client). */
+    ApiClient apiClient() {
+        return client;
     }
 
     /** The chain ID this wallet is connected to. */
@@ -691,118 +700,44 @@ public class Wallet {
         return client.post("/api/v1/links/withdraw", body, LinkResponse.class);
     }
 
-    // ─── Permit Signing ────────────────────────────────────────────────────
+    // ─── Permit Signing (via /permits/prepare) ──────────────────────────────
 
     /**
-     * Signs an EIP-2612 permit for USDC approval (low-level).
+     * Signs a USDC permit via the server's /permits/prepare endpoint.
      *
-     * <p>Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address.
-     * Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline).
+     * <p>The server computes the EIP-712 hash, manages nonces, and resolves
+     * contract addresses. The SDK only signs the raw hash.
      *
-     * @param spender   contract address that will call transferFrom
-     * @param value     amount in USDC base units (6 decimals, e.g. 1_000_000 = $1.00)
-     * @param deadline  Unix timestamp after which the permit is invalid
-     * @param nonce     the owner's current EIP-2612 nonce on the USDC contract
-     * @return PermitSignature with v, r, s, value, deadline
+     * @param flow   payment flow (direct, escrow, tab, stream, bounty, deposit)
+     * @param amount amount in USDC (e.g. 5.0 for $5.00)
+     * @return PermitSignature ready to pass to any payment method
      */
-    public PermitSignature signUsdcPermit(String spender, long value, long deadline, long nonce) {
-        return signUsdcPermit(spender, value, deadline, nonce, null);
-    }
+    @SuppressWarnings("unchecked")
+    public PermitSignature signPermit(String flow, BigDecimal amount) {
+        Map<String, Object> data = client.post(
+            "/api/v1/permits/prepare",
+            Map.of("flow", flow, "amount", amount.toPlainString(), "owner", signer.address()),
+            Map.class);
 
-    /**
-     * Signs an EIP-2612 permit for USDC approval (low-level, custom USDC address).
-     *
-     * @param spender       contract address that will call transferFrom
-     * @param value         amount in USDC base units (6 decimals)
-     * @param deadline      Unix timestamp after which the permit is invalid
-     * @param nonce         the owner's current EIP-2612 nonce on the USDC contract
-     * @param usdcAddress   override USDC contract address (null = chain default)
-     * @return PermitSignature with v, r, s, value, deadline
-     */
-    public PermitSignature signUsdcPermit(String spender, long value, long deadline, long nonce, String usdcAddress) {
-        String usdc = usdcAddress != null ? usdcAddress : USDC_ADDRESSES.getOrDefault(chain, "");
-        if (usdc.isEmpty()) {
-            throw new RemitError(ErrorCodes.INVALID_CHAIN,
-                "No USDC address known for chain \"" + chain + "\". Pass usdcAddress explicitly.",
-                Map.of("chain", chain));
-        }
-
-        // Domain: name="USD Coin", version="2"
-        byte[] domainTypeHash = keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                .getBytes(StandardCharsets.UTF_8));
-        byte[] nameHash = keccak256("USD Coin".getBytes(StandardCharsets.UTF_8));
-        byte[] versionHash = keccak256("2".getBytes(StandardCharsets.UTF_8));
-        byte[] chainIdBytes = ApiClient.toUint256(chainId);
-        byte[] contractBytes = addressToBytes32(usdc);
-
-        byte[] domainSep = keccak256(concatBytes(domainTypeHash, nameHash, versionHash, chainIdBytes, contractBytes));
-
-        // Struct hash: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline)
-        byte[] typeHash = keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-                .getBytes(StandardCharsets.UTF_8));
-
-        byte[] structHash = keccak256(concatBytes(
-            typeHash,
-            addressToBytes32(signer.address()),
-            addressToBytes32(spender),
-            ApiClient.toUint256(value),
-            ApiClient.toUint256(nonce),
-            ApiClient.toUint256(deadline)));
-
-        // EIP-712 digest: "\x19\x01" || domainSeparator || structHash
-        byte[] finalData = new byte[2 + 32 + 32];
-        finalData[0] = 0x19;
-        finalData[1] = 0x01;
-        System.arraycopy(domainSep, 0, finalData, 2, 32);
-        System.arraycopy(structHash, 0, finalData, 34, 32);
-        byte[] digest = keccak256(finalData);
+        String hashHex = (String) data.get("hash");
+        byte[] hashBytes = HexFormat.of().parseHex(hashHex.substring(2));
 
         try {
-            byte[] sig = signer.sign(digest);
-            String r = "0x" + HexFormat.of().formatHex(sig, 0, 32);
-            String s = "0x" + HexFormat.of().formatHex(sig, 32, 64);
-            int v = sig[64] & 0xFF;
+            String sigHex = signer.signHash(hashBytes);
+            String sigRaw = sigHex.startsWith("0x") ? sigHex.substring(2) : sigHex;
+            String r = "0x" + sigRaw.substring(0, 64);
+            String s = "0x" + sigRaw.substring(64, 128);
+            int v = Integer.parseInt(sigRaw.substring(128, 130), 16);
+
+            long value = ((Number) data.get("value")).longValue();
+            long deadline = ((Number) data.get("deadline")).longValue();
+
             return new PermitSignature(value, deadline, v, r, s);
         } catch (Exception e) {
             throw new RemitError(ErrorCodes.INVALID_SIGNATURE,
-                "Failed to sign USDC permit. Check that your private key is valid.",
+                "Failed to sign permit hash. Check that your private key is valid.",
                 Map.of());
         }
-    }
-
-    /**
-     * Convenience: sign an EIP-2612 permit for USDC approval.
-     * Auto-fetches the on-chain nonce and sets a default deadline (1 hour from now).
-     *
-     * @param spender  contract address that will call transferFrom (e.g. Router, Escrow)
-     * @param amount   amount in USDC (e.g. 1.50 for $1.50)
-     * @return PermitSignature ready to pass to any payment method
-     */
-    public PermitSignature signPermit(String spender, BigDecimal amount) {
-        return signPermit(spender, amount, OptionalLong.empty());
-    }
-
-    /**
-     * Convenience: sign an EIP-2612 permit for USDC approval with optional deadline.
-     *
-     * @param spender  contract address that will call transferFrom
-     * @param amount   amount in USDC (e.g. 1.50 for $1.50)
-     * @param deadline optional Unix timestamp; defaults to 1 hour from now if empty
-     * @return PermitSignature ready to pass to any payment method
-     */
-    public PermitSignature signPermit(String spender, BigDecimal amount, OptionalLong deadline) {
-        String usdc = USDC_ADDRESSES.getOrDefault(chain, "");
-        if (usdc.isEmpty()) {
-            throw new RemitError(ErrorCodes.INVALID_CHAIN,
-                "No USDC address known for chain \"" + chain + "\". Cannot auto-sign permit.",
-                Map.of("chain", chain));
-        }
-        long nonce = fetchPermitNonce(usdc);
-        long dl = deadline.orElse(Instant.now().getEpochSecond() + 3600);
-        long rawAmount = amount.movePointRight(6).longValueExact();
-        return signUsdcPermit(spender, rawAmount, dl, nonce);
     }
 
     /**
@@ -811,28 +746,10 @@ public class Wallet {
      * Returns null if permit signing is unavailable (e.g. mock context, API error).
      */
     private PermitSignature autoPermit(String contractField, BigDecimal amount) {
+        String flow = CONTRACT_TO_FLOW.get(contractField);
+        if (flow == null) return null;
         try {
-            ContractAddresses contracts = getContracts();
-            String spender;
-            switch (contractField) {
-                case "router":  spender = contracts.router;  break;
-                case "escrow":  spender = contracts.escrow;  break;
-                case "tab":     spender = contracts.tab;     break;
-                case "stream":  spender = contracts.stream;  break;
-                case "bounty":  spender = contracts.bounty;  break;
-                case "deposit": spender = contracts.deposit;  break;
-                case "relayer": spender = contracts.relayer;  break;
-                default:        return null;
-            }
-            if (spender == null || spender.isBlank()) return null;
-            String usdcAddr = contracts.usdc;
-            if (usdcAddr == null || usdcAddr.isBlank()) {
-                usdcAddr = USDC_ADDRESSES.getOrDefault(chain, "");
-            }
-            long nonce = fetchPermitNonce(usdcAddr);
-            long dl = Instant.now().getEpochSecond() + 3600;
-            long rawAmount = amount.movePointRight(6).longValueExact();
-            return signUsdcPermit(spender, rawAmount, dl, nonce, usdcAddr);
+            return signPermit(flow, amount);
         } catch (Exception e) {
             // Permit signing unavailable (mock context, API error, etc.)
             // Fall through - server will handle approval via other means
@@ -841,23 +758,7 @@ public class Wallet {
         }
     }
 
-    /**
-     * Fetches the EIP-2612 permit nonce from the API.
-     */
-    @SuppressWarnings("unchecked")
-    private long fetchPermitNonce(String usdcAddress) {
-        Map<String, Object> data = client.get(
-            "/api/v1/status/" + signer.address(), Map.class);
-        Object nonce = data != null ? data.get("permit_nonce") : null;
-        if (nonce != null) {
-            return ((Number) nonce).longValue();
-        }
-        throw new RemitError(ErrorCodes.CHAIN_ERROR,
-            "permit_nonce not available from /status API for " + signer.address(),
-            Map.of("address", signer.address()));
-    }
-
-    // ─── Private crypto helpers ──────────────────────────────────────────────
+    // ─── Private crypto helpers (used by signTabCharge) ────────────────────
 
     private static byte[] keccak256(byte[] input) {
         return org.web3j.crypto.Hash.sha3(input);

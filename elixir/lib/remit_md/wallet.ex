@@ -27,11 +27,15 @@ defmodule RemitMd.Wallet do
 
   @min_amount Decimal.new("0.000001")
 
-  # Known USDC contract addresses per chain (EIP-2612 compatible).
-  @usdc_addresses %{
-    "base-sepolia" => "0x2d846325766921935f37d5b4478196d3ef93707c",
-    "base"         => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    "localhost"    => "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  # Contract name -> flow name for /permits/prepare.
+  @contract_to_flow %{
+    "router"  => "direct",
+    "escrow"  => "escrow",
+    "tab"     => "tab",
+    "stream"  => "stream",
+    "bounty"  => "bounty",
+    "deposit" => "deposit",
+    "relayer" => "direct",
   }
 
   defstruct [:signer, :transport, :mock_pid, :address, :chain, :chain_key]
@@ -548,95 +552,44 @@ defmodule RemitMd.Wallet do
     call_sign(w.signer, digest)
   end
 
-  # ─── EIP-2612 Permit ─────────────────────────────────────────────────
+  # ─── EIP-2612 Permit (via /permits/prepare) ─────────────────────────
 
   @doc """
-  Sign an EIP-2612 permit for USDC approval.
+  Sign a USDC permit via the server's `/permits/prepare` endpoint.
 
-  Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address
-  Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline)
+  The server computes the EIP-712 hash, manages nonces, and resolves
+  contract addresses. The SDK only signs the returned hash.
 
   ## Parameters
 
-  - `spender` - contract address that will be approved as spender
-  - `value` - amount in USDC base units (6 decimals, integer)
-  - `deadline` - permit deadline (Unix timestamp)
-
-  ## Options
-
-  - `:nonce` - current permit nonce for this wallet (default: 0)
-  - `:usdc_address` - override the USDC contract address
+  - `flow` - payment flow: `"direct"`, `"escrow"`, `"tab"`, `"stream"`, `"bounty"`, `"deposit"`
+  - `amount` - amount in USDC (number or string, e.g. `5.0` or `"5.00"`)
 
   Returns `%PermitSignature{}`.
   """
-  def sign_usdc_permit(%__MODULE__{} = w, spender, value, deadline, opts \\ []) do
-    keccak = &RemitMd.Keccak.hash/1
+  def sign_permit(%__MODULE__{} = w, flow, amount) when is_binary(flow) do
+    data = do_http_post(w, "/permits/prepare", %{
+      flow: flow,
+      amount: to_string(amount),
+      owner: w.address
+    })
 
-    nonce = Keyword.get(opts, :nonce, 0)
-    usdc_addr = Keyword.get(opts, :usdc_address) || @usdc_addresses[w.chain_key] ||
-      raise Error.new(Error.chain_unsupported(), "No USDC address for chain #{w.chain_key}")
+    hash_hex = Map.fetch!(data, "hash")
+    hash_bytes = hash_hex |> String.trim_leading("0x") |> Base.decode16!(case: :mixed)
 
-    # Domain separator for USDC (EIP-2612)
-    domain_type_hash =
-      keccak.("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-
-    name_hash = keccak.("USD Coin")
-    version_hash = keccak.("2")
-    chain_id_enc = <<chain_id(w)::unsigned-big-integer-size(256)>>
-    contract_enc = address_to_bytes32(usdc_addr)
-
-    domain_separator =
-      keccak.(domain_type_hash <> name_hash <> version_hash <> chain_id_enc <> contract_enc)
-
-    # Permit struct hash
-    permit_type_hash =
-      keccak.("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
-
-    owner_enc    = address_to_bytes32(w.address)
-    spender_enc  = address_to_bytes32(spender)
-    value_enc    = <<value::unsigned-big-integer-size(256)>>
-    nonce_enc    = <<nonce::unsigned-big-integer-size(256)>>
-    deadline_enc = <<deadline::unsigned-big-integer-size(256)>>
-
-    struct_hash =
-      keccak.(permit_type_hash <> owner_enc <> spender_enc <> value_enc <> nonce_enc <> deadline_enc)
-
-    # Final: keccak256(0x1901 || domainSeparator || structHash)
-    digest = keccak.(<<0x19, 0x01>> <> domain_separator <> struct_hash)
-
-    sig_hex = call_sign(w.signer, digest)
-
-    # Parse r, s, v from the 65-byte signature
+    sig_hex = call_sign_hash(w.signer, hash_bytes)
     sig_str = String.trim_leading(sig_hex, "0x")
     r = "0x" <> String.slice(sig_str, 0, 64)
     s = "0x" <> String.slice(sig_str, 64, 64)
     v = String.slice(sig_str, 128, 2) |> String.to_integer(16)
 
-    %PermitSignature{value: value, deadline: deadline, v: v, r: r, s: s}
-  end
-
-  @doc """
-  Convenience: sign an EIP-2612 permit for USDC approval.
-  Auto-fetches the on-chain nonce and sets a default deadline (1 hour from now).
-
-  ## Parameters
-
-  - `spender` - contract address to approve (e.g. router, escrow)
-  - `amount` - amount in USDC (string, e.g. `"5.00"`)
-
-  ## Options
-
-  - `:deadline` - optional Unix timestamp; defaults to 1 hour from now
-
-  Returns `%PermitSignature{}`.
-  """
-  def sign_permit(%__MODULE__{} = w, spender, amount, opts \\ []) do
-    usdc_addr = Keyword.get(opts, :usdc_address) || @usdc_addresses[w.chain_key] ||
-      raise Error.new(Error.chain_unsupported(), "No USDC address for chain #{w.chain_key}")
-    nonce = fetch_permit_nonce(w, usdc_addr)
-    deadline = Keyword.get(opts, :deadline) || (:os.system_time(:second) + 3600)
-    raw = amount |> to_string() |> Decimal.new() |> Decimal.mult(1_000_000) |> Decimal.round(0) |> Decimal.to_integer()
-    sign_usdc_permit(w, spender, raw, deadline, nonce: nonce, usdc_address: usdc_addr)
+    %PermitSignature{
+      value: data["value"] |> to_string() |> String.to_integer(),
+      deadline: data["deadline"] |> to_string() |> String.to_integer(),
+      v: v,
+      r: r,
+      s: s
+    }
   end
 
   @doc """
@@ -1045,43 +998,24 @@ defmodule RemitMd.Wallet do
 
   # ─── Permit helpers ──────────────────────────────────────────────
 
-  # Auto-sign a permit for the given contract type and amount.
-  # Used by payment methods when no explicit permit is provided.
+  # Auto-sign a permit via /permits/prepare for the given contract type and amount.
+  # Maps contract name to flow, then calls sign_permit/3.
+  # Returns nil on failure so callers degrade gracefully.
   defp auto_permit(%__MODULE__{} = w, contract, amount) do
-    {:ok, contracts} = get_contracts(w)
-    spender = Map.get(contracts, String.to_existing_atom(contract))
+    flow = @contract_to_flow[contract]
 
-    unless spender do
+    unless flow do
       require Logger
-      Logger.warning("[remitmd] auto-permit: no #{contract} contract address available")
+      Logger.warning("[remitmd] auto-permit: unknown contract for permit: #{contract}")
       nil
     else
-      sign_permit(w, spender, amount, usdc_address: contracts.usdc)
+      sign_permit(w, flow, amount)
     end
   rescue
     e ->
       require Logger
       Logger.warning("[remitmd] auto-permit failed for #{contract} (amount=#{amount}): #{Exception.message(e)}")
       nil
-  end
-
-  # Fetch the EIP-2612 permit nonce. Mock mode returns 0 directly.
-  defp fetch_permit_nonce(%__MODULE__{mock_pid: pid}, _usdc_address) when pid != nil, do: 0
-
-  defp fetch_permit_nonce(%__MODULE__{} = w, _usdc_address) do
-    data = do_http_get(w, "/status/#{w.address}")
-
-    nonce =
-      case data do
-        %{"permit_nonce" => n} when not is_nil(n) -> n
-        _ -> nil
-      end
-
-    if nonce != nil do
-      if is_integer(nonce), do: nonce, else: nonce |> to_string() |> String.to_integer()
-    else
-      raise Error.new(Error.server_error(), "permit_nonce not available from /status API for #{w.address}")
-    end
   end
 
   # Build a body map for create_fund_link / create_withdraw_link from keyword opts.
@@ -1125,5 +1059,9 @@ defmodule RemitMd.Wallet do
 
   defp call_sign(%{__struct__: mod} = signer, digest) do
     mod.sign(signer, digest)
+  end
+
+  defp call_sign_hash(%{__struct__: mod} = signer, hash) do
+    mod.sign_hash(signer, hash)
   end
 end

@@ -108,6 +108,10 @@ module Remitmd
     def sign(_message)
       "0x" + SecureRandom.hex(32) + SecureRandom.hex(32) + "1b"
     end
+
+    def sign_hash(_hash_bytes)
+      "0x" + SecureRandom.hex(32) + SecureRandom.hex(32) + "1b"
+    end
   end
 
   # ─── Internal: MockTransport ───────────────────────────────────────────────
@@ -134,6 +138,15 @@ module Remitmd
 
     def handle(method, path, b) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       case [method, path]
+
+      # Permits prepare (server-side permit signing)
+      in ["POST", "/permits/prepare"]
+        {
+          "hash"     => "0x#{SecureRandom.hex(32)}",
+          "value"    => ((b[:amount] || b["amount"]).to_f * 1_000_000).round.to_i,
+          "deadline" => Time.now.to_i + 3600,
+          "nonce"    => 0,
+        }
 
       # Contracts (for auto_permit)
       in ["GET", "/contracts"]

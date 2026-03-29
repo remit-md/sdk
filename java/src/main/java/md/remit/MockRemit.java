@@ -477,6 +477,34 @@ public class MockRemit {
         return r;
     }
 
+    @SuppressWarnings("unchecked")
+    Map<String, Object> mockPermitsPrepare(Map<String, Object> body) {
+        // Return a mock hash + value + deadline for the SDK to sign
+        long deadline = Instant.now().getEpochSecond() + 3600;
+        String amountStr = (String) body.get("amount");
+        long value = new BigDecimal(amountStr).movePointRight(6).longValue();
+        return Map.of(
+            "hash", "0x" + "ab".repeat(32),
+            "value", value,
+            "deadline", deadline
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> mockX402Prepare(Map<String, Object> body) {
+        // Return a mock hash + authorization fields
+        String payer = (String) body.get("payer");
+        return Map.of(
+            "hash", "0x" + "cd".repeat(32),
+            "from", payer != null ? payer : MOCK_ADDRESS,
+            "to", "0x0000000000000000000000000000000000000002",
+            "value", "100000",
+            "valid_after", "0",
+            "valid_before", String.valueOf(Instant.now().getEpochSecond() + 60),
+            "nonce", "0x" + "ee".repeat(32)
+        );
+    }
+
     // ─── Mock infrastructure ──────────────────────────────────────────────────
 
     /** Internal ApiClient that routes to mock handlers. */
@@ -618,6 +646,12 @@ public class MockRemit {
             if ("POST".equals(method) && "/api/v1/mint".equals(path)) {
                 double amount = b.get("amount") instanceof Number ? ((Number) b.get("amount")).doubleValue() : 0.0;
                 return (T) mock.mockMint(amount);
+            }
+            if ("POST".equals(method) && "/api/v1/permits/prepare".equals(path)) {
+                return (T) mock.mockPermitsPrepare(b);
+            }
+            if ("POST".equals(method) && "/api/v1/x402/prepare".equals(path)) {
+                return (T) mock.mockX402Prepare(b);
             }
             // Permissive: unrecognized routes succeed with null
             return null;

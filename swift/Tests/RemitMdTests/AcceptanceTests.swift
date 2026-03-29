@@ -111,79 +111,6 @@ final class AcceptanceTests: XCTestCase {
         _ = try await waitForBalanceChange(tw.wallet.address, before: 0, usdcAddress: usdcAddress)
     }
 
-    // ─── EIP-2612 Permit Signing ──────────────────────────────────────────
-
-    func signUsdcPermit(signer: PrivateKeySigner, owner: String, spender: String,
-                        value: UInt64, nonce: UInt64, deadline: UInt64,
-                        usdcAddress: String, chainId: UInt64) throws -> PermitSignature {
-        let domainTypeHash = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".data(using: .utf8)!)
-        let nameHash = keccak256("USD Coin".data(using: .utf8)!)
-        let versionHash = keccak256("2".data(using: .utf8)!)
-
-        var domainData = Data()
-        domainData.append(domainTypeHash)
-        domainData.append(nameHash)
-        domainData.append(versionHash)
-        domainData.append(padUint256(chainId))
-        domainData.append(padAddress(usdcAddress))
-        let domainSep = keccak256(domainData)
-
-        let permitTypeHash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)".data(using: .utf8)!)
-        var structData = Data()
-        structData.append(permitTypeHash)
-        structData.append(padAddress(owner))
-        structData.append(padAddress(spender))
-        structData.append(padUint256(value))
-        structData.append(padUint256(nonce))
-        structData.append(padUint256(deadline))
-        let structHash = keccak256(structData)
-
-        var finalData = Data([0x19, 0x01])
-        finalData.append(domainSep)
-        finalData.append(structHash)
-        let digest = keccak256(finalData)
-
-        let sigHex = try signer.sign(digest: digest)
-        let sigClean = sigHex.hasPrefix("0x") ? String(sigHex.dropFirst(2)) : sigHex
-        let sigBytes = dataFromHex(sigClean)
-
-        let r = "0x" + sigBytes[0..<32].map { String(format: "%02x", $0) }.joined()
-        let s = "0x" + sigBytes[32..<64].map { String(format: "%02x", $0) }.joined()
-        let v = Int(sigBytes[64])
-
-        return PermitSignature(value: Double(value), deadline: Int(deadline), v: v, r: r, s: s)
-    }
-
-    func padUint256(_ value: UInt64) -> Data {
-        var data = Data(repeating: 0, count: 32)
-        var val = value.bigEndian
-        withUnsafeBytes(of: &val) { bytes in
-            data.replaceSubrange(24..<32, with: bytes)
-        }
-        return data
-    }
-
-    func padAddress(_ address: String) -> Data {
-        let hex = address.replacingOccurrences(of: "0x", with: "")
-        let bytes = dataFromHex(hex)
-        var data = Data(repeating: 0, count: 32)
-        data.replaceSubrange(12..<32, with: bytes)
-        return data
-    }
-
-    func dataFromHex(_ hex: String) -> Data {
-        var data = Data(capacity: hex.count / 2)
-        var index = hex.startIndex
-        while index < hex.endIndex {
-            let nextIndex = hex.index(index, offsetBy: 2)
-            if let byte = UInt8(hex[index..<nextIndex], radix: 16) {
-                data.append(byte)
-            }
-            index = nextIndex
-        }
-        return data
-    }
-
     // ─── EIP-712 TabCharge Signing ──────────────────────────────────────────
 
     func signTabCharge(signer: PrivateKeySigner, tabContract: String,
@@ -205,7 +132,6 @@ final class AcceptanceTests: XCTestCase {
 
         let contracts = try await fetchContracts()
         let usdcAddr = contracts["usdc"] as! String
-        let chainId = contracts["chain_id"] as! UInt64
 
         let agent = try await createTestWallet()
         let provider = try await createTestWallet()
@@ -218,11 +144,7 @@ final class AcceptanceTests: XCTestCase {
         let agentBefore = try await getUsdcBalance(agent.wallet.address, usdcAddress: usdcAddr)
         let providerBefore = try await getUsdcBalance(provider.wallet.address, usdcAddress: usdcAddr)
 
-        let routerAddr = contracts["router"] as! String
-        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
-        let permit = try signUsdcPermit(signer: agent.signer, owner: agent.wallet.address,
-                                        spender: routerAddr, value: 2_000_000, nonce: 0, deadline: deadline,
-                                        usdcAddress: usdcAddr, chainId: chainId)
+        let permit = try await agent.wallet.signPermit("direct", amount: 2.0)
 
         let tx = try await agent.wallet.pay(to: provider.wallet.address, amount: 1.0,
                                             memo: "swift-sdk-acceptance", permit: permit)
@@ -243,7 +165,6 @@ final class AcceptanceTests: XCTestCase {
 
         let contracts = try await fetchContracts()
         let usdcAddr = contracts["usdc"] as! String
-        let chainId = contracts["chain_id"] as! UInt64
 
         let agent = try await createTestWallet()
         let provider = try await createTestWallet()
@@ -256,11 +177,7 @@ final class AcceptanceTests: XCTestCase {
         let agentBefore = try await getUsdcBalance(agent.wallet.address, usdcAddress: usdcAddr)
         let providerBefore = try await getUsdcBalance(provider.wallet.address, usdcAddress: usdcAddr)
 
-        let escrowAddr = contracts["escrow"] as! String
-        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
-        let permit = try signUsdcPermit(signer: agent.signer, owner: agent.wallet.address,
-                                        spender: escrowAddr, value: 6_000_000, nonce: 0, deadline: deadline,
-                                        usdcAddress: usdcAddr, chainId: chainId)
+        let permit = try await agent.wallet.signPermit("escrow", amount: 6.0)
 
         let escrow = try await agent.wallet.createEscrow(recipient: provider.wallet.address,
                                                           amount: 5.0, permit: permit)
@@ -300,11 +217,8 @@ final class AcceptanceTests: XCTestCase {
 
         let tabAddr = contracts["tab"] as! String
 
-        // Sign permit for the Tab contract
-        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
-        let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
-                                        spender: tabAddr, value: 20_000_000, nonce: 0, deadline: deadline,
-                                        usdcAddress: usdcAddr, chainId: chainId)
+        // Sign permit via server-side /permits/prepare
+        let permit = try await payer.wallet.signPermit("tab", amount: 20.0)
 
         let payerBefore = try await getUsdcBalance(payer.wallet.address, usdcAddress: usdcAddr)
 
@@ -348,19 +262,13 @@ final class AcceptanceTests: XCTestCase {
 
         let contracts = try await fetchContracts()
         let usdcAddr = contracts["usdc"] as! String
-        let chainId = contracts["chain_id"] as! UInt64
 
         let payer = try await createTestWallet()
         let payee = try await createTestWallet()
         try await fundWallet(payer, amount: 100, usdcAddress: usdcAddr)
 
-        let streamAddr = contracts["stream"] as! String
-
-        // Sign permit for the Stream contract
-        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
-        let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
-                                        spender: streamAddr, value: 10_000_000, nonce: 0, deadline: deadline,
-                                        usdcAddress: usdcAddr, chainId: chainId)
+        // Sign permit via server-side /permits/prepare
+        let permit = try await payer.wallet.signPermit("stream", amount: 10.0)
 
         let payerBefore = try await getUsdcBalance(payer.wallet.address, usdcAddress: usdcAddr)
 
@@ -396,19 +304,13 @@ final class AcceptanceTests: XCTestCase {
 
         let contracts = try await fetchContracts()
         let usdcAddr = contracts["usdc"] as! String
-        let chainId = contracts["chain_id"] as! UInt64
 
         let poster = try await createTestWallet()
         let submitter = try await createTestWallet()
         try await fundWallet(poster, amount: 100, usdcAddress: usdcAddr)
 
-        let bountyAddr = contracts["bounty"] as! String
-
-        // Sign permit for the Bounty contract
-        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
-        let permit = try signUsdcPermit(signer: poster.signer, owner: poster.wallet.address,
-                                        spender: bountyAddr, value: 10_000_000, nonce: 0, deadline: deadline,
-                                        usdcAddress: usdcAddr, chainId: chainId)
+        // Sign permit via server-side /permits/prepare
+        let permit = try await poster.wallet.signPermit("bounty", amount: 10.0)
 
         let posterBefore = try await getUsdcBalance(poster.wallet.address, usdcAddress: usdcAddr)
 
@@ -447,19 +349,13 @@ final class AcceptanceTests: XCTestCase {
 
         let contracts = try await fetchContracts()
         let usdcAddr = contracts["usdc"] as! String
-        let chainId = contracts["chain_id"] as! UInt64
 
         let payer = try await createTestWallet()
         let provider = try await createTestWallet()
         try await fundWallet(payer, amount: 100, usdcAddress: usdcAddr)
 
-        let depositAddr = contracts["deposit"] as! String
-
-        // Sign permit for the Deposit contract
-        let deadline = UInt64(Date().timeIntervalSince1970) + 3600
-        let permit = try signUsdcPermit(signer: payer.signer, owner: payer.wallet.address,
-                                        spender: depositAddr, value: 10_000_000, nonce: 0, deadline: deadline,
-                                        usdcAddress: usdcAddr, chainId: chainId)
+        // Sign permit via server-side /permits/prepare
+        let permit = try await payer.wallet.signPermit("deposit", amount: 10.0)
 
         let payerBefore = try await getUsdcBalance(payer.wallet.address, usdcAddress: usdcAddr)
 

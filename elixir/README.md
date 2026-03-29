@@ -60,17 +60,9 @@ The wallet fetches the on-chain nonce, signs the permit, and includes it in the 
 # Auto-permit (recommended) - just call the method, permit is handled internally
 {:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "5.00")
 
-# Manual permit - sign yourself if you need control over deadline/nonce
-{:ok, contracts} = RemitMd.Wallet.get_contracts(wallet)
-permit = RemitMd.Wallet.sign_permit(wallet, contracts.router, "5.00")
+# Manual permit - sign via server-side /permits/prepare
+permit = RemitMd.Wallet.sign_permit(wallet, "direct", 5.0)
 {:ok, tx} = RemitMd.Wallet.pay(wallet, "0xRecipient", "5.00", permit: permit)
-
-# Low-level permit - full control over all parameters
-permit = RemitMd.Wallet.sign_usdc_permit(wallet, contracts.router,
-  5_000_000,          # base units (6 decimals)
-  :os.system_time(:second) + 3600,  # deadline
-  nonce: 0
-)
 ```
 
 Auto-permit works on: `pay`, `create_escrow`, `create_tab`, `create_stream`, `create_bounty`, `place_deposit`.

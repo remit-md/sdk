@@ -85,7 +85,7 @@ for _, tool := range tools {
 wallet.GetContracts(ctx)                                    // *ContractAddresses
 
 // Permits (auto-signed when omitted - see Advanced section)
-wallet.SignPermit(ctx, spender, amount, deadline...)        // *PermitSignature
+wallet.SignPermit(ctx, flow, amount)                        // *PermitSignature
 
 // Payments (auto-permit built in)
 wallet.Pay(ctx, to, amount, ...PayOption)                   // *Transaction (opts: WithMemo, WithPayPermit)
@@ -159,18 +159,15 @@ if errors.As(err, &remitErr) {
 
 ## Advanced: Manual Permits
 
-All payment methods auto-sign an EIP-2612 permit internally. If you need manual control
-(e.g., custom deadline, pre-signed permit from another signer), use `SignPermit` and pass
-the result via the `With*Permit` option:
+All payment methods auto-sign an EIP-2612 permit internally via the server's `/permits/prepare` endpoint. If you need manual control (pre-signed permits, multi-step workflows), use `SignPermit` and pass the result via the `With*Permit` option:
 
 ```go
-// Sign a permit manually with a custom deadline (2 hours)
-deadline := time.Now().Unix() + 7200
-permit, err := wallet.SignPermit(ctx, routerAddress, 5.0, deadline)
+// Sign a permit manually for a direct payment
+permit, err := wallet.SignPermit(ctx, "direct", 5.0)
 
 // Pass it explicitly - skips auto-permit
 tx, err := wallet.Pay(ctx, "0xRecipient...", decimal.NewFromFloat(5.0),
     remitmd.WithPayPermit(permit))
 ```
 
-Permit nonces are fetched from the API automatically. No RPC configuration needed.
+The `flow` parameter must match the payment type: `"direct"`, `"escrow"`, `"tab"`, `"stream"`, `"bounty"`, `"deposit"`. Nonces and contract addresses are resolved by the server.

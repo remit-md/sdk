@@ -212,28 +212,16 @@ var wallet = new Wallet(key, baseUrl: "http://localhost:3000/v0");
 
 ## Advanced: Manual Permits
 
-Permits are signed automatically by every payment method. If you need manual
-control (custom deadline, pre-signed permits, batching), use `SignPermitAsync`
-or `SignUsdcPermit` directly:
+Permits are signed automatically by every payment method via the server's `/permits/prepare` endpoint. If you need manual control (pre-signed permits, multi-step workflows), use `SignPermitAsync`:
 
 ```csharp
-// Auto-fetches nonce, defaults deadline to 1 hour
-var permit = await wallet.SignPermitAsync(spender: "0xRouterAddr...", amount: 5.00m);
+var permit = await wallet.SignPermitAsync("direct", 5.00m);
 
 // Pass explicit permit to skip auto-signing
 var tx = await wallet.PayAsync("0xAgent...", 5.00m, permit: permit);
 ```
 
-For full control over every parameter:
-
-```csharp
-var permit = wallet.SignUsdcPermit(
-    spender: "0xRouterAddr...",
-    value: 5_000_000,          // raw USDC base units (6 decimals)
-    nonce: 0,                  // fetch with FetchUsdcNonceAsync or track manually
-    deadline: DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 600
-);
-```
+Supported flows: `"direct"`, `"escrow"`, `"tab"`, `"stream"`, `"bounty"`, `"deposit"`.
 
 ## License
 

@@ -240,16 +240,18 @@ match wallet.pay(address, amount).await {
 
 ## Advanced: Manual Permits
 
-By default, all payment methods auto-sign EIP-2612 permits. If you need manual control:
+By default, all payment methods auto-sign EIP-2612 permits via the server's `/permits/prepare` endpoint. If you need manual control:
 
 ```rust
-// Sign a permit yourself
-let permit = wallet.sign_permit("0xContractAddr...", 1.50, None).await?;
+// Sign a permit yourself - flow must match the payment type
+let permit = wallet.sign_permit("direct", 1.50).await?;
 
 // Pass it explicitly to any _with_permit or _full variant
 let tx = wallet.pay_with_permit("0xAgent...", dec!(0.003), permit).await?;
 let tx = wallet.pay_full("0xAgent...", dec!(0.003), "memo", Some(permit)).await?;
 ```
+
+Supported flows: `"direct"`, `"escrow"`, `"tab"`, `"stream"`, `"bounty"`, `"deposit"`.
 
 Manual permit variants: `pay_with_permit`, `create_escrow_with_permit`, `create_tab_with_permit`, `create_stream_with_permit`, `create_bounty_with_permit`, `lock_deposit_with_permit`.
 

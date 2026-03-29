@@ -54,7 +54,7 @@ wallet = RemitMd.Wallet.from_env() # detects remit CLI automatically
 ## Permits (Gasless USDC Approval)
 
 All payment methods auto-sign EIP-2612 permits when no explicit permit is provided.
-The wallet fetches the on-chain nonce, signs the permit, and includes it in the request automatically.
+The server computes the EIP-712 hash via `/permits/prepare`; the SDK only signs the hash.
 
 ```elixir
 # Auto-permit (recommended) - just call the method, permit is handled internally

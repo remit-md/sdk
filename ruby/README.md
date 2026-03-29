@@ -43,7 +43,7 @@ wallet = Remitmd::RemitWallet.from_env
 # Optional: REMITMD_CHAIN (default: "base"), REMITMD_API_URL
 ```
 
-Permits are auto-signed. Every payment method fetches the on-chain USDC nonce, signs an EIP-2612 permit, and includes it automatically.
+Permits are auto-signed. Every payment method calls the server's `/permits/prepare` endpoint, signs the hash, and includes the permit automatically.
 
 ## CLI Signer (Recommended)
 
@@ -200,8 +200,7 @@ wallet.close_tab(tab_id, final_amount: nil, provider_sig: nil)                  
 wallet.sign_tab_charge(tab_contract, tab_id, total_charged, call_count)  # String
 
 # EIP-2612 Permit (auto-signed when omitted from payment methods)
-wallet.sign_permit(spender, amount, deadline: nil)                       # PermitSignature
-wallet.sign_usdc_permit(spender, value, deadline, nonce, usdc_address: nil) # PermitSignature
+wallet.sign_permit(flow, amount)                                         # PermitSignature
 
 # Streams
 wallet.create_stream(payee, rate_per_second, max_total, permit: nil)  # Stream
@@ -275,23 +274,14 @@ Remitmd::RemitWallet.new(private_key: key, chain: "base_sepolia")  # Base Sepoli
 
 ### Manual Permit Signing
 
-Permits are auto-signed by default. If you need manual control (custom deadline, pre-signed permits, or offline signing), pass a `PermitSignature` explicitly:
+Permits are auto-signed by default via the server's `/permits/prepare` endpoint. If you need manual control (pre-signed permits, multi-step workflows), pass a `PermitSignature` explicitly:
 
 ```ruby
-# sign_permit: convenience - auto-fetches nonce, converts amount to base units
-permit = wallet.sign_permit("0xRouterAddress...", 5.00, deadline: Time.now.to_i + 7200)
-tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
-
-# sign_usdc_permit: full control - raw base units, explicit nonce
-permit = wallet.sign_usdc_permit(
-  "0xRouterAddress...",   # spender
-  5_000_000,              # value in base units (6 decimals)
-  Time.now.to_i + 3600,  # deadline
-  0,                      # nonce
-  usdc_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-)
+permit = wallet.sign_permit("direct", 5.00)
 tx = wallet.pay("0xRecipient...", 5.00, permit: permit)
 ```
+
+Supported flows: `"direct"`, `"escrow"`, `"tab"`, `"stream"`, `"bounty"`, `"deposit"`.
 
 ## License
 

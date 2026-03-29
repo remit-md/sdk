@@ -1,22 +1,23 @@
-# Elixir SDK acceptance tests: all 7 payment flows on live Base Sepolia.
+# Elixir SDK acceptance tests: all 9 payment flows on live Base Sepolia.
 #
 # Run: mix test test/acceptance_test.exs --include acceptance
 #
 # Env vars (all optional):
-#   ACCEPTANCE_API_URL  - default: https://remit.md
+#   ACCEPTANCE_API_URL  - default: https://testnet.remit.md
 #   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 defmodule RemitMd.AcceptanceTest do
   use ExUnit.Case, async: false
 
-  alias RemitMd.Wallet
+  alias RemitMd.{A2A, Http, Wallet}
+  alias RemitMd.Models.PermitSignature
 
   @moduletag :acceptance
 
   @api_url System.get_env("ACCEPTANCE_API_URL", "https://testnet.remit.md")
   @rpc_url System.get_env("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
 
-  # ─── Helpers ─────────────────────────────────��────────────────────────────
+  # ─── Helpers ────────────────────────────────────────────────────────────
 
   defp fetch_contracts do
     :inets.start()
@@ -29,9 +30,8 @@ defmodule RemitMd.AcceptanceTest do
     Jason.decode!(to_string(body))
   end
 
-  defp create_test_wallet do
+  defp create_test_wallet(contracts) do
     key_hex = :crypto.strong_rand_bytes(32) |> Base.encode16(case: :lower)
-    contracts = fetch_contracts()
     base_url = if String.ends_with?(@api_url, "/api/v1"), do: @api_url, else: "#{@api_url}/api/v1"
 
     wallet = Wallet.new(
@@ -42,8 +42,7 @@ defmodule RemitMd.AcceptanceTest do
     )
 
     IO.puts("[ACCEPTANCE] wallet: #{wallet.address} (chain=84532)")
-
-    %{wallet: wallet, key_hex: key_hex}
+    wallet
   end
 
   defp get_usdc_balance(address, usdc_address) do
@@ -103,351 +102,338 @@ defmodule RemitMd.AcceptanceTest do
       "#{label}: expected delta #{expected}, got #{actual} (before=#{before}, after=#{after_val})"
   end
 
-  defp fund_wallet(tw, amount, usdc_address) do
-    IO.puts("[ACCEPTANCE] mint: #{amount} USDC -> #{tw.wallet.address}")
-    {:ok, mint_resp} = Wallet.mint(tw.wallet, to_string(amount))
+  defp fund_wallet(wallet, amount, usdc_address) do
+    IO.puts("[ACCEPTANCE] mint: #{amount} USDC -> #{wallet.address}")
+    {:ok, mint_resp} = Wallet.mint(wallet, to_string(amount))
     log_tx("mint", "mint", mint_resp.tx_hash)
-    wait_for_balance_change(tw.wallet.address, 0, usdc_address)
+    wait_for_balance_change(wallet.address, 0, usdc_address)
   end
 
-  # ─── Test: Direct Payment ────��─────────────────────────────────────────
+  # ─── setup_all: shared wallets ──────────────────────────────────────────
 
-  @tag :acceptance
-  test "direct payment with permit" do
+  setup_all do
     contracts = fetch_contracts()
     usdc_address = contracts["usdc"]
 
-    agent = create_test_wallet()
-    provider = create_test_wallet()
+    agent = create_test_wallet(contracts)
+    provider = create_test_wallet(contracts)
     fund_wallet(agent, 100, usdc_address)
 
+    %{agent: agent, provider: provider, contracts: contracts, usdc: usdc_address}
+  end
+
+  # ─── Flow 1: Direct Payment ────────────────────────────────────────────
+
+  @tag :acceptance
+  test "01_direct", %{agent: agent, provider: provider, usdc: usdc} do
     amount = 1.0
-    fee = 0.01
-    provider_receives = amount - fee
 
-    agent_before = get_usdc_balance(agent.wallet.address, usdc_address)
-    provider_before = get_usdc_balance(provider.wallet.address, usdc_address)
+    agent_before = get_usdc_balance(agent.address, usdc)
+    provider_before = get_usdc_balance(provider.address, usdc)
 
-    # Sign permit via server-side /permits/prepare
-    permit = Wallet.sign_permit(agent.wallet, "direct", 2.0)
+    permit = Wallet.sign_permit(agent, "direct", 2.0)
 
-    {:ok, tx} = Wallet.pay(agent.wallet, provider.wallet.address, "1.000000",
-      description: "elixir-sdk-acceptance", permit: permit)
+    {:ok, tx} = Wallet.pay(agent, provider.address, "1.000000",
+      description: "acceptance-direct", permit: permit)
     assert String.starts_with?(tx.tx_hash, "0x")
     log_tx("direct", "pay", tx.tx_hash)
 
-    agent_after = wait_for_balance_change(agent.wallet.address, agent_before, usdc_address)
-    provider_after = get_usdc_balance(provider.wallet.address, usdc_address)
+    agent_after = wait_for_balance_change(agent.address, agent_before, usdc)
+    provider_after = get_usdc_balance(provider.address, usdc)
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
-    assert_balance_change("provider", provider_before, provider_after, provider_receives)
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99)
+    IO.puts("[ACCEPTANCE] direct | PASS")
   end
 
-  # ─── Test: Escrow Lifecycle ─────────���──────────────────────────────────
+  # ─── Flow 2: Escrow ────────────────────────────────────────────────────
 
   @tag :acceptance
-  test "escrow lifecycle (create, claim-start, release)" do
-    contracts = fetch_contracts()
-    usdc_address = contracts["usdc"]
+  test "02_escrow", %{agent: agent, provider: provider, usdc: usdc} do
+    amount = 2.0
 
-    agent = create_test_wallet()
-    provider = create_test_wallet()
-    fund_wallet(agent, 100, usdc_address)
+    agent_before = get_usdc_balance(agent.address, usdc)
+    provider_before = get_usdc_balance(provider.address, usdc)
 
-    amount = 5.0
-    fee = amount * 0.01
-    provider_receives = amount - fee
+    permit = Wallet.sign_permit(agent, "escrow", 3.0)
 
-    agent_before = get_usdc_balance(agent.wallet.address, usdc_address)
-    provider_before = get_usdc_balance(provider.wallet.address, usdc_address)
-
-    # Sign permit via server-side /permits/prepare
-    permit = Wallet.sign_permit(agent.wallet, "escrow", 6.0)
-
-    {:ok, escrow} = Wallet.create_escrow(agent.wallet, provider.wallet.address, "5.000000",
-      permit: permit)
-    assert escrow.escrow_id != nil
+    {:ok, escrow} = Wallet.create_escrow(agent, provider.address, "2.000000", permit: permit)
+    assert escrow.invoice_id != nil || escrow.escrow_id != nil
+    escrow_id = escrow.invoice_id || escrow.escrow_id
     if escrow.tx_hash, do: log_tx("escrow", "create", escrow.tx_hash)
 
-    # Wait for on-chain lock
-    wait_for_balance_change(agent.wallet.address, agent_before, usdc_address)
+    wait_for_balance_change(agent.address, agent_before, usdc)
 
-    # Provider claims start
-    {:ok, claim_tx} = Wallet.claim_start(provider.wallet, escrow.escrow_id)
+    {:ok, claim_tx} = Wallet.claim_start(provider, escrow_id)
     log_tx("escrow", "claim_start", claim_tx.tx_hash)
     Process.sleep(5_000)
 
-    # Agent releases
-    {:ok, release_tx} = Wallet.release_escrow(agent.wallet, escrow.escrow_id)
+    {:ok, release_tx} = Wallet.release_escrow(agent, escrow_id)
     log_tx("escrow", "release", release_tx.tx_hash)
 
-    # Verify balances
-    provider_after = wait_for_balance_change(provider.wallet.address, provider_before, usdc_address)
-    agent_after = get_usdc_balance(agent.wallet.address, usdc_address)
+    provider_after = wait_for_balance_change(provider.address, provider_before, usdc)
+    agent_after = get_usdc_balance(agent.address, usdc)
 
     assert_balance_change("agent", agent_before, agent_after, -amount)
-    assert_balance_change("provider", provider_before, provider_after, provider_receives)
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99)
+    IO.puts("[ACCEPTANCE] escrow | PASS")
   end
 
-  # ─── Test: Tab Lifecycle ───────────────────────────────────────────────
+  # ─── Flow 3: Tab ───────────────────────────────────────────────────────
 
   @tag :acceptance
-  test "tab lifecycle (create, charge, close)" do
-    contracts = fetch_contracts()
-    usdc_address = contracts["usdc"]
+  test "03_tab", %{agent: agent, provider: provider, contracts: contracts, usdc: usdc} do
+    limit = 5.0
+    charge_amount = 1.0
+    charge_units = trunc(charge_amount * 1_000_000)
 
-    payer = create_test_wallet()
-    provider = create_test_wallet()
-    fund_wallet(payer, 100, usdc_address)
+    agent_before = get_usdc_balance(agent.address, usdc)
+    provider_before = get_usdc_balance(provider.address, usdc)
 
-    # Sign permit via server-side /permits/prepare
-    permit = Wallet.sign_permit(payer.wallet, "tab", 20.0)
+    permit = Wallet.sign_permit(agent, "tab", limit + 1.0)
 
-    payer_before = get_usdc_balance(payer.wallet.address, usdc_address)
+    {:ok, tab} = Wallet.create_tab(agent, provider.address, "5.000000", "0.100000",
+      permit: permit)
+    tab_id = tab.id || tab.tab_id
+    assert tab_id != nil
+    IO.puts("[ACCEPTANCE] tab | create | tab_id=#{tab_id}")
 
-    # 1. Create tab: $10 limit, $0.10 per call
-    {:ok, tab} = Wallet.create_tab(payer.wallet, provider.wallet.address,
-      "10.000000", "0.100000", permit: permit)
-    assert tab.tab_id != nil
-    IO.puts("[ACCEPTANCE] tab | create | tab_id=#{tab.tab_id}")
+    wait_for_balance_change(agent.address, agent_before, usdc)
 
-    # Wait for on-chain funding
-    wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
+    tab_contract = contracts["tab"]
+    call_count = 1
 
-    # 2. Charge tab: $0.10 charge, cumulative $0.10, callCount 1
-    charge_sig = Wallet.sign_tab_charge(provider.wallet,
-      contracts["tab"], tab.tab_id, 100_000, 1)
-    {:ok, charge} = Wallet.charge_tab(provider.wallet, tab.tab_id, 0.10, 0.10, 1, charge_sig)
-    assert charge.tab_id == tab.tab_id
-    IO.puts("[ACCEPTANCE] tab | charge | tab_id=#{tab.tab_id}")
+    charge_sig = Wallet.sign_tab_charge(provider, tab_contract, tab_id, charge_units, call_count)
 
-    # 3. Close tab with final settlement
-    close_sig = Wallet.sign_tab_charge(provider.wallet,
-      contracts["tab"], tab.tab_id, 100_000, 1)
-    {:ok, closed} = Wallet.close_tab(payer.wallet, tab.tab_id,
-      final_amount: 0.10, provider_sig: close_sig)
-    assert closed.status != "open"
+    {:ok, charge} = Wallet.charge_tab(provider, tab_id, charge_amount, charge_amount, call_count, charge_sig)
+    assert (charge.tab_id || tab_id) != nil
+    IO.puts("[ACCEPTANCE] tab | charge | tab_id=#{tab_id}")
+
+    close_sig = Wallet.sign_tab_charge(provider, tab_contract, tab_id, charge_units, call_count)
+
+    {:ok, closed} = Wallet.close_tab(agent, tab_id,
+      final_amount: charge_amount, provider_sig: close_sig)
     if closed.tx_hash, do: log_tx("tab", "close", closed.tx_hash)
 
-    # 4. Verify: payer should have lost funds
-    payer_after = wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
-    payer_delta = payer_after - payer_before
-    assert payer_delta < 0
+    provider_after = wait_for_balance_change(provider.address, provider_before, usdc)
+    agent_after = get_usdc_balance(agent.address, usdc)
+
+    assert_balance_change("agent", agent_before, agent_after, -charge_amount)
+    assert_balance_change("provider", provider_before, provider_after, charge_amount * 0.99)
+    IO.puts("[ACCEPTANCE] tab | PASS")
   end
 
-  # ─── Test: Stream Lifecycle ─────────────���──────────────────────────────
+  # ─── Flow 4: Stream ────────────────────────────────────────────────────
 
   @tag :acceptance
-  test "stream lifecycle (create, wait, close with conservation)" do
-    contracts = fetch_contracts()
-    usdc_address = contracts["usdc"]
+  test "04_stream", %{agent: agent, provider: provider, usdc: usdc} do
+    rate = "0.10"
+    max_total = "2.00"
 
-    payer = create_test_wallet()
-    payee = create_test_wallet()
-    fund_wallet(payer, 100, usdc_address)
+    agent_before = get_usdc_balance(agent.address, usdc)
+    provider_before = get_usdc_balance(provider.address, usdc)
 
-    # Sign permit via server-side /permits/prepare
-    permit = Wallet.sign_permit(payer.wallet, "stream", 10.0)
+    permit = Wallet.sign_permit(agent, "stream", 3.0)
 
-    payer_before = get_usdc_balance(payer.wallet.address, usdc_address)
+    {:ok, stream} = Wallet.create_stream(agent, provider.address, rate, max_total,
+      permit: permit)
+    stream_id = stream.id || stream.stream_id
+    assert stream_id != nil
+    IO.puts("[ACCEPTANCE] stream | create | stream_id=#{stream_id}")
 
-    # 1. Create stream: $0.01/sec, $5 max
-    {:ok, stream} = Wallet.create_stream(payer.wallet, payee.wallet.address,
-      "0.01", "5.0", permit: permit)
-    assert stream.stream_id != nil
-    IO.puts("[ACCEPTANCE] stream | create | stream_id=#{stream.stream_id}")
-
-    # Wait for on-chain lock
-    wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
-
-    # 2. Let it run for a few seconds
+    wait_for_balance_change(agent.address, agent_before, usdc)
     Process.sleep(5_000)
 
-    # 3. Close stream
-    {:ok, closed} = Wallet.close_stream(payer.wallet, stream.stream_id)
-    assert %RemitMd.Models.Transaction{} = closed
+    {:ok, closed} = Wallet.close_stream(agent, stream_id)
+    assert closed.tx_hash
     log_tx("stream", "close", closed.tx_hash)
 
-    # 4. Conservation: payer should have lost some funds
-    payer_after = wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
-    payer_delta = payer_after - payer_before
-    assert payer_delta < 0
+    provider_after = wait_for_balance_change(provider.address, provider_before, usdc)
+    agent_after = get_usdc_balance(agent.address, usdc)
+
+    agent_loss = agent_before - agent_after
+    assert agent_loss > 0.05, "agent should lose money, loss=#{agent_loss}"
+    assert agent_loss <= 2.01
+
+    provider_gain = provider_after - provider_before
+    assert provider_gain > 0.04, "provider should gain, gain=#{provider_gain}"
+    IO.puts("[ACCEPTANCE] stream | PASS")
   end
 
-  # ─── Test: Bounty Lifecycle ────────────────────────────────────────────
+  # ─── Flow 5: Bounty ────────────────────────────────────────────────────
 
   @tag :acceptance
-  test "bounty lifecycle (create, submit, award)" do
-    contracts = fetch_contracts()
-    usdc_address = contracts["usdc"]
+  test "05_bounty", %{agent: agent, provider: provider, usdc: usdc} do
+    amount = 2.0
+    deadline_ts = :os.system_time(:second) + 3600
 
-    poster = create_test_wallet()
-    submitter = create_test_wallet()
-    fund_wallet(poster, 100, usdc_address)
+    agent_before = get_usdc_balance(agent.address, usdc)
+    provider_before = get_usdc_balance(provider.address, usdc)
 
-    # Sign permit via server-side /permits/prepare
-    permit = Wallet.sign_permit(poster.wallet, "bounty", 10.0)
+    permit = Wallet.sign_permit(agent, "bounty", 3.0)
 
-    poster_before = get_usdc_balance(poster.wallet.address, usdc_address)
+    {:ok, bounty} = Wallet.create_bounty(agent, "2.000000",
+      "acceptance-bounty", deadline_ts, permit: permit)
+    bounty_id = bounty.id || bounty.bounty_id
+    assert bounty_id != nil
+    IO.puts("[ACCEPTANCE] bounty | create | bounty_id=#{bounty_id}")
 
-    # 1. Create bounty: $5 reward, 1 hour deadline
-    bounty_deadline = :os.system_time(:second) + 3600
-    {:ok, bounty} = Wallet.create_bounty(poster.wallet, "5.000000",
-      "Write an Elixir acceptance test", bounty_deadline, permit: permit)
-    assert bounty.bounty_id != nil
-    IO.puts("[ACCEPTANCE] bounty | create | bounty_id=#{bounty.bounty_id}")
+    wait_for_balance_change(agent.address, agent_before, usdc)
 
-    # Wait for on-chain lock
-    wait_for_balance_change(poster.wallet.address, poster_before, usdc_address)
+    evidence = "0x" <> String.duplicate("ab", 32)
+    {:ok, sub} = Wallet.submit_bounty(provider, bounty_id, evidence)
+    IO.puts("[ACCEPTANCE] bounty | submit | id=#{bounty_id}")
 
-    # 2. Submit evidence (as submitter)
-    evidence_hash = "0x" <> (RemitMd.Keccak.hex("elixir test evidence"))
-    {:ok, sub} = Wallet.submit_bounty(submitter.wallet, bounty.bounty_id, evidence_hash)
-    assert sub.bounty_id == bounty.bounty_id
-    IO.puts("[ACCEPTANCE] bounty | submit | submission_id=#{sub.id}")
+    # Retry award up to 15 times (Ponder indexer lag)
+    awarded = Enum.reduce_while(0..14, nil, fn attempt, _acc ->
+      Process.sleep(3_000)
+      case Wallet.award_bounty(agent, bounty_id, 1) do
+        {:ok, result} ->
+          {:halt, result}
+        {:error, e} ->
+          if attempt < 14 do
+            IO.puts("[ACCEPTANCE] bounty award retry #{attempt + 1}: #{inspect(e)}")
+            {:cont, nil}
+          else
+            raise "bounty award failed after 15 retries: #{inspect(e)}"
+          end
+      end
+    end)
 
-    # 3. Award bounty (as poster)
-    {:ok, awarded} = Wallet.award_bounty(poster.wallet, bounty.bounty_id, sub.id)
-    assert %RemitMd.Models.Bounty{} = awarded
-    IO.puts("[ACCEPTANCE] bounty | award | bounty_id=#{awarded.bounty_id}")
+    assert awarded != nil
+    assert awarded.status == "awarded"
+    IO.puts("[ACCEPTANCE] bounty | award | bounty_id=#{bounty_id}")
 
-    # 4. Verify: submitter should have received funds
-    submitter_after = wait_for_balance_change(submitter.wallet.address, 0, usdc_address)
-    assert submitter_after > 0
+    provider_after = wait_for_balance_change(provider.address, provider_before, usdc)
+    agent_after = get_usdc_balance(agent.address, usdc)
+
+    assert_balance_change("agent", agent_before, agent_after, -amount)
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99)
+    IO.puts("[ACCEPTANCE] bounty | PASS")
   end
 
-  # ─── Test: Deposit Lifecycle ───────────────────────────────────────────
+  # ─── Flow 6: Deposit ───────────────────────────────────────────────────
 
   @tag :acceptance
-  test "deposit lifecycle (place, return with full refund)" do
-    contracts = fetch_contracts()
-    usdc_address = contracts["usdc"]
+  test "06_deposit", %{agent: agent, provider: provider, usdc: usdc} do
+    amount = 2.0
 
-    payer = create_test_wallet()
-    provider = create_test_wallet()
-    fund_wallet(payer, 100, usdc_address)
+    agent_before = get_usdc_balance(agent.address, usdc)
 
-    # Sign permit via server-side /permits/prepare
-    permit = Wallet.sign_permit(payer.wallet, "deposit", 10.0)
+    permit = Wallet.sign_permit(agent, "deposit", 3.0)
 
-    payer_before = get_usdc_balance(payer.wallet.address, usdc_address)
-
-    # 1. Place deposit: $5, expires in 1 hour
-    {:ok, deposit} = Wallet.place_deposit(payer.wallet, provider.wallet.address, "5.000000",
+    {:ok, deposit} = Wallet.place_deposit(agent, provider.address, "2.000000",
       expires_in: 3600, permit: permit)
-    assert deposit.deposit_id != nil
+    deposit_id = deposit.id || deposit.deposit_id
+    assert deposit_id != nil
     if deposit.tx_hash, do: log_tx("deposit", "place", deposit.tx_hash)
 
-    # Wait for on-chain lock
-    wait_for_balance_change(payer.wallet.address, payer_before, usdc_address)
-    payer_after_deposit = get_usdc_balance(payer.wallet.address, usdc_address)
+    agent_mid = wait_for_balance_change(agent.address, agent_before, usdc)
+    assert_balance_change("agent locked", agent_before, agent_mid, -amount)
 
-    # 2. Return deposit (by provider)
-    {:ok, return_tx} = Wallet.return_deposit(provider.wallet, deposit.deposit_id)
-    log_tx("deposit", "return", return_tx.tx_hash)
+    {:ok, returned} = Wallet.return_deposit(provider, deposit_id)
+    assert returned.status == "returned" || returned.tx_hash != nil
+    if returned.tx_hash, do: log_tx("deposit", "return", returned.tx_hash)
 
-    # 3. Verify full refund (deposits have no fee)
-    payer_after_return = wait_for_balance_change(payer.wallet.address, payer_after_deposit, usdc_address)
-    refund_amount = payer_after_return - payer_after_deposit
-    assert refund_amount >= 4.99,
-      "expected near-full refund (~5.0), got #{refund_amount}"
+    agent_after = wait_for_balance_change(agent.address, agent_mid, usdc)
+    assert_balance_change("agent refund", agent_before, agent_after, 0)
+    IO.puts("[ACCEPTANCE] deposit | PASS")
   end
 
-  # ─── Test: X402 Auto-Pay ──────────────────────────────────────────────
+  # ─── Flow 7: x402 Prepare ──────────────────────────────────────────────
 
-  # Skipped: x402 test fails with process EXIT — TCP server + :httpc interaction
-  @tag skip: "x402 local TCP server causes process EXIT in CI"
-  @tag timeout: 120_000
-  test "x402 auto-pay (local server with 402)" do
-    contracts = fetch_contracts()
-    usdc_address = contracts["usdc"]
+  @tag :acceptance
+  test "07_x402_prepare", %{agent: agent, contracts: contracts} do
+    {:ok, contract_addrs} = Wallet.get_contracts(agent)
 
-    provider_wallet = create_test_wallet()
-
-    # Build the PAYMENT-REQUIRED header payload
-    api_base = if String.ends_with?(@api_url, "/api/v1"), do: @api_url, else: "#{@api_url}/api/v1"
-    payment_payload = %{
-      "payTo"       => provider_wallet.wallet.address,
-      "amount"      => "1000",
-      "network"     => "eip155:#{contracts["chain_id"]}",
-      "asset"       => usdc_address,
-      "facilitator" => api_base,
-      "maxTimeout"  => 60,
-      "resource"    => "/v1/data",
-      "description" => "Test data endpoint",
-      "mimeType"    => "application/json"
+    payment_required = %{
+      "scheme" => "exact",
+      "network" => "eip155:84532",
+      "amount" => "100000",
+      "asset" => contract_addrs.usdc,
+      "payTo" => contract_addrs.router,
+      "maxTimeoutSeconds" => 60
     }
-    encoded_header = Base.encode64(Jason.encode!(payment_payload))
+    encoded = Base.encode64(Jason.encode!(payment_required))
 
-    # Start a local HTTP server that returns 402
-    {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
-    {:ok, port} = :inet.port(listen_socket)
-    server_url = "http://127.0.0.1:#{port}"
+    # Use Http.post directly to call /x402/prepare
+    data = Http.post(agent.transport, "/x402/prepare", %{
+      "payment_required" => encoded,
+      "payer" => agent.address
+    })
 
-    # Spawn a simple HTTP server
-    server_pid = spawn_link(fn -> accept_loop(listen_socket, encoded_header) end)
+    assert is_map(data), "x402/prepare should return a map"
+    assert Map.has_key?(data, "hash"), "x402/prepare missing hash: #{inspect(data)}"
+    assert String.starts_with?(data["hash"], "0x")
+    assert String.length(data["hash"]) == 66
+    assert Map.has_key?(data, "from")
+    assert Map.has_key?(data, "to")
+    assert Map.has_key?(data, "value")
 
-    try do
-      # 1. Make a request without payment - should get 402
-      :inets.start()
-      :ssl.start()
-      {:ok, {{_, status, _}, resp_headers, _body}} =
-        :httpc.request(:get, {String.to_charlist("#{server_url}/v1/data"), []},
-                       [{:timeout, 5_000}], [])
-      assert status == 402
-
-      # 2. Verify PAYMENT-REQUIRED header is present and parseable
-      pay_req = :proplists.get_value(~c"payment-required", resp_headers)
-      assert pay_req != :undefined
-      decoded = Jason.decode!(Base.decode64!(to_string(pay_req)))
-      assert decoded["payTo"] == provider_wallet.wallet.address
-      assert decoded["resource"] == "/v1/data"
-      assert decoded["description"] == "Test data endpoint"
-      assert decoded["mimeType"] == "application/json"
-
-      # 3. Make a request WITH a payment header - should get 200
-      {:ok, {{_, status2, _}, _, resp_body2}} =
-        :httpc.request(:get,
-          {String.to_charlist("#{server_url}/v1/data"),
-           [{~c"x-payment", ~c"test-payment-token"}]},
-          [{:timeout, 5_000}], [])
-      assert status2 == 200
-      body_parsed = Jason.decode!(to_string(resp_body2))
-      assert body_parsed["status"] == "ok"
-      assert body_parsed["data"] == "secret"
-    after
-      Process.exit(server_pid, :kill)
-      :gen_tcp.close(listen_socket)
-    end
+    IO.puts(
+      "[ACCEPTANCE] x402 | prepare | hash=#{String.slice(data["hash"], 0, 18)}..." <>
+      " | from=#{String.slice(data["from"], 0, 10)}..."
+    )
+    IO.puts("[ACCEPTANCE] x402_prepare | PASS")
   end
 
-  # Simple HTTP server for x402 test
-  defp accept_loop(listen_socket, encoded_header) do
-    case :gen_tcp.accept(listen_socket, 5_000) do
-      {:ok, client} ->
-        {:ok, data} = :gen_tcp.recv(client, 0, 5_000)
-        request_str = to_string(data)
+  # ─── Flow 8: AP2 Discovery ─────────────────────────────────────────────
 
-        has_payment = String.contains?(String.downcase(request_str), "x-payment:")
+  @tag :acceptance
+  test "08_ap2_discovery", _context do
+    {:ok, card} = A2A.discover(@api_url)
 
-        if has_payment do
-          body = ~s({"status":"ok","data":"secret"})
-          response = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
-          :gen_tcp.send(client, response)
-        else
-          body = ~s({"error":"payment required"})
-          response = "HTTP/1.1 402 Payment Required\r\nConnection: close\r\nPayment-Required: #{encoded_header}\r\nContent-Type: application/json\r\nContent-Length: #{byte_size(body)}\r\n\r\n#{body}"
-          :gen_tcp.send(client, response)
-        end
+    assert card.name != nil and card.name != "", "agent card should have a name"
+    assert card.url != nil and card.url != "", "agent card should have a URL"
+    assert length(card.skills) > 0, "agent card should have skills"
+    assert card.x402 != nil and card.x402 != %{}, "agent card should have x402 config"
 
-        :gen_tcp.close(client)
-        accept_loop(listen_socket, encoded_header)
+    IO.puts(
+      "[ACCEPTANCE] ap2-discovery | name=#{card.name}" <>
+      " | skills=#{length(card.skills)}" <>
+      " | x402=#{card.x402 != %{}}"
+    )
+    IO.puts("[ACCEPTANCE] ap2_discovery | PASS")
+  end
 
-      {:error, :timeout} ->
-        accept_loop(listen_socket, encoded_header)
+  # ─── Flow 9: AP2 Payment ───────────────────────────────────────────────
 
-      {:error, _} ->
-        :ok
-    end
+  @tag :acceptance
+  test "09_ap2_payment", %{agent: agent, provider: provider, contracts: contracts, usdc: usdc} do
+    amount = 1.0
+
+    agent_before = get_usdc_balance(agent.address, usdc)
+    provider_before = get_usdc_balance(provider.address, usdc)
+
+    {:ok, card} = A2A.discover(@api_url)
+
+    permit = Wallet.sign_permit(agent, "direct", 2.0)
+
+    client = A2A.Client.from_card(card, agent.signer,
+      chain: "base_sepolia",
+      verifying_contract: contracts["router"]
+    )
+
+    {:ok, task} = A2A.Client.send(client,
+      to: provider.address,
+      amount: amount,
+      memo: "acceptance-ap2",
+      permit: permit
+    )
+
+    assert task.status.state == "completed",
+      "A2A task failed: state=#{task.status.state}, message=#{task.status.message}"
+
+    tx_hash = RemitMd.A2A.Task.get_tx_hash(task)
+    assert tx_hash != nil and String.starts_with?(tx_hash, "0x"),
+      "A2A task should return a tx hash"
+    log_tx("ap2-payment", "#{amount} USDC via A2A", tx_hash)
+
+    agent_after = wait_for_balance_change(agent.address, agent_before, usdc)
+    provider_after = get_usdc_balance(provider.address, usdc)
+
+    assert_balance_change("agent", agent_before, agent_after, -amount)
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99)
+    IO.puts("[ACCEPTANCE] ap2_payment | PASS")
   end
 end

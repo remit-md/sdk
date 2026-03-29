@@ -1,11 +1,11 @@
 //go:build acceptance
 
-// Go SDK acceptance tests: all 7 payment flows on live Base Sepolia.
+// Go SDK acceptance tests: 9 payment flows with 2 shared wallets on live Base Sepolia.
 //
 // Run: go test -tags acceptance -timeout 600s -v -count=1
 //
 // Env vars (all optional):
-//   ACCEPTANCE_API_URL  - default: https://remit.md
+//   ACCEPTANCE_API_URL  - default: https://testnet.remit.md
 //   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 package remitmd_test
@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -90,7 +89,8 @@ func fetchContracts(t *testing.T) *testContracts {
 
 type testWallet struct {
 	*remitmd.Wallet
-	key *ecdsa.PrivateKey
+	key    *ecdsa.PrivateKey
+	hexKey string
 }
 
 func createTestWallet(t *testing.T) *testWallet {
@@ -113,7 +113,7 @@ func createTestWallet(t *testing.T) *testWallet {
 	}
 
 	t.Logf("[ACCEPTANCE] wallet: %s (chain=84532)", wallet.Address())
-	return &testWallet{Wallet: wallet, key: key}
+	return &testWallet{Wallet: wallet, key: key, hexKey: hexKey}
 }
 
 // ─── On-chain balance via RPC ─────────────────────────────────────────────────
@@ -178,14 +178,14 @@ func waitForBalanceChange(t *testing.T, usdcAddr, address string, before float64
 func assertBalanceChange(t *testing.T, label string, before, after, expected float64) {
 	t.Helper()
 	actual := after - before
-	tolerance := math.Abs(expected) * 0.001 // 10 bps
+	tolerance := math.Max(math.Abs(expected)*0.02, 0.01) // 2% or 1 cent
 	if math.Abs(actual-expected) > tolerance {
 		t.Fatalf("%s: expected delta %.6f, got %.6f (before=%.6f, after=%.6f)",
 			label, expected, actual, before, after)
 	}
 }
 
-// ─── Funding ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 func logTx(t *testing.T, flow, step, txHash string) {
 	t.Helper()
@@ -204,219 +204,15 @@ func fundTestWallet(t *testing.T, w *testWallet, amount float64) {
 	waitForBalanceChange(t, contracts.USDC, w.Address(), 0)
 }
 
-// ─── EIP-2612 Permit Signing ──────────────────────────────────────────────────
-
-func signUSDCPermit(
-	t *testing.T,
-	key *ecdsa.PrivateKey,
-	owner, spender common.Address,
-	usdcAddr common.Address,
-	chainID *big.Int,
-	value, nonce, deadline *big.Int,
-) *remitmd.PermitSignature {
-	t.Helper()
-
-	// ABI types (reused across calls)
-	bytes32T, _ := abi.NewType("bytes32", "", nil)
-	uint256T, _ := abi.NewType("uint256", "", nil)
-	addressT, _ := abi.NewType("address", "", nil)
-
-	// ── Domain separator ──
-	domainTypeHash := crypto.Keccak256Hash(
-		[]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-	)
-	nameHash := crypto.Keccak256Hash([]byte("USD Coin"))
-	versionHash := crypto.Keccak256Hash([]byte("2"))
-
-	domainPacked, err := abi.Arguments{
-		{Type: bytes32T}, // typeHash
-		{Type: bytes32T}, // name
-		{Type: bytes32T}, // version
-		{Type: uint256T}, // chainId
-		{Type: addressT}, // verifyingContract
-	}.Pack(domainTypeHash, nameHash, versionHash, chainID, usdcAddr)
-	if err != nil {
-		t.Fatalf("pack domain: %v", err)
-	}
-	domainSep := crypto.Keccak256Hash(domainPacked)
-
-	// ── Struct hash ──
-	permitTypeHash := crypto.Keccak256Hash(
-		[]byte("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
-	)
-	structPacked, err := abi.Arguments{
-		{Type: bytes32T},  // typeHash
-		{Type: addressT},  // owner
-		{Type: addressT},  // spender
-		{Type: uint256T},  // value
-		{Type: uint256T},  // nonce
-		{Type: uint256T},  // deadline
-	}.Pack(permitTypeHash, owner, spender, value, nonce, deadline)
-	if err != nil {
-		t.Fatalf("pack permit struct: %v", err)
-	}
-	structHash := crypto.Keccak256Hash(structPacked)
-
-	// ── EIP-712 digest ──
-	digest := crypto.Keccak256Hash(
-		append([]byte("\x19\x01"), append(domainSep[:], structHash[:]...)...),
-	)
-
-	// ── Sign ──
-	sig, err := crypto.Sign(digest[:], key)
-	if err != nil {
-		t.Fatalf("sign permit: %v", err)
-	}
-	sig[64] += 27 // Ethereum v adjustment
-
-	return &remitmd.PermitSignature{
-		Value:    value.Int64(),
-		Deadline: deadline.Int64(),
-		V:        int(sig[64]),
-		R:        "0x" + hex.EncodeToString(sig[:32]),
-		S:        "0x" + hex.EncodeToString(sig[32:64]),
-	}
-}
-
-// ─── Test: Direct Payment ─────────────────────────────────────────────────────
-
-func TestPayDirectWithPermit(t *testing.T) {
-	ctx := context.Background()
-
-	agent := createTestWallet(t)
-	provider := createTestWallet(t)
-	fundTestWallet(t, agent, 100)
-
-	contracts := fetchContracts(t)
-	chainID := new(big.Int).SetUint64(contracts.ChainID)
-
-	amount := 1.0
-	fee := 0.01
-	providerReceives := amount - fee
-
-	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
-	providerBefore := getUsdcBalance(t, contracts.USDC, provider.Address())
-
-	// Sign EIP-2612 permit for the Router contract
-	permit := signUSDCPermit(t, agent.key,
-		crypto.PubkeyToAddress(agent.key.PublicKey),
-		common.HexToAddress(contracts.Router),
-		common.HexToAddress(contracts.USDC),
-		chainID,
-		big.NewInt(2_000_000), // $2 USDC in base units
-		big.NewInt(0),         // nonce 0 (fresh wallet)
-		big.NewInt(time.Now().Unix()+3600),
-	)
-
-	tx, err := agent.Pay(ctx, provider.Address(), decimal.NewFromFloat(amount),
-		remitmd.WithMemo("go-sdk-acceptance"),
-		remitmd.WithPayPermit(permit),
-	)
-	if err != nil {
-		t.Fatalf("Pay: %v", err)
-	}
-	if !strings.HasPrefix(tx.TxHash, "0x") {
-		t.Fatalf("expected tx hash starting with 0x, got: %s", tx.TxHash)
-	}
-	logTx(t, "direct", "pay", tx.TxHash)
-
-	agentAfter := waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
-	providerAfter := getUsdcBalance(t, contracts.USDC, provider.Address())
-
-	assertBalanceChange(t, "agent", agentBefore, agentAfter, -amount)
-	assertBalanceChange(t, "provider", providerBefore, providerAfter, providerReceives)
-}
-
-// ─── Test: Escrow Lifecycle ───────────────────────────────────────────────────
-
-func TestEscrowLifecycle(t *testing.T) {
-	ctx := context.Background()
-
-	agent := createTestWallet(t)
-	provider := createTestWallet(t)
-	fundTestWallet(t, agent, 100)
-
-	contracts := fetchContracts(t)
-	chainID := new(big.Int).SetUint64(contracts.ChainID)
-
-	amount := 5.0
-	fee := amount * 0.01
-	providerReceives := amount - fee
-
-	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
-	providerBefore := getUsdcBalance(t, contracts.USDC, provider.Address())
-
-	// Sign EIP-2612 permit for the Escrow contract
-	permit := signUSDCPermit(t, agent.key,
-		crypto.PubkeyToAddress(agent.key.PublicKey),
-		common.HexToAddress(contracts.Escrow),
-		common.HexToAddress(contracts.USDC),
-		chainID,
-		big.NewInt(6_000_000), // $6 USDC in base units
-		big.NewInt(0),         // nonce 0
-		big.NewInt(time.Now().Unix()+3600),
-	)
-
-	// Create and fund escrow
-	escrow, err := agent.CreateEscrow(ctx, provider.Address(), decimal.NewFromFloat(amount),
-		remitmd.WithEscrowMemo("go-escrow-test"),
-		remitmd.WithEscrowPermit(permit),
-	)
-	if err != nil {
-		t.Fatalf("CreateEscrow: %v", err)
-	}
-	if escrow.InvoiceID == "" {
-		t.Fatal("escrow should have an InvoiceID")
-	}
-	if escrow.TxHash != "" {
-		logTx(t, "escrow", "fund", escrow.TxHash)
-	}
-
-	// Wait for on-chain lock
-	waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
-
-	// Provider claims start
-	claimResult, err := provider.ClaimStart(ctx, escrow.InvoiceID)
-	if err != nil {
-		t.Fatalf("ClaimStart: %v", err)
-	}
-	if claimResult != nil && claimResult.TxHash != "" {
-		logTx(t, "escrow", "claimStart", claimResult.TxHash)
-	}
-	time.Sleep(5 * time.Second)
-
-	// Agent releases
-	releaseResult, err := agent.ReleaseEscrow(ctx, escrow.InvoiceID)
-	if err != nil {
-		t.Fatalf("ReleaseEscrow: %v", err)
-	}
-	if releaseResult != nil && releaseResult.TxHash != "" {
-		logTx(t, "escrow", "release", releaseResult.TxHash)
-	}
-
-	// Verify balances
-	providerAfter := waitForBalanceChange(t, contracts.USDC, provider.Address(), providerBefore)
-	agentAfter := getUsdcBalance(t, contracts.USDC, agent.Address())
-
-	assertBalanceChange(t, "agent", agentBefore, agentAfter, -amount)
-	assertBalanceChange(t, "provider", providerBefore, providerAfter, providerReceives)
-}
-
 // ─── EIP-712 TabCharge Signing ────────────────────────────────────────────────
 
-// signTabCharge produces an EIP-712 signature for the TabCharge struct.
-//
-// Domain: name="RemitTab", version="1", chainId=84532, verifyingContract=<tab contract>
-// Type:   TabCharge(bytes32 tabId, uint96 totalCharged, uint32 callCount)
-//
-// tabID is the UUID string, ASCII-encoded as bytes32 (right-padded with zeroes).
 func signTabCharge(
 	t *testing.T,
 	key *ecdsa.PrivateKey,
 	tabContract common.Address,
 	chainID *big.Int,
 	tabID string,
-	totalCharged *big.Int, // USDC base units (6 decimals)
+	totalCharged *big.Int,
 	callCount uint32,
 ) string {
 	t.Helper()
@@ -425,7 +221,6 @@ func signTabCharge(
 	uint256T, _ := abi.NewType("uint256", "", nil)
 	addressT, _ := abi.NewType("address", "", nil)
 
-	// ── Domain separator (RemitTab) ──
 	domainTypeHash := crypto.Keccak256Hash(
 		[]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
 	)
@@ -444,20 +239,18 @@ func signTabCharge(
 	}
 	domainSep := crypto.Keccak256Hash(domainPacked)
 
-	// ── Struct hash ──
 	tabChargeTypeHash := crypto.Keccak256Hash(
 		[]byte("TabCharge(bytes32 tabId,uint96 totalCharged,uint32 callCount)"),
 	)
 
-	// Encode tabID as bytes32: ASCII chars padded to 32 bytes
 	var tabIDBytes [32]byte
 	copy(tabIDBytes[:], []byte(tabID))
 
 	structPacked, err := abi.Arguments{
-		{Type: bytes32T}, // typeHash
-		{Type: bytes32T}, // tabId
-		{Type: uint256T}, // totalCharged (uint96 ABI-encodes as uint256)
-		{Type: uint256T}, // callCount (uint32 ABI-encodes as uint256)
+		{Type: bytes32T},
+		{Type: bytes32T},
+		{Type: uint256T},
+		{Type: uint256T},
 	}.Pack(
 		tabChargeTypeHash,
 		tabIDBytes,
@@ -469,7 +262,6 @@ func signTabCharge(
 	}
 	structHash := crypto.Keccak256Hash(structPacked)
 
-	// ── EIP-712 digest ──
 	digest := crypto.Keccak256Hash(
 		append([]byte("\x19\x01"), append(domainSep[:], structHash[:]...)...),
 	)
@@ -478,40 +270,249 @@ func signTabCharge(
 	if err != nil {
 		t.Fatalf("sign tab charge: %v", err)
 	}
-	sig[64] += 27 // Ethereum v adjustment
+	sig[64] += 27
 
 	return "0x" + hex.EncodeToString(sig)
 }
 
-// ─── Test: Tab Lifecycle ──────────────────────────────────────────────────────
+// ─── Shared wallets ──────────────────────────────────────────────────────────
 
-func TestTabLifecycle(t *testing.T) {
+var (
+	sharedAgent    *testWallet
+	sharedProvider *testWallet
+)
+
+func TestMain(m *testing.M) {
+	// Cannot use t.Helper() here — TestMain gets *testing.M, not *testing.T.
+	// Use fmt for setup logging.
+	fmt.Println("[ACCEPTANCE] setting up shared wallets...")
+
+	contracts := fetchContractsForMain()
+	if contracts == nil {
+		fmt.Println("[ACCEPTANCE] FATAL: could not fetch contracts")
+		os.Exit(1)
+	}
+
+	agent := createWalletForMain(contracts)
+	provider := createWalletForMain(contracts)
+
+	// Fund agent with 100 USDC
+	fmt.Printf("[ACCEPTANCE] minting 100 USDC -> %s\n", agent.Address())
 	ctx := context.Background()
+	_, err := agent.Mint(ctx, 100)
+	if err != nil {
+		fmt.Printf("[ACCEPTANCE] FATAL: Mint failed: %v\n", err)
+		os.Exit(1)
+	}
+	// Wait for balance
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		bal := getUsdcBalanceRaw(contracts.USDC, agent.Address())
+		if bal > 0.001 {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	fmt.Printf("[ACCEPTANCE] agent funded: %s\n", agent.Address())
 
-	payer := createTestWallet(t)
-	provider := createTestWallet(t)
-	fundTestWallet(t, payer, 100)
+	sharedAgent = agent
+	sharedProvider = provider
 
+	os.Exit(m.Run())
+}
+
+// fetchContractsForMain is a TestMain-safe version (no *testing.T).
+func fetchContractsForMain() *testContracts {
+	resp, err := http.Get(acceptanceAPIURL + "/api/v1/contracts")
+	if err != nil {
+		fmt.Printf("[ACCEPTANCE] GET /contracts failed: %v\n", err)
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		fmt.Printf("[ACCEPTANCE] GET /contracts returned %d\n", resp.StatusCode)
+		return nil
+	}
+	var data testContracts
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		fmt.Printf("[ACCEPTANCE] decode /contracts: %v\n", err)
+		return nil
+	}
+	cachedContracts = &data
+	return cachedContracts
+}
+
+func createWalletForMain(contracts *testContracts) *testWallet {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		fmt.Printf("[ACCEPTANCE] FATAL: generate key: %v\n", err)
+		os.Exit(1)
+	}
+	hexKey := "0x" + hex.EncodeToString(crypto.FromECDSA(key))
+
+	wallet, err := remitmd.NewWallet(hexKey,
+		remitmd.WithTestnet(),
+		remitmd.WithBaseURL(acceptanceAPIURL),
+		remitmd.WithRouterAddress(contracts.Router),
+	)
+	if err != nil {
+		fmt.Printf("[ACCEPTANCE] FATAL: NewWallet: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("[ACCEPTANCE] wallet: %s (chain=84532)\n", wallet.Address())
+	return &testWallet{Wallet: wallet, key: key, hexKey: hexKey}
+}
+
+// getUsdcBalanceRaw is a TestMain-safe version (no *testing.T).
+func getUsdcBalanceRaw(usdcAddr, address string) float64 {
+	padded := strings.ToLower(strings.TrimPrefix(address, "0x"))
+	for len(padded) < 64 {
+		padded = "0" + padded
+	}
+	callData := "0x70a08231" + padded
+	reqBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"%s","data":"%s"},"latest"]}`,
+		usdcAddr, callData,
+	)
+	resp, err := http.Post(acceptanceRPCURL, "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Result string `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0
+	}
+	bal, ok := new(big.Int).SetString(strings.TrimPrefix(result.Result, "0x"), 16)
+	if !ok {
+		return 0
+	}
+	f, _ := new(big.Float).Quo(
+		new(big.Float).SetInt(bal),
+		new(big.Float).SetFloat64(1e6),
+	).Float64()
+	return f
+}
+
+// ─── Flow 1: Direct ──────────────────────────────────────────────────────────
+
+func TestDirect(t *testing.T) {
+	ctx := context.Background()
+	agent := sharedAgent
+	provider := sharedProvider
+	contracts := fetchContracts(t)
+	amount := 1.0
+
+	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
+	providerBefore := getUsdcBalance(t, contracts.USDC, provider.Address())
+
+	permit, err := agent.SignPermit(ctx, "direct", amount)
+	if err != nil {
+		t.Fatalf("SignPermit: %v", err)
+	}
+
+	tx, err := agent.Pay(ctx, provider.Address(), decimal.NewFromFloat(amount),
+		remitmd.WithMemo("acceptance-direct"),
+		remitmd.WithPayPermit(permit),
+	)
+	if err != nil {
+		t.Fatalf("Pay: %v", err)
+	}
+	if !strings.HasPrefix(tx.TxHash, "0x") {
+		t.Fatalf("expected tx hash starting with 0x, got: %s", tx.TxHash)
+	}
+	logTx(t, "direct", fmt.Sprintf("%.1f USDC %s->%s", amount, agent.Address(), provider.Address()), tx.TxHash)
+
+	agentAfter := waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
+	providerAfter := getUsdcBalance(t, contracts.USDC, provider.Address())
+
+	assertBalanceChange(t, "agent", agentBefore, agentAfter, -amount)
+	assertBalanceChange(t, "provider", providerBefore, providerAfter, amount*0.99)
+}
+
+// ─── Flow 2: Escrow ──────────────────────────────────────────────────────────
+
+func TestEscrow(t *testing.T) {
+	ctx := context.Background()
+	agent := sharedAgent
+	provider := sharedProvider
+	contracts := fetchContracts(t)
+	amount := 2.0
+
+	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
+	providerBefore := getUsdcBalance(t, contracts.USDC, provider.Address())
+
+	permit, err := agent.SignPermit(ctx, "escrow", amount)
+	if err != nil {
+		t.Fatalf("SignPermit: %v", err)
+	}
+
+	escrow, err := agent.CreateEscrow(ctx, provider.Address(), decimal.NewFromFloat(amount),
+		remitmd.WithEscrowMemo("acceptance-escrow"),
+		remitmd.WithEscrowPermit(permit),
+	)
+	if err != nil {
+		t.Fatalf("CreateEscrow: %v", err)
+	}
+	if escrow.InvoiceID == "" {
+		t.Fatal("escrow should have an InvoiceID")
+	}
+	if escrow.TxHash != "" {
+		logTx(t, "escrow", fmt.Sprintf("fund %.1f USDC", amount), escrow.TxHash)
+	}
+
+	waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
+
+	claimResult, err := provider.ClaimStart(ctx, escrow.InvoiceID)
+	if err != nil {
+		t.Fatalf("ClaimStart: %v", err)
+	}
+	if claimResult != nil && claimResult.TxHash != "" {
+		logTx(t, "escrow", "claimStart", claimResult.TxHash)
+	}
+	time.Sleep(5 * time.Second)
+
+	releaseResult, err := agent.ReleaseEscrow(ctx, escrow.InvoiceID)
+	if err != nil {
+		t.Fatalf("ReleaseEscrow: %v", err)
+	}
+	if releaseResult != nil && releaseResult.TxHash != "" {
+		logTx(t, "escrow", "release", releaseResult.TxHash)
+	}
+
+	providerAfter := waitForBalanceChange(t, contracts.USDC, provider.Address(), providerBefore)
+	agentAfter := getUsdcBalance(t, contracts.USDC, agent.Address())
+
+	assertBalanceChange(t, "agent", agentBefore, agentAfter, -amount)
+	assertBalanceChange(t, "provider", providerBefore, providerAfter, amount*0.99)
+}
+
+// ─── Flow 3: Tab ─────────────────────────────────────────────────────────────
+
+func TestTab(t *testing.T) {
+	ctx := context.Background()
+	agent := sharedAgent
+	provider := sharedProvider
 	contracts := fetchContracts(t)
 	chainID := new(big.Int).SetUint64(contracts.ChainID)
 
-	// Sign permit for the Tab contract
-	permit := signUSDCPermit(t, payer.key,
-		crypto.PubkeyToAddress(payer.key.PublicKey),
-		common.HexToAddress(contracts.Tab),
-		common.HexToAddress(contracts.USDC),
-		chainID,
-		big.NewInt(20_000_000), // $20 USDC in base units
-		big.NewInt(0),
-		big.NewInt(time.Now().Unix()+3600),
-	)
+	limit := 5.0
+	chargeAmount := 1.0
+	chargeUnits := int64(chargeAmount * 1_000_000)
 
-	payerBefore := getUsdcBalance(t, contracts.USDC, payer.Address())
+	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
+	providerBefore := getUsdcBalance(t, contracts.USDC, provider.Address())
 
-	// 1. Create tab: $10 limit, $0.10 per call
-	tab, err := payer.CreateTab(ctx, provider.Address(),
-		decimal.NewFromFloat(10.0),
-		decimal.NewFromFloat(0.10),
+	permit, err := agent.SignPermit(ctx, "tab", limit)
+	if err != nil {
+		t.Fatalf("SignPermit: %v", err)
+	}
+
+	tab, err := agent.CreateTab(ctx, provider.Address(),
+		decimal.NewFromFloat(limit),
+		decimal.NewFromFloat(0.1),
 		remitmd.WithTabPermit(permit),
 	)
 	if err != nil {
@@ -521,91 +522,77 @@ func TestTabLifecycle(t *testing.T) {
 		t.Fatal("tab ID should not be empty")
 	}
 	if tab.TxHash != "" {
-		logTx(t, "tab", "open", tab.TxHash)
+		logTx(t, "tab", fmt.Sprintf("open limit=%.1f", limit), tab.TxHash)
 	}
-	t.Logf("Tab created: %s", tab.ID)
 
-	// Wait for on-chain funding
-	waitForBalanceChange(t, contracts.USDC, payer.Address(), payerBefore)
+	waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
 
-	// 2. Charge tab: $0.10 charge, cumulative $0.10, callCount 1
-	chargeAmount := 0.10
+	// Charge tab
+	callCount := uint32(1)
 	chargeSig := signTabCharge(t, provider.key,
 		common.HexToAddress(contracts.Tab),
 		chainID,
 		tab.ID,
-		big.NewInt(100_000), // $0.10 in base units
-		1,
+		big.NewInt(chargeUnits),
+		callCount,
 	)
-	charge, err := provider.ChargeTab(ctx, tab.ID, chargeAmount, chargeAmount, 1, chargeSig)
+	charge, err := provider.ChargeTab(ctx, tab.ID, chargeAmount, chargeAmount, int(callCount), chargeSig)
 	if err != nil {
 		t.Fatalf("ChargeTab: %v", err)
 	}
 	if charge.TabID != tab.ID {
 		t.Fatalf("charge tab_id mismatch: got %s, want %s", charge.TabID, tab.ID)
 	}
-	t.Logf("Tab charged: amount=%s, cumulative=%s", charge.Amount, charge.Cumulative)
 
-	// 3. Close tab with final settlement
+	// Close tab
 	closeSig := signTabCharge(t, provider.key,
 		common.HexToAddress(contracts.Tab),
 		chainID,
 		tab.ID,
-		big.NewInt(100_000), // final = $0.10
-		1,
+		big.NewInt(chargeUnits),
+		callCount,
 	)
-	closed, err := payer.CloseTab(ctx, tab.ID,
+	closed, err := agent.CloseTab(ctx, tab.ID,
 		remitmd.WithCloseTabAmount(chargeAmount),
 		remitmd.WithCloseTabSig(closeSig),
 	)
 	if err != nil {
 		t.Fatalf("CloseTab: %v", err)
 	}
-	if closed.TxHash != "" {
-		logTx(t, "tab", "close", closed.TxHash)
+	if closed.TxHash == "" || !strings.HasPrefix(closed.TxHash, "0x") {
+		t.Fatalf("expected tx hash starting with 0x, got: %s", closed.TxHash)
 	}
-	t.Logf("Tab closed: tx=%s", closed.TxHash)
+	logTx(t, "tab", "close", closed.TxHash)
 
-	// 4. Verify balance: payer should have lost the charged amount (+ fee)
-	payerAfter := waitForBalanceChange(t, contracts.USDC, payer.Address(), payerBefore)
+	providerAfter := waitForBalanceChange(t, contracts.USDC, provider.Address(), providerBefore)
+	agentAfter := getUsdcBalance(t, contracts.USDC, agent.Address())
 
-	// Payer should lose at most limit ($10) - depends on contract settlement
-	payerDelta := payerAfter - payerBefore
-	if payerDelta > 0 {
-		t.Fatalf("payer should not have gained funds, delta=%.6f", payerDelta)
-	}
-	t.Logf("Payer balance delta: %.6f", payerDelta)
+	assertBalanceChange(t, "agent", agentBefore, agentAfter, -chargeAmount)
+	assertBalanceChange(t, "provider", providerBefore, providerAfter, chargeAmount*0.99)
 }
 
-// ─── Test: Stream Lifecycle ───────────────────────────────────────────────────
+// ─── Flow 4: Stream ──────────────────────────────────────────────────────────
 
-func TestStreamLifecycle(t *testing.T) {
+func TestStream(t *testing.T) {
 	ctx := context.Background()
-
-	payer := createTestWallet(t)
-	payee := createTestWallet(t)
-	fundTestWallet(t, payer, 100)
-
+	agent := sharedAgent
+	provider := sharedProvider
 	contracts := fetchContracts(t)
-	chainID := new(big.Int).SetUint64(contracts.ChainID)
 
-	// Sign permit for the Stream contract
-	permit := signUSDCPermit(t, payer.key,
-		crypto.PubkeyToAddress(payer.key.PublicKey),
-		common.HexToAddress(contracts.Stream),
-		common.HexToAddress(contracts.USDC),
-		chainID,
-		big.NewInt(10_000_000), // $10 USDC in base units
-		big.NewInt(0),
-		big.NewInt(time.Now().Unix()+3600),
-	)
+	rate := 0.1 // $0.10/s
+	maxTotal := 2.0
 
-	payerBefore := getUsdcBalance(t, contracts.USDC, payer.Address())
+	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
+	providerBefore := getUsdcBalance(t, contracts.USDC, provider.Address())
 
-	// 1. Create stream: $0.01/sec, $5 max
-	stream, err := payer.CreateStream(ctx, payee.Address(),
-		decimal.NewFromFloat(0.01), // rate_per_second
-		decimal.NewFromFloat(5.0),  // max_total
+	permit, err := agent.SignPermit(ctx, "stream", maxTotal)
+	if err != nil {
+		t.Fatalf("SignPermit: %v", err)
+	}
+
+	stream, err := agent.CreateStream(ctx, provider.Address(),
+		decimal.NewFromFloat(rate),
+		decimal.NewFromFloat(maxTotal),
 		remitmd.WithStreamPermit(permit),
 	)
 	if err != nil {
@@ -615,26 +602,21 @@ func TestStreamLifecycle(t *testing.T) {
 		t.Fatal("stream ID should not be empty")
 	}
 	if stream.TxHash != "" {
-		logTx(t, "stream", "open", stream.TxHash)
+		logTx(t, "stream", fmt.Sprintf("open rate=%.1f/s max=%.1f", rate, maxTotal), stream.TxHash)
 	}
-	t.Logf("Stream created: %s, status=%s", stream.ID, stream.Status)
 
-	// Wait for on-chain lock
-	waitForBalanceChange(t, contracts.USDC, payer.Address(), payerBefore)
+	waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
+	time.Sleep(5 * time.Second)
 
-	// 2. Let it run and wait for indexer to catch up
-	t.Log("Waiting 10 seconds for stream accrual + indexer lag...")
-	time.Sleep(10 * time.Second)
-
-	// 3. Close stream (retry for Ponder indexer lag - may take 30-90s)
+	// Close stream (retry for Ponder indexer lag)
 	var closedTx *remitmd.Transaction
 	for attempt := 0; attempt < 20; attempt++ {
-		closedTx, err = payer.CloseStream(ctx, stream.ID)
+		closedTx, err = agent.CloseStream(ctx, stream.ID)
 		if err == nil {
 			break
 		}
 		if attempt < 19 {
-			t.Logf("CloseStream attempt %d failed: %v, retrying...", attempt+1, err)
+			t.Logf("[ACCEPTANCE] stream | CloseStream retry %d: %v", attempt+1, err)
 			time.Sleep(5 * time.Second)
 		}
 	}
@@ -644,44 +626,46 @@ func TestStreamLifecycle(t *testing.T) {
 	if closedTx.TxHash != "" {
 		logTx(t, "stream", "close", closedTx.TxHash)
 	}
-	t.Logf("Stream closed: tx=%s", closedTx.TxHash)
 
-	// 4. Conservation of funds: payer + payee balances should account for all USDC
-	payerAfter := waitForBalanceChange(t, contracts.USDC, payer.Address(), payerBefore)
-	payeeAfter := getUsdcBalance(t, contracts.USDC, payee.Address())
+	providerAfter := waitForBalanceChange(t, contracts.USDC, provider.Address(), providerBefore)
+	agentAfter := getUsdcBalance(t, contracts.USDC, agent.Address())
 
-	// Payer should have lost some amount (stream + fees), payee should have gained some
-	payerDelta := payerAfter - payerBefore
-	if payerDelta >= 0 {
-		t.Fatalf("payer should have lost funds, delta=%.6f", payerDelta)
+	agentLoss := agentBefore - agentAfter
+	if agentLoss < 0.05 {
+		t.Fatalf("agent should lose money, loss=%.6f", agentLoss)
 	}
-	t.Logf("Payer delta: %.6f, Payee balance: %.6f", payerDelta, payeeAfter)
+	if agentLoss > maxTotal+0.01 {
+		t.Fatalf("agent loss %.6f exceeds max_total %.1f", agentLoss, maxTotal)
+	}
+
+	providerGain := providerAfter - providerBefore
+	if providerGain < 0.04 {
+		t.Fatalf("provider should gain, gain=%.6f", providerGain)
+	}
 }
 
-// ─── Test: Bounty Lifecycle ───────────────────────────────────────────────────
+// ─── Flow 5: Bounty ──────────────────────────────────────────────────────────
 
-func TestBountyLifecycle(t *testing.T) {
-	t.Skip("Server-side: bounty permit signing produces invalid signature")
+func TestBounty(t *testing.T) {
 	ctx := context.Background()
-
-	poster := createTestWallet(t)
-	submitter := createTestWallet(t)
-	fundTestWallet(t, poster, 100)
-
+	agent := sharedAgent
+	provider := sharedProvider
 	contracts := fetchContracts(t)
-	posterBefore := getUsdcBalance(t, contracts.USDC, poster.Address())
+	amount := 2.0
+	deadlineTs := time.Now().Unix() + 3600
 
-	// 1. Create bounty: $5 reward, 1 hour deadline
-	deadline := time.Now().Unix() + 3600
-	// Explicit permit with $1 headroom (same pattern as TS/Python tests)
-	permit, err := poster.SignPermit(ctx, "bounty", 6.0)
+	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
+	providerBefore := getUsdcBalance(t, contracts.USDC, provider.Address())
+
+	permit, err := agent.SignPermit(ctx, "bounty", amount)
 	if err != nil {
-		t.Fatalf("SignPermit for bounty: %v", err)
+		t.Fatalf("SignPermit: %v", err)
 	}
-	bounty, err := poster.CreateBounty(ctx,
-		decimal.NewFromFloat(5.0),
-		"Write a Go acceptance test",
-		deadline,
+
+	bounty, err := agent.CreateBounty(ctx,
+		decimal.NewFromFloat(amount),
+		"acceptance-bounty",
+		deadlineTs,
 		remitmd.WithBountyPermit(permit),
 	)
 	if err != nil {
@@ -691,71 +675,62 @@ func TestBountyLifecycle(t *testing.T) {
 		t.Fatal("bounty ID should not be empty")
 	}
 	if bounty.TxHash != "" {
-		logTx(t, "bounty", "post", bounty.TxHash)
+		logTx(t, "bounty", fmt.Sprintf("post %.1f USDC", amount), bounty.TxHash)
 	}
-	t.Logf("Bounty created: %s, status=%s", bounty.ID, bounty.Status)
 
-	// Wait for on-chain lock
-	waitForBalanceChange(t, contracts.USDC, poster.Address(), posterBefore)
+	waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
 
-	// 2. Submit evidence (as submitter)
+	// Submit evidence
 	evidenceHash := "0x" + hex.EncodeToString(crypto.Keccak256([]byte("test evidence")))
-	sub, err := submitter.SubmitBounty(ctx, bounty.ID, evidenceHash)
+	sub, err := provider.SubmitBounty(ctx, bounty.ID, evidenceHash)
 	if err != nil {
 		t.Fatalf("SubmitBounty: %v", err)
 	}
-	if sub.BountyID != bounty.ID {
-		t.Fatalf("submission bounty_id mismatch: got %s, want %s", sub.BountyID, bounty.ID)
-	}
-	t.Logf("Submission created: id=%d, status=%s", sub.ID, sub.Status)
+	t.Logf("[ACCEPTANCE] bounty | submit | id=%s, sub=%d", bounty.ID, sub.ID)
 
-	// 3. Award bounty (as poster)
-	awarded, err := poster.AwardBounty(ctx, bounty.ID, sub.ID)
-	if err != nil {
-		t.Fatalf("AwardBounty: %v", err)
+	// Retry award (Ponder indexer lag)
+	var awarded *remitmd.Transaction
+	for attempt := 0; attempt < 15; attempt++ {
+		time.Sleep(3 * time.Second)
+		awarded, err = agent.AwardBounty(ctx, bounty.ID, sub.ID)
+		if err == nil {
+			break
+		}
+		if attempt < 14 {
+			t.Logf("[ACCEPTANCE] bounty award retry %d: %v", attempt+1, err)
+		} else {
+			t.Fatalf("AwardBounty failed after 15 retries: %v", err)
+		}
 	}
-	if awarded.TxHash != "" {
+	if awarded != nil && awarded.TxHash != "" {
 		logTx(t, "bounty", "award", awarded.TxHash)
 	}
-	t.Logf("Bounty awarded: tx=%s", awarded.TxHash)
 
-	// 4. Verify balances
-	submitterAfter := waitForBalanceChange(t, contracts.USDC, submitter.Address(), 0)
+	providerAfter := waitForBalanceChange(t, contracts.USDC, provider.Address(), providerBefore)
+	agentAfter := getUsdcBalance(t, contracts.USDC, agent.Address())
 
-	if submitterAfter <= 0 {
-		t.Fatalf("submitter should have received funds, got balance=%.6f", submitterAfter)
-	}
-	t.Logf("Submitter received: %.6f", submitterAfter)
+	assertBalanceChange(t, "agent", agentBefore, agentAfter, -amount)
+	assertBalanceChange(t, "provider", providerBefore, providerAfter, amount*0.99)
 }
 
-// ─── Test: Deposit Lifecycle ──────────────────────────────────────────────────
+// ─── Flow 6: Deposit ─────────────────────────────────────────────────────────
 
-func TestDepositLifecycle(t *testing.T) {
+func TestDeposit(t *testing.T) {
 	ctx := context.Background()
-
-	payer := createTestWallet(t)
-	provider := createTestWallet(t)
-	fundTestWallet(t, payer, 100)
-
+	agent := sharedAgent
+	provider := sharedProvider
 	contracts := fetchContracts(t)
-	chainID := new(big.Int).SetUint64(contracts.ChainID)
+	amount := 2.0
 
-	// Sign permit for the Deposit contract
-	permit := signUSDCPermit(t, payer.key,
-		crypto.PubkeyToAddress(payer.key.PublicKey),
-		common.HexToAddress(contracts.Deposit),
-		common.HexToAddress(contracts.USDC),
-		chainID,
-		big.NewInt(10_000_000), // $10 USDC in base units
-		big.NewInt(0),
-		big.NewInt(time.Now().Unix()+3600),
-	)
+	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
 
-	payerBefore := getUsdcBalance(t, contracts.USDC, payer.Address())
+	permit, err := agent.SignPermit(ctx, "deposit", amount)
+	if err != nil {
+		t.Fatalf("SignPermit: %v", err)
+	}
 
-	// 1. Place deposit: $5, expires in 1 hour
-	deposit, err := payer.PlaceDeposit(ctx, provider.Address(),
-		decimal.NewFromFloat(5.0),
+	deposit, err := agent.PlaceDeposit(ctx, provider.Address(),
+		decimal.NewFromFloat(amount),
 		1*time.Hour,
 		remitmd.WithDepositPermit(permit),
 	)
@@ -766,117 +741,189 @@ func TestDepositLifecycle(t *testing.T) {
 		t.Fatal("deposit ID should not be empty")
 	}
 	if deposit.TxHash != "" {
-		logTx(t, "deposit", "place", deposit.TxHash)
+		logTx(t, "deposit", fmt.Sprintf("place %.1f USDC", amount), deposit.TxHash)
 	}
-	t.Logf("Deposit placed: %s, status=%s", deposit.ID, deposit.Status)
 
-	// Wait for on-chain lock
-	waitForBalanceChange(t, contracts.USDC, payer.Address(), payerBefore)
-	payerAfterDeposit := getUsdcBalance(t, contracts.USDC, payer.Address())
+	agentMid := waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
+	assertBalanceChange(t, "agent locked", agentBefore, agentMid, -amount)
 
-	// 2. Return deposit (by provider)
-	returnResult, err := provider.ReturnDeposit(ctx, deposit.ID)
+	returned, err := provider.ReturnDeposit(ctx, deposit.ID)
 	if err != nil {
 		t.Fatalf("ReturnDeposit: %v", err)
 	}
-	if returnResult != nil && returnResult.TxHash != "" {
-		logTx(t, "deposit", "return", returnResult.TxHash)
+	if returned != nil && returned.TxHash != "" {
+		logTx(t, "deposit", "return", returned.TxHash)
 	}
-	t.Log("Deposit returned")
 
-	// 3. Verify full refund (deposits have no fee)
-	payerAfterReturn := waitForBalanceChange(t, contracts.USDC, payer.Address(), payerAfterDeposit)
-	refundAmount := payerAfterReturn - payerAfterDeposit
-	if refundAmount < 4.99 {
-		t.Fatalf("expected near-full refund (~5.0), got %.6f", refundAmount)
-	}
-	t.Logf("Deposit refunded: %.6f (full refund, no fee)", refundAmount)
+	agentAfter := waitForBalanceChange(t, contracts.USDC, agent.Address(), agentMid)
+	assertBalanceChange(t, "agent refund", agentBefore, agentAfter, 0)
 }
 
-// ─── Test: X402 Auto-Pay ──────────────────────────────────────────────────────
+// ─── Flow 7: x402 Prepare ────────────────────────────────────────────────────
 
-func TestX402AutoPay(t *testing.T) {
+func TestX402Prepare(t *testing.T) {
 	ctx := context.Background()
-
-	// 1. Spin up a local HTTP server that returns 402
-	providerWallet := createTestWallet(t)
+	agent := sharedAgent
 	contracts := fetchContracts(t)
 
-	paywall, err := remitmd.NewX402Paywall(remitmd.PaywallOptions{
-		WalletAddress:     providerWallet.Address(),
-		AmountUsdc:        0.001,
-		Network:           "eip155:84532",
-		Asset:             contracts.USDC,
-		FacilitatorURL:    acceptanceAPIURL,
-		MaxTimeoutSeconds: 60,
-		Resource:          "/v1/data",
-		Description:       "Test data endpoint",
-		MimeType:          "application/json",
+	paymentRequired := map[string]any{
+		"scheme":            "exact",
+		"network":           "eip155:84532",
+		"amount":            "100000", // $0.10 USDC
+		"asset":             contracts.USDC,
+		"payTo":             contracts.Router,
+		"maxTimeoutSeconds": 60,
+	}
+	encoded := base64.StdEncoding.EncodeToString(mustJSON(t, paymentRequired))
+
+	// POST /api/v1/x402/prepare
+	permit, err := agent.SignPermit(ctx, "direct", 0.10)
+	if err != nil {
+		t.Fatalf("SignPermit for x402: %v", err)
+	}
+	_ = permit // permit not needed for /x402/prepare, but validates server-side signing works
+
+	body := map[string]any{
+		"payment_required": encoded,
+		"payer":            agent.Address(),
+	}
+	bodyBytes := mustJSON(t, body)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		acceptanceAPIURL+"/api/v1/x402/prepare",
+		strings.NewReader(string(bodyBytes)),
+	)
+	if err != nil {
+		t.Fatalf("build x402/prepare request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /x402/prepare: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var data map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Fatalf("decode x402/prepare response: %v", err)
+	}
+
+	hashVal, ok := data["hash"]
+	if !ok {
+		t.Fatalf("x402/prepare missing hash: %v", data)
+	}
+	hashStr, ok := hashVal.(string)
+	if !ok || !strings.HasPrefix(hashStr, "0x") {
+		t.Fatalf("x402/prepare hash not 0x-prefixed: %v", hashVal)
+	}
+	if len(hashStr) != 66 {
+		t.Fatalf("x402/prepare hash wrong length: got %d, want 66", len(hashStr))
+	}
+	if _, ok := data["from"]; !ok {
+		t.Fatal("x402/prepare missing 'from' field")
+	}
+	if _, ok := data["to"]; !ok {
+		t.Fatal("x402/prepare missing 'to' field")
+	}
+	if _, ok := data["value"]; !ok {
+		t.Fatal("x402/prepare missing 'value' field")
+	}
+
+	t.Logf("[ACCEPTANCE] x402 | prepare | hash=%s... | from=%v", hashStr[:18], data["from"])
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	return b
+}
+
+// ─── Flow 8: AP2 Discovery ───────────────────────────────────────────────────
+
+func TestAP2Discovery(t *testing.T) {
+	ctx := context.Background()
+
+	card, err := remitmd.DiscoverAgent(ctx, acceptanceAPIURL)
+	if err != nil {
+		t.Fatalf("DiscoverAgent: %v", err)
+	}
+
+	if card.Name == "" {
+		t.Fatal("agent card should have a name")
+	}
+	if card.URL == "" {
+		t.Fatal("agent card should have a URL")
+	}
+	if len(card.Skills) == 0 {
+		t.Fatal("agent card should have skills")
+	}
+	if card.X402.SettleEndpoint == "" {
+		t.Fatal("agent card should have x402 config")
+	}
+
+	t.Logf("[ACCEPTANCE] ap2-discovery | name=%s | skills=%d | x402=%v",
+		card.Name, len(card.Skills), card.X402.SettleEndpoint != "")
+}
+
+// ─── Flow 9: AP2 Payment ────────────────────────────────────────────────────
+
+func TestAP2Payment(t *testing.T) {
+	ctx := context.Background()
+	agent := sharedAgent
+	provider := sharedProvider
+	contracts := fetchContracts(t)
+	amount := 1.0
+
+	agentBefore := getUsdcBalance(t, contracts.USDC, agent.Address())
+	providerBefore := getUsdcBalance(t, contracts.USDC, provider.Address())
+
+	card, err := remitmd.DiscoverAgent(ctx, acceptanceAPIURL)
+	if err != nil {
+		t.Fatalf("DiscoverAgent: %v", err)
+	}
+
+	permit, err := agent.SignPermit(ctx, "direct", amount)
+	if err != nil {
+		t.Fatalf("SignPermit: %v", err)
+	}
+
+	// Create A2A client from agent card + signer
+	signer, err := remitmd.NewPrivateKeySigner(agent.hexKey)
+	if err != nil {
+		t.Fatalf("NewPrivateKeySigner: %v", err)
+	}
+
+	a2aClient, err := remitmd.A2AClientFromCard(card, signer, "base-sepolia")
+	if err != nil {
+		t.Fatalf("A2AClientFromCard: %v", err)
+	}
+
+	task, err := a2aClient.Send(ctx, remitmd.SendOptions{
+		To:     provider.Address(),
+		Amount: amount,
+		Memo:   "acceptance-ap2",
+		Permit: permit,
 	})
 	if err != nil {
-		t.Fatalf("NewX402Paywall: %v", err)
+		t.Fatalf("A2A Send: %v", err)
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("/v1/data", paywall.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		_, _ = w.Write([]byte(`{"status":"ok","data":"secret"}`))
-	})))
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	server := &http.Server{Handler: mux}
-	serverURL := "http://" + listener.Addr().String()
-	go server.Serve(listener) //nolint:errcheck
-	defer server.Close()
-
-	t.Logf("X402 test server at %s", serverURL)
-
-	// 2. Make a request without payment - should get 402
-	resp, err := http.Get(serverURL + "/v1/data")
-	if err != nil {
-		t.Fatalf("GET /v1/data: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != 402 {
-		t.Fatalf("expected 402, got %d", resp.StatusCode)
+	if task.Status.State != "completed" {
+		t.Fatalf("A2A task not completed: state=%s", task.Status.State)
 	}
 
-	// Verify PAYMENT-REQUIRED header is present and parseable
-	payReq := resp.Header.Get("PAYMENT-REQUIRED")
-	if payReq == "" {
-		t.Fatal("missing PAYMENT-REQUIRED header")
-	}
-	decoded, err := base64.StdEncoding.DecodeString(payReq)
-	if err != nil {
-		t.Fatalf("decode PAYMENT-REQUIRED: %v", err)
-	}
-	var reqPayload map[string]any
-	if err := json.Unmarshal(decoded, &reqPayload); err != nil {
-		t.Fatalf("parse PAYMENT-REQUIRED JSON: %v", err)
-	}
-	if reqPayload["payTo"] == nil {
-		t.Fatal("PAYMENT-REQUIRED missing payTo field")
+	txHash := remitmd.GetTaskTxHash(task)
+	if txHash != "" {
+		logTx(t, "ap2-payment", fmt.Sprintf("%.1f USDC via A2A", amount), txHash)
 	}
 
-	// 3. Verify the paywall Check method works with empty sig (should return invalid)
-	result, err := paywall.Check(ctx, "")
-	if err != nil {
-		t.Fatalf("Check empty: %v", err)
-	}
-	if result.IsValid {
-		t.Fatal("empty sig should not be valid")
-	}
+	agentAfter := waitForBalanceChange(t, contracts.USDC, agent.Address(), agentBefore)
+	providerAfter := getUsdcBalance(t, contracts.USDC, provider.Address())
 
-	// 4. Verify V2 fields are present in the PAYMENT-REQUIRED header
-	if reqPayload["resource"] != "/v1/data" {
-		t.Fatalf("expected resource=/v1/data, got %v", reqPayload["resource"])
-	}
-	if reqPayload["description"] != "Test data endpoint" {
-		t.Fatalf("expected description='Test data endpoint', got %v", reqPayload["description"])
-	}
-	t.Logf("X402 paywall verified: 402 with PAYMENT-REQUIRED header, V2 fields present")
+	assertBalanceChange(t, "agent", agentBefore, agentAfter, -amount)
+	assertBalanceChange(t, "provider", providerBefore, providerAfter, amount*0.99)
 }

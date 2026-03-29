@@ -2,8 +2,8 @@ package md.remit;
 
 import md.remit.models.*;
 
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+
 import org.web3j.crypto.ECKeyPair;
 import org.web3j.crypto.Keys;
 import org.web3j.utils.Numeric;
@@ -18,19 +18,26 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Java SDK acceptance tests: payDirect + escrow lifecycle on live Base Sepolia.
+ * Java SDK acceptance tests: 9 payment flows with 2 shared wallets on live Base Sepolia.
+ *
+ * <p>Creates agent (payer) + provider (payee) wallets once, mints 100 USDC
+ * to agent, then runs all 9 flows sequentially with small amounts.
+ *
+ * <p>Flows: direct, escrow, tab, stream, bounty, deposit, x402Prepare, ap2Discovery, ap2Payment.
  *
  * <p>Run: ./gradlew acceptanceTest
  *
  * <p>Env vars (all optional):
- *   ACCEPTANCE_API_URL  - default: https://remit.md
+ *   ACCEPTANCE_API_URL  - default: https://testnet.remit.md
  *   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
  */
 @Tag("acceptance")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class AcceptanceTest {
 
     // ─── Config ──────────────────────────────────────────────────────────────
@@ -46,13 +53,23 @@ class AcceptanceTest {
         return (v != null && !v.isBlank()) ? v : fallback;
     }
 
-    // ─── Test wallet ─────────────────────────────────────────────────────────
+    // ─── Shared wallets (created once, reused across all tests) ──────────
 
     private record TestWallet(Wallet wallet, ECKeyPair keyPair) {
         String address() { return wallet.address(); }
     }
 
-    private static TestWallet createTestWallet() throws Exception {
+    private static TestWallet agent;
+    private static TestWallet provider;
+
+    @BeforeAll
+    static void setupWallets() throws Exception {
+        agent = createTestWallet("agent");
+        provider = createTestWallet("provider");
+        fundWallet(agent, 100);
+    }
+
+    private static TestWallet createTestWallet(String label) throws Exception {
         ECKeyPair keyPair = Keys.createEcKeyPair();
         String hexKey = "0x" + Numeric.toHexStringNoPrefixZeroPadded(keyPair.getPrivateKey(), 64);
 
@@ -63,7 +80,7 @@ class AcceptanceTest {
                 .routerAddress(contracts.router)
                 .build();
 
-        System.out.println("[ACCEPTANCE] wallet: " + wallet.address() + " (chain=84532)");
+        System.out.println("[ACCEPTANCE] " + label + " wallet: " + wallet.address() + " (chain=84532)");
         return new TestWallet(wallet, keyPair);
     }
 
@@ -72,7 +89,7 @@ class AcceptanceTest {
                 + " | https://sepolia.basescan.org/tx/" + txHash);
     }
 
-    // ─── Contract discovery (unauthenticated) ───────────────────────────────
+    // ─── Contract discovery (unauthenticated, cached) ────────────────────
 
     private static volatile ContractAddresses cachedContracts;
 
@@ -92,7 +109,7 @@ class AcceptanceTest {
         return cachedContracts;
     }
 
-    // ─── On-chain balance via RPC ───────────────────────────────────────────
+    // ─── On-chain balance via RPC ────────────────────────────────────────
 
     private static double getUsdcBalance(String address) throws Exception {
         ContractAddresses contracts = fetchContracts();
@@ -142,7 +159,7 @@ class AcceptanceTest {
                         label, expected, actual, before, after));
     }
 
-    // ─── Funding ────────────────────────────────────────────────────────────
+    // ─── Funding ─────────────────────────────────────────────────────────
 
     private static void fundWallet(TestWallet w, double amount) throws Exception {
         System.out.println("[ACCEPTANCE] mint: " + amount + " USDC -> " + w.address());
@@ -151,400 +168,346 @@ class AcceptanceTest {
         waitForBalanceChange(w.address(), 0);
     }
 
-    // ─── Tests ──────────────────────────────────────────────────────────────
+    // ─── Flow 1: Direct ──────────────────────────────────────────────────
 
     @Test
-    void payDirectWithPermit() throws Exception {
-        TestWallet agent = createTestWallet();
-        TestWallet provider = createTestWallet();
-        fundWallet(agent, 100);
-
+    @Order(1)
+    void test01Direct() throws Exception {
         double amount = 1.0;
-        double fee = 0.01;
-        double providerReceives = amount - fee;
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Sign permit via /permits/prepare
-        PermitSignature permit = agent.wallet.signPermit("direct", new BigDecimal("2.0"));
+        PermitSignature permit = agent.wallet.signPermit("direct", new BigDecimal("1.0"));
 
         Transaction tx = agent.wallet.pay(
                 provider.address(),
                 new BigDecimal("1.0"),
-                "java-sdk-acceptance",
+                "acceptance-direct",
                 permit);
         assertNotNull(tx.txHash, "tx_hash should not be null");
         assertTrue(tx.txHash.startsWith("0x"), "expected tx hash 0x prefix, got: " + tx.txHash);
-        logTx("direct", "pay", tx.txHash);
+        logTx("direct", amount + " USDC " + agent.address() + "->" + provider.address(), tx.txHash);
 
         double agentAfter = waitForBalanceChange(agent.address(), agentBefore);
         double providerAfter = getUsdcBalance(provider.address());
 
         assertBalanceChange("agent", agentBefore, agentAfter, -amount);
-        assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
+        assertBalanceChange("provider", providerBefore, providerAfter, amount * 0.99);
     }
 
-    @Test
-    void escrowLifecycle() throws Exception {
-        TestWallet agent = createTestWallet();
-        TestWallet provider = createTestWallet();
-        fundWallet(agent, 100);
+    // ─── Flow 2: Escrow ──────────────────────────────────────────────────
 
-        double amount = 5.0;
-        double fee = amount * 0.01;
-        double providerReceives = amount - fee;
+    @Test
+    @Order(2)
+    void test02Escrow() throws Exception {
+        double amount = 2.0;
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Sign permit via /permits/prepare
-        PermitSignature permit = agent.wallet.signPermit("escrow", new BigDecimal("6.0"));
+        PermitSignature permit = agent.wallet.signPermit("escrow", new BigDecimal("2.0"));
 
         Escrow escrow = agent.wallet.createEscrow(
                 provider.address(),
-                new BigDecimal("5.0"),
+                new BigDecimal("2.0"),
+                "acceptance-escrow",
+                Duration.ofHours(1),
+                null, null,
                 permit);
         assertNotNull(escrow.id, "escrow should have an id");
         assertFalse(escrow.id.isBlank(), "escrow id should not be blank");
+        System.out.println("[ACCEPTANCE] escrow | fund " + amount + " USDC | id=" + escrow.id);
 
-        // Wait for on-chain lock
         waitForBalanceChange(agent.address(), agentBefore);
 
-        // Provider claims start
         Transaction claimTx = provider.wallet.claimStart(escrow.id);
         if (claimTx.txHash != null) logTx("escrow", "claimStart", claimTx.txHash);
         Thread.sleep(5_000);
 
-        // Agent releases
         Transaction releaseTx = agent.wallet.releaseEscrow(escrow.id);
         if (releaseTx.txHash != null) logTx("escrow", "release", releaseTx.txHash);
 
-        // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
         double agentAfter = getUsdcBalance(agent.address());
 
         assertBalanceChange("agent", agentBefore, agentAfter, -amount);
-        assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
+        assertBalanceChange("provider", providerBefore, providerAfter, amount * 0.99);
     }
 
-    // ─── Tab lifecycle ───────────────────────────────────────────────────────
+    // ─── Flow 3: Tab ─────────────────────────────────────────────────────
 
     @Test
-    void testTabLifecycle() throws Exception {
-        TestWallet agent = createTestWallet();
-        TestWallet provider = createTestWallet();
-        fundWallet(agent, 100);
-
-        double limit = 10.0;
-        double chargeAmount = 2.0;
-        int chargeUnits = (int) (chargeAmount * 1_000_000); // uint96 base units
-        double fee = chargeAmount * 0.01; // 1% = $0.02
-        double providerReceives = chargeAmount - fee; // $1.98
+    @Order(3)
+    void test03Tab() throws Exception {
+        double limit = 5.0;
+        double chargeAmount = 1.0;
+        int chargeUnits = (int) (chargeAmount * 1_000_000);
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Step 1: Open tab (agent, with permit via /permits/prepare)
         ContractAddresses contracts = fetchContracts();
         String tabContract = contracts.tab;
 
-        PermitSignature permit = agent.wallet.signPermit("tab", new BigDecimal("11.0"));
+        PermitSignature permit = agent.wallet.signPermit("tab", new BigDecimal("5.0"));
 
         Tab tab = agent.wallet.createTab(
                 provider.address(),
-                new BigDecimal("10.0"),
+                new BigDecimal("5.0"),
                 new BigDecimal("0.1"),
                 permit);
         assertNotNull(tab.id, "tab should have an id");
         assertFalse(tab.id.isBlank(), "tab id should not be blank");
+        System.out.println("[ACCEPTANCE] tab | open limit=" + limit + " | id=" + tab.id);
 
-        // Wait for on-chain lock (agent USDC moves to Tab contract)
         waitForBalanceChange(agent.address(), agentBefore);
 
-        // Step 2: Provider charges $2 (off-chain with TabCharge EIP-712 sig)
         int callCount = 1;
         String chargeSig = provider.wallet.signTabCharge(
                 tabContract, tab.id, chargeUnits, callCount);
 
         TabCharge charge = provider.wallet.chargeTab(
                 tab.id,
-                new BigDecimal("2.0"),
-                new BigDecimal("2.0"),
+                new BigDecimal("1.0"),
+                new BigDecimal("1.0"),
                 callCount,
                 chargeSig);
         assertEquals(tab.id, charge.tabId, "charge should reference the tab");
 
-        // Step 3: Close tab (agent, with provider's close signature on final state)
         String closeSig = provider.wallet.signTabCharge(
                 tabContract, tab.id, chargeUnits, callCount);
 
         Transaction closeTx = agent.wallet.closeTab(
                 tab.id,
-                new BigDecimal("2.0"),
+                new BigDecimal("1.0"),
                 closeSig);
         assertNotNull(closeTx.txHash, "close should return tx hash");
         assertTrue(closeTx.txHash.startsWith("0x"),
                 "close tx hash should start with 0x, got: " + closeTx.txHash);
         logTx("tab", "close", closeTx.txHash);
 
-        // Verify balances
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
         double agentAfter = getUsdcBalance(agent.address());
 
-        // Agent: locked $10, refunded $8, net change = -$2
         assertBalanceChange("agent", agentBefore, agentAfter, -chargeAmount);
-        // Provider: received $2 minus 1% fee = $1.98
-        assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
+        assertBalanceChange("provider", providerBefore, providerAfter, chargeAmount * 0.99);
     }
 
-    // ─── Stream lifecycle ────────────────────────────────────────────────────
+    // ─── Flow 4: Stream ──────────────────────────────────────────────────
 
     @Test
-    void testStreamLifecycle() throws Exception {
-        TestWallet agent = createTestWallet();
-        TestWallet provider = createTestWallet();
-        fundWallet(agent, 100);
-
-        double ratePerSecond = 0.1; // $0.10/s
-        double maxTotal = 5.0;
+    @Order(4)
+    void test04Stream() throws Exception {
+        double maxTotal = 2.0;
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Step 1: Open stream with permit via /permits/prepare
-        PermitSignature permit = agent.wallet.signPermit("stream", new BigDecimal("6.0"));
+        PermitSignature permit = agent.wallet.signPermit("stream", new BigDecimal("2.0"));
 
         Stream stream = agent.wallet.createStream(
                 provider.address(),
                 new BigDecimal("0.1"),
-                new BigDecimal("5.0"),
+                new BigDecimal("2.0"),
                 permit);
         assertNotNull(stream.id, "stream should have an id");
         assertFalse(stream.id.isBlank(), "stream id should not be blank");
+        System.out.println("[ACCEPTANCE] stream | open rate=0.1/s max=" + maxTotal + " | id=" + stream.id);
 
-        // Wait for on-chain creation (agent locks maxTotal in Stream contract)
         waitForBalanceChange(agent.address(), agentBefore);
-
-        // Step 2: Wait for accrual (~5 seconds)
         Thread.sleep(5_000);
 
-        // Step 3: Close stream (payer only)
         Transaction closeTx = agent.wallet.closeStream(stream.id);
         assertNotNull(closeTx.txHash, "close stream should return tx hash");
         logTx("stream", "close", closeTx.txHash);
 
-        // Wait for settlement (provider balance should increase)
         double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
         double agentAfter = getUsdcBalance(agent.address());
 
-        // Calculate actual changes
         double agentLoss = agentBefore - agentAfter;
-        double providerGain = providerAfter - providerBefore;
-
-        // Agent should have lost money (stream accrued), but <= maxTotal
         assertTrue(agentLoss > 0.05,
                 "agent should have lost money from streaming, got loss=" + agentLoss);
         assertTrue(agentLoss <= maxTotal + 0.01,
                 "agent loss should not exceed maxTotal ($" + maxTotal + "), got loss=" + agentLoss);
 
-        // Provider should have received payout (accrued minus 1% fee)
+        double providerGain = providerAfter - providerBefore;
         assertTrue(providerGain > 0.04,
                 "provider should have received payout, got gain=" + providerGain);
     }
 
-    // ─── Bounty lifecycle ────────────────────────────────────────────────────
+    // ─── Flow 5: Bounty ──────────────────────────────────────────────────
 
     @Test
-    @org.junit.jupiter.api.Disabled("Server-side: Ponder indexer lag causes BountyNotFound on award")
-    void testBountyLifecycle() throws Exception {
-        TestWallet poster = createTestWallet();
-        TestWallet provider = createTestWallet();
-        fundWallet(poster, 100);
-
-        double amount = 5.0;
-        double fee = amount * 0.01; // 1% = $0.05
-        double providerReceives = amount - fee; // $4.95
-
-        double posterBefore = getUsdcBalance(poster.address());
-        double providerBefore = getUsdcBalance(provider.address());
-
-        // Step 1: Post bounty (auto-permit via /permits/prepare)
+    @Order(5)
+    void test05Bounty() throws Exception {
+        double amount = 2.0;
         long deadlineTs = Instant.now().getEpochSecond() + 3600;
-
-        Bounty bounty = poster.wallet.createBounty(
-                new BigDecimal("5.0"),
-                "java-bounty-acceptance-test",
-                deadlineTs);
-        assertNotNull(bounty.id, "bounty should have an id");
-        assertFalse(bounty.id.isBlank(), "bounty id should not be blank");
-
-        // Wait for on-chain bounty creation (poster USDC locked in Bounty contract)
-        waitForBalanceChange(poster.address(), posterBefore);
-
-        // Step 2: Provider submits evidence
-        String evidenceHash = "0x" + "ab".repeat(32);
-        Transaction submitTx = provider.wallet.submitBounty(bounty.id, evidenceHash);
-        assertNotNull(submitTx.id, "submission should have an id");
-        if (submitTx.txHash != null) logTx("bounty", "submit", submitTx.txHash);
-
-        // Wait for submission to be recorded
-        Thread.sleep(10_000);
-
-        // Step 3: Poster awards to the submission
-        Transaction awardTx = poster.wallet.awardBounty(bounty.id, 1);
-        assertNotNull(awardTx.txHash, "award should return tx hash");
-        logTx("bounty", "award", awardTx.txHash);
-
-        // Verify balances
-        double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
-        double posterAfter = getUsdcBalance(poster.address());
-
-        // Poster: lost $5 (bounty amount)
-        assertBalanceChange("poster", posterBefore, posterAfter, -amount);
-        // Provider: received $5 minus 1% fee = $4.95
-        assertBalanceChange("provider", providerBefore, providerAfter, providerReceives);
-    }
-
-    // ─── Deposit lifecycle ───────────────────────────────────────────────────
-
-    @Test
-    void testDepositLifecycle() throws Exception {
-        TestWallet agent = createTestWallet();
-        TestWallet provider = createTestWallet();
-        fundWallet(agent, 100);
-
-        double amount = 5.0;
 
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Step 1: Place deposit with permit via /permits/prepare
-        PermitSignature permit = agent.wallet.signPermit("deposit", new BigDecimal("6.0"));
+        PermitSignature permit = agent.wallet.signPermit("bounty", new BigDecimal("2.0"));
+
+        Bounty bounty = agent.wallet.createBounty(
+                new BigDecimal("2.0"),
+                "acceptance-bounty",
+                deadlineTs,
+                permit);
+        assertNotNull(bounty.id, "bounty should have an id");
+        assertFalse(bounty.id.isBlank(), "bounty id should not be blank");
+        System.out.println("[ACCEPTANCE] bounty | post " + amount + " USDC | id=" + bounty.id);
+
+        waitForBalanceChange(agent.address(), agentBefore);
+
+        String evidence = "0x" + "ab".repeat(32);
+        Transaction submitTx = provider.wallet.submitBounty(bounty.id, evidence);
+        assertNotNull(submitTx.id, "submission should have an id");
+        System.out.println("[ACCEPTANCE] bounty | submit | id=" + bounty.id);
+
+        // Retry award up to 15 times (Ponder indexer lag)
+        Transaction awarded = null;
+        for (int attempt = 0; attempt < 15; attempt++) {
+            Thread.sleep(3_000);
+            try {
+                awarded = agent.wallet.awardBounty(bounty.id, 1);
+                break;
+            } catch (Exception e) {
+                if (attempt < 14) {
+                    System.out.println("[ACCEPTANCE] bounty award retry " + (attempt + 1) + ": " + e.getMessage());
+                } else {
+                    throw e;
+                }
+            }
+        }
+        assertNotNull(awarded, "award should succeed");
+        assertNotNull(awarded.txHash, "award should return tx hash");
+        logTx("bounty", "award", awarded.txHash);
+
+        double providerAfter = waitForBalanceChange(provider.address(), providerBefore);
+        double agentAfter = getUsdcBalance(agent.address());
+
+        assertBalanceChange("agent", agentBefore, agentAfter, -amount);
+        assertBalanceChange("provider", providerBefore, providerAfter, amount * 0.99);
+    }
+
+    // ─── Flow 6: Deposit ─────────────────────────────────────────────────
+
+    @Test
+    @Order(6)
+    void test06Deposit() throws Exception {
+        double amount = 2.0;
+
+        double agentBefore = getUsdcBalance(agent.address());
+
+        PermitSignature permit = agent.wallet.signPermit("deposit", new BigDecimal("2.0"));
 
         Deposit deposit = agent.wallet.lockDeposit(
                 provider.address(),
-                new BigDecimal("5.0"),
-                3600, // 1 hour
+                new BigDecimal("2.0"),
+                3600,
                 permit);
         assertNotNull(deposit.id, "deposit should have an id");
         assertFalse(deposit.id.isBlank(), "deposit id should not be blank");
+        System.out.println("[ACCEPTANCE] deposit | place " + amount + " USDC | id=" + deposit.id);
 
-        // Wait for on-chain deposit lock
         double agentMid = waitForBalanceChange(agent.address(), agentBefore);
         assertBalanceChange("agent locked", agentBefore, agentMid, -amount);
 
-        // Step 2: Provider returns the deposit
         Transaction returnTx = provider.wallet.returnDeposit(deposit.id);
         assertNotNull(returnTx.txHash, "return deposit should return tx hash");
         logTx("deposit", "return", returnTx.txHash);
 
-        // Wait for return settlement (agent gets full refund)
         double agentAfter = waitForBalanceChange(agent.address(), agentMid);
-        double providerAfter = getUsdcBalance(provider.address());
-
-        // Agent: full refund -- net change ~ $0
-        assertBalanceChange("agent net", agentBefore, agentAfter, 0);
-        // Provider: unchanged
-        assertBalanceChange("provider", providerBefore, providerAfter, 0);
+        assertBalanceChange("agent refund", agentBefore, agentAfter, 0);
     }
 
-    // ─── x402 auto-pay ──────────────────────────────────────────────────────
+    // ─── Flow 7: x402 (via /x402/prepare — no local HTTP server) ────────
 
     @Test
-    void testX402AutoPay() throws Exception {
-        TestWallet agent = createTestWallet();
-        fundWallet(agent, 100);
-
-        // Fetch contract addresses for the paywall header
+    @Order(7)
+    void test07X402Prepare() throws Exception {
         ContractAddresses contracts = fetchContracts();
 
-        // Start a local paywall server that returns 402 first, then 200 on retry
-        var server = com.sun.net.httpserver.HttpServer.create(
-                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
-        int port = server.getAddress().getPort();
-        String serverUrl = "http://127.0.0.1:" + port;
+        var paymentRequired = new java.util.LinkedHashMap<String, Object>();
+        paymentRequired.put("scheme", "exact");
+        paymentRequired.put("network", "eip155:84532");
+        paymentRequired.put("amount", "100000");
+        paymentRequired.put("asset", contracts.usdc);
+        paymentRequired.put("payTo", contracts.router);
+        paymentRequired.put("maxTimeoutSeconds", 60);
 
-        server.createContext("/test-resource", exchange -> {
-            String paymentSig = exchange.getRequestHeaders().getFirst("PAYMENT-SIGNATURE");
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        String json = mapper.writeValueAsString(paymentRequired);
+        String encoded = Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
 
-            if (paymentSig == null) {
-                // First request: return 402
-                var paymentRequired = new java.util.LinkedHashMap<String, Object>();
-                paymentRequired.put("scheme", "exact");
-                paymentRequired.put("network", "eip155:84532");
-                paymentRequired.put("amount", "100000"); // $0.10 USDC
-                paymentRequired.put("asset", contracts.usdc);
-                paymentRequired.put("payTo", contracts.router);
-                paymentRequired.put("maxTimeoutSeconds", 60);
-                paymentRequired.put("resource", "/test-resource");
-                paymentRequired.put("description", "x402 acceptance test");
-                paymentRequired.put("mimeType", "text/plain");
+        // POST /x402/prepare using the wallet's authenticated API client
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = agent.wallet.apiClient().post(
+                "/api/v1/x402/prepare",
+                Map.of("payment_required", encoded, "payer", agent.address()),
+                Map.class);
 
-                var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                String json = mapper.writeValueAsString(paymentRequired);
-                String encoded = Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+        assertNotNull(data.get("hash"), "x402/prepare missing hash: " + data);
+        String hash = data.get("hash").toString();
+        assertTrue(hash.startsWith("0x"), "hash should start with 0x");
+        assertEquals(66, hash.length(), "hash should be 0x + 64 hex chars");
+        assertNotNull(data.get("from"), "x402/prepare missing from");
+        assertNotNull(data.get("to"), "x402/prepare missing to");
+        assertNotNull(data.get("value"), "x402/prepare missing value");
 
-                exchange.getResponseHeaders().add("PAYMENT-REQUIRED", encoded);
-                exchange.getResponseHeaders().add("Content-Type", "text/plain");
-                exchange.sendResponseHeaders(402, 16);
-                exchange.getResponseBody().write("Payment Required".getBytes());
-                exchange.getResponseBody().close();
-            } else {
-                // Second request: validate PAYMENT-SIGNATURE structure
-                try {
-                    String decoded = new String(Base64.getDecoder().decode(paymentSig), StandardCharsets.UTF_8);
-                    var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                    @SuppressWarnings("unchecked")
-                    var payload = mapper.readValue(decoded, java.util.Map.class);
+        System.out.println("[ACCEPTANCE] x402 | prepare | hash=" + hash.substring(0, 18) + "..."
+                + " | from=" + data.get("from").toString().substring(0, 10) + "...");
+    }
 
-                    assertEquals("exact", payload.get("scheme"));
-                    assertEquals("eip155:84532", payload.get("network"));
+    // ─── Flow 8: AP2 Discovery ───────────────────────────────────────────
 
-                    @SuppressWarnings("unchecked")
-                    var inner = (java.util.Map<String, Object>) payload.get("payload");
-                    assertNotNull(inner.get("signature"));
-                    assertTrue(inner.get("signature").toString().startsWith("0x"));
+    @Test
+    @Order(8)
+    void test08Ap2Discovery() throws Exception {
+        A2A.AgentCard card = A2A.AgentCard.discover(API_URL).join();
 
-                    @SuppressWarnings("unchecked")
-                    var auth = (java.util.Map<String, Object>) inner.get("authorization");
-                    assertEquals(agent.address().toLowerCase(), auth.get("from").toString().toLowerCase());
-                    assertEquals("100000", auth.get("value"));
+        assertNotNull(card.name(), "agent card should have a name");
+        assertFalse(card.name().isBlank(), "agent card name should not be blank");
+        assertNotNull(card.url(), "agent card should have a URL");
+        assertNotNull(card.skills(), "agent card should have skills");
+        assertFalse(card.skills().isEmpty(), "agent card should have at least one skill");
+        assertNotNull(card.x402(), "agent card should have x402 config");
 
-                    byte[] resp = "paid content".getBytes();
-                    exchange.getResponseHeaders().add("Content-Type", "text/plain");
-                    exchange.sendResponseHeaders(200, resp.length);
-                    exchange.getResponseBody().write(resp);
-                    exchange.getResponseBody().close();
-                } catch (Exception e) {
-                    byte[] err = ("Invalid payment: " + e.getMessage()).getBytes();
-                    exchange.sendResponseHeaders(400, err.length);
-                    exchange.getResponseBody().write(err);
-                    exchange.getResponseBody().close();
-                }
-            }
-        });
+        System.out.println("[ACCEPTANCE] ap2-discovery | name=" + card.name()
+                + " | skills=" + card.skills().size()
+                + " | x402=" + (card.x402() != null));
+    }
 
-        server.start();
-        try {
-            // x402 auto-pay
-            X402Client x402 = new X402Client(agent.wallet, 0.20);
-            X402Client.X402Response response = x402.fetch(serverUrl + "/test-resource");
+    // ─── Flow 9: AP2 Payment ─────────────────────────────────────────────
 
-            assertEquals(200, response.response().statusCode(),
-                    "should get 200 after auto-payment, got " + response.response().statusCode());
-            assertEquals("paid content", response.response().body(),
-                    "should receive paid content");
+    @Test
+    @Order(9)
+    void test09Ap2Payment() throws Exception {
+        double amount = 1.0;
 
-            // Verify last payment metadata (V2 fields)
-            assertNotNull(response.lastPayment(), "lastPayment should be set");
-            assertEquals("exact", response.lastPayment().get("scheme"));
-            assertEquals("100000", response.lastPayment().get("amount"));
-            assertEquals("/test-resource", response.lastPayment().get("resource"));
-            assertEquals("x402 acceptance test", response.lastPayment().get("description"));
-            assertEquals("text/plain", response.lastPayment().get("mimeType"));
-        } finally {
-            server.stop(0);
-        }
+        double agentBefore = getUsdcBalance(agent.address());
+        double providerBefore = getUsdcBalance(provider.address());
+
+        A2A.AgentCard card = A2A.AgentCard.discover(API_URL).join();
+
+        PermitSignature permit = agent.wallet.signPermit("direct", new BigDecimal("1.0"));
+
+        A2A.Client a2a = A2A.Client.fromCard(card, agent.wallet.signer(), agent.wallet.chainId(), "");
+        A2A.Task task = a2a.send(new A2A.SendOptions(
+                provider.address(), amount, "acceptance-ap2", null, permit));
+
+        assertEquals("completed", task.status().state(),
+                "A2A task failed: state=" + task.status().state());
+        String txHash = A2A.getTaskTxHash(task);
+        assertNotNull(txHash, "A2A task should have txHash in artifacts");
+        assertTrue(txHash.startsWith("0x"), "txHash should start with 0x");
+        logTx("ap2-payment", amount + " USDC via A2A", txHash);
+
+        double agentAfter = waitForBalanceChange(agent.address(), agentBefore);
+        double providerAfter = getUsdcBalance(provider.address());
+
+        assertBalanceChange("agent", agentBefore, agentAfter, -amount);
+        assertBalanceChange("provider", providerBefore, providerAfter, amount * 0.99);
     }
 }

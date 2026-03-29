@@ -1,18 +1,21 @@
-//! Rust SDK acceptance tests: all 7 payment flows on live Base Sepolia.
+//! Rust SDK acceptance tests: all 9 payment flows on live Base Sepolia.
 //!
 //! Run: cargo test --test acceptance -- --include-ignored --nocapture
 //!
 //! Env vars (all optional):
-//!   ACCEPTANCE_API_URL  - default: https://remit.md
+//!   ACCEPTANCE_API_URL  - default: https://testnet.remit.md
 //!   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 use k256::ecdsa::SigningKey;
-use remitmd::Wallet;
+use remitmd::a2a::{get_task_tx_hash, A2AClient, AgentCard, SendOptions};
+use remitmd::{PrivateKeySigner, Wallet};
 use rust_decimal::Decimal;
 use sha3::{Digest, Keccak256};
 use std::env;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::OnceCell;
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -26,7 +29,7 @@ fn rpc_url() -> String {
 
 // ─── Contract discovery (unauthenticated) ────────────────────────────────────
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 struct Contracts {
     router: String,
     #[allow(dead_code)]
@@ -48,11 +51,38 @@ async fn fetch_contracts() -> Contracts {
     resp.json::<Contracts>().await.expect("parse /contracts")
 }
 
+// ─── Shared wallets (created once, reused across tests) ─────────────────────
+
+struct SharedWallets {
+    agent: TestWallet,
+    provider: TestWallet,
+    contracts: Contracts,
+}
+
+static WALLETS: OnceCell<SharedWallets> = OnceCell::const_new();
+
+async fn get_wallets() -> &'static SharedWallets {
+    WALLETS
+        .get_or_init(|| async {
+            let contracts = fetch_contracts().await;
+            let agent = create_test_wallet(&contracts.router);
+            let provider = create_test_wallet(&contracts.router);
+            fund_wallet(&agent, 100.0, &contracts.usdc).await;
+            SharedWallets {
+                agent,
+                provider,
+                contracts,
+            }
+        })
+        .await
+}
+
 // ─── Wallet creation ─────────────────────────────────────────────────────────
 
 struct TestWallet {
     wallet: Wallet,
     signing_key: SigningKey,
+    hex_key: String,
 }
 
 fn create_test_wallet(router: &str) -> TestWallet {
@@ -66,12 +96,12 @@ fn create_test_wallet(router: &str) -> TestWallet {
         .build()
         .expect("build wallet");
 
-    let tw = TestWallet {
+    eprintln!("[ACCEPTANCE] wallet: {} (chain=84532)", wallet.address());
+    TestWallet {
         wallet,
         signing_key,
-    };
-    eprintln!("[ACCEPTANCE] wallet: {} (chain=84532)", tw.wallet.address());
-    tw
+        hex_key,
+    }
 }
 
 // ─── On-chain balance via RPC ────────────────────────────────────────────────
@@ -177,20 +207,14 @@ fn pad_u256(val: u64) -> [u8; 32] {
 }
 
 /// Sign a TabCharge EIP-712 message for the RemitTab contract.
-///
-/// Domain: { name: "RemitTab", version: "1", chainId: <chain_id>, verifyingContract: tab_contract }
-/// Type:   TabCharge(bytes32 tabId, uint96 totalCharged, uint32 callCount)
-///
-/// tabId is the UUID string, ASCII-encoded as bytes32 (right-padded with zeroes).
 fn sign_tab_charge(
     key: &SigningKey,
     tab_contract: &str,
     tab_id: &str,
-    total_charged: u64, // USDC base units (6 decimals)
+    total_charged: u64,
     call_count: u32,
     chain_id: u64,
 ) -> String {
-    // Domain separator for RemitTab
     let domain_type_hash = keccak256(
         b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
     );
@@ -205,30 +229,24 @@ fn sign_tab_charge(
     domain_data[128..160].copy_from_slice(&pad_address(tab_contract));
     let domain_sep = keccak256(&domain_data);
 
-    // Struct hash: TabCharge(bytes32 tabId, uint96 totalCharged, uint32 callCount)
     let tab_charge_type_hash =
         keccak256(b"TabCharge(bytes32 tabId,uint96 totalCharged,uint32 callCount)");
 
-    // Encode tabId as bytes32: ASCII chars right-padded to 32 bytes
     let mut tab_id_bytes = [0u8; 32];
     let id_bytes = tab_id.as_bytes();
     let copy_len = id_bytes.len().min(32);
     tab_id_bytes[..copy_len].copy_from_slice(&id_bytes[..copy_len]);
 
-    // totalCharged as uint256 (uint96 ABI-encodes as uint256)
     let total_charged_padded = pad_u256(total_charged);
-
-    // callCount as uint256 (uint32 ABI-encodes as uint256)
     let call_count_padded = pad_u256(call_count as u64);
 
-    let mut struct_data = [0u8; 128]; // 4 × 32
+    let mut struct_data = [0u8; 128];
     struct_data[0..32].copy_from_slice(&tab_charge_type_hash);
     struct_data[32..64].copy_from_slice(&tab_id_bytes);
     struct_data[64..96].copy_from_slice(&total_charged_padded);
     struct_data[96..128].copy_from_slice(&call_count_padded);
     let struct_hash = keccak256(&struct_data);
 
-    // EIP-712 digest
     let mut final_data = [0u8; 66];
     final_data[0] = 0x19;
     final_data[1] = 0x01;
@@ -236,7 +254,6 @@ fn sign_tab_charge(
     final_data[34..66].copy_from_slice(&struct_hash);
     let digest = keccak256(&final_data);
 
-    // Sign with k256
     let (sig, recovery_id) = key
         .sign_prehash_recoverable(&digest)
         .expect("sign tab charge");
@@ -246,406 +263,488 @@ fn sign_tab_charge(
     format!("0x{}", hex::encode(&sig_bytes))
 }
 
+// ─── EIP-712 API Auth (for raw HTTP requests) ───────────────────────────────
+
+fn compute_api_eip712_hash(
+    chain_id: u64,
+    router_address: &str,
+    method: &str,
+    path: &str,
+    timestamp: u64,
+    nonce: &[u8; 32],
+) -> [u8; 32] {
+    let domain_type_hash = keccak256(
+        b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+    );
+    let name_hash = keccak256(b"remit.md");
+    let version_hash = keccak256(b"0.1");
+
+    let mut domain_data = [0u8; 160];
+    domain_data[0..32].copy_from_slice(&domain_type_hash);
+    domain_data[32..64].copy_from_slice(&name_hash);
+    domain_data[64..96].copy_from_slice(&version_hash);
+    domain_data[96..128].copy_from_slice(&pad_u256(chain_id));
+    domain_data[128..160].copy_from_slice(&pad_address(router_address));
+    let domain_sep = keccak256(&domain_data);
+
+    let struct_type_hash =
+        keccak256(b"APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)");
+    let method_hash = keccak256(method.as_bytes());
+    let path_hash = keccak256(path.as_bytes());
+
+    let mut struct_data = [0u8; 160];
+    struct_data[0..32].copy_from_slice(&struct_type_hash);
+    struct_data[32..64].copy_from_slice(&method_hash);
+    struct_data[64..96].copy_from_slice(&path_hash);
+    struct_data[96..128].copy_from_slice(&pad_u256(timestamp));
+    struct_data[128..160].copy_from_slice(nonce);
+    let struct_hash = keccak256(&struct_data);
+
+    let mut final_data = [0u8; 66];
+    final_data[0] = 0x19;
+    final_data[1] = 0x01;
+    final_data[2..34].copy_from_slice(&domain_sep);
+    final_data[34..66].copy_from_slice(&struct_hash);
+    keccak256(&final_data)
+}
+
+/// Make an authenticated POST request using EIP-712 signed headers.
+async fn authenticated_post(
+    url: &str,
+    path: &str,
+    body: &serde_json::Value,
+    signing_key: &SigningKey,
+    address: &str,
+    chain_id: u64,
+    router_address: &str,
+) -> serde_json::Value {
+    let nonce: [u8; 32] = rand_bytes();
+    let nonce_hex = format!("0x{}", hex::encode(nonce));
+    let timestamp = now_unix();
+
+    let digest = compute_api_eip712_hash(chain_id, router_address, "POST", path, timestamp, &nonce);
+    let (sig, recovery_id) = signing_key
+        .sign_prehash_recoverable(&digest)
+        .expect("sign API request");
+    let mut sig_bytes = sig.to_bytes().to_vec();
+    sig_bytes.push(recovery_id.to_byte() + 27);
+    let sig_hex = format!("0x{}", hex::encode(&sig_bytes));
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(url)
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("X-Remit-Agent", address)
+        .header("X-Remit-Nonce", &nonce_hex)
+        .header("X-Remit-Timestamp", timestamp.to_string())
+        .header("X-Remit-Signature", &sig_hex)
+        .json(body)
+        .send()
+        .await
+        .expect("authenticated POST");
+
+    let status = resp.status().as_u16();
+    let text = resp.text().await.expect("read response body");
+    assert!(
+        status < 400,
+        "authenticated POST {path} returned {status}: {text}"
+    );
+    serde_json::from_str(&text).expect("parse JSON response")
+}
+
+fn rand_bytes<const N: usize>() -> [u8; N] {
+    let mut buf = [0u8; N];
+    getrandom::getrandom(&mut buf).expect("getrandom");
+    buf
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
+// 1. Direct payment
 #[tokio::test]
 #[ignore = "hits live Base Sepolia"]
-async fn acceptance_pay_direct_with_permit() {
-    let contracts = fetch_contracts().await;
-
-    let agent = create_test_wallet(&contracts.router);
-    let provider = create_test_wallet(&contracts.router);
-    fund_wallet(&agent, 100.0, &contracts.usdc).await;
-
+async fn acceptance_01_direct() {
+    let w = get_wallets().await;
     let amount = 1.0;
-    let fee = 0.01;
-    let provider_receives = amount - fee;
 
-    let agent_before = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
-    let provider_before = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
+    let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
+    let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
-    // Sign permit via server-side /permits/prepare
-    let permit = agent
+    let permit = w
+        .agent
         .wallet
         .sign_permit("direct", 2.0)
         .await
         .expect("sign_permit direct");
-
-    let tx = agent
+    let tx = w
+        .agent
         .wallet
         .pay_full(
-            provider.wallet.address(),
+            w.provider.wallet.address(),
             Decimal::from_str("1.0").unwrap(),
-            "rust-sdk-acceptance",
+            "acceptance-direct",
             Some(permit),
         )
         .await
         .expect("pay_full");
-    log_tx("direct", "pay", &tx.tx_hash);
-    assert!(
-        tx.tx_hash.starts_with("0x"),
-        "expected tx hash starting with 0x, got: {}",
-        tx.tx_hash
-    );
+
+    assert!(tx.tx_hash.starts_with("0x"), "bad tx hash: {}", tx.tx_hash);
+    log_tx("direct", &format!("{amount} USDC"), &tx.tx_hash);
 
     let agent_after =
-        wait_for_balance_change(agent.wallet.address(), agent_before, &contracts.usdc).await;
-    let provider_after = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
+        wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
+    let provider_after = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
-    assert_balance_change(
-        "provider",
-        provider_before,
-        provider_after,
-        provider_receives,
-    );
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99);
 }
 
+// 2. Escrow lifecycle
 #[tokio::test]
 #[ignore = "hits live Base Sepolia"]
-async fn acceptance_escrow_lifecycle() {
-    let contracts = fetch_contracts().await;
+async fn acceptance_02_escrow() {
+    let w = get_wallets().await;
+    let amount = 2.0;
 
-    let agent = create_test_wallet(&contracts.router);
-    let provider = create_test_wallet(&contracts.router);
-    fund_wallet(&agent, 100.0, &contracts.usdc).await;
+    let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
+    let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
-    let amount = 5.0;
-    let fee = amount * 0.01;
-    let provider_receives = amount - fee;
-
-    let agent_before = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
-    let provider_before = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
-
-    // Sign permit via server-side /permits/prepare
-    let permit = agent
+    let permit = w
+        .agent
         .wallet
-        .sign_permit("escrow", 6.0)
+        .sign_permit("escrow", 3.0)
         .await
         .expect("sign_permit escrow");
-
-    let escrow = agent
+    let escrow = w
+        .agent
         .wallet
         .create_escrow_with_permit(
-            provider.wallet.address(),
-            Decimal::from_str("5.0").unwrap(),
+            w.provider.wallet.address(),
+            Decimal::from_str("2.0").unwrap(),
             permit,
         )
         .await
         .expect("create_escrow_with_permit");
+
     assert!(!escrow.id.is_empty(), "escrow should have an id");
-    log_tx("escrow", "create", &escrow.tx_hash);
+    log_tx("escrow", &format!("fund {amount} USDC"), &escrow.tx_hash);
 
-    // Wait for on-chain lock
-    wait_for_balance_change(agent.wallet.address(), agent_before, &contracts.usdc).await;
+    wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
 
-    // Provider claims start
-    let claimed = provider
+    let claimed = w
+        .provider
         .wallet
         .claim_start(&escrow.id)
         .await
         .expect("claim_start");
-    log_tx("escrow", "claim_start", &claimed.tx_hash);
+    log_tx("escrow", "claimStart", &claimed.tx_hash);
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
-    // Agent releases
-    let released = agent
+    let released = w
+        .agent
         .wallet
         .release_escrow(&escrow.id, None)
         .await
         .expect("release_escrow");
     log_tx("escrow", "release", &released.tx_hash);
 
-    // Verify balances
-    let provider_after =
-        wait_for_balance_change(provider.wallet.address(), provider_before, &contracts.usdc).await;
-    let agent_after = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
+    let provider_after = wait_for_balance_change(
+        w.provider.wallet.address(),
+        provider_before,
+        &w.contracts.usdc,
+    )
+    .await;
+    let agent_after = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
     assert_balance_change("agent", agent_before, agent_after, -amount);
-    assert_balance_change(
-        "provider",
-        provider_before,
-        provider_after,
-        provider_receives,
-    );
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99);
 }
 
-// ─── Test: Tab Lifecycle ──────────────────────────────────────────────────────
-
+// 3. Tab lifecycle
 #[tokio::test]
 #[ignore = "hits live Base Sepolia"]
-async fn acceptance_tab_lifecycle() {
-    let contracts = fetch_contracts().await;
+async fn acceptance_03_tab() {
+    let w = get_wallets().await;
+    let limit = 5.0;
+    let charge_amount = 1.0;
+    let charge_units: u64 = (charge_amount * 1_000_000.0) as u64;
 
-    let payer = create_test_wallet(&contracts.router);
-    let provider = create_test_wallet(&contracts.router);
-    fund_wallet(&payer, 100.0, &contracts.usdc).await;
+    let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
+    let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
-    // Sign permit via server-side /permits/prepare
-    let permit = payer
+    let permit = w
+        .agent
         .wallet
-        .sign_permit("tab", 20.0)
+        .sign_permit("tab", limit + 1.0)
         .await
         .expect("sign_permit tab");
-
-    let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
-
-    // 1. Create tab: $10 limit, $0.10 per call
-    let tab = payer
+    let tab = w
+        .agent
         .wallet
         .create_tab_with_permit(
-            provider.wallet.address(),
-            Decimal::from_str("10.0").unwrap(),
+            w.provider.wallet.address(),
+            Decimal::from_str("5.0").unwrap(),
             Decimal::from_str("0.10").unwrap(),
             permit,
         )
         .await
         .expect("create_tab_with_permit");
+
     assert!(!tab.id.is_empty(), "tab ID should not be empty");
-    log_tx("tab", "create", &tab.tx_hash);
-    eprintln!("Tab created: {}", tab.id);
+    log_tx("tab", &format!("open limit={limit}"), &tab.tx_hash);
 
-    // Wait for on-chain funding
-    wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
+    wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
 
-    // 2. Charge tab: $0.10, cumulative $0.10, callCount 1
+    // Charge tab
+    let call_count: u32 = 1;
     let charge_sig = sign_tab_charge(
-        &provider.signing_key,
-        &contracts.tab,
+        &w.provider.signing_key,
+        &w.contracts.tab,
         &tab.id,
-        100_000, // $0.10 in base units
-        1,
-        contracts.chain_id,
+        charge_units,
+        call_count,
+        w.contracts.chain_id,
     );
-    let charge = provider
+    let charge = w
+        .provider
         .wallet
-        .charge_tab(&tab.id, 0.10, 0.10, 1, &charge_sig)
+        .charge_tab(
+            &tab.id,
+            charge_amount,
+            charge_amount,
+            call_count,
+            &charge_sig,
+        )
         .await
         .expect("charge_tab");
     assert_eq!(charge.tab_id, tab.id, "charge tab_id mismatch");
-    eprintln!(
-        "Tab charged: amount={}, cumulative={}",
-        charge.amount, charge.cumulative
-    );
+    eprintln!("[ACCEPTANCE] tab | charge | amount={}", charge.amount);
 
-    // 3. Close tab with final settlement
+    // Close tab
     let close_sig = sign_tab_charge(
-        &provider.signing_key,
-        &contracts.tab,
+        &w.provider.signing_key,
+        &w.contracts.tab,
         &tab.id,
-        100_000, // final = $0.10
-        1,
-        contracts.chain_id,
+        charge_units,
+        call_count,
+        w.contracts.chain_id,
     );
-    let closed = payer
+    let closed = w
+        .agent
         .wallet
-        .close_tab(&tab.id, 0.10, &close_sig)
+        .close_tab(&tab.id, charge_amount, &close_sig)
         .await
         .expect("close_tab");
-    assert_ne!(
-        closed.status,
-        remitmd::TabStatus::Open,
-        "tab should not be open after close"
+    assert!(
+        closed.tx_hash.starts_with("0x"),
+        "close_tab tx_hash missing"
     );
     log_tx("tab", "close", &closed.tx_hash);
-    eprintln!("Tab closed: status={:?}", closed.status);
 
-    // 4. Verify balance: payer should have lost funds
-    let payer_after =
-        wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
+    let provider_after = wait_for_balance_change(
+        w.provider.wallet.address(),
+        provider_before,
+        &w.contracts.usdc,
+    )
+    .await;
+    let agent_after = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
-    let payer_delta = payer_after - payer_before;
-    assert!(
-        payer_delta < 0.0,
-        "payer should have lost funds, delta={payer_delta:.6}"
+    assert_balance_change("agent", agent_before, agent_after, -charge_amount);
+    assert_balance_change(
+        "provider",
+        provider_before,
+        provider_after,
+        charge_amount * 0.99,
     );
-    eprintln!("Payer balance delta: {payer_delta:.6}");
 }
 
-// ─── Test: Stream Lifecycle ──────────────────────────────────────────────────
-
+// 4. Stream lifecycle
 #[tokio::test]
 #[ignore = "hits live Base Sepolia"]
-async fn acceptance_stream_lifecycle() {
-    let contracts = fetch_contracts().await;
+async fn acceptance_04_stream() {
+    let w = get_wallets().await;
+    let rate = 0.1; // $0.10/s
+    let max_total = 2.0;
 
-    let payer = create_test_wallet(&contracts.router);
-    let payee = create_test_wallet(&contracts.router);
-    fund_wallet(&payer, 100.0, &contracts.usdc).await;
+    let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
+    let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
-    // Sign permit via server-side /permits/prepare
-    let permit = payer
+    let permit = w
+        .agent
         .wallet
-        .sign_permit("stream", 10.0)
+        .sign_permit("stream", max_total + 1.0)
         .await
         .expect("sign_permit stream");
-
-    let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
-
-    // 1. Create stream: $0.01/sec, $5 max
-    let stream = payer
+    let stream = w
+        .agent
         .wallet
         .create_stream_with_permit(
-            payee.wallet.address(),
-            Decimal::from_str("0.01").unwrap(), // rate_per_second
-            Decimal::from_str("5.0").unwrap(),  // max_total
+            w.provider.wallet.address(),
+            Decimal::from_str("0.1").unwrap(),
+            Decimal::from_str("2.0").unwrap(),
             Some(permit),
         )
         .await
         .expect("create_stream_with_permit");
+
     assert!(!stream.id.is_empty(), "stream ID should not be empty");
-    log_tx("stream", "create", &stream.tx_hash);
-    eprintln!("Stream created: {}, status={:?}", stream.id, stream.status);
+    log_tx(
+        "stream",
+        &format!("open rate={rate}/s max={max_total}"),
+        &stream.tx_hash,
+    );
 
-    // Wait for on-chain lock
-    wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
-
-    // 2. Let it run for a few seconds
-    eprintln!("Waiting 5 seconds for stream to accrue...");
+    wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
+    eprintln!("[ACCEPTANCE] stream | waiting 5s for accrual...");
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
-    // 3. Close stream
-    let closed = payer
+    let closed = w
+        .agent
         .wallet
         .close_stream(&stream.id)
         .await
         .expect("close_stream");
     log_tx("stream", "close", &closed.tx_hash);
-    eprintln!("Stream closed: status={:?}", closed.status);
 
-    // 4. Conservation of funds: payer should have lost some amount
-    let payer_after =
-        wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
-    let payee_after = get_usdc_balance(payee.wallet.address(), &contracts.usdc).await;
+    let provider_after = wait_for_balance_change(
+        w.provider.wallet.address(),
+        provider_before,
+        &w.contracts.usdc,
+    )
+    .await;
+    let agent_after = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
-    let payer_delta = payer_after - payer_before;
+    let agent_loss = agent_before - agent_after;
     assert!(
-        payer_delta < 0.0,
-        "payer should have lost funds, delta={payer_delta:.6}"
+        agent_loss > 0.05,
+        "agent should lose money, loss={agent_loss}"
     );
-    eprintln!("Payer delta: {payer_delta:.6}, Payee balance: {payee_after:.6}");
+    assert!(agent_loss <= max_total + 0.01);
+
+    let provider_gain = provider_after - provider_before;
+    assert!(
+        provider_gain > 0.04,
+        "provider should gain, gain={provider_gain}"
+    );
 }
 
-// ─── Test: Bounty Lifecycle ──────────────────────────────────────────────────
-
+// 5. Bounty lifecycle (with retry for Ponder indexer lag)
 #[tokio::test]
 #[ignore = "hits live Base Sepolia"]
-async fn acceptance_bounty_lifecycle() {
-    let contracts = fetch_contracts().await;
+async fn acceptance_05_bounty() {
+    let w = get_wallets().await;
+    let amount = 2.0;
+    let deadline_ts = now_unix() + 3600;
 
-    let poster = create_test_wallet(&contracts.router);
-    let submitter = create_test_wallet(&contracts.router);
-    fund_wallet(&poster, 100.0, &contracts.usdc).await;
+    let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
+    let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
 
-    // Sign permit via server-side /permits/prepare
-    let permit = poster
+    let permit = w
+        .agent
         .wallet
-        .sign_permit("bounty", 10.0)
+        .sign_permit("bounty", amount + 1.0)
         .await
         .expect("sign_permit bounty");
-
-    let poster_before = get_usdc_balance(poster.wallet.address(), &contracts.usdc).await;
-
-    // 1. Create bounty: $5 reward, 1 hour deadline
-    let deadline = now_unix() + 3600;
-    let bounty = poster
+    let bounty = w
+        .agent
         .wallet
         .create_bounty_with_permit(
-            Decimal::from_str("5.0").unwrap(),
-            "Write a Rust acceptance test",
-            deadline,
+            Decimal::from_str("2.0").unwrap(),
+            "acceptance-bounty",
+            deadline_ts,
             permit,
         )
         .await
         .expect("create_bounty_with_permit");
+
     assert!(!bounty.id.is_empty(), "bounty ID should not be empty");
-    log_tx("bounty", "create", &bounty.tx_hash);
-    eprintln!("Bounty created: {}, status={:?}", bounty.id, bounty.status);
+    log_tx("bounty", &format!("post {amount} USDC"), &bounty.tx_hash);
 
-    // Wait for on-chain lock
-    wait_for_balance_change(poster.wallet.address(), poster_before, &contracts.usdc).await;
+    wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
 
-    // 2. Submit evidence (as submitter)
+    // Submit evidence
     let evidence_hash = format!("0x{}", hex::encode(keccak256(b"test evidence")));
-    let submission = submitter
+    let submission = w
+        .provider
         .wallet
         .submit_bounty(&bounty.id, &evidence_hash)
         .await
         .expect("submit_bounty");
-    assert_eq!(
-        submission.bounty_id, bounty.id,
-        "submission bounty_id mismatch"
-    );
     eprintln!(
-        "Submission created: id={}, status={}",
-        submission.id, submission.status
+        "[ACCEPTANCE] bounty | submit | id={} sub_id={}",
+        bounty.id, submission.id
     );
 
-    // 3. Award bounty (as poster)
-    let awarded = poster
-        .wallet
-        .award_bounty(&bounty.id, submission.id)
-        .await
-        .expect("award_bounty");
+    // Retry award up to 15 times with 3s sleep (Ponder indexer lag)
+    let mut awarded = None;
+    for attempt in 0..15 {
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        match w.agent.wallet.award_bounty(&bounty.id, submission.id).await {
+            Ok(b) => {
+                awarded = Some(b);
+                break;
+            }
+            Err(e) => {
+                if attempt < 14 {
+                    eprintln!("[ACCEPTANCE] bounty award retry {}: {}", attempt + 1, e);
+                } else {
+                    panic!("bounty award failed after 15 retries: {}", e);
+                }
+            }
+        }
+    }
+    let awarded = awarded.expect("bounty should be awarded");
     log_tx("bounty", "award", &awarded.tx_hash);
-    eprintln!("Bounty awarded: status={:?}", awarded.status);
 
-    // 4. Verify balances
-    let submitter_after =
-        wait_for_balance_change(submitter.wallet.address(), 0.0, &contracts.usdc).await;
+    let provider_after = wait_for_balance_change(
+        w.provider.wallet.address(),
+        provider_before,
+        &w.contracts.usdc,
+    )
+    .await;
+    let agent_after = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
-    assert!(
-        submitter_after > 0.0,
-        "submitter should have received funds, got balance={submitter_after:.6}"
-    );
-    eprintln!("Submitter received: {submitter_after:.6}");
+    assert_balance_change("agent", agent_before, agent_after, -amount);
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99);
 }
 
-// ─── Test: Deposit Lifecycle ─────────────────────────────────────────────────
-
+// 6. Deposit lifecycle (place + return)
 #[tokio::test]
 #[ignore = "hits live Base Sepolia"]
-async fn acceptance_deposit_lifecycle() {
-    let contracts = fetch_contracts().await;
+async fn acceptance_06_deposit() {
+    let w = get_wallets().await;
+    let amount = 2.0;
 
-    let payer = create_test_wallet(&contracts.router);
-    let provider = create_test_wallet(&contracts.router);
-    fund_wallet(&payer, 100.0, &contracts.usdc).await;
+    let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
 
-    // Sign permit via server-side /permits/prepare
-    let permit = payer
+    let permit = w
+        .agent
         .wallet
-        .sign_permit("deposit", 10.0)
+        .sign_permit("deposit", amount + 1.0)
         .await
         .expect("sign_permit deposit");
-
-    let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
-
-    // 1. Place deposit: $5, expires in 1 hour
-    let expiry = now_unix() + 3600;
-    let deposit = payer
+    let deposit = w
+        .agent
         .wallet
         .lock_deposit_with_permit(
-            provider.wallet.address(),
-            Decimal::from_str("5.0").unwrap(),
-            expiry,
+            w.provider.wallet.address(),
+            Decimal::from_str("2.0").unwrap(),
+            3600,
             permit,
         )
         .await
         .expect("lock_deposit_with_permit");
+
     assert!(!deposit.id.is_empty(), "deposit ID should not be empty");
-    log_tx("deposit", "lock", &deposit.tx_hash);
-    eprintln!(
-        "Deposit placed: {}, status={:?}",
-        deposit.id, deposit.status
-    );
+    log_tx("deposit", &format!("place {amount} USDC"), &deposit.tx_hash);
 
-    // Wait for on-chain lock
-    wait_for_balance_change(payer.wallet.address(), payer_before, &contracts.usdc).await;
-    let payer_after_deposit = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
+    let agent_mid =
+        wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
+    assert_balance_change("agent locked", agent_before, agent_mid, -amount);
 
-    // 2. Return deposit (by provider)
-    let returned = provider
+    let returned: serde_json::Value = w
+        .provider
         .wallet
         .return_deposit(&deposit.id)
         .await
@@ -653,132 +752,140 @@ async fn acceptance_deposit_lifecycle() {
     if let Some(tx) = returned.get("tx_hash").and_then(|v| v.as_str()) {
         log_tx("deposit", "return", tx);
     }
-    eprintln!("Deposit returned");
+    eprintln!("[ACCEPTANCE] deposit | returned");
 
-    // 3. Verify full refund (deposits have no fee)
-    let payer_after_return =
-        wait_for_balance_change(payer.wallet.address(), payer_after_deposit, &contracts.usdc).await;
-    let refund_amount = payer_after_return - payer_after_deposit;
-    assert!(
-        refund_amount > 4.99,
-        "expected near-full refund (~5.0), got {refund_amount:.6}"
-    );
-    eprintln!("Deposit refunded: {refund_amount:.6} (full refund, no fee)");
+    let agent_after =
+        wait_for_balance_change(w.agent.wallet.address(), agent_mid, &w.contracts.usdc).await;
+    assert_balance_change("agent refund", agent_before, agent_after, 0.0);
 }
 
-// ─── Test: X402 Auto-Pay ─────────────────────────────────────────────────────
-
+// 7. x402 prepare (no local HTTP server)
 #[tokio::test]
 #[ignore = "hits live Base Sepolia"]
-async fn acceptance_x402() {
-    use std::io::Write;
-    use std::net::TcpListener;
+async fn acceptance_07_x402_prepare() {
+    let w = get_wallets().await;
 
-    let contracts = fetch_contracts().await;
+    let contracts = w.agent.wallet.get_contracts().await.expect("get_contracts");
 
-    let payer = create_test_wallet(&contracts.router);
-    fund_wallet(&payer, 100.0, &contracts.usdc).await;
+    let payment_required = serde_json::json!({
+        "scheme": "exact",
+        "network": "eip155:84532",
+        "amount": "100000",
+        "asset": contracts.usdc,
+        "payTo": contracts.router,
+        "maxTimeoutSeconds": 60,
+    });
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD
+        .encode(serde_json::to_string(&payment_required).unwrap());
 
-    // 1. Start a local HTTP server that returns 402 with PAYMENT-REQUIRED header
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind local server");
-    let port = listener.local_addr().unwrap().port();
-    let server_url = format!("http://127.0.0.1:{port}");
-    let usdc = contracts.usdc.clone();
-    let router = contracts.router.clone();
-
-    let server_handle = std::thread::spawn(move || {
-        // Accept up to 2 connections (first = 402, second = 200 with payment)
-        for stream in listener.incoming().take(2) {
-            if let Ok(mut stream) = stream {
-                let mut buf = [0u8; 4096];
-                let n = std::io::Read::read(&mut stream, &mut buf).unwrap_or(0);
-                let request = String::from_utf8_lossy(&buf[..n]);
-
-                // Check if PAYMENT-SIGNATURE header is present
-                let has_payment = request.contains("PAYMENT-SIGNATURE");
-
-                if has_payment {
-                    let body = b"paid content";
-                    let response = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n",
-                        body.len()
-                    );
-                    let _ = stream.write_all(response.as_bytes());
-                    let _ = stream.write_all(body);
-                } else {
-                    // Return 402 with PAYMENT-REQUIRED header
-                    let payment_required = serde_json::json!({
-                        "scheme": "exact",
-                        "network": "eip155:84532",
-                        "amount": "100000",
-                        "asset": usdc,
-                        "payTo": router,
-                        "maxTimeoutSeconds": 60,
-                        "resource": "/test-resource",
-                        "description": "x402 acceptance test",
-                        "mimeType": "text/plain",
-                    });
-                    use base64::Engine;
-                    let encoded = base64::engine::general_purpose::STANDARD
-                        .encode(serde_json::to_string(&payment_required).unwrap());
-                    let body = b"Payment Required";
-                    let response = format!(
-                        "HTTP/1.1 402 Payment Required\r\nContent-Type: text/plain\r\nPAYMENT-REQUIRED: {}\r\nContent-Length: {}\r\n\r\n",
-                        encoded,
-                        body.len()
-                    );
-                    let _ = stream.write_all(response.as_bytes());
-                    let _ = stream.write_all(body);
-                }
-            }
-        }
+    let url = format!("{}/api/v1/x402/prepare", api_url());
+    let body = serde_json::json!({
+        "payment_required": encoded,
+        "payer": w.agent.wallet.address(),
     });
 
-    // 2. Make an unauthenticated request - should get 402
-    let client = reqwest::Client::new();
-    let resp = client
-        .get(&format!("{server_url}/test-resource"))
-        .send()
-        .await
-        .expect("GET /test-resource");
-    assert_eq!(resp.status().as_u16(), 402, "expected 402 response");
+    let data = authenticated_post(
+        &url,
+        "/api/v1/x402/prepare",
+        &body,
+        &w.agent.signing_key,
+        w.agent.wallet.address(),
+        w.contracts.chain_id,
+        &w.contracts.router,
+    )
+    .await;
 
-    // 3. Verify PAYMENT-REQUIRED header is present and parseable
-    let pay_req = resp
-        .headers()
-        .get("payment-required")
-        .expect("missing PAYMENT-REQUIRED header")
-        .to_str()
-        .expect("header not valid utf-8");
-    use base64::Engine;
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(pay_req)
-        .expect("decode PAYMENT-REQUIRED");
-    let req_payload: serde_json::Value =
-        serde_json::from_slice(&decoded).expect("parse PAYMENT-REQUIRED JSON");
+    let hash = data["hash"].as_str().expect("x402/prepare missing hash");
+    assert!(hash.starts_with("0x"), "hash should start with 0x");
+    assert_eq!(hash.len(), 66, "hash should be 66 chars (0x + 64 hex)");
+    assert!(data["from"].is_string(), "missing from field");
+    assert!(data["to"].is_string(), "missing to field");
     assert!(
-        req_payload["payTo"].is_string(),
-        "PAYMENT-REQUIRED missing payTo field"
+        data["value"].is_string() || data["value"].is_number(),
+        "missing value field"
     );
 
-    // 4. Verify V2 fields are present
-    assert_eq!(
-        req_payload["resource"].as_str().unwrap(),
-        "/test-resource",
-        "expected resource=/test-resource"
+    eprintln!(
+        "[ACCEPTANCE] x402 | prepare | hash={}... | from={}...",
+        &hash[..18],
+        &data["from"].as_str().unwrap_or("?")[..10]
     );
-    assert_eq!(
-        req_payload["description"].as_str().unwrap(),
-        "x402 acceptance test",
-        "expected description"
-    );
-    assert_eq!(
-        req_payload["mimeType"].as_str().unwrap(),
-        "text/plain",
-        "expected mimeType"
-    );
-    eprintln!("X402 paywall verified: 402 with PAYMENT-REQUIRED header, V2 fields present");
+}
 
-    // Wait for server thread to finish (it only accepts 2 connections)
-    let _ = server_handle.join();
+// 8. AP2 Discovery (agent card)
+#[tokio::test]
+#[ignore = "hits live Base Sepolia"]
+async fn acceptance_08_ap2_discovery() {
+    let card = AgentCard::discover(&api_url())
+        .await
+        .expect("agent card discovery");
+
+    assert!(!card.name.is_empty(), "agent card should have a name");
+    assert!(!card.url.is_empty(), "agent card should have a URL");
+    assert!(!card.skills.is_empty(), "agent card should have skills");
+    // x402 field is always present (struct field, not Option)
+    assert!(
+        !card.x402.settle_endpoint.is_empty(),
+        "agent card should have x402 settle_endpoint"
+    );
+
+    eprintln!(
+        "[ACCEPTANCE] ap2-discovery | name={} | skills={} | x402=true",
+        card.name,
+        card.skills.len()
+    );
+}
+
+// 9. AP2 Payment (A2A JSON-RPC)
+#[tokio::test]
+#[ignore = "hits live Base Sepolia"]
+async fn acceptance_09_ap2_payment() {
+    let w = get_wallets().await;
+    let amount = 1.0;
+
+    let agent_before = get_usdc_balance(w.agent.wallet.address(), &w.contracts.usdc).await;
+    let provider_before = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
+
+    let card = AgentCard::discover(&api_url())
+        .await
+        .expect("agent card discovery");
+
+    let permit = w
+        .agent
+        .wallet
+        .sign_permit("direct", 2.0)
+        .await
+        .expect("sign_permit direct");
+
+    let signer = Arc::new(PrivateKeySigner::new(&w.agent.hex_key).expect("create signer"));
+    let a2a = A2AClient::from_card(&card, signer);
+
+    let task = a2a
+        .send(SendOptions {
+            to: w.provider.wallet.address().to_string(),
+            amount,
+            memo: Some("acceptance-ap2".to_string()),
+            mandate: None,
+            permit: Some(permit),
+        })
+        .await
+        .expect("A2A send");
+
+    assert_eq!(
+        task.status.state, "completed",
+        "A2A task should complete, got state={}, message={:?}",
+        task.status.state, task.status.message
+    );
+
+    let tx_hash = get_task_tx_hash(&task).expect("A2A task should have txHash");
+    assert!(tx_hash.starts_with("0x"), "bad tx hash: {tx_hash}");
+    log_tx("ap2-payment", &format!("{amount} USDC via A2A"), &tx_hash);
+
+    let agent_after =
+        wait_for_balance_change(w.agent.wallet.address(), agent_before, &w.contracts.usdc).await;
+    let provider_after = get_usdc_balance(w.provider.wallet.address(), &w.contracts.usdc).await;
+
+    assert_balance_change("agent", agent_before, agent_after, -amount);
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99);
 }

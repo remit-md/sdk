@@ -1,22 +1,25 @@
 # frozen_string_literal: true
 
-# Ruby SDK acceptance tests: all 7 payment flows on live Base Sepolia.
+# Ruby SDK acceptance tests: all 9 payment flows with 2 shared wallets.
+#
+# Creates agent (payer) + provider (payee) wallets once, mints 100 USDC
+# to agent, then runs all 9 flows sequentially with small amounts.
+#
+# Flows: direct, escrow, tab, stream, bounty, deposit, x402_prepare,
+#        ap2_discovery, ap2_payment.
 #
 # Run: bundle exec rspec spec/acceptance_spec.rb --tag acceptance
 #
 # Env vars (all optional):
-#   ACCEPTANCE_API_URL  - default: https://remit.md
+#   ACCEPTANCE_API_URL  - default: https://testnet.remit.md
 #   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 require "remitmd"
 require "net/http"
 require "json"
 require "securerandom"
-require "openssl"
 require "uri"
 require "base64"
-require "socket"
-require "webrick"
 
 API_URL = ENV.fetch("ACCEPTANCE_API_URL", "https://testnet.remit.md")
 RPC_URL = ENV.fetch("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
@@ -40,7 +43,6 @@ end
 def create_test_wallet
   key_hex = SecureRandom.hex(32)
   contracts = fetch_contracts
-  # Ruby SDK paths don't include /api/v1, so base URL must include it.
   base_url = API_URL.end_with?("/api/v1") ? API_URL : "#{API_URL}/api/v1"
   wallet = Remitmd::RemitWallet.new(
     private_key: "0x#{key_hex}",
@@ -97,320 +99,311 @@ end
 
 # ─── Tests ────────────────────────────────────────────────────────────────────
 
-RSpec.describe "Acceptance", :acceptance do # rubocop:disable Metrics/BlockLength
-  describe "direct payments" do
-    it "payDirect with permit" do
-      agent = create_test_wallet
-      provider = create_test_wallet
-      fund_wallet(agent, 100)
-
-      amount = 1.0
-      fee = 0.01
-      provider_receives = amount - fee
-
-      agent_before = get_usdc_balance(agent[:wallet].address)
-      provider_before = get_usdc_balance(provider[:wallet].address)
-
-      # Sign permit via server-side /permits/prepare
-      permit = agent[:wallet].sign_permit("direct", 2.0)
-
-      tx = agent[:wallet].pay(provider[:wallet].address, 1.0,
-                              memo: "ruby-sdk-acceptance", permit: permit)
-      log_tx("direct", "pay", tx.tx_hash)
-      expect(tx.tx_hash).to start_with("0x")
-
-      agent_after = wait_for_balance_change(agent[:wallet].address, agent_before)
-      provider_after = get_usdc_balance(provider[:wallet].address)
-
-      assert_balance_change("agent", agent_before, agent_after, -amount)
-      assert_balance_change("provider", provider_before, provider_after, provider_receives)
-    end
+RSpec.describe "Acceptance: all 9 flows", :acceptance, order: :defined do # rubocop:disable Metrics/BlockLength
+  before(:all) do
+    @agent = create_test_wallet
+    @provider = create_test_wallet
+    fund_wallet(@agent, 100)
   end
 
-  describe "escrow" do
-    it "escrow lifecycle" do
-      agent = create_test_wallet
-      provider = create_test_wallet
-      fund_wallet(agent, 100)
+  # ── Flow 1: Direct ──────────────────────────────────────────────────────────
 
-      amount = 5.0
-      fee = amount * 0.01
-      provider_receives = amount - fee
+  it "01 direct payment with permit" do
+    amount = 1.0
 
-      agent_before = get_usdc_balance(agent[:wallet].address)
-      provider_before = get_usdc_balance(provider[:wallet].address)
+    agent_before = get_usdc_balance(@agent[:wallet].address)
+    provider_before = get_usdc_balance(@provider[:wallet].address)
 
-      # Sign permit via server-side /permits/prepare
-      permit = agent[:wallet].sign_permit("escrow", 6.0)
+    permit = @agent[:wallet].sign_permit("direct", amount)
+    tx = @agent[:wallet].pay(@provider[:wallet].address, amount,
+                             memo: "acceptance-direct", permit: permit)
 
-      escrow = agent[:wallet].create_escrow(provider[:wallet].address, 5.0, permit: permit)
-      expect(escrow.id).not_to be_nil
-      expect(escrow.id).not_to be_empty
+    expect(tx.tx_hash).to start_with("0x")
+    log_tx("direct", "#{amount} USDC #{@agent[:wallet].address}->#{@provider[:wallet].address}", tx.tx_hash)
 
-      # Wait for on-chain lock
-      wait_for_balance_change(agent[:wallet].address, agent_before)
+    agent_after = wait_for_balance_change(@agent[:wallet].address, agent_before)
+    provider_after = get_usdc_balance(@provider[:wallet].address)
 
-      # Provider claims start
-      provider[:wallet].claim_start(escrow.id)
-      sleep 5
-
-      # Agent releases
-      release_tx = agent[:wallet].release_escrow(escrow.id)
-      log_tx("escrow", "release", release_tx.tx_hash)
-
-      # Verify balances
-      provider_after = wait_for_balance_change(provider[:wallet].address, provider_before)
-      agent_after = get_usdc_balance(agent[:wallet].address)
-
-      assert_balance_change("agent", agent_before, agent_after, -amount)
-      assert_balance_change("provider", provider_before, provider_after, provider_receives)
-    end
+    assert_balance_change("agent", agent_before, agent_after, -amount)
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99)
   end
 
-  describe "tab" do
-    it "tab lifecycle (open, charge, close)" do
-      payer = create_test_wallet
-      provider = create_test_wallet
-      fund_wallet(payer, 100)
+  # ── Flow 2: Escrow ─────────────────────────────────────────────────────────
 
-      contracts = fetch_contracts
+  it "02 escrow lifecycle" do
+    amount = 2.0
 
-      # Sign permit via server-side /permits/prepare
-      permit = payer[:wallet].sign_permit("tab", 20.0)
+    agent_before = get_usdc_balance(@agent[:wallet].address)
+    provider_before = get_usdc_balance(@provider[:wallet].address)
 
-      payer_before = get_usdc_balance(payer[:wallet].address)
+    permit = @agent[:wallet].sign_permit("escrow", amount)
+    escrow = @agent[:wallet].create_escrow(@provider[:wallet].address, amount, permit: permit)
+    expect(escrow.id).not_to be_nil
+    expect(escrow.id).not_to be_empty
+    puts "[ACCEPTANCE] escrow | fund #{amount} USDC | id=#{escrow.id}"
 
-      # 1. Create tab: $10 limit, $0.10 per call
-      tab = payer[:wallet].create_tab(
-        provider[:wallet].address, 10.0, 0.10,
-        permit: permit
-      )
-      expect(tab.id).not_to be_nil
-      expect(tab.id).not_to be_empty
+    wait_for_balance_change(@agent[:wallet].address, agent_before)
 
-      # Wait for on-chain funding
-      wait_for_balance_change(payer[:wallet].address, payer_before)
+    @provider[:wallet].claim_start(escrow.id)
+    puts "[ACCEPTANCE] escrow | claim_start"
+    sleep 5
 
-      # 2. Charge tab: $0.10, cumulative $0.10, callCount 1
-      charge_sig = provider[:wallet].sign_tab_charge(
-        contracts["tab"], tab.id,
-        100_000, # $0.10 in base units (6 decimals)
-        1
-      )
-      charge = provider[:wallet].charge_tab(tab.id, 0.10, 0.10, 1, charge_sig)
-      expect(charge.tab_id).to eq(tab.id)
+    release = @agent[:wallet].release_escrow(escrow.id)
+    log_tx("escrow", "release", release.tx_hash) if release.tx_hash
 
-      # 3. Close tab with final settlement
-      close_sig = provider[:wallet].sign_tab_charge(
-        contracts["tab"], tab.id,
-        100_000, # final = $0.10
-        1
-      )
-      closed = payer[:wallet].close_tab(
-        tab.id,
-        final_amount: 0.10,
-        provider_sig: close_sig
-      )
-      expect(closed.status).not_to eq("open")
+    provider_after = wait_for_balance_change(@provider[:wallet].address, provider_before)
+    agent_after = get_usdc_balance(@agent[:wallet].address)
 
-      # 4. Verify balances: payer should have lost funds
-      payer_after = wait_for_balance_change(payer[:wallet].address, payer_before)
-      payer_delta = payer_after - payer_before
-      expect(payer_delta).to be < 0
-    end
+    assert_balance_change("agent", agent_before, agent_after, -amount)
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99)
   end
 
-  describe "stream" do
-    it "stream lifecycle (open, wait, close with conservation)" do
-      payer = create_test_wallet
-      payee = create_test_wallet
-      fund_wallet(payer, 100)
+  # ── Flow 3: Tab ────────────────────────────────────────────────────────────
 
-      # Sign permit via server-side /permits/prepare
-      permit = payer[:wallet].sign_permit("stream", 10.0)
+  it "03 tab lifecycle (open, charge, close)" do
+    limit = 5.0
+    charge_amount = 1.0
+    charge_units = (charge_amount * 1_000_000).to_i
 
-      payer_before = get_usdc_balance(payer[:wallet].address)
+    agent_before = get_usdc_balance(@agent[:wallet].address)
+    provider_before = get_usdc_balance(@provider[:wallet].address)
 
-      # 1. Create stream: $0.01/sec, $5 max
-      stream = payer[:wallet].create_stream(
-        payee[:wallet].address,
-        0.01,  # rate_per_second
-        5.0,   # max_total
-        permit: permit
-      )
-      expect(stream.id).not_to be_nil
-      expect(stream.id).not_to be_empty
+    contracts = fetch_contracts
+    tab_contract = contracts["tab"]
 
-      # Wait for on-chain lock
-      wait_for_balance_change(payer[:wallet].address, payer_before)
+    permit = @agent[:wallet].sign_permit("tab", limit)
+    tab = @agent[:wallet].create_tab(
+      @provider[:wallet].address, limit, 0.1,
+      permit: permit
+    )
+    expect(tab.id).not_to be_nil
+    expect(tab.id).not_to be_empty
+    log_tx("tab", "open limit=#{limit}", tab.tx_hash) if tab.respond_to?(:tx_hash) && tab.tx_hash
 
-      # 2. Let it run for a few seconds
-      sleep 5
+    wait_for_balance_change(@agent[:wallet].address, agent_before)
 
-      # 3. Close stream
-      closed = payer[:wallet].close_stream(stream.id)
-      expect(closed).to be_a(Remitmd::Stream)
+    call_count = 1
+    charge_sig = @provider[:wallet].sign_tab_charge(
+      tab_contract, tab.id,
+      charge_units,
+      call_count
+    )
+    charge = @provider[:wallet].charge_tab(tab.id, charge_amount, charge_amount, call_count, charge_sig)
+    expect(charge.tab_id).to eq(tab.id)
+    puts "[ACCEPTANCE] tab | charge #{charge_amount} USDC"
 
-      # 4. Conservation: payer should have lost some funds, payee gained some
-      payer_after = wait_for_balance_change(payer[:wallet].address, payer_before)
-      _payee_after = get_usdc_balance(payee[:wallet].address)
+    close_sig = @provider[:wallet].sign_tab_charge(
+      tab_contract, tab.id,
+      charge_units,
+      call_count
+    )
+    closed = @agent[:wallet].close_tab(
+      tab.id,
+      final_amount: charge_amount,
+      provider_sig: close_sig
+    )
+    puts "[ACCEPTANCE] tab | close"
 
-      payer_delta = payer_after - payer_before
-      expect(payer_delta).to be < 0
-    end
+    provider_after = wait_for_balance_change(@provider[:wallet].address, provider_before)
+    agent_after = get_usdc_balance(@agent[:wallet].address)
+
+    assert_balance_change("agent", agent_before, agent_after, -charge_amount)
+    assert_balance_change("provider", provider_before, provider_after, charge_amount * 0.99)
   end
 
-  describe "bounty" do
-    it "bounty lifecycle (post, submit, award)" do
-      poster = create_test_wallet
-      submitter = create_test_wallet
-      fund_wallet(poster, 100)
+  # ── Flow 4: Stream ─────────────────────────────────────────────────────────
 
-      # Sign permit via server-side /permits/prepare
-      permit = poster[:wallet].sign_permit("bounty", 10.0)
+  it "04 stream lifecycle (open, wait, close)" do
+    rate = 0.1 # $0.10/s
+    max_total = 2.0
 
-      poster_before = get_usdc_balance(poster[:wallet].address)
+    agent_before = get_usdc_balance(@agent[:wallet].address)
+    provider_before = get_usdc_balance(@provider[:wallet].address)
 
-      # 1. Create bounty: $5 reward, 1 hour deadline
-      bounty_deadline = Time.now.to_i + 3600
-      bounty = poster[:wallet].create_bounty(
-        5.0,
-        "Write a Ruby acceptance test",
-        bounty_deadline,
-        permit: permit
-      )
-      expect(bounty.id).not_to be_nil
-      expect(bounty.id).not_to be_empty
+    permit = @agent[:wallet].sign_permit("stream", max_total)
+    stream = @agent[:wallet].create_stream(
+      @provider[:wallet].address,
+      rate,
+      max_total,
+      permit: permit
+    )
+    expect(stream.id).not_to be_nil
+    expect(stream.id).not_to be_empty
+    log_tx("stream", "open rate=#{rate}/s max=#{max_total}", stream.tx_hash) if stream.respond_to?(:tx_hash) && stream.tx_hash
 
-      # Wait for on-chain lock
-      wait_for_balance_change(poster[:wallet].address, poster_before)
+    wait_for_balance_change(@agent[:wallet].address, agent_before)
+    sleep 5
 
-      # 2. Submit evidence (as submitter)
-      evidence_hash = "0x" + Remitmd::Keccak.hexdigest("ruby test evidence")
-      sub = submitter[:wallet].submit_bounty(bounty.id, evidence_hash)
-      expect(sub.bounty_id).to eq(bounty.id)
+    closed = @agent[:wallet].close_stream(stream.id)
+    expect(closed).to be_a(Remitmd::Stream)
+    puts "[ACCEPTANCE] stream | close | status=#{closed.status}"
 
-      # 3. Award bounty (as poster)
-      awarded = poster[:wallet].award_bounty(bounty.id, sub.id)
-      expect(awarded).to be_a(Remitmd::Bounty)
+    provider_after = wait_for_balance_change(@provider[:wallet].address, provider_before)
+    agent_after = get_usdc_balance(@agent[:wallet].address)
 
-      # 4. Verify: submitter should have received funds
-      submitter_after = wait_for_balance_change(submitter[:wallet].address, 0)
-      expect(submitter_after).to be > 0
-    end
+    agent_loss = agent_before - agent_after
+    expect(agent_loss).to be > 0.05, "agent should lose money, loss=#{agent_loss}"
+    expect(agent_loss).to be <= max_total + 0.01
+
+    provider_gain = provider_after - provider_before
+    expect(provider_gain).to be > 0.04, "provider should gain, gain=#{provider_gain}"
   end
 
-  describe "deposit" do
-    it "deposit lifecycle (place, return with full refund)" do
-      payer = create_test_wallet
-      provider = create_test_wallet
-      fund_wallet(payer, 100)
+  # ── Flow 5: Bounty ─────────────────────────────────────────────────────────
 
-      # Sign permit via server-side /permits/prepare
-      permit = payer[:wallet].sign_permit("deposit", 10.0)
+  it "05 bounty lifecycle (post, submit, award)" do
+    amount = 2.0
+    deadline_ts = Time.now.to_i + 3600
 
-      payer_before = get_usdc_balance(payer[:wallet].address)
+    agent_before = get_usdc_balance(@agent[:wallet].address)
+    provider_before = get_usdc_balance(@provider[:wallet].address)
 
-      # 1. Place deposit: $5, expires in 1 hour
-      deposit = payer[:wallet].place_deposit(
-        provider[:wallet].address, 5.0,
-        expires_in_secs: 3600,
-        permit: permit
-      )
-      expect(deposit.id).not_to be_nil
-      expect(deposit.id).not_to be_empty
+    permit = @agent[:wallet].sign_permit("bounty", amount)
+    bounty = @agent[:wallet].create_bounty(
+      amount,
+      "acceptance-bounty",
+      deadline_ts,
+      permit: permit
+    )
+    expect(bounty.id).not_to be_nil
+    expect(bounty.id).not_to be_empty
+    log_tx("bounty", "post #{amount} USDC", bounty.tx_hash) if bounty.respond_to?(:tx_hash) && bounty.tx_hash
 
-      # Wait for on-chain lock
-      wait_for_balance_change(payer[:wallet].address, payer_before)
-      payer_after_deposit = get_usdc_balance(payer[:wallet].address)
+    wait_for_balance_change(@agent[:wallet].address, agent_before)
 
-      # 2. Return deposit (by provider)
-      return_tx = provider[:wallet].return_deposit(deposit.id)
-      log_tx("deposit", "return", return_tx.tx_hash)
+    evidence = "0x" + "ab" * 32
+    sub = @provider[:wallet].submit_bounty(bounty.id, evidence)
+    puts "[ACCEPTANCE] bounty | submit | id=#{bounty.id}"
 
-      # 3. Verify full refund (deposits have no fee)
-      payer_after_return = wait_for_balance_change(payer[:wallet].address, payer_after_deposit)
-      refund_amount = payer_after_return - payer_after_deposit
-      expect(refund_amount).to be >= 4.99
-    end
-  end
-
-  describe "x402" do
-    it "x402 auto-pay (local server with 402)" do
-      provider_wallet = create_test_wallet
-
-      # Build the PAYMENT-REQUIRED header payload
-      contracts = fetch_contracts
-      payment_payload = {
-        "payTo"       => provider_wallet[:wallet].address,
-        "amount"      => "1000",              # $0.001 USDC in base units
-        "network"     => "eip155:84532",
-        "asset"       => contracts["usdc"],
-        "facilitator" => "#{API_URL}/api/v1",
-        "maxTimeout"  => 60,
-        "resource"    => "/v1/data",
-        "description" => "Test data endpoint",
-        "mimeType"    => "application/json",
-      }
-      encoded_header = Base64.strict_encode64(payment_payload.to_json)
-
-      # 1. Spin up a local HTTP server that returns 402
-      server = WEBrick::HTTPServer.new(
-        Port: 0,  # auto-pick port
-        Logger: WEBrick::Log.new("/dev/null"),
-        AccessLog: []
-      )
-      port = server.config[:Port]
-      server_url = "http://127.0.0.1:#{port}"
-
-      server.mount_proc "/v1/data" do |req, res|
-        if req["X-PAYMENT"]
-          # Payment provided - return 200
-          res.status = 200
-          res["Content-Type"] = "application/json"
-          res.body = '{"status":"ok","data":"secret"}'
+    # Retry award up to 15 times (Ponder indexer lag)
+    awarded = nil
+    15.times do |attempt|
+      sleep 3
+      begin
+        awarded = @agent[:wallet].award_bounty(bounty.id, sub.id)
+        break
+      rescue StandardError => e
+        if attempt < 14
+          puts "[ACCEPTANCE] bounty award retry #{attempt + 1}: #{e.message}"
         else
-          # No payment - return 402
-          res.status = 402
-          res["PAYMENT-REQUIRED"] = encoded_header
-          res["Content-Type"] = "application/json"
-          res.body = '{"error":"payment required"}'
+          raise
         end
       end
-
-      thread = Thread.new { server.start }
-
-      begin
-        # 2. Make a request without payment - should get 402
-        uri = URI("#{server_url}/v1/data")
-        resp = Net::HTTP.get_response(uri)
-        expect(resp.code).to eq("402")
-
-        # 3. Verify PAYMENT-REQUIRED header is present and parseable
-        pay_req = resp["PAYMENT-REQUIRED"]
-        expect(pay_req).not_to be_nil
-        expect(pay_req).not_to be_empty
-
-        decoded = JSON.parse(Base64.strict_decode64(pay_req))
-        expect(decoded["payTo"]).to eq(provider_wallet[:wallet].address)
-        expect(decoded["resource"]).to eq("/v1/data")
-        expect(decoded["description"]).to eq("Test data endpoint")
-        expect(decoded["mimeType"]).to eq("application/json")
-
-        # 4. Make a request WITH a payment header - should get 200
-        req = Net::HTTP::Get.new(uri)
-        req["X-PAYMENT"] = "test-payment-token"
-        http = Net::HTTP.new(uri.host, uri.port)
-        resp2 = http.request(req)
-        expect(resp2.code).to eq("200")
-
-        body = JSON.parse(resp2.body)
-        expect(body["status"]).to eq("ok")
-        expect(body["data"]).to eq("secret")
-      ensure
-        server.shutdown
-        thread.join(5)
-      end
     end
+    expect(awarded).not_to be_nil
+    expect(awarded.status).to eq("awarded")
+    log_tx("bounty", "award", awarded.tx_hash) if awarded.respond_to?(:tx_hash) && awarded.tx_hash
+
+    provider_after = wait_for_balance_change(@provider[:wallet].address, provider_before)
+    agent_after = get_usdc_balance(@agent[:wallet].address)
+
+    assert_balance_change("agent", agent_before, agent_after, -amount)
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99)
+  end
+
+  # ── Flow 6: Deposit ────────────────────────────────────────────────────────
+
+  it "06 deposit lifecycle (place, return with full refund)" do
+    amount = 2.0
+
+    agent_before = get_usdc_balance(@agent[:wallet].address)
+
+    permit = @agent[:wallet].sign_permit("deposit", amount)
+    deposit = @agent[:wallet].place_deposit(
+      @provider[:wallet].address, amount,
+      expires_in_secs: 3600,
+      permit: permit
+    )
+    expect(deposit.id).not_to be_nil
+    expect(deposit.id).not_to be_empty
+    log_tx("deposit", "place #{amount} USDC", deposit.tx_hash) if deposit.respond_to?(:tx_hash) && deposit.tx_hash
+
+    agent_mid = wait_for_balance_change(@agent[:wallet].address, agent_before)
+    assert_balance_change("agent locked", agent_before, agent_mid, -amount)
+
+    returned = @provider[:wallet].return_deposit(deposit.id)
+    expect(returned.tx_hash).to start_with("0x") if returned.respond_to?(:tx_hash) && returned.tx_hash
+    log_tx("deposit", "return", returned.tx_hash) if returned.respond_to?(:tx_hash) && returned.tx_hash
+
+    agent_after = wait_for_balance_change(@agent[:wallet].address, agent_mid)
+    assert_balance_change("agent refund", agent_before, agent_after, 0)
+  end
+
+  # ── Flow 7: x402 (via /x402/prepare — no local HTTP server) ────────────────
+
+  it "07 x402_prepare" do
+    contracts = @agent[:wallet].get_contracts
+
+    payment_required = {
+      "scheme" => "exact",
+      "network" => "eip155:84532",
+      "amount" => "100000",
+      "asset" => contracts.usdc,
+      "payTo" => contracts.router,
+      "maxTimeoutSeconds" => 60
+    }
+    encoded = Base64.strict_encode64(payment_required.to_json)
+
+    # POST /x402/prepare via the wallet's authenticated transport
+    # We access the transport directly since it handles EIP-712 auth
+    data = @agent[:wallet].instance_variable_get(:@transport).post(
+      "/x402/prepare",
+      { payment_required: encoded, payer: @agent[:wallet].address }
+    )
+
+    expect(data).to include("hash")
+    expect(data["hash"]).to start_with("0x")
+    expect(data["hash"].length).to eq(66) # 0x + 64 hex chars
+    expect(data).to include("from")
+    expect(data).to include("to")
+    expect(data).to include("value")
+
+    puts "[ACCEPTANCE] x402 | prepare | hash=#{data["hash"][0, 18]}... | from=#{data["from"][0, 10]}..."
+  end
+
+  # ── Flow 8: AP2 Discovery ──────────────────────────────────────────────────
+
+  it "08 ap2_discovery" do
+    card = Remitmd::AgentCard.discover(API_URL)
+
+    expect(card.name).not_to be_empty, "agent card should have a name"
+    expect(card.url).not_to be_empty, "agent card should have a URL"
+    expect(card.skills.length).to be > 0, "agent card should have skills"
+    expect(card.x402).not_to be_empty, "agent card should have x402 config"
+
+    puts "[ACCEPTANCE] ap2-discovery | name=#{card.name} | skills=#{card.skills.length} | x402=#{!card.x402.empty?}"
+  end
+
+  # ── Flow 9: AP2 Payment ────────────────────────────────────────────────────
+
+  it "09 ap2_payment" do
+    amount = 1.0
+
+    agent_before = get_usdc_balance(@agent[:wallet].address)
+    provider_before = get_usdc_balance(@provider[:wallet].address)
+
+    card = Remitmd::AgentCard.discover(API_URL)
+    permit = @agent[:wallet].sign_permit("direct", amount)
+
+    signer = @agent[:wallet].instance_variable_get(:@signer)
+    a2a = Remitmd::A2AClient.from_card(card, signer, chain: "base-sepolia")
+    task = a2a.send(
+      to: @provider[:wallet].address,
+      amount: amount,
+      memo: "acceptance-ap2",
+      permit: permit
+    )
+
+    expect(task.status.state).not_to eq("failed"), "A2A task failed: state=#{task.status.state}"
+    tx_hash = task.tx_hash
+    expect(tx_hash).not_to be_nil
+    expect(tx_hash).to start_with("0x")
+    log_tx("ap2-payment", "#{amount} USDC via A2A", tx_hash)
+
+    agent_after = wait_for_balance_change(@agent[:wallet].address, agent_before)
+    provider_after = get_usdc_balance(@provider[:wallet].address)
+
+    assert_balance_change("agent", agent_before, agent_after, -amount)
+    assert_balance_change("provider", provider_before, provider_after, amount * 0.99)
   end
 end

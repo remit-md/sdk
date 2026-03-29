@@ -103,14 +103,10 @@ class CliSigner(Signer):
             proc.communicate(digest_hex.encode()), timeout=_CLI_TIMEOUT
         )
         if proc.returncode != 0:
-            raise RuntimeError(
-                f"CliSigner: sign_hash failed: {stderr.decode().strip()}"
-            )
+            raise RuntimeError(f"CliSigner: sign_hash failed: {stderr.decode().strip()}")
         sig = stdout.decode().strip()
         if not sig.startswith("0x") or len(sig) != 132:
-            raise RuntimeError(
-                f"CliSigner: invalid signature from CLI: {sig}"
-            )
+            raise RuntimeError(f"CliSigner: invalid signature from CLI: {sig}")
         return sig
 
     @staticmethod

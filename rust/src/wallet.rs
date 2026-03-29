@@ -53,8 +53,6 @@ pub struct Wallet {
     pub(crate) address: String,
     pub(crate) chain_id: ChainId,
     pub(crate) chain: String,
-    /// Full chain key (e.g. "base-sepolia") for USDC/RPC lookups.
-    pub(crate) chain_key: String,
     pub(crate) contracts_cache: Mutex<Option<ContractAddresses>>,
     /// Retained signer reference for permit signing.
     pub(crate) signer: Arc<dyn Signer>,
@@ -1268,7 +1266,6 @@ fn build_wallet(
         address,
         chain_id: ChainId(cfg.chain_id),
         chain: chain.to_string(),
-        chain_key,
         contracts_cache: Mutex::new(None),
         signer,
     })

@@ -98,7 +98,6 @@ impl MockRemit {
             address: MOCK_WALLET.to_string(),
             chain_id: ChainId::BASE_SEPOLIA,
             chain: "base".to_string(),
-            chain_key: "base-sepolia".to_string(),
             contracts_cache: Mutex::new(None),
             signer,
         }

@@ -1,11 +1,12 @@
 /**
- * TS SDK acceptance: All 9 payment flows with 2 shared wallets.
+ * TS SDK acceptance: All 13 payment flows with 2 shared wallets.
  *
  * Creates agent (payer) + provider (payee) wallets once, mints 100 USDC
- * to agent, then runs all 9 flows sequentially with small amounts.
+ * to agent, then runs all flows sequentially with small amounts.
  *
  * Flows: direct, escrow, tab, stream, bounty, deposit, x402 (via /x402/prepare),
- *        AP2 discovery, AP2 payment.
+ *        AP2 discovery, AP2 payment, deposit forfeit, bounty reclaim,
+ *        webhook update, wallet settings.
  */
 
 import { describe, it, before } from "node:test";
@@ -413,5 +414,129 @@ describe("SDK: All 9 Flows", { timeout: 600_000 }, () => {
 
     assertBalanceChange("agent", agentBefore, agentAfter, -amount);
     assertBalanceChange("provider", providerBefore, providerAfter, amount * 0.99);
+  });
+
+  // ── Flow 12: Deposit Forfeit ────────────────────────────────────────────────
+
+  it("12 deposit forfeit: placeDeposit → forfeitDeposit", async () => {
+    const amount = 1.0;
+
+    const agentBefore = await getUsdcBalance(agent.address);
+    const providerBefore = await getUsdcBalance(provider.address);
+
+    const permit = await agent.signPermit("deposit", amount);
+    const deposit = await agent.placeDeposit({
+      to: provider.address,
+      amount,
+      expires: 3600,
+      permit,
+    });
+    assert.ok(deposit.id, "deposit should have an id");
+    const placeTxHash = (deposit as unknown as Record<string, string>).txHash ?? (deposit as unknown as Record<string, string>).tx_hash;
+    if (placeTxHash) logTx("deposit-forfeit", `place ${amount} USDC`, placeTxHash);
+
+    await waitForBalanceChange(agent.address, agentBefore);
+
+    // Provider forfeits (claims the deposit)
+    const forfeited = await provider.forfeitDeposit(deposit.id);
+    const forfeitTxHash = forfeited.txHash ?? (forfeited as unknown as Record<string, string>).tx_hash;
+    const forfeitStatus = forfeited.status ?? (forfeited as unknown as Record<string, string>).status;
+    assert.ok(forfeitTxHash?.startsWith("0x") || forfeitStatus, "forfeit should succeed");
+    if (forfeitTxHash) logTx("deposit-forfeit", "forfeit", forfeitTxHash);
+
+    const providerAfter = await waitForBalanceChange(provider.address, providerBefore);
+    const agentAfter = await getUsdcBalance(agent.address);
+
+    // Agent loses the deposit, provider gains it (minus fees)
+    assertBalanceChange("agent", agentBefore, agentAfter, -amount);
+    assertBalanceChange("provider", providerBefore, providerAfter, amount * 0.99);
+  });
+
+  // ── Flow 13: Bounty Reclaim ─────────────────────────────────────────────────
+
+  it("13 bounty reclaim: postBounty → wait → reclaimBounty", async () => {
+    const amount = 1.0;
+    // Very short deadline: 2 seconds from now
+    const deadline = Math.floor(Date.now() / 1000) + 2;
+
+    const agentBefore = await getUsdcBalance(agent.address);
+
+    const permit = await agent.signPermit("bounty", amount);
+    const bounty = await agent.postBounty({
+      amount,
+      task: "acceptance-bounty-reclaim",
+      deadline,
+      permit,
+    });
+    assert.ok(bounty.id, "bounty should have an id");
+    const postTxHash = (bounty as unknown as Record<string, string>).txHash ?? (bounty as unknown as Record<string, string>).tx_hash;
+    if (postTxHash) logTx("bounty-reclaim", `post ${amount} USDC deadline=+2s`, postTxHash);
+
+    await waitForBalanceChange(agent.address, agentBefore);
+    const agentMid = await getUsdcBalance(agent.address);
+
+    // Wait for deadline to pass
+    await new Promise((r) => setTimeout(r, 3000));
+
+    // Agent reclaims expired bounty (retry for indexer lag)
+    let reclaimed: Record<string, unknown> | null = null;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      try {
+        reclaimed = await agent.reclaimBounty(bounty.id) as unknown as Record<string, unknown>;
+        break;
+      } catch (e) {
+        if (attempt < 14) {
+          console.log(`[ACCEPTANCE] bounty-reclaim retry ${attempt + 1}: ${(e as Error).message}`);
+          await new Promise((r) => setTimeout(r, 3000));
+        } else {
+          throw e;
+        }
+      }
+    }
+    assert.ok(reclaimed, "bounty should be reclaimed");
+    const reclaimTxHash = (reclaimed as Record<string, string>).txHash ?? (reclaimed as Record<string, string>).tx_hash;
+    const reclaimStatus = (reclaimed as Record<string, string>).status;
+    assert.ok(reclaimTxHash?.startsWith("0x") || reclaimStatus, "reclaim should succeed");
+    if (reclaimTxHash) logTx("bounty-reclaim", "reclaim", reclaimTxHash);
+
+    // Agent should get funds back (minus any fees on the round-trip)
+    const agentAfter = await waitForBalanceChange(agent.address, agentMid);
+    assertBalanceChange("agent refund", agentBefore, agentAfter, 0);
+  });
+
+  // ── Flow 14: Webhook Update ─────────────────────────────────────────────────
+
+  it("14 webhook update: registerWebhook → updateWebhook → deleteWebhook", async () => {
+    // Register a webhook
+    const wh = await agent.registerWebhook(
+      "https://example.com/original",
+      ["payment.completed"],
+    );
+    assert.ok(wh.id, "webhook should have an id");
+    assert.equal(wh.url, "https://example.com/original");
+    console.log(`[ACCEPTANCE] webhook-update | register | id=${wh.id}`);
+
+    // Update the URL
+    const updated = await agent.updateWebhook(wh.id, {
+      url: "https://example.com/updated",
+    });
+    assert.equal(updated.url, "https://example.com/updated");
+    console.log(`[ACCEPTANCE] webhook-update | update | url=${updated.url}`);
+
+    // Clean up
+    await agent.deleteWebhook(wh.id);
+    console.log(`[ACCEPTANCE] webhook-update | delete | id=${wh.id}`);
+  });
+
+  // ── Flow 15: Wallet Settings ────────────────────────────────────────────────
+
+  it("15 wallet settings: updateWalletSettings", async () => {
+    const settings = await agent.updateWalletSettings({
+      display_name: "acceptance-test-agent",
+    });
+    // Server returns camelCase displayName
+    const name = settings.displayName ?? (settings as unknown as Record<string, string>).display_name;
+    assert.equal(name, "acceptance-test-agent", "display name should be updated");
+    console.log(`[ACCEPTANCE] wallet-settings | update | display_name=${name}`);
   });
 });

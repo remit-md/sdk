@@ -4,13 +4,14 @@ import XCTest
 final class ErrorTests: XCTestCase {
 
     func testRemitErrorHasCodeAndMessage() {
-        let err = RemitError(code: "TEST_CODE", message: "test message")
+        let err = RemitError("TEST_CODE", "test message")
         XCTAssertEqual(err.code, "TEST_CODE")
-        XCTAssertEqual(err.message, "test message")
+        XCTAssertTrue(err.message.contains("TEST_CODE"))
+        XCTAssertTrue(err.message.contains("test message"))
     }
 
     func testRemitErrorDescription() {
-        let err = RemitError(code: "INVALID_ADDRESS", message: "bad addr")
+        let err = RemitError("INVALID_ADDRESS", "bad addr")
         let desc = err.description
         XCTAssertTrue(desc.contains("INVALID_ADDRESS"))
     }

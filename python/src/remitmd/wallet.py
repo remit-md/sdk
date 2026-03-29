@@ -793,9 +793,7 @@ class Wallet(RemitClient):
 
     async def history(self, page: int = 1, per_page: int = 20) -> dict[str, Any]:
         """Return paginated transaction history."""
-        return await self._http.get(
-            f"/api/v1/wallet/history?page={page}&per_page={per_page}"
-        )
+        return await self._http.get(f"/api/v1/wallet/history?page={page}&per_page={per_page}")
 
     async def reputation(self, address: str | None = None) -> dict[str, Any]:
         """Return on-chain reputation for the given address (defaults to self)."""

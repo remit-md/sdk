@@ -18,15 +18,17 @@ final class X402Tests: XCTestCase {
 
     func testX402ClientCanBeCreated() {
         let mock = MockRemit()
-        let wallet = RemitWallet(mock: mock)
-        let client = X402Client(wallet: wallet)
+        let signer = MockSigner()
+        let transport = MockTransport(mock: mock)
+        let client = X402Client(signer: signer, address: signer.address, apiTransport: transport)
         XCTAssertNotNil(client)
     }
 
     func testX402ClientCustomLimit() {
         let mock = MockRemit()
-        let wallet = RemitWallet(mock: mock)
-        let client = X402Client(wallet: wallet, maxAutoPayUsdc: 5.0)
+        let signer = MockSigner()
+        let transport = MockTransport(mock: mock)
+        let client = X402Client(signer: signer, address: signer.address, maxAutoPayUsdc: 5.0, apiTransport: transport)
         XCTAssertEqual(client.maxAutoPayUsdc, 5.0, accuracy: 0.001)
     }
 }

@@ -19,7 +19,12 @@ RSpec.describe "Remitmd X402" do
 
   describe "X402Paywall" do
     it "can be created" do
-      paywall = Remitmd::X402Paywall.new(amount: 0.01, payee: "0x0000000000000000000000000000000000000001")
+      paywall = Remitmd::X402Paywall.new(
+        wallet_address: "0x0000000000000000000000000000000000000001",
+        amount_usdc: 0.01,
+        network: "base",
+        asset: "USDC"
+      )
       expect(paywall).not_to be_nil
     end
   end

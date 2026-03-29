@@ -1048,13 +1048,13 @@ impl Wallet {
 
     /// List all registered webhooks for this wallet.
     pub async fn list_webhooks(&self) -> Result<Vec<Webhook>, RemitError> {
-        let val = self.http.get("/api/v1/webhooks").await?;
-        serde_json::from_value(val).map_err(|e| RemitError::new("PARSE_ERROR", &e.to_string()))
+        let val = self.transport.get("/api/v1/webhooks").await?;
+        serde_json::from_value(val).map_err(|e| RemitError::new("PARSE_ERROR", e.to_string()))
     }
 
     /// Delete a webhook by ID.
     pub async fn delete_webhook(&self, webhook_id: &str) -> Result<(), RemitError> {
-        self.http
+        self.transport
             .delete(&format!("/api/v1/webhooks/{}", webhook_id))
             .await?;
         Ok(())
@@ -1087,7 +1087,7 @@ impl Wallet {
         &self,
         amount: Decimal,
         task: &str,
-        deadline: i64,
+        deadline: u64,
     ) -> Result<Bounty, RemitError> {
         self.create_bounty(amount, task, deadline).await
     }
@@ -1108,7 +1108,7 @@ impl Wallet {
         to: &str,
         amount: Decimal,
         payment_type: &str,
-    ) -> Result<Value, RemitError> {
+    ) -> Result<Intent, RemitError> {
         self.propose_intent(to, amount, payment_type).await
     }
 

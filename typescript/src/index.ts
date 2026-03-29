@@ -32,7 +32,6 @@ export type {
   PostBountyOptions,
   PlaceDepositOptions,
   PermitSignature,
-  SignPermitOptions,
 } from "./wallet.js";
 
 // Signers

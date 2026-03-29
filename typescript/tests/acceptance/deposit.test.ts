@@ -30,9 +30,8 @@ describe("SDK: Deposit Lifecycle", { timeout: 180_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    // Step 1: Place deposit with permit for Deposit contract
-    const contracts = await agent.getContracts();
-    const permit = await agent.signPermit(contracts.deposit, amount + 1);
+    // Step 1: Place deposit with permit via /permits/prepare
+    const permit = await agent.signPermit("deposit", amount + 1);
 
     const deposit = await agent.placeDeposit({
       to: provider.address,

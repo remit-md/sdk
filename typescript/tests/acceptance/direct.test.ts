@@ -32,9 +32,8 @@ describe("SDK: Direct Payment", { timeout: 120_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    // SDK: get contracts, sign permit, pay
-    const contracts = await agent.getContracts();
-    const permit = await agent.signPermit(contracts.router, 2.0);
+    // SDK: sign permit via /permits/prepare, then pay
+    const permit = await agent.signPermit("direct", 2.0);
     const tx = await agent.payDirect(provider.address, amount, "sdk-acceptance", { permit });
 
     const txHash = tx.txHash ?? (tx as unknown as Record<string, string>).tx_hash;

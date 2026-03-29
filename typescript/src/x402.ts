@@ -3,8 +3,9 @@
  *
  * x402 is an open payment standard where resource servers return HTTP 402 with
  * a `PAYMENT-REQUIRED` header describing the cost. This module provides a
- * `fetch` wrapper that intercepts those responses, signs an EIP-3009
- * authorization, and retries the request with a `PAYMENT-SIGNATURE` header.
+ * `fetch` wrapper that intercepts those responses, calls the server's
+ * `/x402/prepare` endpoint for hash + authorization fields, signs the hash,
+ * and retries the request with a `PAYMENT-SIGNATURE` header.
  *
  * Usage:
  *   ```typescript
@@ -16,26 +17,15 @@
  *     signer,
  *     address: signer.getAddress(),
  *     maxAutoPayUsdc: 0.10,
+ *     apiHttp: authenticatedClient,
  *   });
  *
  *   const response = await client.fetch("https://api.provider.com/v1/data");
  *   ```
  */
 
-import { randomBytes } from "node:crypto";
 import type { Signer } from "./signer.js";
-
-/** EIP-712 type definitions for USDC's transferWithAuthorization (EIP-3009). */
-const EIP3009_TYPES = {
-  TransferWithAuthorization: [
-    { name: "from", type: "address" },
-    { name: "to", type: "address" },
-    { name: "value", type: "uint256" },
-    { name: "validAfter", type: "uint256" },
-    { name: "validBefore", type: "uint256" },
-    { name: "nonce", type: "bytes32" },
-  ],
-} as const;
+import type { AuthenticatedClient } from "./http.js";
 
 /** Raised when an x402 payment amount exceeds the configured auto-pay limit. */
 export class AllowanceExceededError extends Error {
@@ -54,12 +44,14 @@ export class AllowanceExceededError extends Error {
 
 /** Configuration for {@link X402Client}. */
 export interface X402ClientOptions {
-  /** Signer used for EIP-3009 authorization signatures. */
+  /** Signer used for hash signing. */
   signer: Signer;
   /** Checksummed payer address - must match the signer's public key. */
   address: string;
   /** Maximum USDC amount to auto-pay per request (default: 0.10). */
   maxAutoPayUsdc?: number;
+  /** Authenticated HTTP client for calling /x402/prepare. */
+  apiHttp: AuthenticatedClient;
 }
 
 /** Shape of the base64-decoded PAYMENT-REQUIRED header (V2). */
@@ -85,9 +77,10 @@ export interface PaymentRequired {
  * On receiving a 402, the client:
  * 1. Decodes the `PAYMENT-REQUIRED` header (base64 JSON)
  * 2. Checks the amount is within `maxAutoPayUsdc`
- * 3. Builds and signs an EIP-3009 `transferWithAuthorization`
- * 4. Base64-encodes the `PAYMENT-SIGNATURE` header
- * 5. Retries the original request with payment attached
+ * 3. Calls `/x402/prepare` to get hash + authorization fields
+ * 4. Signs the hash
+ * 5. Base64-encodes the `PAYMENT-SIGNATURE` header
+ * 6. Retries the original request with payment attached
  *
  * V2: The decoded `PAYMENT-REQUIRED` may include `resource`, `description`,
  * and `mimeType` fields. Access the last payment via `lastPayment`.
@@ -96,13 +89,15 @@ export class X402Client {
   readonly #signer: Signer;
   readonly #address: string;
   readonly #maxAutoPayUsdc: number;
+  readonly #apiHttp: AuthenticatedClient;
   /** The last PAYMENT-REQUIRED decoded before payment. Useful for logging/display. */
   lastPayment: PaymentRequired | null = null;
 
-  constructor({ signer, address, maxAutoPayUsdc = 0.1 }: X402ClientOptions) {
+  constructor({ signer, address, maxAutoPayUsdc = 0.1, apiHttp }: X402ClientOptions) {
     this.#signer = signer;
     this.#address = address;
     this.#maxAutoPayUsdc = maxAutoPayUsdc;
+    this.#apiHttp = apiHttp;
   }
 
   /** Make a fetch request, auto-paying any 402 responses within the configured limit. */
@@ -122,7 +117,7 @@ export class X402Client {
     }
     const required = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as PaymentRequired;
 
-    // 2. Only the "exact" scheme is supported in V5.
+    // 2. Only the "exact" scheme is supported.
     if (required.scheme !== "exact") {
       throw new Error(`Unsupported x402 scheme: ${required.scheme}`);
     }
@@ -137,40 +132,22 @@ export class X402Client {
       throw new AllowanceExceededError(amountUsdc, this.#maxAutoPayUsdc);
     }
 
-    // 4. Parse chainId from CAIP-2 network string (e.g. "eip155:84532" → 84532).
-    const chainId = parseInt(required.network.split(":")[1]!, 10);
+    // 4. Call /x402/prepare to get the hash + authorization fields.
+    const prepareData = await this.#apiHttp.post<Record<string, string>>("/x402/prepare", {
+      payment_required: raw,
+      payer: this.#address,
+    });
 
-    // 5. Build EIP-3009 authorization fields.
-    const nowSecs = Math.floor(Date.now() / 1000);
-    const validBefore = nowSecs + (required.maxTimeoutSeconds ?? 60);
-    const nonce = `0x${randomBytes(32).toString("hex")}` as `0x${string}`;
-
-    const domain = {
-      name: "USD Coin",
-      version: "2",
-      chainId,
-      verifyingContract: required.asset as `0x${string}`,
-    };
-
-    // viem requires uint256 values as bigint.
-    const message = {
-      from: this.#address as `0x${string}`,
-      to: required.payTo as `0x${string}`,
-      value: amountBaseUnits,
-      validAfter: BigInt(0),
-      validBefore: BigInt(validBefore),
-      nonce,
-    };
-
-    // 6. Sign EIP-712 typed data.
-    const signature = await this.#signer.signTypedData(
-      domain,
-      // Cast: EIP3009_TYPES satisfies TypedDataTypes but has readonly arrays.
-      EIP3009_TYPES as unknown as Record<string, Array<{ name: string; type: string }>>,
-      message as unknown as Record<string, unknown>,
+    // 5. Sign the hash.
+    const hashHex = prepareData.hash;
+    const hashBytes = new Uint8Array(
+      (hashHex.startsWith("0x") ? hashHex.slice(2) : hashHex)
+        .match(/.{2}/g)!
+        .map((b) => parseInt(b, 16)),
     );
+    const signature = await this.#signer.signHash(hashBytes);
 
-    // 7. Build PAYMENT-SIGNATURE JSON payload.
+    // 6. Build PAYMENT-SIGNATURE JSON payload.
     const paymentPayload = {
       scheme: required.scheme,
       network: required.network,
@@ -178,18 +155,18 @@ export class X402Client {
       payload: {
         signature,
         authorization: {
-          from: this.#address,
-          to: required.payTo,
-          value: required.amount, // string (base units)
-          validAfter: "0",
-          validBefore: String(validBefore),
-          nonce,
+          from: prepareData.from,
+          to: prepareData.to,
+          value: prepareData.value,
+          validAfter: prepareData.validAfter,
+          validBefore: prepareData.validBefore,
+          nonce: prepareData.nonce,
         },
       },
     };
     const paymentHeader = Buffer.from(JSON.stringify(paymentPayload)).toString("base64");
 
-    // 8. Retry with PAYMENT-SIGNATURE header.
+    // 7. Retry with PAYMENT-SIGNATURE header.
     const newHeaders = new Headers(init?.headers);
     newHeaders.set("PAYMENT-SIGNATURE", paymentHeader);
     return globalThis.fetch(url, { ...init, headers: newHeaders });

@@ -292,35 +292,23 @@ new Wallet({ privateKey: key, chain: "base-sepolia" })   // Base Sepolia testnet
 
 ## Advanced: Manual Permits
 
-All payment methods auto-sign EIP-2612 USDC permits internally. If you need explicit control (custom spenders, pre-signed permits, multi-step workflows), you can sign and pass them manually:
+All payment methods auto-sign EIP-2612 USDC permits internally via the server's `/permits/prepare` endpoint. If you need explicit control (pre-signed permits, multi-step workflows), you can sign and pass them manually:
 
 ```typescript
-const contracts = await wallet.getContracts();
-const permit = await wallet.signPermit(contracts.router, 5.0);
+const permit = await wallet.signPermit("direct", 5.0);
 await wallet.payDirect("0xRecipient...", 5.0, "task", { permit });
 ```
 
-The `spender` must match the contract handling the payment:
+The `flow` parameter must match the payment type:
 
-| Payment type | Spender |
+| Payment type | Flow |
 |---|---|
-| Direct | `contracts.router` |
-| Escrow | `contracts.escrow` |
-| Tab | `contracts.tab` |
-| Stream | `contracts.stream` |
-| Bounty | `contracts.bounty` |
-| Deposit | `contracts.deposit` |
-
-For lower-level control over nonce, deadline, and USDC address:
-
-```typescript
-const permit = await wallet.signUsdcPermit({
-  spender: contracts.router,
-  value: BigInt(5_000_000), // raw USDC base units
-  deadline: Math.floor(Date.now() / 1000) + 3600,
-  nonce: 0,
-});
-```
+| Direct | `"direct"` |
+| Escrow | `"escrow"` |
+| Tab | `"tab"` |
+| Stream | `"stream"` |
+| Bounty | `"bounty"` |
+| Deposit | `"deposit"` |
 
 ## License
 

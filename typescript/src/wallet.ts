@@ -70,20 +70,6 @@ export interface PermitSignature {
   s: string;
 }
 
-/** Options for signing an EIP-2612 USDC permit. */
-export interface SignPermitOptions {
-  /** Contract address that will be approved as spender. */
-  spender: string;
-  /** Amount in USDC base units (6 decimals). */
-  value: bigint;
-  /** Permit deadline (Unix timestamp). */
-  deadline: number;
-  /** Current permit nonce for this wallet (default: 0). */
-  nonce?: number;
-  /** USDC contract address (defaults to Base Sepolia MockUSDC). */
-  usdcAddress?: string;
-}
-
 export interface PostBountyOptions {
   amount: number;
   task: string;
@@ -314,65 +300,51 @@ export class Wallet extends RemitClient {
     return `Wallet { address: '${this.address}', chain: '${this._chain}' }`;
   }
 
-  // ─── EIP-2612 Permit ─────────────────────────────────────────────────────────
+  // ─── EIP-2612 Permit (via /permits/prepare) ────────────────────────────────
 
-  /** Default USDC addresses per chain. */
-  static readonly USDC_ADDRESSES: Record<string, string> = {
-    "base-sepolia": "0x2d846325766921935f37d5b4478196d3ef93707c",
-    base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    localhost: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  /** Contract name → flow name for /permits/prepare. */
+  static readonly #CONTRACT_TO_FLOW: Record<string, string> = {
+    router: "direct",
+    escrow: "escrow",
+    tab: "tab",
+    stream: "stream",
+    bounty: "bounty",
+    deposit: "deposit",
+    relayer: "direct",
   };
 
   /**
-   * Sign an EIP-2612 permit for USDC approval.
-   * Returns a PermitSignature object that can be passed to postBounty() or placeDeposit().
+   * Sign a USDC permit via the server's /permits/prepare endpoint.
+   *
+   * The server computes the EIP-712 hash, manages nonces, and resolves
+   * contract addresses. The SDK only signs the hash.
+   *
+   * @param flow Payment flow (direct, escrow, tab, stream, bounty, deposit).
+   * @param amount Amount in USDC (e.g. 5.0 for $5.00).
    */
-  async signUsdcPermit(options: SignPermitOptions): Promise<PermitSignature> {
-    const usdcAddress = options.usdcAddress ?? Wallet.USDC_ADDRESSES[this._chain];
-    if (!usdcAddress) {
-      throw new Error(
-        `No USDC address for chain '${this._chain}'. ` +
-        `Supported chains: ${Object.keys(Wallet.USDC_ADDRESSES).join(", ")}. ` +
-        "Pass usdcAddress explicitly.",
-      );
-    }
-
-    const domain = {
-      name: "USD Coin",
-      version: "2",
-      chainId: this._chainId,
-      verifyingContract: usdcAddress,
-    };
-
-    const types = {
-      Permit: [
-        { name: "owner", type: "address" },
-        { name: "spender", type: "address" },
-        { name: "value", type: "uint256" },
-        { name: "nonce", type: "uint256" },
-        { name: "deadline", type: "uint256" },
-      ],
-    };
-
-    const value = {
+  async signPermit(flow: string, amount: number): Promise<PermitSignature> {
+    const data = await this.#auth.post<Record<string, string>>("/permits/prepare", {
+      flow,
+      amount: String(amount),
       owner: this.address,
-      spender: options.spender,
-      value: options.value.toString(),
-      nonce: options.nonce ?? 0,
-      deadline: options.deadline,
-    };
+    });
 
-    const sig = await this.#signer.signTypedData(domain, types, value);
+    const hashHex = data.hash;
+    const hashBytes = new Uint8Array(
+      (hashHex.startsWith("0x") ? hashHex.slice(2) : hashHex)
+        .match(/.{2}/g)!
+        .map((b) => parseInt(b, 16)),
+    );
 
-    // Split signature into v, r, s
-    const sigBytes = sig.startsWith("0x") ? sig.slice(2) : sig;
-    const r = `0x${sigBytes.slice(0, 64)}`;
-    const s = `0x${sigBytes.slice(64, 128)}`;
-    const v = parseInt(sigBytes.slice(128, 130), 16);
+    const sig = await this.#signer.signHash(hashBytes);
+    const sigHex = sig.startsWith("0x") ? sig.slice(2) : sig;
+    const r = `0x${sigHex.slice(0, 64)}`;
+    const s = `0x${sigHex.slice(64, 128)}`;
+    const v = parseInt(sigHex.slice(128, 130), 16);
 
     return {
-      value: Number(options.value),
-      deadline: options.deadline,
+      value: Number(data.value),
+      deadline: Number(data.deadline),
       v,
       r,
       s,
@@ -380,66 +352,25 @@ export class Wallet extends RemitClient {
   }
 
   /**
-   * Convenience: sign an EIP-2612 permit for USDC approval.
-   * Auto-fetches the on-chain nonce and sets a default deadline (1 hour).
-   * @param spender Contract address that will call transferFrom (e.g. Router, Escrow).
-   * @param amount Amount in USDC (e.g. 1.50 for $1.50).
-   * @param deadline Optional Unix timestamp. Defaults to 1 hour from now.
-   */
-  async signPermit(spender: string, amount: number, deadline?: number, usdcAddress?: string): Promise<PermitSignature> {
-    const resolvedUsdc = usdcAddress ?? Wallet.USDC_ADDRESSES[this._chain];
-    if (!resolvedUsdc) {
-      throw new Error(
-        `No USDC address for chain '${this._chain}'. ` +
-        `Supported chains: ${Object.keys(Wallet.USDC_ADDRESSES).join(", ")}. ` +
-        "Pass usdcAddress to signUsdcPermit() instead.",
-      );
-    }
-    const nonce = await this.#fetchPermitNonce(resolvedUsdc);
-    const dl = deadline ?? Math.floor(Date.now() / 1000) + 3600;
-    const rawAmount = BigInt(Math.round(amount * 1e6));
-    return this.signUsdcPermit({
-      spender,
-      value: rawAmount,
-      deadline: dl,
-      nonce,
-      usdcAddress: resolvedUsdc,
-    });
-  }
-
-  /**
-   * Internal: auto-sign a permit for the given contract type and amount.
-   * Used by payment methods when no explicit permit is provided.
+   * Internal: auto-sign a permit via /permits/prepare.
+   * Maps the contract name to a flow and calls signPermit().
+   * Returns undefined on failure so callers degrade gracefully.
    */
   async #autoPermit(
     contract: "router" | "escrow" | "tab" | "stream" | "bounty" | "deposit" | "relayer",
     amount: number,
   ): Promise<PermitSignature | undefined> {
+    const flow = Wallet.#CONTRACT_TO_FLOW[contract];
+    if (!flow) {
+      console.warn(`[remitmd] unknown contract for permit: ${contract}`);
+      return undefined;
+    }
     try {
-      const contracts = await this.getContracts();
-      const spender = contracts[contract];
-      if (!spender) return undefined;
-      const usdc = contracts.usdc;
-      return await this.signPermit(spender, amount, undefined, usdc);
+      return await this.signPermit(flow, amount);
     } catch (err) {
       console.warn(`[remitmd] auto-permit failed for ${contract} (amount=${amount}):`, err);
       return undefined;
     }
-  }
-
-  /**
-   * Fetch the current EIP-2612 permit nonce for this wallet from the API.
-   * The server reads the on-chain nonce via its own RPC connection.
-   */
-  async #fetchPermitNonce(_usdcAddress: string): Promise<number> {
-    const s = await this.status();
-    if (s.permitNonce !== null && s.permitNonce !== undefined) {
-      return s.permitNonce;
-    }
-    throw new Error(
-      "Server returned null permit_nonce - RPC may be unavailable server-side. " +
-      "Cannot sign permit without a valid nonce.",
-    );
   }
 
   // ─── Direct Payment ─────────────────────────────────────────────────────────
@@ -734,7 +665,12 @@ export class Wallet extends RemitClient {
     maxAutoPayUsdc = 0.1,
     init?: RequestInit,
   ): Promise<{ response: Response; lastPayment: PaymentRequired | null }> {
-    const client = new X402Client({ signer: this.#signer, address: this.address, maxAutoPayUsdc });
+    const client = new X402Client({
+      signer: this.#signer,
+      address: this.address,
+      maxAutoPayUsdc,
+      apiHttp: this.#auth,
+    });
     const response = await client.fetch(url, init);
     return { response, lastPayment: client.lastPayment };
   }

@@ -32,9 +32,8 @@ describe("SDK: Bounty Lifecycle", { timeout: 180_000 }, () => {
 
     const posterBefore = await getUsdcBalance(poster.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    // Step 1: Post bounty with permit for Bounty contract
-    const contracts = await poster.getContracts();
-    const permit = await poster.signPermit(contracts.bounty, amount + 1);
+    // Step 1: Post bounty with permit via /permits/prepare
+    const permit = await poster.signPermit("bounty", amount + 1);
     const deadline = Math.floor(Date.now() / 1000) + 3600;
 
     const bounty = await poster.postBounty({

@@ -1,6 +1,6 @@
 {
   "name": "@remitmd/sdk",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "TypeScript SDK for the remit.md universal AI payment protocol",
   "type": "module",
   "main": "./dist/index.js",

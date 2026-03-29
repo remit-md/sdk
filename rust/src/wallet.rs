@@ -910,11 +910,8 @@ impl Wallet {
 
     /// Reclaim an expired or cancelled bounty (called by the poster).
     pub async fn reclaim_bounty(&self, bounty_id: &str) -> Result<Transaction, RemitError> {
-        self.post(
-            &format!("/api/v1/bounties/{bounty_id}/reclaim"),
-            json!({}),
-        )
-        .await
+        self.post(&format!("/api/v1/bounties/{bounty_id}/reclaim"), json!({}))
+            .await
     }
 
     /// List bounties with optional filters.
@@ -1022,11 +1019,8 @@ impl Wallet {
 
     /// Forfeit a deposit (called by the depositor to surrender their deposit).
     pub async fn forfeit_deposit(&self, deposit_id: &str) -> Result<Transaction, RemitError> {
-        self.post(
-            &format!("/api/v1/deposits/{deposit_id}/forfeit"),
-            json!({}),
-        )
-        .await
+        self.post(&format!("/api/v1/deposits/{deposit_id}/forfeit"), json!({}))
+            .await
     }
 
     // ─── One-time operator links ──────────────────────────────────────────────

@@ -173,8 +173,14 @@ impl HttpTransport {
         let sig_hex = format!("0x{}", hex::encode(&sig));
 
         let mut req = match method {
-            "POST" => self.client.post(url).header("Content-Type", "application/json"),
-            "PATCH" => self.client.patch(url).header("Content-Type", "application/json"),
+            "POST" => self
+                .client
+                .post(url)
+                .header("Content-Type", "application/json"),
+            "PATCH" => self
+                .client
+                .patch(url)
+                .header("Content-Type", "application/json"),
             "DELETE" => self.client.delete(url),
             _ => self.client.get(url),
         };

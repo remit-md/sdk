@@ -794,10 +794,17 @@ impl MockTransport {
             // ─── Webhook update ──────────────────────────────────────────
             ("PATCH", path) if path.starts_with("/api/v1/webhooks/") => {
                 let webhook_id = path.trim_start_matches("/api/v1/webhooks/");
-                let url = b["url"].as_str().unwrap_or("https://example.com/hook").to_string();
+                let url = b["url"]
+                    .as_str()
+                    .unwrap_or("https://example.com/hook")
+                    .to_string();
                 let events: Vec<String> = b["events"]
                     .as_array()
-                    .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
                     .unwrap_or_default();
                 Ok(json!({
                     "id": webhook_id,
@@ -821,7 +828,11 @@ impl MockTransport {
             }
 
             // ─── Deposit forfeit ─────────────────────────────────────────
-            (method, path) if method == "POST" && path.contains("/deposits/") && path.ends_with("/forfeit") => {
+            (method, path)
+                if method == "POST"
+                    && path.contains("/deposits/")
+                    && path.ends_with("/forfeit") =>
+            {
                 let tx = Transaction {
                     id: new_id("tx"),
                     tx_hash: format!("0x{}", mock_hash()),
@@ -839,7 +850,11 @@ impl MockTransport {
             }
 
             // ─── Bounty reclaim ──────────────────────────────────────────
-            (method, path) if method == "POST" && path.contains("/bounties/") && path.ends_with("/reclaim") => {
+            (method, path)
+                if method == "POST"
+                    && path.contains("/bounties/")
+                    && path.ends_with("/reclaim") =>
+            {
                 let tx = Transaction {
                     id: new_id("tx"),
                     tx_hash: format!("0x{}", mock_hash()),

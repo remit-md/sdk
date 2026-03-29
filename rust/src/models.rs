@@ -473,6 +473,8 @@ pub struct Webhook {
     #[serde(default)]
     pub chains: Vec<String>,
     pub active: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

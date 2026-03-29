@@ -23,6 +23,12 @@ module Remitmd
       raise NotImplementedError, "#{self.class}#sign is not implemented"
     end
 
+    # Sign a 32-byte hash (raw binary bytes). Returns 0x-prefixed 65-byte hex signature.
+    # Used by /permits/prepare and /x402/prepare flows.
+    def sign_hash(hash_bytes)
+      sign(hash_bytes)
+    end
+
     # The Ethereum address corresponding to the signing key (0x-prefixed).
     def address
       raise NotImplementedError, "#{self.class}#address is not implemented"

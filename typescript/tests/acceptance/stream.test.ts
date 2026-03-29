@@ -33,9 +33,8 @@ describe("SDK: Stream Lifecycle", { timeout: 180_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    // Step 1: Open stream with permit for Stream contract
-    const contracts = await agent.getContracts();
-    const permit = await agent.signPermit(contracts.stream, maxTotal + 1);
+    // Step 1: Open stream with permit via /permits/prepare
+    const permit = await agent.signPermit("stream", maxTotal + 1);
 
     const stream = await agent.openStream({
       to: provider.address,

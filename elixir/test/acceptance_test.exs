@@ -16,7 +16,7 @@ defmodule RemitMd.AcceptanceTest do
   @api_url System.get_env("ACCEPTANCE_API_URL", "https://testnet.remit.md")
   @rpc_url System.get_env("ACCEPTANCE_RPC_URL", "https://sepolia.base.org")
 
-  # ─── Helpers ──────────────────────────────────────────────────────────────
+  # ─── Helpers ─────────────────────────────────��────────────────────────────
 
   defp fetch_contracts do
     :inets.start()
@@ -110,64 +110,12 @@ defmodule RemitMd.AcceptanceTest do
     wait_for_balance_change(tw.wallet.address, 0, usdc_address)
   end
 
-  # ─── EIP-2612 Permit Signing ───────────────────────────────────────────
-
-  defp keccak256(data), do: RemitMd.Keccak.hash(data)
-
-  defp pad_address(addr) do
-    hex = String.trim_leading(addr, "0x")
-    addr_bytes = Base.decode16!(hex, case: :mixed)
-    :binary.copy(<<0>>, 12) <> addr_bytes
-  end
-
-  defp pad_uint256(value) do
-    <<value::unsigned-big-integer-size(256)>>
-  end
-
-  defp sign_usdc_permit(key_hex, owner, spender, value, nonce, deadline, usdc_address, chain_id) do
-    # Domain separator
-    domain_type_hash = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-    name_hash = keccak256("USD Coin")
-    version_hash = keccak256("2")
-    usdc_padded = pad_address(usdc_address)
-
-    domain_data = domain_type_hash <> name_hash <> version_hash <> pad_uint256(chain_id) <> usdc_padded
-    domain_sep = keccak256(domain_data)
-
-    # Permit struct hash
-    permit_type_hash = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
-    struct_data = permit_type_hash <> pad_address(owner) <> pad_address(spender) <>
-                  pad_uint256(value) <> pad_uint256(nonce) <> pad_uint256(deadline)
-    struct_hash = keccak256(struct_data)
-
-    # EIP-712 digest
-    final_data = <<0x19, 0x01>> <> domain_sep <> struct_hash
-    digest = keccak256(final_data)
-
-    # Sign using the SDK's signer
-    signer = RemitMd.PrivateKeySigner.new("0x#{key_hex}")
-    sig_hex = RemitMd.PrivateKeySigner.sign(signer, digest)
-
-    # Parse r, s, v from the 65-byte hex signature
-    sig_bytes = sig_hex |> String.trim_leading("0x") |> Base.decode16!(case: :mixed)
-    <<r_bytes::binary-size(32), s_bytes::binary-size(32), v>> = sig_bytes
-
-    %RemitMd.Models.PermitSignature{
-      value: value,
-      deadline: deadline,
-      v: v,
-      r: "0x" <> Base.encode16(r_bytes, case: :lower),
-      s: "0x" <> Base.encode16(s_bytes, case: :lower)
-    }
-  end
-
-  # ─── Test: Direct Payment ──────────────────────────────────────────────
+  # ─── Test: Direct Payment ────��─────────────────────────────────────────
 
   @tag :acceptance
   test "direct payment with permit" do
     contracts = fetch_contracts()
     usdc_address = contracts["usdc"]
-    chain_id = contracts["chain_id"]
 
     agent = create_test_wallet()
     provider = create_test_wallet()
@@ -180,12 +128,8 @@ defmodule RemitMd.AcceptanceTest do
     agent_before = get_usdc_balance(agent.wallet.address, usdc_address)
     provider_before = get_usdc_balance(provider.wallet.address, usdc_address)
 
-    # Sign EIP-2612 permit for Router
-    deadline = :os.system_time(:second) + 3600
-    permit = sign_usdc_permit(
-      agent.key_hex, agent.wallet.address, contracts["router"],
-      2_000_000, 0, deadline, usdc_address, chain_id
-    )
+    # Sign permit via server-side /permits/prepare
+    permit = Wallet.sign_permit(agent.wallet, "direct", 2.0)
 
     {:ok, tx} = Wallet.pay(agent.wallet, provider.wallet.address, "1.000000",
       description: "elixir-sdk-acceptance", permit: permit)
@@ -199,13 +143,12 @@ defmodule RemitMd.AcceptanceTest do
     assert_balance_change("provider", provider_before, provider_after, provider_receives)
   end
 
-  # ─── Test: Escrow Lifecycle ────────────────────────────────────────────
+  # ─── Test: Escrow Lifecycle ─────────���──────────────────────────────────
 
   @tag :acceptance
   test "escrow lifecycle (create, claim-start, release)" do
     contracts = fetch_contracts()
     usdc_address = contracts["usdc"]
-    chain_id = contracts["chain_id"]
 
     agent = create_test_wallet()
     provider = create_test_wallet()
@@ -218,12 +161,8 @@ defmodule RemitMd.AcceptanceTest do
     agent_before = get_usdc_balance(agent.wallet.address, usdc_address)
     provider_before = get_usdc_balance(provider.wallet.address, usdc_address)
 
-    # Sign EIP-2612 permit for Escrow contract
-    deadline = :os.system_time(:second) + 3600
-    permit = sign_usdc_permit(
-      agent.key_hex, agent.wallet.address, contracts["escrow"],
-      6_000_000, 0, deadline, usdc_address, chain_id
-    )
+    # Sign permit via server-side /permits/prepare
+    permit = Wallet.sign_permit(agent.wallet, "escrow", 6.0)
 
     {:ok, escrow} = Wallet.create_escrow(agent.wallet, provider.wallet.address, "5.000000",
       permit: permit)
@@ -256,18 +195,13 @@ defmodule RemitMd.AcceptanceTest do
   test "tab lifecycle (create, charge, close)" do
     contracts = fetch_contracts()
     usdc_address = contracts["usdc"]
-    chain_id = contracts["chain_id"]
 
     payer = create_test_wallet()
     provider = create_test_wallet()
     fund_wallet(payer, 100, usdc_address)
 
-    # Sign permit for the Tab contract
-    deadline = :os.system_time(:second) + 3600
-    permit = sign_usdc_permit(
-      payer.key_hex, payer.wallet.address, contracts["tab"],
-      20_000_000, 0, deadline, usdc_address, chain_id
-    )
+    # Sign permit via server-side /permits/prepare
+    permit = Wallet.sign_permit(payer.wallet, "tab", 20.0)
 
     payer_before = get_usdc_balance(payer.wallet.address, usdc_address)
 
@@ -301,24 +235,19 @@ defmodule RemitMd.AcceptanceTest do
     assert payer_delta < 0
   end
 
-  # ─── Test: Stream Lifecycle ────────────────────────────────────────────
+  # ─── Test: Stream Lifecycle ─────────────���──────────────────────────────
 
   @tag :acceptance
   test "stream lifecycle (create, wait, close with conservation)" do
     contracts = fetch_contracts()
     usdc_address = contracts["usdc"]
-    chain_id = contracts["chain_id"]
 
     payer = create_test_wallet()
     payee = create_test_wallet()
     fund_wallet(payer, 100, usdc_address)
 
-    # Sign permit for the Stream contract
-    deadline = :os.system_time(:second) + 3600
-    permit = sign_usdc_permit(
-      payer.key_hex, payer.wallet.address, contracts["stream"],
-      10_000_000, 0, deadline, usdc_address, chain_id
-    )
+    # Sign permit via server-side /permits/prepare
+    permit = Wallet.sign_permit(payer.wallet, "stream", 10.0)
 
     payer_before = get_usdc_balance(payer.wallet.address, usdc_address)
 
@@ -351,18 +280,13 @@ defmodule RemitMd.AcceptanceTest do
   test "bounty lifecycle (create, submit, award)" do
     contracts = fetch_contracts()
     usdc_address = contracts["usdc"]
-    chain_id = contracts["chain_id"]
 
     poster = create_test_wallet()
     submitter = create_test_wallet()
     fund_wallet(poster, 100, usdc_address)
 
-    # Sign permit for the Bounty contract
-    deadline_permit = :os.system_time(:second) + 3600
-    permit = sign_usdc_permit(
-      poster.key_hex, poster.wallet.address, contracts["bounty"],
-      10_000_000, 0, deadline_permit, usdc_address, chain_id
-    )
+    # Sign permit via server-side /permits/prepare
+    permit = Wallet.sign_permit(poster.wallet, "bounty", 10.0)
 
     poster_before = get_usdc_balance(poster.wallet.address, usdc_address)
 
@@ -398,18 +322,13 @@ defmodule RemitMd.AcceptanceTest do
   test "deposit lifecycle (place, return with full refund)" do
     contracts = fetch_contracts()
     usdc_address = contracts["usdc"]
-    chain_id = contracts["chain_id"]
 
     payer = create_test_wallet()
     provider = create_test_wallet()
     fund_wallet(payer, 100, usdc_address)
 
-    # Sign permit for the Deposit contract
-    deadline = :os.system_time(:second) + 3600
-    permit = sign_usdc_permit(
-      payer.key_hex, payer.wallet.address, contracts["deposit"],
-      10_000_000, 0, deadline, usdc_address, chain_id
-    )
+    # Sign permit via server-side /permits/prepare
+    permit = Wallet.sign_permit(payer.wallet, "deposit", 10.0)
 
     payer_before = get_usdc_balance(payer.wallet.address, usdc_address)
 
@@ -442,7 +361,6 @@ defmodule RemitMd.AcceptanceTest do
   test "x402 auto-pay (local server with 402)" do
     contracts = fetch_contracts()
     usdc_address = contracts["usdc"]
-    chain_id = contracts["chain_id"]
 
     provider_wallet = create_test_wallet()
 
@@ -451,7 +369,7 @@ defmodule RemitMd.AcceptanceTest do
     payment_payload = %{
       "payTo"       => provider_wallet.wallet.address,
       "amount"      => "1000",
-      "network"     => "eip155:#{chain_id}",
+      "network"     => "eip155:#{contracts["chain_id"]}",
       "asset"       => usdc_address,
       "facilitator" => api_base,
       "maxTimeout"  => 60,

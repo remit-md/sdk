@@ -283,30 +283,18 @@ MintResponse result = wallet.mint(100.0);  // $100 testnet USDC
 
 ## Advanced: Manual Permits
 
-All payment methods auto-sign permits. Use these methods only if you need explicit control over nonce, deadline, or USDC address.
+All payment methods auto-sign permits via the server's `/permits/prepare` endpoint. Use `signPermit` only if you need explicit control:
 
-### signPermit (recommended)
+### signPermit (via server)
 
-Auto-fetches the on-chain nonce and defaults deadline to 1 hour:
+The server handles nonce management, contract resolution, and EIP-712 hash computation. The SDK only signs the raw hash.
 
 ```java
-ContractAddresses contracts = wallet.getContracts();
-PermitSignature permit = wallet.signPermit(contracts.router, new BigDecimal("5.00"));
+PermitSignature permit = wallet.signPermit("direct", new BigDecimal("5.00"));
 wallet.pay("0xRecipient...", new BigDecimal("5.00"), "task", permit);
 ```
 
-### signUsdcPermit (low-level)
-
-Full control over all permit parameters:
-
-```java
-PermitSignature permit = wallet.signUsdcPermit(
-    contracts.router,     // spender
-    5_000_000L,           // value in base units (6 decimals)
-    1999999999L,          // deadline (unix timestamp)
-    0L                    // nonce
-);
-```
+Supported flows: `direct`, `escrow`, `tab`, `stream`, `bounty`, `deposit`.
 
 ---
 

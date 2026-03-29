@@ -14,11 +14,15 @@ public final class RemitWallet: @unchecked Sendable {
     private var contractsCache: ContractAddresses?
     private let cacheLock = NSLock()
 
-    /// Known USDC contract addresses per chain (EIP-2612 compatible).
-    public static let usdcAddresses: [String: String] = [
-        "base-sepolia": "0x2d846325766921935f37d5b4478196d3ef93707c",
-        "base": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    /// Contract name -> flow name for /permits/prepare.
+    private static let contractToFlow: [String: String] = [
+        "router": "direct",
+        "escrow": "escrow",
+        "tab": "tab",
+        "stream": "stream",
+        "bounty": "bounty",
+        "deposit": "deposit",
+        "relayer": "direct",
     ]
 
     public init(privateKey: String, chain: RemitChain = .base, baseURL: String? = nil, routerAddress: String? = nil) throws {
@@ -492,144 +496,65 @@ public final class RemitWallet: @unchecked Sendable {
         return try signer.sign(digest: digest)
     }
 
-    // MARK: - EIP-2612 Permit
+    // MARK: - EIP-2612 Permit (via /permits/prepare)
 
-    /// Sign an EIP-2612 permit for USDC approval.
+    /// Sign a USDC permit via the server's /permits/prepare endpoint.
     ///
-    /// Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address
-    /// Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline)
+    /// The server computes the EIP-712 hash, manages nonces, and resolves
+    /// contract addresses. The SDK only signs the hash.
     ///
     /// - Parameters:
-    ///   - spender: Contract address that will be approved as spender (e.g. Router, Escrow).
-    ///   - value: Amount in USDC base units (6 decimals).
-    ///   - deadline: Permit deadline (Unix timestamp).
-    ///   - nonce: Current permit nonce for this wallet (default: 0).
-    ///   - usdcAddress: Override the USDC contract address. Defaults to the chain's known address.
+    ///   - flow: Payment flow (direct, escrow, tab, stream, bounty, deposit).
+    ///   - amount: Amount in USDC (e.g. 5.0 for $5.00).
     /// - Returns: A `PermitSignature` with value, deadline, v, r, s.
-    public func signUsdcPermit(
-        spender: String,
-        value: UInt64,
-        deadline: Int,
-        nonce: Int = 0,
-        usdcAddress: String? = nil
-    ) throws -> PermitSignature {
+    public func signPermit(_ flow: String, amount: Double) async throws -> PermitSignature {
         guard let signer = self.signer else {
             throw RemitError(RemitError.invalidSignature, "Cannot sign permits in mock mode - no signer available")
         }
 
-        let usdcAddr = usdcAddress ?? RemitWallet.usdcAddresses[chain.chainName]
-        guard let usdcAddr, !usdcAddr.isEmpty else {
-            throw RemitError(RemitError.chainUnavailable, "No USDC address known for chain '\(chain.chainName)' - provide usdcAddress explicitly")
+        let data: PermitPrepareResponse = try await transport.request(
+            method: "POST", path: "/api/v1/permits/prepare",
+            body: PermitPrepareBody(flow: flow, amount: String(amount), owner: signerAddress)
+        )
+
+        let hashHex = data.hash.hasPrefix("0x") ? String(data.hash.dropFirst(2)) : data.hash
+        guard let hashBytes = Data(hexString: hashHex), hashBytes.count == 32 else {
+            throw RemitError(RemitError.serverError, "Invalid hash from /permits/prepare: \(data.hash)")
         }
 
-        // Domain separator for USDC (EIP-2612)
-        let domainTypeHash = keccak256(Data("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".utf8))
-        let nameHash = keccak256(Data("USD Coin".utf8))
-        let versionHash = keccak256(Data("2".utf8))
+        let sig = try await signer.signHash(hashBytes)
+        let sigHex = sig.hasPrefix("0x") ? String(sig.dropFirst(2)) : sig
+        let r = "0x" + String(sigHex.prefix(64))
+        let s = "0x" + String(sigHex.dropFirst(64).prefix(64))
+        let vStr = String(sigHex.dropFirst(128).prefix(2))
+        let v = Int(vStr, radix: 16) ?? 27
 
-        var domainData = Data()
-        domainData.append(domainTypeHash)
-        domainData.append(nameHash)
-        domainData.append(versionHash)
-        domainData.append(permitEncodeUint256(UInt64(chain.rawValue)))
-        domainData.append(permitEncodeAddress(usdcAddr))
-        let domainSep = keccak256(domainData)
-
-        // Permit struct hash
-        let typeHash = keccak256(Data("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)".utf8))
-
-        var structData = Data()
-        structData.append(typeHash)
-        structData.append(permitEncodeAddress(signerAddress))
-        structData.append(permitEncodeAddress(spender))
-        structData.append(permitEncodeUint256(value))
-        structData.append(permitEncodeUint256(UInt64(nonce)))
-        structData.append(permitEncodeUint256(UInt64(deadline)))
-        let structHash = keccak256(structData)
-
-        // Final EIP-712 digest
-        var finalData = Data([0x19, 0x01])
-        finalData.append(domainSep)
-        finalData.append(structHash)
-        let digest = keccak256(finalData)
-
-        let sigHex = try signer.sign(digest: digest)
-
-        // Parse r, s, v from 65-byte signature
-        let sigStr = sigHex.hasPrefix("0x") ? String(sigHex.dropFirst(2)) : sigHex
-        let r = "0x" + String(sigStr.prefix(64))
-        let s = "0x" + String(sigStr.dropFirst(64).prefix(64))
-        let vHex = String(sigStr.dropFirst(128).prefix(2))
-        let v = Int(vHex, radix: 16) ?? 27
-
-        return PermitSignature(value: Double(value), deadline: deadline, v: v, r: r, s: s)
+        return PermitSignature(
+            value: Double(data.value) ?? amount,
+            deadline: Int(data.deadline) ?? (Int(Date().timeIntervalSince1970) + 3600),
+            v: v,
+            r: r,
+            s: s
+        )
     }
 
-    /// Convenience: sign an EIP-2612 permit for USDC approval.
-    /// Auto-fetches the on-chain nonce and sets a default deadline (1 hour from now).
-    ///
-    /// - Parameters:
-    ///   - spender: Contract address that will call transferFrom (e.g. Router, Escrow).
-    ///   - amount: Amount in USDC (e.g. 1.50 for $1.50).
-    ///   - deadline: Optional Unix timestamp. Defaults to 1 hour from now.
-    /// - Returns: A `PermitSignature`.
-    public func signPermit(spender: String, amount: Double, deadline: Int? = nil, usdcAddress: String? = nil) async throws -> PermitSignature {
-        let usdcAddr: String
-        if let override_ = usdcAddress, !override_.isEmpty {
-            usdcAddr = override_
-        } else if let mapped = RemitWallet.usdcAddresses[chain.chainName], !mapped.isEmpty {
-            usdcAddr = mapped
-        } else {
-            throw RemitError(RemitError.chainUnavailable, "No USDC address known for chain '\(chain.chainName)'")
-        }
-        let nonce = try await fetchPermitNonce(usdcAddress: usdcAddr)
-        let dl = deadline ?? (Int(Date().timeIntervalSince1970) + 3600)
-        let rawAmount = UInt64(round(amount * 1_000_000))
-        return try signUsdcPermit(spender: spender, value: rawAmount, deadline: dl, nonce: nonce, usdcAddress: usdcAddr)
-    }
-
-    /// Internal: auto-sign a permit for the given contract type and amount.
-    /// Used by payment methods when no explicit permit is provided.
-    /// Returns nil on failure instead of throwing, so callers can proceed without a permit.
+    /// Internal: auto-sign a permit via /permits/prepare.
+    /// Maps the contract name to a flow and calls signPermit().
+    /// Returns nil on failure so callers degrade gracefully.
     private func autoPermit(
         contract: String,
         amount: Double
     ) async -> PermitSignature? {
+        guard let flow = RemitWallet.contractToFlow[contract] else {
+            print("[remitmd] unknown contract for permit: \(contract)")
+            return nil
+        }
         do {
-            let contracts = try await getContracts()
-            let spender: String
-            switch contract {
-            case "router":  spender = contracts.router
-            case "escrow":  spender = contracts.escrow
-            case "tab":     spender = contracts.tab
-            case "stream":  spender = contracts.stream
-            case "bounty":  spender = contracts.bounty
-            case "deposit": spender = contracts.deposit
-            case "relayer": spender = contracts.relayer ?? ""
-            default:
-                return nil
-            }
-            guard !spender.isEmpty else { return nil }
-            return try await signPermit(spender: spender, amount: amount, usdcAddress: contracts.usdc)
+            return try await signPermit(flow, amount: amount)
         } catch {
             print("[remitmd] auto-permit failed for \(contract) (amount=\(amount)): \(error)")
             return nil
         }
-    }
-
-    /// Fetch the EIP-2612 permit nonce from the API.
-    private func fetchPermitNonce(usdcAddress: String) async throws -> Int {
-        // Mock mode: return 0 directly
-        if isMock { return 0 }
-
-        let walletStatus: WalletStatus = try await transport.request(
-            method: "GET", path: "/api/v1/status/\(signerAddress)",
-            body: Optional<EmptyBody>.none
-        )
-        guard let nonce = walletStatus.permitNonce else {
-            throw RemitError(RemitError.serverError, "permit_nonce not available from /status API for \(signerAddress)")
-        }
-        return nonce
     }
 
     // MARK: - Validation
@@ -824,25 +749,17 @@ private func tabEncodeAddress(_ address: String) -> Data {
     return result
 }
 
-// MARK: - EIP-2612 Permit helpers (file-level)
+// MARK: - /permits/prepare request/response
 
-/// Encode a UInt64 as ABI uint256 (32-byte big-endian, zero-padded on the left).
-private func permitEncodeUint256(_ value: UInt64) -> Data {
-    var result = Data(repeating: 0, count: 32)
-    var v = value
-    for i in stride(from: 31, through: 24, by: -1) {
-        result[i] = UInt8(v & 0xFF)
-        v >>= 8
-    }
-    return result
+private struct PermitPrepareBody: Codable {
+    let flow: String
+    let amount: String
+    let owner: String
 }
 
-/// Encode an Ethereum address as ABI bytes32 (12 zero bytes + 20 address bytes).
-private func permitEncodeAddress(_ address: String) -> Data {
-    var result = Data(repeating: 0, count: 32)
-    let hex = address.hasPrefix("0x") ? String(address.dropFirst(2)) : address
-    guard hex.count == 40, let addrData = Data(hexString: hex) else { return result }
-    result.replaceSubrange(12..<32, with: addrData)
-    return result
+private struct PermitPrepareResponse: Codable {
+    let hash: String
+    let value: String
+    let deadline: String
 }
 

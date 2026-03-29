@@ -5,9 +5,7 @@ import md.remit.models.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.web3j.crypto.ECKeyPair;
-import org.web3j.crypto.Hash;
 import org.web3j.crypto.Keys;
-import org.web3j.crypto.Sign;
 import org.web3j.utils.Numeric;
 
 import java.math.BigDecimal;
@@ -20,7 +18,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -154,97 +151,6 @@ class AcceptanceTest {
         waitForBalanceChange(w.address(), 0);
     }
 
-    // ─── EIP-2612 Permit Signing ────────────────────────────────────────────
-
-    private static PermitSignature signUsdcPermit(
-            ECKeyPair keyPair,
-            String owner,
-            String spender,
-            long value,
-            long nonce,
-            long deadline) throws Exception {
-
-        ContractAddresses contracts = fetchContracts();
-
-        // Domain separator: EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)
-        byte[] domainTypeHash = Hash.sha3(
-                "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".getBytes());
-        byte[] nameHash = Hash.sha3("USD Coin".getBytes());
-        byte[] versionHash = Hash.sha3("2".getBytes());
-
-        byte[] domainData = concat(
-                domainTypeHash,
-                nameHash,
-                versionHash,
-                toUint256(contracts.chainId),
-                addressToBytes32(contracts.usdc));
-        byte[] domainSep = Hash.sha3(domainData);
-
-        // Permit struct hash
-        byte[] permitTypeHash = Hash.sha3(
-                "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)".getBytes());
-
-        byte[] structData = concat(
-                permitTypeHash,
-                addressToBytes32(owner),
-                addressToBytes32(spender),
-                toUint256(value),
-                toUint256(nonce),
-                toUint256(deadline));
-        byte[] structHash = Hash.sha3(structData);
-
-        // EIP-712 digest: "\x19\x01" || domainSeparator || structHash
-        byte[] finalData = new byte[2 + 32 + 32];
-        finalData[0] = 0x19;
-        finalData[1] = 0x01;
-        System.arraycopy(domainSep, 0, finalData, 2, 32);
-        System.arraycopy(structHash, 0, finalData, 34, 32);
-        byte[] digest = Hash.sha3(finalData);
-
-        // Sign (needToHash=false - digest is already the final hash)
-        Sign.SignatureData sig = Sign.signMessage(digest, keyPair, false);
-
-        int v = sig.getV()[0] & 0xFF;
-        String r = "0x" + HexFormat.of().formatHex(sig.getR());
-        String s = "0x" + HexFormat.of().formatHex(sig.getS());
-
-        return new PermitSignature(value, deadline, v, r, s);
-    }
-
-    private static byte[] toUint256(long value) {
-        BigInteger bi = BigInteger.valueOf(value);
-        if (value < 0) {
-            // Unsigned interpretation
-            bi = new BigInteger(Long.toUnsignedString(value));
-        }
-        byte[] b = bi.toByteArray();
-        byte[] result = new byte[32];
-        int start = (b.length > 1 && b[0] == 0) ? 1 : 0;
-        int len = b.length - start;
-        System.arraycopy(b, start, result, 32 - len, len);
-        return result;
-    }
-
-    private static byte[] addressToBytes32(String address) {
-        String hex = address.startsWith("0x") ? address.substring(2) : address;
-        byte[] addr = HexFormat.of().parseHex(hex);
-        byte[] result = new byte[32];
-        System.arraycopy(addr, 0, result, 12, 20);
-        return result;
-    }
-
-    private static byte[] concat(byte[]... arrays) {
-        int total = 0;
-        for (byte[] a : arrays) total += a.length;
-        byte[] result = new byte[total];
-        int pos = 0;
-        for (byte[] a : arrays) {
-            System.arraycopy(a, 0, result, pos, a.length);
-            pos += a.length;
-        }
-        return result;
-    }
-
     // ─── Tests ──────────────────────────────────────────────────────────────
 
     @Test
@@ -260,14 +166,8 @@ class AcceptanceTest {
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Sign EIP-2612 permit for Router
-        ContractAddresses contracts = fetchContracts();
-        long deadline = Instant.now().getEpochSecond() + 3600;
-        PermitSignature permit = signUsdcPermit(
-                agent.keyPair, agent.address(), contracts.router,
-                2_000_000, // $2 USDC in base units
-                0,         // nonce 0 (fresh wallet)
-                deadline);
+        // Sign permit via /permits/prepare
+        PermitSignature permit = agent.wallet.signPermit("direct", new BigDecimal("2.0"));
 
         Transaction tx = agent.wallet.pay(
                 provider.address(),
@@ -298,14 +198,8 @@ class AcceptanceTest {
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Sign EIP-2612 permit for Escrow contract
-        ContractAddresses contracts = fetchContracts();
-        long deadline = Instant.now().getEpochSecond() + 3600;
-        PermitSignature permit = signUsdcPermit(
-                agent.keyPair, agent.address(), contracts.escrow,
-                6_000_000, // $6 USDC in base units
-                0,         // nonce 0
-                deadline);
+        // Sign permit via /permits/prepare
+        PermitSignature permit = agent.wallet.signPermit("escrow", new BigDecimal("6.0"));
 
         Escrow escrow = agent.wallet.createEscrow(
                 provider.address(),
@@ -351,15 +245,11 @@ class AcceptanceTest {
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Step 1: Open tab (agent, with permit for Tab contract)
+        // Step 1: Open tab (agent, with permit via /permits/prepare)
         ContractAddresses contracts = fetchContracts();
         String tabContract = contracts.tab;
 
-        long deadline = Instant.now().getEpochSecond() + 3600;
-        long rawAmount = (long) ((limit + 1) * 1_000_000);
-        PermitSignature permit = signUsdcPermit(
-                agent.keyPair, agent.address(), tabContract,
-                rawAmount, 0, deadline);
+        PermitSignature permit = agent.wallet.signPermit("tab", new BigDecimal("11.0"));
 
         Tab tab = agent.wallet.createTab(
                 provider.address(),
@@ -422,15 +312,8 @@ class AcceptanceTest {
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Step 1: Open stream with permit for Stream contract
-        ContractAddresses contracts = fetchContracts();
-        String streamContract = contracts.stream;
-
-        long deadline = Instant.now().getEpochSecond() + 3600;
-        long rawAmount = (long) ((maxTotal + 1) * 1_000_000);
-        PermitSignature permit = signUsdcPermit(
-                agent.keyPair, agent.address(), streamContract,
-                rawAmount, 0, deadline);
+        // Step 1: Open stream with permit via /permits/prepare
+        PermitSignature permit = agent.wallet.signPermit("stream", new BigDecimal("6.0"));
 
         Stream stream = agent.wallet.createStream(
                 provider.address(),
@@ -486,10 +369,9 @@ class AcceptanceTest {
         double posterBefore = getUsdcBalance(poster.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Step 1: Post bounty (auto-permit)
+        // Step 1: Post bounty (auto-permit via /permits/prepare)
         long deadlineTs = Instant.now().getEpochSecond() + 3600;
 
-        // Use auto-permit (SDK signs internally)
         Bounty bounty = poster.wallet.createBounty(
                 new BigDecimal("5.0"),
                 "java-bounty-acceptance-test",
@@ -537,15 +419,8 @@ class AcceptanceTest {
         double agentBefore = getUsdcBalance(agent.address());
         double providerBefore = getUsdcBalance(provider.address());
 
-        // Step 1: Place deposit with permit for Deposit contract
-        ContractAddresses contracts = fetchContracts();
-        String depositContract = contracts.deposit;
-
-        long deadline = Instant.now().getEpochSecond() + 3600;
-        long rawAmount = (long) ((amount + 1) * 1_000_000);
-        PermitSignature permit = signUsdcPermit(
-                agent.keyPair, agent.address(), depositContract,
-                rawAmount, 0, deadline);
+        // Step 1: Place deposit with permit via /permits/prepare
+        PermitSignature permit = agent.wallet.signPermit("deposit", new BigDecimal("6.0"));
 
         Deposit deposit = agent.wallet.lockDeposit(
                 provider.address(),

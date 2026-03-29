@@ -3,8 +3,6 @@ Python SDK acceptance: Deposit lifecycle via wallet.place_deposit(), return_depo
 Verifies SDK permit signing + deposit lock/return with full refund (no fee).
 """
 
-import time
-
 import pytest
 
 from .conftest import (
@@ -30,17 +28,7 @@ async def test_deposit_lifecycle() -> None:
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
     # Step 1: Place deposit with permit for Deposit contract
-    contracts = await agent.get_contracts()
-    deposit_contract = contracts["deposit"]
-
-    deadline = int(time.time()) + 3600
-    raw_amount = int((amount + 1) * 1_000_000)
-    permit = await agent.sign_usdc_permit(
-        spender=deposit_contract,
-        value=raw_amount,
-        deadline=deadline,
-        nonce=0,
-    )
+    permit = await agent.sign_permit("deposit", amount)
 
     deposit = await agent.place_deposit(
         to=provider.address,

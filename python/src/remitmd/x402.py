@@ -2,8 +2,9 @@
 
 x402 is an open payment standard where resource servers return HTTP 402 with
 a ``PAYMENT-REQUIRED`` header describing the cost. This module provides an
-httpx wrapper that intercepts those responses, signs an EIP-3009 authorization,
-and retries the request with a ``PAYMENT-SIGNATURE`` header.
+httpx wrapper that intercepts those responses, signs an EIP-3009 authorization
+via the server's ``/x402/prepare`` endpoint, and retries the request with a
+``PAYMENT-SIGNATURE`` header.
 
 Usage::
 
@@ -22,26 +23,11 @@ from __future__ import annotations
 
 import base64
 import json
-import secrets
-import time
 from typing import Any
 
 import httpx
 
 from remitmd.signer import Signer
-
-# EIP-712 type definition for USDC's transferWithAuthorization (EIP-3009).
-# Domain: { name: "USD Coin", version: "2", chainId: N, verifyingContract: USDC }
-_EIP3009_TYPES: dict[str, object] = {
-    "TransferWithAuthorization": [
-        {"name": "from", "type": "address"},
-        {"name": "to", "type": "address"},
-        {"name": "value", "type": "uint256"},
-        {"name": "validAfter", "type": "uint256"},
-        {"name": "validBefore", "type": "uint256"},
-        {"name": "nonce", "type": "bytes32"},
-    ]
-}
 
 
 class AllowanceExceededError(Exception):
@@ -87,6 +73,7 @@ class X402Client:
         self._address: str = wallet.address
         self._max_auto_pay_usdc = max_auto_pay_usdc
         self._http = httpx.AsyncClient(timeout=timeout)
+        self._api_http = wallet._http  # Authenticated Remit API client
         # Set after each payment; contains V2 fields (resource, description, mimeType) if provided.
         self.last_payment: dict[str, Any] | None = None
 
@@ -123,12 +110,11 @@ class X402Client:
 
         required: dict[str, Any] = json.loads(base64.b64decode(raw))
 
-        # 2. Only the "exact" scheme is supported in V5.
+        # 2. Only the "exact" scheme is supported.
         if required.get("scheme") != "exact":
             raise ValueError(f"Unsupported x402 scheme: {required.get('scheme')!r}")
 
-        # Store for caller inspection. V2 fields (resource, description, mimeType) are
-        # included here when the resource server sends them.
+        # Store for caller inspection (V2 fields: resource, description, mimeType).
         self.last_payment = required
 
         # 3. Check auto-pay limit.
@@ -137,35 +123,18 @@ class X402Client:
         if amount_usdc > self._max_auto_pay_usdc:
             raise AllowanceExceededError(amount_usdc, self._max_auto_pay_usdc)
 
-        # 4. Parse chainId from CAIP-2 network string (e.g. "eip155:84532" → 84532).
+        # 4. Call /x402/prepare to get the hash + authorization fields.
+        prepare_data = await self._api_http.post(
+            "/api/v1/x402/prepare",
+            {"payment_required": raw, "payer": self._address},
+        )
+
+        # 5. Sign the hash.
+        hash_bytes = bytes.fromhex(prepare_data["hash"][2:])
+        signature = await self._signer.sign_hash(hash_bytes)
+
+        # 6. Build PAYMENT-SIGNATURE JSON payload.
         network: str = required["network"]
-        chain_id = int(network.split(":")[1])
-
-        # 5. Build EIP-3009 authorization fields.
-        now = int(time.time())
-        valid_before = now + int(required.get("maxTimeoutSeconds", 60))
-        nonce = "0x" + secrets.token_hex(32)
-
-        domain: dict[str, Any] = {
-            "name": "USD Coin",
-            "version": "2",
-            "chainId": chain_id,
-            "verifyingContract": required["asset"],
-        }
-        # eth_account encodes uint256 from Python int and bytes32 from 0x-hex string.
-        eip712_value: dict[str, Any] = {
-            "from": self._address,
-            "to": required["payTo"],
-            "value": amount_base_units,
-            "validAfter": 0,
-            "validBefore": valid_before,
-            "nonce": nonce,
-        }
-
-        # 6. Sign with EIP-712.
-        signature = await self._signer.sign_typed_data(domain, _EIP3009_TYPES, eip712_value)
-
-        # 7. Build PAYMENT-SIGNATURE JSON payload.
         payment_payload = {
             "scheme": required["scheme"],
             "network": network,
@@ -173,18 +142,18 @@ class X402Client:
             "payload": {
                 "signature": signature,
                 "authorization": {
-                    "from": self._address,
-                    "to": required["payTo"],
-                    "value": required["amount"],  # string (base units)
-                    "validAfter": "0",
-                    "validBefore": str(valid_before),
-                    "nonce": nonce,
+                    "from": prepare_data["from"],
+                    "to": prepare_data["to"],
+                    "value": prepare_data["value"],
+                    "validAfter": prepare_data["valid_after"],
+                    "validBefore": prepare_data["valid_before"],
+                    "nonce": prepare_data["nonce"],
                 },
             },
         }
         payment_header = base64.b64encode(json.dumps(payment_payload).encode()).decode()
 
-        # 8. Retry with PAYMENT-SIGNATURE header.
+        # 7. Retry with PAYMENT-SIGNATURE header.
         headers: dict[str, str] = dict(kwargs.pop("headers", {}))
         headers["PAYMENT-SIGNATURE"] = payment_header
         return await self._http.request(method, url, headers=headers, **kwargs)

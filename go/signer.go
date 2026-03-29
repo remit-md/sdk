@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/shopspring/decimal"
 )
 
 
@@ -19,6 +18,9 @@ import (
 type Signer interface {
 	// Sign returns an EIP-712 signature over the given digest (32 bytes).
 	Sign(digest [32]byte) ([]byte, error)
+	// SignHash signs a raw 32-byte hash and returns the 0x-prefixed hex signature (65 bytes: r+s+v).
+	// Used by server-side permit/x402 flows where the server computes the EIP-712 hash.
+	SignHash(hash []byte) (string, error)
 	// Address returns the Ethereum address of the signing key.
 	Address() common.Address
 }
@@ -61,23 +63,26 @@ func (s *PrivateKeySigner) Sign(digest [32]byte) ([]byte, error) {
 	return sig, nil
 }
 
+// SignHash signs a raw 32-byte hash and returns a 0x-prefixed hex signature string.
+func (s *PrivateKeySigner) SignHash(hash []byte) (string, error) {
+	if len(hash) != 32 {
+		return "", fmt.Errorf("SignHash: expected 32 bytes, got %d", len(hash))
+	}
+	var digest [32]byte
+	copy(digest[:], hash)
+	sig, err := s.Sign(digest)
+	if err != nil {
+		return "", err
+	}
+	return "0x" + hex.EncodeToString(sig), nil
+}
+
 // Address returns the Ethereum address for this signing key.
 func (s *PrivateKeySigner) Address() common.Address {
 	return s.address
 }
 
-// eip712Domain holds the parameters for the remit.md EIP-712 domain separator.
-type eip712Domain struct {
-	ChainID         *big.Int
-	VerifyingContract common.Address
-}
-
-// paymentRequest is the EIP-712 struct type for direct payments.
-type paymentRequest struct {
-	Recipient common.Address
-	Amount    *big.Int // USDC base units (6 decimals)
-	Nonce     [32]byte
-}
+// ─── EIP-712 domain and API request authentication ─────────────────────────────
 
 var (
 	domainType = abi.Arguments{
@@ -87,12 +92,6 @@ var (
 		{Type: mustType("uint256")},  // chainId
 		{Type: mustType("address")},  // verifyingContract
 	}
-	paymentType = abi.Arguments{
-		{Type: mustType("bytes32")},  // typeHash
-		{Type: mustType("address")},  // recipient
-		{Type: mustType("uint256")},  // amount
-		{Type: mustType("bytes32")},  // nonce
-	}
 	apiRequestType = abi.Arguments{
 		{Type: mustType("bytes32")},  // typeHash
 		{Type: mustType("bytes32")},  // keccak256(method)
@@ -100,46 +99,17 @@ var (
 		{Type: mustType("uint256")},  // timestamp
 		{Type: mustType("bytes32")},  // nonce
 	}
-	permitType = abi.Arguments{
-		{Type: mustType("bytes32")},  // typeHash
-		{Type: mustType("address")},  // owner
-		{Type: mustType("address")},  // spender
-		{Type: mustType("uint256")},  // value
-		{Type: mustType("uint256")},  // nonce
-		{Type: mustType("uint256")},  // deadline
-	}
 
 	domainTypeHash      = crypto.Keccak256Hash([]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"))
-	paymentTypeHash     = crypto.Keccak256Hash([]byte("Payment(address recipient,uint256 amount,bytes32 nonce)"))
 	apiRequestTypeHash  = crypto.Keccak256Hash([]byte("APIRequest(string method,string path,uint256 timestamp,bytes32 nonce)"))
-	permitTypeHash      = crypto.Keccak256Hash([]byte("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"))
 	nameHash            = crypto.Keccak256Hash([]byte("remit.md"))
 	versionHash         = crypto.Keccak256Hash([]byte("0.1"))
-
-	// USDC EIP-712 domain uses name="USD Coin", version="2"
-	usdcNameHash    = crypto.Keccak256Hash([]byte("USD Coin"))
-	usdcVersionHash = crypto.Keccak256Hash([]byte("2"))
 )
 
 // computeDomainSeparator returns the EIP-712 domain separator for a given chain and contract.
 func computeDomainSeparator(chainID *big.Int, contract common.Address) [32]byte {
 	packed, _ := domainType.Pack(domainTypeHash, nameHash, versionHash, chainID, contract)
 	return crypto.Keccak256Hash(packed)
-}
-
-// computePaymentDigest computes the EIP-712 digest for a payment request.
-func computePaymentDigest(domain [32]byte, recipient common.Address, amount decimal.Decimal, nonce [32]byte) [32]byte {
-	// Convert USDC amount to base units (6 decimals)
-	baseUnits := amount.Mul(decimal.NewFromInt(1_000_000)).BigInt()
-
-	packed, _ := paymentType.Pack(paymentTypeHash, recipient, baseUnits, nonce)
-	structHash := crypto.Keccak256Hash(packed)
-
-	// EIP-712 final digest: \x19\x01 || domainSeparator || structHash
-	digest := crypto.Keccak256Hash(
-		append([]byte("\x19\x01"), append(domain[:], structHash[:]...)...),
-	)
-	return digest
 }
 
 // computeRequestDigest computes the EIP-712 digest for authenticating an API request.
@@ -159,26 +129,6 @@ func computeRequestDigest(chainID *big.Int, contract common.Address, method, pat
 		new(big.Int).SetUint64(timestamp),
 		nonce,
 	)
-	structHash := crypto.Keccak256Hash(packed)
-
-	return crypto.Keccak256Hash(
-		append([]byte("\x19\x01"), append(domain[:], structHash[:]...)...),
-	)
-}
-
-// computeUsdcDomainSeparator returns the EIP-712 domain separator for USDC (name="USD Coin", version="2").
-func computeUsdcDomainSeparator(chainID *big.Int, usdcAddress common.Address) [32]byte {
-	packed, _ := domainType.Pack(domainTypeHash, usdcNameHash, usdcVersionHash, chainID, usdcAddress)
-	return crypto.Keccak256Hash(packed)
-}
-
-// computePermitDigest computes the EIP-712 digest for an EIP-2612 Permit message.
-// Domain: name="USD Coin", version="2", chainId, verifyingContract=USDC address.
-// Type: Permit(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline).
-func computePermitDigest(chainID *big.Int, usdcAddress, owner, spender common.Address, value, nonce, deadline *big.Int) [32]byte {
-	domain := computeUsdcDomainSeparator(chainID, usdcAddress)
-
-	packed, _ := permitType.Pack(permitTypeHash, owner, spender, value, nonce, deadline)
 	structHash := crypto.Keccak256Hash(packed)
 
 	return crypto.Keccak256Hash(

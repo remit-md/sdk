@@ -7,7 +7,7 @@
 //!   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 use k256::ecdsa::SigningKey;
-use remitmd::{PermitSignature, Wallet};
+use remitmd::Wallet;
 use rust_decimal::Decimal;
 use sha3::{Digest, Keccak256};
 use std::env;
@@ -29,10 +29,14 @@ fn rpc_url() -> String {
 #[derive(serde::Deserialize)]
 struct Contracts {
     router: String,
+    #[allow(dead_code)]
     escrow: String,
     tab: String,
+    #[allow(dead_code)]
     stream: String,
+    #[allow(dead_code)]
     bounty: String,
+    #[allow(dead_code)]
     deposit: String,
     usdc: String,
     chain_id: u64,
@@ -141,13 +145,20 @@ fn log_tx(flow: &str, step: &str, tx_hash: &str) {
     );
 }
 
-// ─── EIP-2612 Permit Signing ─────────────────────────────────────────────────
-
 fn keccak256(data: &[u8]) -> [u8; 32] {
     let mut h = Keccak256::new();
     h.update(data);
     h.finalize().into()
 }
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+// ─── EIP-712 TabCharge Signing ───────────────────────────────────────────────
 
 fn pad_address(addr: &str) -> [u8; 32] {
     let hex_str = addr.trim_start_matches("0x");
@@ -164,81 +175,6 @@ fn pad_u256(val: u64) -> [u8; 32] {
     padded[24..].copy_from_slice(&val.to_be_bytes());
     padded
 }
-
-fn sign_usdc_permit(
-    key: &SigningKey,
-    owner: &str,
-    spender: &str,
-    value: u64,
-    nonce: u64,
-    deadline: u64,
-    usdc_address: &str,
-    chain_id: u64,
-) -> PermitSignature {
-    // Domain separator for USDC EIP-2612
-    let domain_type_hash = keccak256(
-        b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
-    );
-    let name_hash = keccak256(b"USD Coin");
-    let version_hash = keccak256(b"2");
-
-    let usdc_hex = usdc_address.trim_start_matches("0x");
-    let usdc_bytes = hex::decode(usdc_hex).expect("decode USDC address");
-    let mut usdc_padded = [0u8; 32];
-    usdc_padded[12..].copy_from_slice(&usdc_bytes);
-
-    let mut domain_data = [0u8; 160];
-    domain_data[0..32].copy_from_slice(&domain_type_hash);
-    domain_data[32..64].copy_from_slice(&name_hash);
-    domain_data[64..96].copy_from_slice(&version_hash);
-    domain_data[96..128].copy_from_slice(&pad_u256(chain_id));
-    domain_data[128..160].copy_from_slice(&usdc_padded);
-    let domain_sep = keccak256(&domain_data);
-
-    // Permit struct hash
-    let permit_type_hash = keccak256(
-        b"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)",
-    );
-
-    let mut struct_data = [0u8; 192]; // 6 × 32
-    struct_data[0..32].copy_from_slice(&permit_type_hash);
-    struct_data[32..64].copy_from_slice(&pad_address(owner));
-    struct_data[64..96].copy_from_slice(&pad_address(spender));
-    struct_data[96..128].copy_from_slice(&pad_u256(value));
-    struct_data[128..160].copy_from_slice(&pad_u256(nonce));
-    struct_data[160..192].copy_from_slice(&pad_u256(deadline));
-    let struct_hash = keccak256(&struct_data);
-
-    // EIP-712 digest
-    let mut final_data = [0u8; 66];
-    final_data[0] = 0x19;
-    final_data[1] = 0x01;
-    final_data[2..34].copy_from_slice(&domain_sep);
-    final_data[34..66].copy_from_slice(&struct_hash);
-    let digest = keccak256(&final_data);
-
-    // Sign with k256
-    let (sig, recovery_id) = key.sign_prehash_recoverable(&digest).expect("sign permit");
-    let sig_bytes = sig.to_bytes();
-    let v = recovery_id.to_byte() + 27;
-
-    PermitSignature {
-        value,
-        deadline,
-        v,
-        r: format!("0x{}", hex::encode(&sig_bytes[..32])),
-        s: format!("0x{}", hex::encode(&sig_bytes[32..])),
-    }
-}
-
-fn now_unix() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-}
-
-// ─── EIP-712 TabCharge Signing ───────────────────────────────────────────────
 
 /// Sign a TabCharge EIP-712 message for the RemitTab contract.
 ///
@@ -328,17 +264,12 @@ async fn acceptance_pay_direct_with_permit() {
     let agent_before = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
     let provider_before = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
 
-    // Sign EIP-2612 permit for Router
-    let permit = sign_usdc_permit(
-        &agent.signing_key,
-        agent.wallet.address(),
-        &contracts.router,
-        2_000_000, // $2 USDC in base units
-        0,         // nonce 0
-        now_unix() + 3600,
-        &contracts.usdc,
-        contracts.chain_id,
-    );
+    // Sign permit via server-side /permits/prepare
+    let permit = agent
+        .wallet
+        .sign_permit("direct", 2.0)
+        .await
+        .expect("sign_permit direct");
 
     let tx = agent
         .wallet
@@ -386,17 +317,12 @@ async fn acceptance_escrow_lifecycle() {
     let agent_before = get_usdc_balance(agent.wallet.address(), &contracts.usdc).await;
     let provider_before = get_usdc_balance(provider.wallet.address(), &contracts.usdc).await;
 
-    // Sign EIP-2612 permit for Escrow contract
-    let permit = sign_usdc_permit(
-        &agent.signing_key,
-        agent.wallet.address(),
-        &contracts.escrow,
-        6_000_000, // $6 USDC
-        0,
-        now_unix() + 3600,
-        &contracts.usdc,
-        contracts.chain_id,
-    );
+    // Sign permit via server-side /permits/prepare
+    let permit = agent
+        .wallet
+        .sign_permit("escrow", 6.0)
+        .await
+        .expect("sign_permit escrow");
 
     let escrow = agent
         .wallet
@@ -455,17 +381,12 @@ async fn acceptance_tab_lifecycle() {
     let provider = create_test_wallet(&contracts.router);
     fund_wallet(&payer, 100.0, &contracts.usdc).await;
 
-    // Sign permit for the Tab contract
-    let permit = sign_usdc_permit(
-        &payer.signing_key,
-        payer.wallet.address(),
-        &contracts.tab,
-        20_000_000, // $20 USDC in base units
-        0,
-        now_unix() + 3600,
-        &contracts.usdc,
-        contracts.chain_id,
-    );
+    // Sign permit via server-side /permits/prepare
+    let permit = payer
+        .wallet
+        .sign_permit("tab", 20.0)
+        .await
+        .expect("sign_permit tab");
 
     let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
 
@@ -552,17 +473,12 @@ async fn acceptance_stream_lifecycle() {
     let payee = create_test_wallet(&contracts.router);
     fund_wallet(&payer, 100.0, &contracts.usdc).await;
 
-    // Sign permit for the Stream contract
-    let permit = sign_usdc_permit(
-        &payer.signing_key,
-        payer.wallet.address(),
-        &contracts.stream,
-        10_000_000, // $10 USDC in base units
-        0,
-        now_unix() + 3600,
-        &contracts.usdc,
-        contracts.chain_id,
-    );
+    // Sign permit via server-side /permits/prepare
+    let permit = payer
+        .wallet
+        .sign_permit("stream", 10.0)
+        .await
+        .expect("sign_permit stream");
 
     let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
 
@@ -621,17 +537,12 @@ async fn acceptance_bounty_lifecycle() {
     let submitter = create_test_wallet(&contracts.router);
     fund_wallet(&poster, 100.0, &contracts.usdc).await;
 
-    // Sign permit for the Bounty contract
-    let permit = sign_usdc_permit(
-        &poster.signing_key,
-        poster.wallet.address(),
-        &contracts.bounty,
-        10_000_000, // $10 USDC in base units
-        0,
-        now_unix() + 3600,
-        &contracts.usdc,
-        contracts.chain_id,
-    );
+    // Sign permit via server-side /permits/prepare
+    let permit = poster
+        .wallet
+        .sign_permit("bounty", 10.0)
+        .await
+        .expect("sign_permit bounty");
 
     let poster_before = get_usdc_balance(poster.wallet.address(), &contracts.usdc).await;
 
@@ -701,17 +612,12 @@ async fn acceptance_deposit_lifecycle() {
     let provider = create_test_wallet(&contracts.router);
     fund_wallet(&payer, 100.0, &contracts.usdc).await;
 
-    // Sign permit for the Deposit contract
-    let permit = sign_usdc_permit(
-        &payer.signing_key,
-        payer.wallet.address(),
-        &contracts.deposit,
-        10_000_000, // $10 USDC in base units
-        0,
-        now_unix() + 3600,
-        &contracts.usdc,
-        contracts.chain_id,
-    );
+    // Sign permit via server-side /permits/prepare
+    let permit = payer
+        .wallet
+        .sign_permit("deposit", 10.0)
+        .await
+        .expect("sign_permit deposit");
 
     let payer_before = get_usdc_balance(payer.wallet.address(), &contracts.usdc).await;
 

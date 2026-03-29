@@ -192,9 +192,10 @@ internal sealed class ApiClient : IDisposable
 }
 
 /// <summary>
-/// Internal transport abstraction - allows MockRemit to replace the HTTP layer.
+/// Transport abstraction used by <see cref="Wallet"/> and <see cref="X402Client"/>.
+/// Implement to intercept or mock HTTP calls.
 /// </summary>
-internal interface IRemitTransport
+public interface IRemitTransport
 {
     Task<T> GetAsync<T>(string path, CancellationToken ct);
     Task<T> PostAsync<T>(string path, object body, CancellationToken ct);

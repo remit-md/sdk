@@ -3,12 +3,34 @@ import assert from "node:assert/strict";
 
 import { PrivateKeySigner } from "../src/signer.js";
 import { AllowanceExceededError, X402Client } from "../src/x402.js";
+import type { AuthenticatedClient } from "../src/http.js";
 
 // Anvil account #0 - well-known test key.
 const TEST_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const TEST_ADDR = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 const PROVIDER = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
 const USDC = "0x2d846325766921935f37d5b4478196d3ef93707c";
+
+/**
+ * Build a mock AuthenticatedClient whose `post` returns a canned /x402/prepare
+ * response. The hash is 32 zero-bytes (0x00…00) which the signer will happily sign.
+ */
+function makeMockApiHttp(overrides?: Partial<Record<string, string>>): AuthenticatedClient {
+  const defaults: Record<string, string> = {
+    hash: "0x" + "00".repeat(32),
+    from: TEST_ADDR,
+    to: PROVIDER,
+    value: "100000",
+    validAfter: "0",
+    validBefore: "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    nonce: "0x" + "ab".repeat(32),
+    ...overrides,
+  };
+  return {
+    post: async () => defaults,
+    get: async () => ({}),
+  } as unknown as AuthenticatedClient;
+}
 
 function makePaymentRequired(opts: {
   amount?: string;
@@ -54,14 +76,14 @@ function makeMockFetch(responses: Array<{ status: number; headers?: Record<strin
 describe("X402Client construction", () => {
   it("constructs with signer and address", () => {
     const signer = new PrivateKeySigner(TEST_KEY);
-    const client = new X402Client({ signer, address: TEST_ADDR });
+    const client = new X402Client({ signer, address: TEST_ADDR, apiHttp: makeMockApiHttp() });
     // Should not throw; toJSON() reveals address only.
     assert.equal(client.toJSON().address, TEST_ADDR);
   });
 
   it("defaults maxAutoPayUsdc to 0.10", () => {
     const signer = new PrivateKeySigner(TEST_KEY);
-    const client = new X402Client({ signer, address: TEST_ADDR });
+    const client = new X402Client({ signer, address: TEST_ADDR, apiHttp: makeMockApiHttp() });
     // Only way to observe is via toJSON (no limit getter).
     assert.ok(client instanceof X402Client);
   });
@@ -91,7 +113,7 @@ describe("X402Client.fetch - non-402 passthrough", () => {
   it("returns 200 response unchanged", async () => {
     const signer = new PrivateKeySigner(TEST_KEY);
     const { fetchFn } = makeMockFetch([{ status: 200 }]);
-    const client = new X402Client({ signer, address: TEST_ADDR });
+    const client = new X402Client({ signer, address: TEST_ADDR, apiHttp: makeMockApiHttp() });
 
     // Temporarily patch globalThis.fetch.
     const orig = globalThis.fetch;
@@ -111,7 +133,7 @@ describe("X402Client.fetch - 402 handling", () => {
   it("throws when PAYMENT-REQUIRED header is absent", async () => {
     const signer = new PrivateKeySigner(TEST_KEY);
     const { fetchFn } = makeMockFetch([{ status: 402 }]);
-    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0 });
+    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0, apiHttp: makeMockApiHttp() });
 
     const orig = globalThis.fetch;
     try {
@@ -129,7 +151,7 @@ describe("X402Client.fetch - 402 handling", () => {
     const signer = new PrivateKeySigner(TEST_KEY);
     const header = makePaymentRequired({ scheme: "upto" });
     const { fetchFn } = makeMockFetch([{ status: 402, headers: { "payment-required": header } }]);
-    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0 });
+    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0, apiHttp: makeMockApiHttp() });
 
     const orig = globalThis.fetch;
     try {
@@ -148,7 +170,7 @@ describe("X402Client.fetch - 402 handling", () => {
     // 100000 base units = 0.10 USDC; limit = 0.05
     const header = makePaymentRequired({ amount: "100000" });
     const { fetchFn } = makeMockFetch([{ status: 402, headers: { "payment-required": header } }]);
-    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 0.05 });
+    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 0.05, apiHttp: makeMockApiHttp() });
 
     const orig = globalThis.fetch;
     try {
@@ -169,7 +191,7 @@ describe("X402Client.fetch - 402 handling", () => {
       { status: 402, headers: { "payment-required": header402 } },
       { status: 200 },
     ]);
-    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0 });
+    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0, apiHttp: makeMockApiHttp() });
 
     const orig = globalThis.fetch;
     try {
@@ -230,7 +252,7 @@ describe("X402Client.fetch - 402 handling", () => {
       { status: 402, headers: { "payment-required": header402 } },
       { status: 200 },
     ]);
-    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0 });
+    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0, apiHttp: makeMockApiHttp() });
 
     const orig = globalThis.fetch;
     try {
@@ -260,7 +282,7 @@ describe("X402Client.fetch - 402 handling", () => {
       { status: 402, headers: { "payment-required": header402 } },
       { status: 200 },
     ]);
-    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0 });
+    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0, apiHttp: makeMockApiHttp() });
 
     const orig = globalThis.fetch;
     try {
@@ -283,7 +305,7 @@ describe("X402Client.fetch - 402 handling", () => {
       { status: 402, headers: { "payment-required": header402 } },
       { status: 200 },
     ]);
-    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0 });
+    const client = new X402Client({ signer, address: TEST_ADDR, maxAutoPayUsdc: 1.0, apiHttp: makeMockApiHttp() });
 
     const orig = globalThis.fetch;
     try {

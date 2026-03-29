@@ -3,8 +3,6 @@ Python SDK acceptance: Tab lifecycle via wallet.open_tab(), charge_tab(), close_
 Verifies SDK permit signing + tab charge EIP-712 signing + full lifecycle balances.
 """
 
-import time
-
 import pytest
 
 from .conftest import (
@@ -37,14 +35,7 @@ async def test_tab_lifecycle() -> None:
     contracts = await agent.get_contracts()
     tab_contract = contracts["tab"]
 
-    deadline = int(time.time()) + 3600
-    raw_amount = int((limit + 1) * 1_000_000)
-    permit = await agent.sign_usdc_permit(
-        spender=tab_contract,
-        value=raw_amount,
-        deadline=deadline,
-        nonce=0,
-    )
+    permit = await agent.sign_permit("tab", limit)
 
     tab = await agent.open_tab(
         to=provider.address,

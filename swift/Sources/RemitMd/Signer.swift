@@ -10,6 +10,10 @@ public protocol Signer: Sendable {
 
     /// Sign a 32-byte digest and return a 65-byte hex-encoded ECDSA signature (r+s+v).
     func sign(digest: Data) throws -> String
+
+    /// Sign a raw 32-byte hash and return the 0x-prefixed hex signature (65 bytes: r+s+v).
+    /// Used by /permits/prepare and /x402/prepare server-side signing flows.
+    func signHash(_ hash: Data) async throws -> String
 }
 
 // MARK: - PrivateKeySigner
@@ -59,6 +63,11 @@ public final class PrivateKeySigner: Signer {
         var result = Data(sigData.prefix(64))
         result.append(sigData[64] + 27)  // v = 27 or 28
         return "0x" + result.hexString
+    }
+
+    /// Sign a raw 32-byte hash (delegates to sign(digest:)).
+    public func signHash(_ hash: Data) async throws -> String {
+        return try sign(digest: hash)
     }
 
     // MARK: - Ethereum address derivation from 33-byte compressed public key
@@ -216,6 +225,10 @@ public final class MockSigner: Signer, @unchecked Sendable {
     public func sign(digest _: Data) throws -> String {
         // 65-byte zero signature - accepted by MockTransport, rejected by real contracts
         return "0x" + String(repeating: "00", count: 130)
+    }
+
+    public func signHash(_ hash: Data) async throws -> String {
+        return try sign(digest: hash)
     }
 }
 

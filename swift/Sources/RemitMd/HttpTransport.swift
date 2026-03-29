@@ -6,7 +6,7 @@ import FoundationNetworking
 // MARK: - Transport protocol
 
 /// HTTP transport layer. Inject ``MockTransport`` in tests, ``HttpTransport`` in production.
-internal protocol Transport: Sendable {
+public protocol Transport: Sendable {
     func request<T: Decodable>(
         method: String,
         path: String,

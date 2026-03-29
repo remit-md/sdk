@@ -114,6 +114,14 @@ export class OwsSigner implements Signer {
     );
   }
 
+  async signHash(_hash: Uint8Array): Promise<string> {
+    throw new Error(
+      "OwsSigner does not support raw hash signing. " +
+      "OWS only supports EIP-712 typed data signing. " +
+      "Use PrivateKeySigner or CliSigner for operations that require signHash.",
+    );
+  }
+
   getAddress(): string {
     return this.#address;
   }

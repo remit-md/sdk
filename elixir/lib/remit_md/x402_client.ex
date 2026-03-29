@@ -4,8 +4,9 @@ defmodule RemitMd.X402Client do
 
   x402 is an open payment standard where resource servers return HTTP 402 with
   a `PAYMENT-REQUIRED` header describing the cost. This module provides a
-  `fetch/3` function that intercepts those responses, signs an EIP-3009
-  authorization, and retries the request with a `PAYMENT-SIGNATURE` header.
+  `fetch/3` function that intercepts those responses, calls the server's
+  `/x402/prepare` endpoint for hash + authorization fields, signs the hash,
+  and retries the request with a `PAYMENT-SIGNATURE` header.
 
   ## Example
 
@@ -13,11 +14,10 @@ defmodule RemitMd.X402Client do
       {:ok, {status, headers, body}} = RemitMd.X402Client.fetch(
         signer, "0xYourAddress",
         "https://api.provider.com/v1/data",
-        max_auto_pay_usdc: 0.10
+        max_auto_pay_usdc: 0.10,
+        api_url: "https://remit.md"
       )
   """
-
-  @eip3009_type_hash "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
 
   defmodule AllowanceExceededError do
     @moduledoc "Raised when an x402 payment amount exceeds the configured auto-pay limit."
@@ -59,6 +59,7 @@ defmodule RemitMd.X402Client do
   - `:method` - HTTP method (default: `:get`)
   - `:body` - request body (for POST requests)
   - `:headers` - additional request headers (list of `{key, value}` charlists)
+  - `:api_url` - base URL of the remit.md API (default: `"https://remit.md"`)
 
   Returns `{:ok, {status_code, response_headers, response_body}}` or `{:error, reason}`.
   """
@@ -72,10 +73,11 @@ defmodule RemitMd.X402Client do
     method = Keyword.get(opts, :method, :get)
     body = Keyword.get(opts, :body)
     extra_headers = Keyword.get(opts, :headers, [])
+    api_url = Keyword.get(opts, :api_url, "https://remit.md") |> String.trim_trailing("/")
 
     case do_request(method, url, body, extra_headers) do
       {:ok, {402, resp_headers, _resp_body}} ->
-        handle_402(signer, address, url, method, body, extra_headers, resp_headers, max_auto_pay)
+        handle_402(signer, address, url, method, body, extra_headers, resp_headers, max_auto_pay, api_url)
 
       {:ok, {status, resp_headers, resp_body}} ->
         {:ok, {status, resp_headers, resp_body}}
@@ -87,7 +89,7 @@ defmodule RemitMd.X402Client do
 
   # ─── Private ──────────────────────────────────────────────────────────────
 
-  defp handle_402(signer, address, url, method, body, extra_headers, resp_headers, max_auto_pay) do
+  defp handle_402(signer, address, url, method, body, extra_headers, resp_headers, max_auto_pay, api_url) do
     # 1. Decode PAYMENT-REQUIRED header (case-insensitive lookup)
     raw = find_header(resp_headers, "payment-required")
 
@@ -111,51 +113,29 @@ defmodule RemitMd.X402Client do
       raise AllowanceExceededError, amount_usdc: amount_usdc, limit_usdc: max_auto_pay
     end
 
-    # 4. Parse chainId from CAIP-2 network string (e.g. "eip155:84532")
+    # 4. Call /x402/prepare to get the hash + authorization fields
+    prepare_url = String.to_charlist("#{api_url}/api/v1/x402/prepare")
+    prepare_body = Jason.encode!(%{payment_required: raw, payer: address})
+    prepare_headers = [{~c"content-type", ~c"application/json"}]
+
+    {:ok, {{_ver, prepare_status, _reason}, _prep_headers, prep_body}} =
+      :httpc.request(:post, {prepare_url, prepare_headers, ~c"application/json",
+                     String.to_charlist(prepare_body)}, [{:timeout, 10_000}], [])
+
+    unless prepare_status in 200..299 do
+      raise "x402/prepare failed with status #{prepare_status}: #{to_string(prep_body)}"
+    end
+
+    prepare_data = Jason.decode!(to_string(prep_body))
+
+    # 5. Sign the hash
+    hash_hex = Map.fetch!(prepare_data, "hash")
+    hash_bytes = hash_hex |> String.trim_leading("0x") |> Base.decode16!(case: :mixed)
+    signature = call_sign_hash(signer, hash_bytes)
+
+    # 6. Build PAYMENT-SIGNATURE JSON payload
     network = Map.fetch!(required, "network")
-    chain_id = network |> String.split(":") |> List.last() |> String.to_integer()
 
-    # 5. Build EIP-3009 authorization
-    now_secs = :os.system_time(:second)
-    max_timeout = Map.get(required, "maxTimeoutSeconds", 60)
-    valid_before = now_secs + max_timeout
-    nonce_bytes = :crypto.strong_rand_bytes(32)
-    nonce_hex = "0x" <> Base.encode16(nonce_bytes, case: :lower)
-
-    asset = Map.fetch!(required, "asset")
-    pay_to = Map.fetch!(required, "payTo")
-
-    # 6. Sign EIP-712 typed data for TransferWithAuthorization
-    keccak = &RemitMd.Keccak.hash/1
-
-    domain_type_hash =
-      keccak.("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-
-    name_hash = keccak.("USD Coin")
-    version_hash = keccak.("2")
-    chain_id_enc = <<chain_id::unsigned-big-integer-size(256)>>
-    contract_enc = address_to_bytes32(asset)
-
-    domain_separator =
-      keccak.(domain_type_hash <> name_hash <> version_hash <> chain_id_enc <> contract_enc)
-
-    transfer_type_hash = keccak.(@eip3009_type_hash)
-
-    from_enc = address_to_bytes32(address)
-    to_enc = address_to_bytes32(pay_to)
-    value_enc = <<amount_base_units::unsigned-big-integer-size(256)>>
-    valid_after_enc = <<0::unsigned-big-integer-size(256)>>
-    valid_before_enc = <<valid_before::unsigned-big-integer-size(256)>>
-
-    struct_hash =
-      keccak.(transfer_type_hash <> from_enc <> to_enc <> value_enc <>
-              valid_after_enc <> valid_before_enc <> nonce_bytes)
-
-    digest = keccak.(<<0x19, 0x01>> <> domain_separator <> struct_hash)
-
-    signature = call_sign(signer, digest)
-
-    # 7. Build PAYMENT-SIGNATURE JSON payload
     payment_payload = %{
       scheme: scheme,
       network: network,
@@ -163,19 +143,19 @@ defmodule RemitMd.X402Client do
       payload: %{
         signature: signature,
         authorization: %{
-          from: address,
-          to: pay_to,
-          value: Map.fetch!(required, "amount"),
-          validAfter: "0",
-          validBefore: to_string(valid_before),
-          nonce: nonce_hex
+          from: prepare_data["from"],
+          to: prepare_data["to"],
+          value: prepare_data["value"],
+          validAfter: prepare_data["valid_after"] || prepare_data["validAfter"],
+          validBefore: prepare_data["valid_before"] || prepare_data["validBefore"],
+          nonce: prepare_data["nonce"]
         }
       }
     }
 
     payment_header = payment_payload |> Jason.encode!() |> Base.encode64()
 
-    # 8. Retry with PAYMENT-SIGNATURE header
+    # 7. Retry with PAYMENT-SIGNATURE header
     payment_headers = [{~c"PAYMENT-SIGNATURE", String.to_charlist(payment_header)} | extra_headers]
     do_request(method, url, body, payment_headers)
   end
@@ -214,13 +194,7 @@ defmodule RemitMd.X402Client do
     end)
   end
 
-  defp address_to_bytes32(address) do
-    hex = String.trim_leading(address, "0x")
-    addr_bytes = Base.decode16!(hex, case: :mixed)
-    :binary.copy(<<0>>, 12) <> addr_bytes
-  end
-
-  defp call_sign(%{__struct__: mod} = signer, digest) do
-    mod.sign(signer, digest)
+  defp call_sign_hash(%{__struct__: mod} = signer, hash) do
+    mod.sign_hash(signer, hash)
   end
 end

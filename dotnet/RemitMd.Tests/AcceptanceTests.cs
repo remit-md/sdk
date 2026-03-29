@@ -8,7 +8,6 @@
 //   ACCEPTANCE_RPC_URL  - default: https://sepolia.base.org
 
 using System.Net;
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Nethereum.Signer;
@@ -26,7 +25,7 @@ public class AcceptanceTests
     private static readonly HttpClient Http = new();
     private static Dictionary<string, JsonElement>? _contracts;
 
-    record TestWallet(Wallet Wallet, PrivateKeySigner Signer);
+    record TestWallet(Wallet Wallet);
 
     private async Task<TestWallet> CreateTestWallet()
     {
@@ -37,9 +36,8 @@ public class AcceptanceTests
         var routerAddress = contracts["router"].GetString()!;
 
         var wallet = new Wallet(hexKey, chain: "base", testnet: true, baseUrl: ApiUrl, routerAddress: routerAddress);
-        var signer = new PrivateKeySigner(hexKey);
         _output.WriteLine($"[ACCEPTANCE] wallet: {wallet.Address} (chain=84532)");
-        return new TestWallet(wallet, signer);
+        return new TestWallet(wallet);
     }
 
     private async Task<Dictionary<string, JsonElement>> FetchContracts()
@@ -92,70 +90,6 @@ public class AcceptanceTests
         await WaitForBalanceChange(tw.Wallet.Address, 0);
     }
 
-    // ─── EIP-2612 Permit Signing ────────────────────────────────────────────
-
-    private async Task<PermitSignature> SignUsdcPermitAsync(PrivateKeySigner signer, string owner, string spender,
-                                                  long value, long nonce, long deadline)
-    {
-        var contracts = await FetchContracts();
-        var chainId = contracts["chain_id"].GetInt64();
-        var usdcAddr = contracts["usdc"].GetString()!;
-
-        var domainTypeHash = Eip712.Keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-        var nameHash = Eip712.Keccak256("USD Coin");
-        var versionHash = Eip712.Keccak256("2");
-
-        var domainData = Concat(domainTypeHash, nameHash, versionHash, PadUint256(chainId), PadAddress(usdcAddr));
-        var domainSep = Eip712.Keccak256(domainData);
-
-        var permitTypeHash = Eip712.Keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-        var structData = Concat(permitTypeHash, PadAddress(owner), PadAddress(spender),
-                               PadUint256(value), PadUint256(nonce), PadUint256(deadline));
-        var structHash = Eip712.Keccak256(structData);
-
-        var finalData = new byte[66];
-        finalData[0] = 0x19;
-        finalData[1] = 0x01;
-        Buffer.BlockCopy(domainSep, 0, finalData, 2, 32);
-        Buffer.BlockCopy(structHash, 0, finalData, 34, 32);
-        var digest = Eip712.Keccak256(finalData);
-
-        var sigHex = signer.Sign(digest);
-        var sigBytes = Convert.FromHexString(sigHex.Replace("0x", ""));
-        var r = "0x" + Convert.ToHexString(sigBytes[..32]).ToLowerInvariant();
-        var s = "0x" + Convert.ToHexString(sigBytes[32..64]).ToLowerInvariant();
-        var v = (int)sigBytes[64];
-
-        return new PermitSignature(value, deadline, v, r, s);
-    }
-
-    private static byte[] PadUint256(long value)
-    {
-        var result = new byte[32];
-        var bytes = BitConverter.GetBytes((ulong)value);
-        if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
-        Buffer.BlockCopy(bytes, 0, result, 24, 8);
-        return result;
-    }
-
-    private static byte[] PadAddress(string address)
-    {
-        var hex = address.Replace("0x", "");
-        var bytes = Convert.FromHexString(hex);
-        var result = new byte[32];
-        Buffer.BlockCopy(bytes, 0, result, 12, 20);
-        return result;
-    }
-
-    private static byte[] Concat(params byte[][] arrays)
-    {
-        var total = arrays.Sum(a => a.Length);
-        var result = new byte[total];
-        var pos = 0;
-        foreach (var a in arrays) { Buffer.BlockCopy(a, 0, result, pos, a.Length); pos += a.Length; }
-        return result;
-    }
-
     private readonly ITestOutputHelper _output;
 
     public AcceptanceTests(ITestOutputHelper output) { _output = output; }
@@ -184,11 +118,7 @@ public class AcceptanceTests
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
         var providerBefore = await GetUsdcBalance(provider.Wallet.Address);
 
-        var contracts = await FetchContracts();
-        var routerAddr = contracts["router"].GetString()!;
-        var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, routerAddr,
-                                    2_000_000, 0, deadline);
+        var permit = await agent.Wallet.SignPermitAsync("direct", 2.0m);
 
         var tx = await agent.Wallet.PayAsync(provider.Wallet.Address, 1.0m,
                                              memo: "dotnet-sdk-acceptance", permit: permit);
@@ -219,11 +149,7 @@ public class AcceptanceTests
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
         var providerBefore = await GetUsdcBalance(provider.Wallet.Address);
 
-        var contracts = await FetchContracts();
-        var escrowAddr = contracts["escrow"].GetString()!;
-        var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, escrowAddr,
-                                    6_000_000, 0, deadline);
+        var permit = await agent.Wallet.SignPermitAsync("escrow", 5.0m);
 
         var escrow = await agent.Wallet.CreateEscrowAsync(provider.Wallet.Address, 5.0m,
                                                           permit: permit);
@@ -257,9 +183,8 @@ public class AcceptanceTests
 
         var contracts = await FetchContracts();
         var tabAddr = contracts["tab"].GetString()!;
-        var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, tabAddr,
-                                    20_000_000, 0, deadline);
+
+        var permit = await agent.Wallet.SignPermitAsync("tab", 10.0m);
 
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
 
@@ -299,11 +224,7 @@ public class AcceptanceTests
         var provider = await CreateTestWallet();
         await FundWallet(agent, 100);
 
-        var contracts = await FetchContracts();
-        var streamAddr = contracts["stream"].GetString()!;
-        var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, streamAddr,
-                                    20_000_000, 0, deadline);
+        var permit = await agent.Wallet.SignPermitAsync("stream", 10.0m);
 
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
 
@@ -336,11 +257,7 @@ public class AcceptanceTests
         var submitter = await CreateTestWallet();
         await FundWallet(poster, 100);
 
-        var contracts = await FetchContracts();
-        var bountyAddr = contracts["bounty"].GetString()!;
-        var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = await SignUsdcPermitAsync(poster.Signer, poster.Wallet.Address, bountyAddr,
-                                    6_000_000, 0, deadline);
+        var permit = await poster.Wallet.SignPermitAsync("bounty", 5.0m);
 
         // 1. Post bounty
         var bounty = await poster.Wallet.CreateBountyAsync(
@@ -370,11 +287,7 @@ public class AcceptanceTests
         var provider = await CreateTestWallet();
         await FundWallet(agent, 100);
 
-        var contracts = await FetchContracts();
-        var depositAddr = contracts["deposit"].GetString()!;
-        var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600;
-        var permit = await SignUsdcPermitAsync(agent.Signer, agent.Wallet.Address, depositAddr,
-                                    6_000_000, 0, deadline);
+        var permit = await agent.Wallet.SignPermitAsync("deposit", 5.0m);
 
         var agentBefore = await GetUsdcBalance(agent.Wallet.Address);
 

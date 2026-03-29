@@ -3,8 +3,6 @@ Python SDK acceptance: Direct payment via wallet.pay_direct().
 Verifies SDK permit signing + payment works end-to-end on Base Sepolia.
 """
 
-import time
-
 import pytest
 
 from .conftest import (
@@ -31,19 +29,8 @@ async def test_pay_direct_with_permit() -> None:
 
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
-    # Get router address for permit
-    contracts = await agent.get_contracts()
-    router = contracts["router"]
-
-    # Sign EIP-2612 permit
-    deadline = int(time.time()) + 3600
-    raw_amount = int(2.0 * 1_000_000)  # permit for $2
-    permit = await agent.sign_usdc_permit(
-        spender=router,
-        value=raw_amount,
-        deadline=deadline,
-        nonce=0,
-    )
+    # Sign permit for direct payment
+    permit = await agent.sign_permit("direct", 2.0)
 
     # Pay
     tx = await agent.pay_direct(

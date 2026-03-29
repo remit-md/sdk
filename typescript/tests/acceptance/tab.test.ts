@@ -34,9 +34,8 @@ describe("SDK: Tab Lifecycle", { timeout: 180_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    // Step 1: Open tab (agent, with permit for Tab contract)
-    const contracts = await agent.getContracts();
-    const permit = await agent.signPermit(contracts.tab, limit + 1);
+    // Step 1: Open tab (agent, with permit via /permits/prepare)
+    const permit = await agent.signPermit("tab", limit + 1);
 
     const tab = await agent.openTab({
       to: provider.address,

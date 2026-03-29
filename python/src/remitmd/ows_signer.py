@@ -132,6 +132,13 @@ class OwsSigner(Signer):
         v = recovery_id + 27
         return f"0x{sig}{v:02x}"
 
+    async def sign_hash(self, hash_bytes: bytes) -> str:
+        """OWS does not support raw hash signing — only EIP-712 typed data."""
+        raise NotImplementedError(
+            "OwsSigner does not support sign_hash(). "
+            "OWS only supports EIP-712 typed data signing via sign_typed_data()."
+        )
+
     # Never expose key material or API keys.
     def __repr__(self) -> str:
         return f"OwsSigner(address={self._address!r}, wallet={self._wallet_id!r})"

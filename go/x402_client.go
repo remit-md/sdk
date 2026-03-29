@@ -2,20 +2,14 @@ package remitmd
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // AllowanceExceededError is raised when an x402 payment amount exceeds the
@@ -50,7 +44,7 @@ type PaymentRequired struct {
 }
 
 // X402Client is a consumer-side HTTP client that auto-pays x402 Payment Required
-// responses by signing EIP-3009 TransferWithAuthorization.
+// responses by calling the server's /x402/prepare endpoint.
 type X402Client struct {
 	wallet         *Wallet
 	MaxAutoPayUsdc float64
@@ -72,7 +66,7 @@ func NewX402Client(wallet *Wallet, maxAutoPayUsdc ...float64) *X402Client {
 }
 
 // Fetch makes a GET request to the given URL. If a 402 Payment Required is
-// returned, it signs an EIP-3009 authorization and retries with a
+// returned, it calls /x402/prepare, signs the hash, and retries with a
 // PAYMENT-SIGNATURE header.
 func (c *X402Client) Fetch(ctx context.Context, url string) (*X402Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -127,49 +121,35 @@ func (c *X402Client) handle402(ctx context.Context, url string, resp *http.Respo
 		return nil, &AllowanceExceededError{AmountUsdc: amountUsdc, LimitUsdc: c.MaxAutoPayUsdc}
 	}
 
-	// 4. Parse chainId from CAIP-2 network string (e.g. "eip155:84532" -> 84532).
-	parts := strings.Split(required.Network, ":")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("x402: invalid network format: %s", required.Network)
+	// 4. Call /x402/prepare to get the hash + authorization fields.
+	var prepareData struct {
+		Hash        string `json:"hash"`
+		From        string `json:"from"`
+		To          string `json:"to"`
+		Value       string `json:"value"`
+		ValidAfter  string `json:"valid_after"`
+		ValidBefore string `json:"valid_before"`
+		Nonce       string `json:"nonce"`
 	}
-	chainID, err := strconv.ParseInt(parts[1], 10, 64)
+	if err := c.wallet.http.post(ctx, "/api/v1/x402/prepare", map[string]any{
+		"payment_required": raw,
+		"payer":            c.wallet.Address(),
+	}, &prepareData); err != nil {
+		return nil, fmt.Errorf("x402: /x402/prepare failed: %w", err)
+	}
+
+	// 5. Sign the hash.
+	hashHex := strings.TrimPrefix(prepareData.Hash, "0x")
+	hashBytes, err := hex.DecodeString(hashHex)
 	if err != nil {
-		return nil, fmt.Errorf("x402: parse chainId: %w", err)
+		return nil, fmt.Errorf("x402: invalid hash hex: %w", err)
 	}
-
-	// 5. Build EIP-3009 TransferWithAuthorization fields.
-	nowSecs := time.Now().Unix()
-	maxTimeout := required.MaxTimeoutSeconds
-	if maxTimeout <= 0 {
-		maxTimeout = 60
-	}
-	validBefore := nowSecs + int64(maxTimeout)
-
-	var nonceBytes [32]byte
-	if _, err := rand.Read(nonceBytes[:]); err != nil {
-		return nil, fmt.Errorf("x402: generate nonce: %w", err)
-	}
-	nonce := "0x" + hex.EncodeToString(nonceBytes[:])
-
-	// 6. Sign EIP-712 typed data (EIP-3009 TransferWithAuthorization).
-	digest := computeEIP3009Digest(
-		new(big.Int).SetInt64(chainID),
-		common.HexToAddress(required.Asset),
-		c.wallet.signer.Address(),
-		common.HexToAddress(required.PayTo),
-		amountBaseUnits,
-		big.NewInt(0),
-		big.NewInt(validBefore),
-		nonceBytes,
-	)
-
-	sig, err := c.wallet.signer.Sign(digest)
+	signature, err := c.wallet.signer.SignHash(hashBytes)
 	if err != nil {
 		return nil, fmt.Errorf("x402: sign: %w", err)
 	}
-	signature := "0x" + hex.EncodeToString(sig)
 
-	// 7. Build PAYMENT-SIGNATURE JSON payload.
+	// 6. Build PAYMENT-SIGNATURE JSON payload.
 	paymentPayload := map[string]any{
 		"scheme":      required.Scheme,
 		"network":     required.Network,
@@ -177,12 +157,12 @@ func (c *X402Client) handle402(ctx context.Context, url string, resp *http.Respo
 		"payload": map[string]any{
 			"signature": signature,
 			"authorization": map[string]any{
-				"from":        c.wallet.signer.Address().Hex(),
-				"to":          required.PayTo,
-				"value":       required.Amount,
-				"validAfter":  "0",
-				"validBefore": strconv.FormatInt(validBefore, 10),
-				"nonce":       nonce,
+				"from":        prepareData.From,
+				"to":          prepareData.To,
+				"value":       prepareData.Value,
+				"validAfter":  prepareData.ValidAfter,
+				"validBefore": prepareData.ValidBefore,
+				"nonce":       prepareData.Nonce,
 			},
 		},
 	}
@@ -193,7 +173,7 @@ func (c *X402Client) handle402(ctx context.Context, url string, resp *http.Respo
 	}
 	paymentHeader := base64.StdEncoding.EncodeToString(payloadJSON)
 
-	// 8. Retry with PAYMENT-SIGNATURE header.
+	// 7. Retry with PAYMENT-SIGNATURE header.
 	retryReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("x402: create retry request: %w", err)
@@ -209,46 +189,4 @@ func (c *X402Client) handle402(ctx context.Context, url string, resp *http.Respo
 		Response:    retryResp,
 		LastPayment: &required,
 	}, nil
-}
-
-// EIP-3009 type hash
-var transferWithAuthorizationTypeHash = crypto.Keccak256Hash(
-	[]byte("TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"),
-)
-
-// eip3009Type defines the ABI encoding for TransferWithAuthorization struct.
-var eip3009Type = abi.Arguments{
-	{Type: mustType("bytes32")}, // typeHash
-	{Type: mustType("address")}, // from
-	{Type: mustType("address")}, // to
-	{Type: mustType("uint256")}, // value
-	{Type: mustType("uint256")}, // validAfter
-	{Type: mustType("uint256")}, // validBefore
-	{Type: mustType("bytes32")}, // nonce
-}
-
-// computeEIP3009Digest computes the EIP-712 digest for EIP-3009
-// TransferWithAuthorization (used by USDC).
-func computeEIP3009Digest(
-	chainID *big.Int,
-	usdcAddr common.Address,
-	from common.Address,
-	to common.Address,
-	value *big.Int,
-	validAfter *big.Int,
-	validBefore *big.Int,
-	nonce [32]byte,
-) [32]byte {
-	// USDC domain separator (name="USD Coin", version="2")
-	domain := computeUsdcDomainSeparator(chainID, usdcAddr)
-
-	packed, _ := eip3009Type.Pack(
-		transferWithAuthorizationTypeHash,
-		from, to, value, validAfter, validBefore, nonce,
-	)
-	structHash := crypto.Keccak256Hash(packed)
-
-	return crypto.Keccak256Hash(
-		append([]byte("\x19\x01"), append(domain[:], structHash[:]...)...),
-	)
 }

@@ -11,6 +11,15 @@ pub trait Signer: Send + Sync {
     /// Sign a 32-byte digest and return a 65-byte Ethereum signature (r, s, v).
     fn sign(&self, digest: &[u8; 32]) -> Result<Vec<u8>, RemitError>;
 
+    /// Sign a 32-byte hash and return the 0x-prefixed hex signature (65 bytes: r+s+v).
+    ///
+    /// Used by `/permits/prepare` and `/x402/prepare` flows where the server
+    /// computes the EIP-712 hash and the SDK only signs it.
+    fn sign_hash(&self, hash: &[u8; 32]) -> Result<String, RemitError> {
+        let sig_bytes = self.sign(hash)?;
+        Ok(format!("0x{}", hex::encode(&sig_bytes)))
+    }
+
     /// Return the Ethereum address (checksummed hex, `0x`-prefixed) for this key.
     fn address(&self) -> &str;
 }

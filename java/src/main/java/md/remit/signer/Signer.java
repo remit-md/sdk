@@ -24,6 +24,20 @@ public interface Signer {
     byte[] sign(byte[] hash) throws Exception;
 
     /**
+     * Sign a 32-byte hash and return the 0x-prefixed hex signature (65 bytes: r+s+v).
+     *
+     * <p>Default implementation delegates to {@link #sign(byte[])} and hex-encodes the result.
+     *
+     * @param hash 32-byte hash to sign
+     * @return 0x-prefixed hex string (130 hex chars + "0x" prefix)
+     * @throws Exception if signing fails
+     */
+    default String signHash(byte[] hash) throws Exception {
+        byte[] sig = sign(hash);
+        return "0x" + java.util.HexFormat.of().formatHex(sig);
+    }
+
+    /**
      * Returns the Ethereum address (0x-prefixed, checksummed) corresponding to this signer's key.
      * Default implementation returns a placeholder - override if address is needed for display.
      */

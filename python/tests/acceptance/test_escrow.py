@@ -2,8 +2,6 @@
 Python SDK acceptance: Escrow lifecycle via wallet.pay(), claim_start(), release_escrow().
 """
 
-import time
-
 import pytest
 
 from remitmd.models.invoice import Invoice
@@ -32,19 +30,8 @@ async def test_escrow_lifecycle() -> None:
 
     agent_before = await get_usdc_balance(agent.address)
     provider_before = await get_usdc_balance(provider.address)
-    # Get escrow contract for permit
-    contracts = await agent.get_contracts()
-    escrow_contract = contracts["escrow"]
-
     # Sign permit for escrow
-    deadline = int(time.time()) + 3600
-    raw_amount = int((amount + 1) * 1_000_000)
-    permit = await agent.sign_usdc_permit(
-        spender=escrow_contract,
-        value=raw_amount,
-        deadline=deadline,
-        nonce=0,
-    )
+    permit = await agent.sign_permit("escrow", amount)
 
     # Create and fund escrow
     invoice = Invoice(to=provider.address, amount=amount, memo="python-escrow-test")

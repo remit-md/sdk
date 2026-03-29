@@ -6,6 +6,10 @@
 //! - [`X402Client`] - a `fetch` wrapper that auto-pays 402 responses
 //! - [`X402Paywall`] - server-side middleware for gating endpoints behind payments
 //!
+//! The client calls the server's `/x402/prepare` endpoint to get the hash and
+//! authorization fields, signs the hash, and retries the request with a
+//! `PAYMENT-SIGNATURE` header.
+//!
 //! # Client usage
 //!
 //! ```rust,ignore
@@ -76,9 +80,10 @@ pub struct X402Response {
 /// On receiving a 402, the client:
 /// 1. Decodes the `PAYMENT-REQUIRED` header (base64 JSON)
 /// 2. Checks the amount is within `max_auto_pay_usdc`
-/// 3. Builds and signs an EIP-3009 `transferWithAuthorization`
-/// 4. Base64-encodes the `PAYMENT-SIGNATURE` header
-/// 5. Retries the original request with payment attached
+/// 3. Calls `/x402/prepare` to get hash + authorization fields
+/// 4. Signs the hash
+/// 5. Base64-encodes the `PAYMENT-SIGNATURE` header
+/// 6. Retries the original request with payment attached
 pub struct X402Client {
     wallet: crate::Wallet,
     max_auto_pay_usdc: f64,
@@ -189,42 +194,45 @@ impl X402Client {
             ));
         }
 
-        // 4. Parse chainId from CAIP-2 network string (e.g. "eip155:84532").
-        let chain_id: u64 = required
-            .network
-            .split(':')
-            .nth(1)
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
+        // 4. Call /x402/prepare to get the hash + authorization fields.
+        let prepare_data = self
+            .wallet
+            .transport
+            .post(
+                "/api/v1/x402/prepare",
+                Some(serde_json::json!({
+                    "payment_required": raw,
+                    "payer": self.wallet.address(),
+                })),
+            )
+            .await?;
 
-        // 5. Build EIP-3009 authorization fields.
-        let now_secs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        let valid_before = now_secs + required.max_timeout_seconds.unwrap_or(60);
+        // 5. Sign the hash.
+        let hash_hex = prepare_data["hash"]
+            .as_str()
+            .ok_or_else(|| RemitError::new(codes::SERVER_ERROR, "x402/prepare: missing hash"))?;
+        let hash_str = hash_hex.strip_prefix("0x").unwrap_or(hash_hex);
+        let hash_bytes_vec = hex::decode(hash_str).map_err(|e| {
+            RemitError::new(
+                codes::SERVER_ERROR,
+                format!("x402/prepare: invalid hash hex: {e}"),
+            )
+        })?;
+        if hash_bytes_vec.len() != 32 {
+            return Err(RemitError::new(
+                codes::SERVER_ERROR,
+                format!(
+                    "x402/prepare: expected 32-byte hash, got {}",
+                    hash_bytes_vec.len()
+                ),
+            ));
+        }
+        let mut hash: [u8; 32] = [0u8; 32];
+        hash.copy_from_slice(&hash_bytes_vec);
 
-        let mut nonce_bytes = [0u8; 32];
-        getrandom::getrandom(&mut nonce_bytes)
-            .map_err(|_| RemitError::new(codes::SERVER_ERROR, "random generation failed"))?;
-        let nonce = format!("0x{}", hex::encode(nonce_bytes));
+        let signature = self.wallet.signer.sign_hash(&hash)?;
 
-        // 6. Build EIP-712 typed data hash for TransferWithAuthorization.
-        let domain_separator = eip712_domain_separator(chain_id, &required.asset);
-        let struct_hash = eip3009_struct_hash(
-            self.wallet.address(),
-            &required.pay_to,
-            amount_base_units,
-            0,
-            valid_before,
-            &nonce_bytes,
-        );
-        let digest = eip712_digest(&domain_separator, &struct_hash);
-
-        let sig_bytes = self.wallet.signer.sign(&digest)?;
-        let signature = format!("0x{}", hex::encode(&sig_bytes));
-
-        // 7. Build PAYMENT-SIGNATURE JSON payload.
+        // 6. Build PAYMENT-SIGNATURE JSON payload from prepare response.
         let payment_payload = serde_json::json!({
             "scheme": required.scheme,
             "network": required.network,
@@ -232,19 +240,23 @@ impl X402Client {
             "payload": {
                 "signature": signature,
                 "authorization": {
-                    "from": self.wallet.address(),
-                    "to": required.pay_to,
-                    "value": required.amount,
-                    "validAfter": "0",
-                    "validBefore": valid_before.to_string(),
-                    "nonce": nonce,
+                    "from": prepare_data["from"].as_str().unwrap_or(""),
+                    "to": prepare_data["to"].as_str().unwrap_or(""),
+                    "value": prepare_data["value"].as_str().unwrap_or(""),
+                    "validAfter": prepare_data["validAfter"].as_str()
+                        .or_else(|| prepare_data["valid_after"].as_str())
+                        .unwrap_or("0"),
+                    "validBefore": prepare_data["validBefore"].as_str()
+                        .or_else(|| prepare_data["valid_before"].as_str())
+                        .unwrap_or(""),
+                    "nonce": prepare_data["nonce"].as_str().unwrap_or(""),
                 },
             },
         });
         let payment_header = base64::engine::general_purpose::STANDARD
             .encode(serde_json::to_string(&payment_payload).unwrap());
 
-        // 8. Retry with PAYMENT-SIGNATURE header.
+        // 7. Retry with PAYMENT-SIGNATURE header.
         let client = reqwest::Client::new();
         let retry_resp = client
             .get(url)
@@ -447,97 +459,4 @@ impl X402Paywall {
             },
         }
     }
-}
-
-// ─── EIP-712 helpers ─────────────────────────────────────────────────────────
-
-use sha3::{Digest, Keccak256};
-
-fn eip712_domain_separator(chain_id: u64, usdc_address: &str) -> [u8; 32] {
-    // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-    let type_hash = Keccak256::digest(
-        b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
-    );
-    let name_hash = Keccak256::digest(b"USD Coin");
-    let version_hash = Keccak256::digest(b"2");
-
-    let mut chain_bytes = [0u8; 32];
-    chain_bytes[24..32].copy_from_slice(&chain_id.to_be_bytes());
-
-    let addr_bytes = parse_address(usdc_address);
-    let mut addr_padded = [0u8; 32];
-    addr_padded[12..32].copy_from_slice(&addr_bytes);
-
-    let mut data = Vec::with_capacity(160);
-    data.extend_from_slice(&type_hash);
-    data.extend_from_slice(&name_hash);
-    data.extend_from_slice(&version_hash);
-    data.extend_from_slice(&chain_bytes);
-    data.extend_from_slice(&addr_padded);
-
-    Keccak256::digest(&data).into()
-}
-
-fn eip3009_struct_hash(
-    from: &str,
-    to: &str,
-    value: u64,
-    valid_after: u64,
-    valid_before: u64,
-    nonce: &[u8; 32],
-) -> [u8; 32] {
-    // keccak256("TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)")
-    let type_hash = Keccak256::digest(
-        b"TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)",
-    );
-
-    let from_bytes = parse_address(from);
-    let mut from_padded = [0u8; 32];
-    from_padded[12..32].copy_from_slice(&from_bytes);
-
-    let to_bytes = parse_address(to);
-    let mut to_padded = [0u8; 32];
-    to_padded[12..32].copy_from_slice(&to_bytes);
-
-    let mut value_bytes = [0u8; 32];
-    value_bytes[24..32].copy_from_slice(&value.to_be_bytes());
-
-    let mut valid_after_bytes = [0u8; 32];
-    valid_after_bytes[24..32].copy_from_slice(&valid_after.to_be_bytes());
-
-    let mut valid_before_bytes = [0u8; 32];
-    valid_before_bytes[24..32].copy_from_slice(&valid_before.to_be_bytes());
-
-    let mut data = Vec::with_capacity(224);
-    data.extend_from_slice(&type_hash);
-    data.extend_from_slice(&from_padded);
-    data.extend_from_slice(&to_padded);
-    data.extend_from_slice(&value_bytes);
-    data.extend_from_slice(&valid_after_bytes);
-    data.extend_from_slice(&valid_before_bytes);
-    data.extend_from_slice(nonce);
-
-    Keccak256::digest(&data).into()
-}
-
-fn eip712_digest(domain_separator: &[u8; 32], struct_hash: &[u8; 32]) -> [u8; 32] {
-    let mut data = Vec::with_capacity(66);
-    data.extend_from_slice(b"\x19\x01");
-    data.extend_from_slice(domain_separator);
-    data.extend_from_slice(struct_hash);
-    Keccak256::digest(&data).into()
-}
-
-fn parse_address(addr: &str) -> [u8; 20] {
-    let hex_str = addr
-        .strip_prefix("0x")
-        .or_else(|| addr.strip_prefix("0X"))
-        .unwrap_or(addr);
-    let mut out = [0u8; 20];
-    if let Ok(bytes) = hex::decode(hex_str) {
-        if bytes.len() == 20 {
-            out.copy_from_slice(&bytes);
-        }
-    }
-    out
 }

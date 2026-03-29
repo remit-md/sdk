@@ -26,22 +26,25 @@ module Remitmd
   # On receiving a 402, the client:
   # 1. Decodes the PAYMENT-REQUIRED header (base64 JSON)
   # 2. Checks the amount is within max_auto_pay_usdc
-  # 3. Builds and signs an EIP-3009 transferWithAuthorization
-  # 4. Base64-encodes the PAYMENT-SIGNATURE header
-  # 5. Retries the original request with payment attached
+  # 3. Calls /x402/prepare to get hash + authorization fields
+  # 4. Signs the hash
+  # 5. Base64-encodes the PAYMENT-SIGNATURE header
+  # 6. Retries the original request with payment attached
   #
   # @example
   #   signer = Remitmd::PrivateKeySigner.new("0x...")
-  #   client = Remitmd::X402Client.new(wallet: signer)
+  #   client = Remitmd::X402Client.new(wallet: signer, api_transport: transport)
   #   response = client.fetch("https://api.provider.com/v1/data")
   #
   class X402Client
     attr_reader :last_payment
 
-    # @param wallet [#sign, #address] a signer that can sign EIP-712 digests
+    # @param wallet [#sign_hash, #address] a signer that can sign raw hashes
+    # @param api_transport [#post] authenticated HTTP transport for calling /x402/prepare
     # @param max_auto_pay_usdc [Float] maximum USDC amount to auto-pay per request (default: 0.10)
-    def initialize(wallet:, max_auto_pay_usdc: 0.10)
+    def initialize(wallet:, api_transport: nil, max_auto_pay_usdc: 0.10)
       @wallet            = wallet
+      @api_transport     = api_transport
       @max_auto_pay_usdc = max_auto_pay_usdc
       @last_payment      = nil
     end
@@ -106,96 +109,44 @@ module Remitmd
         raise AllowanceExceededError.new(amount_usdc, @max_auto_pay_usdc)
       end
 
-      # 4. Parse chainId from CAIP-2 network string (e.g. "eip155:84532" -> 84532).
-      chain_id = required["network"].split(":")[1].to_i
+      # 4. Call /x402/prepare to get the hash + authorization fields.
+      unless @api_transport
+        raise RemitError.new("SERVER_ERROR",
+          "x402 auto-pay requires an api_transport for calling /x402/prepare")
+      end
 
-      # 5. Build EIP-3009 authorization fields.
-      now_secs     = Time.now.to_i
-      valid_before = now_secs + (required["maxTimeoutSeconds"] || 60).to_i
-      nonce_bytes  = SecureRandom.bytes(32)
-      nonce_hex    = "0x#{nonce_bytes.unpack1("H*")}"
+      prepare_data = @api_transport.post("/x402/prepare", {
+        payment_required: raw,
+        payer: @wallet.address
+      })
 
-      # 6. Sign EIP-712 typed data for TransferWithAuthorization.
-      digest = eip3009_digest(
-        chain_id:     chain_id,
-        asset:        required["asset"],
-        from:         @wallet.address,
-        to:           required["payTo"],
-        value:        amount_base_units,
-        valid_after:  0,
-        valid_before: valid_before,
-        nonce_bytes:  nonce_bytes
-      )
-      signature = @wallet.sign(digest)
+      # 5. Sign the hash.
+      hash_hex = prepare_data["hash"]
+      hash_bytes = [hash_hex.delete_prefix("0x")].pack("H*")
+      signature = @wallet.sign_hash(hash_bytes)
 
-      # 7. Build PAYMENT-SIGNATURE JSON payload.
+      # 6. Build PAYMENT-SIGNATURE JSON payload.
       payment_payload = {
         scheme:      required["scheme"],
         network:     required["network"],
         x402Version: 1,
         payload: {
-          signature:     signature,
+          signature: signature,
           authorization: {
-            from:        @wallet.address,
-            to:          required["payTo"],
-            value:       required["amount"],
-            validAfter:  "0",
-            validBefore: valid_before.to_s,
-            nonce:       nonce_hex,
+            from:        prepare_data["from"],
+            to:          prepare_data["to"],
+            value:       prepare_data["value"],
+            validAfter:  prepare_data["valid_after"] || prepare_data["validAfter"],
+            validBefore: prepare_data["valid_before"] || prepare_data["validBefore"],
+            nonce:       prepare_data["nonce"],
           },
         },
       }
       payment_header = Base64.strict_encode64(JSON.generate(payment_payload))
 
-      # 8. Retry with PAYMENT-SIGNATURE header.
+      # 7. Retry with PAYMENT-SIGNATURE header.
       new_headers = headers.merge("PAYMENT-SIGNATURE" => payment_header)
       make_request(uri, method, new_headers, body)
-    end
-
-    # Compute the EIP-712 hash for EIP-3009 TransferWithAuthorization.
-    def eip3009_digest(chain_id:, asset:, from:, to:, value:, valid_after:, valid_before:, nonce_bytes:)
-      # Domain separator: USD Coin / version 2
-      domain_type_hash = keccak256(
-        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-      )
-      name_hash     = keccak256("USD Coin")
-      version_hash  = keccak256("2")
-      chain_id_enc  = abi_uint256(chain_id)
-      contract_enc  = abi_address(asset)
-
-      domain_data      = domain_type_hash + name_hash + version_hash + chain_id_enc + contract_enc
-      domain_separator = keccak256(domain_data)
-
-      # TransferWithAuthorization struct hash
-      type_hash = keccak256(
-        "TransferWithAuthorization(address from,address to,uint256 value," \
-        "uint256 validAfter,uint256 validBefore,bytes32 nonce)"
-      )
-      struct_data = type_hash +
-                    abi_address(from) +
-                    abi_address(to) +
-                    abi_uint256(value) +
-                    abi_uint256(valid_after) +
-                    abi_uint256(valid_before) +
-                    nonce_bytes
-
-      struct_hash = keccak256(struct_data)
-
-      # Final EIP-712 hash
-      keccak256("\x19\x01" + domain_separator + struct_hash)
-    end
-
-    def keccak256(data)
-      Remitmd::Keccak.digest(data.b)
-    end
-
-    def abi_uint256(value)
-      [value.to_i.to_s(16).rjust(64, "0")].pack("H*")
-    end
-
-    def abi_address(addr)
-      hex = addr.to_s.delete_prefix("0x").rjust(64, "0")
-      [hex].pack("H*")
     end
   end
 end

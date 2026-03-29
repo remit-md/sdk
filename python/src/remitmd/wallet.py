@@ -42,11 +42,15 @@ class PermitSignature:
         }
 
 
-# Default USDC contract addresses per chain.
-USDC_ADDRESSES: dict[str, str] = {
-    "base-sepolia": "0x2d846325766921935f37d5b4478196d3ef93707c",
-    "base": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    "localhost": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+# Contract name → flow name for /permits/prepare.
+_CONTRACT_TO_FLOW: dict[str, str] = {
+    "router": "direct",
+    "escrow": "escrow",
+    "tab": "tab",
+    "stream": "stream",
+    "bounty": "bounty",
+    "deposit": "deposit",
+    "relayer": "direct",
 }
 
 
@@ -282,124 +286,60 @@ class Wallet(RemitClient):
         """Checksummed Ethereum address for this wallet."""
         return self._signer.get_address()
 
-    # ─── EIP-2612 Permit ─────────────────────────────────────────────────────
-
-    async def sign_usdc_permit(
-        self,
-        spender: str,
-        value: int,
-        deadline: int,
-        nonce: int = 0,
-        usdc_address: str | None = None,
-    ) -> PermitSignature:
-        """Sign an EIP-2612 permit for USDC approval.
-
-        Args:
-            spender: Contract address that will be approved.
-            value: Amount in USDC base units (6 decimals).
-            deadline: Permit deadline (Unix timestamp).
-            nonce: Current permit nonce for this wallet (default: 0).
-            usdc_address: Override the USDC contract address.
-
-        Returns:
-            A PermitSignature that can be passed to pay_direct(), pay(),
-            open_tab(), open_stream(), post_bounty(), or place_deposit().
-        """
-        usdc_addr = usdc_address or USDC_ADDRESSES.get(self.chain, "")
-        if not usdc_addr:
-            raise ValueError(
-                f"No USDC address for chain '{self.chain}'. "
-                f"Supported chains: {', '.join(USDC_ADDRESSES)}. "
-                "Pass usdc_address explicitly."
-            )
-
-        domain = {
-            "name": "USD Coin",
-            "version": "2",
-            "chainId": self._chain_id,
-            "verifyingContract": usdc_addr,
-        }
-        types: dict[str, object] = {
-            "Permit": [
-                {"name": "owner", "type": "address"},
-                {"name": "spender", "type": "address"},
-                {"name": "value", "type": "uint256"},
-                {"name": "nonce", "type": "uint256"},
-                {"name": "deadline", "type": "uint256"},
-            ],
-        }
-        message = {
-            "owner": self.address,
-            "spender": spender,
-            "value": str(value),
-            "nonce": nonce,
-            "deadline": deadline,
-        }
-
-        sig = await self._signer.sign_typed_data(domain, types, message)
-        sig_hex = sig if sig.startswith("0x") else f"0x{sig}"
-        sig_bytes = sig_hex[2:]
-        r = f"0x{sig_bytes[:64]}"
-        s = f"0x{sig_bytes[64:128]}"
-        v = int(sig_bytes[128:130], 16)
-
-        return PermitSignature(value=value, deadline=deadline, v=v, r=r, s=s)
-
-    async def _fetch_permit_nonce(self, usdc_address: str) -> int:
-        """Fetch the EIP-2612 permit nonce from the API."""
-        data = await self._http.get(f"/api/v1/status/{self.address}")
-        nonce = data.get("permit_nonce") if isinstance(data, dict) else None
-        if nonce is not None:
-            return int(nonce)
-        raise RuntimeError(
-            f"permit_nonce not available from API for {self.address}. "
-            "Ensure the server supports the permit_nonce field in GET /api/v1/status."
-        )
+    # ─── EIP-2612 Permit (via /permits/prepare) ────────────────────────────
 
     async def sign_permit(
         self,
-        spender: str,
+        flow: str,
         amount: float,
-        deadline: int | None = None,
-        usdc_address: str | None = None,
     ) -> PermitSignature:
-        """Convenience: sign a USDC permit. Auto-fetches nonce, defaults deadline to 1 hour.
+        """Sign a USDC permit via the server's /permits/prepare endpoint.
+
+        The server computes the EIP-712 hash, manages nonces, and resolves
+        contract addresses. The SDK only signs the hash.
 
         Args:
-            spender: Contract address to approve (e.g. router, escrow).
+            flow: Payment flow (direct, escrow, tab, stream, bounty, deposit).
             amount: Amount in USDC (e.g. 5.0 for $5.00).
-            deadline: Optional Unix timestamp. Defaults to 1 hour from now.
-            usdc_address: Override the USDC contract address (e.g. from get_contracts()).
         """
-        usdc_addr = usdc_address or USDC_ADDRESSES.get(self.chain, "")
-        if not usdc_addr:
-            raise ValueError(
-                f"No USDC address for chain '{self.chain}'. "
-                f"Supported chains: {', '.join(USDC_ADDRESSES)}. "
-                "Pass usdc_address to sign_usdc_permit() instead."
-            )
-        nonce = await self._fetch_permit_nonce(usdc_addr)
-        dl = deadline or (int(time.time()) + 3600)
-        raw = int(round(amount * 1_000_000))
-        return await self.sign_usdc_permit(spender, raw, dl, nonce, usdc_addr)
+        data = await self._http.post(
+            "/api/v1/permits/prepare",
+            {"flow": flow, "amount": str(amount), "owner": self.address},
+        )
+        hash_hex = data["hash"]
+        hash_bytes = bytes.fromhex(hash_hex[2:])
+
+        sig = await self._signer.sign_hash(hash_bytes)
+        sig_hex = sig if sig.startswith("0x") else f"0x{sig}"
+        sig_raw = sig_hex[2:]
+        r = f"0x{sig_raw[:64]}"
+        s = f"0x{sig_raw[64:128]}"
+        v = int(sig_raw[128:130], 16)
+
+        return PermitSignature(
+            value=int(data["value"]),
+            deadline=int(data["deadline"]),
+            v=v,
+            r=r,
+            s=s,
+        )
 
     async def _auto_permit(self, contract: str, amount: float) -> PermitSignature | None:
-        """Internal: auto-sign a permit for the given contract type and amount.
+        """Internal: auto-sign a permit via /permits/prepare.
 
-        Catches permit-specific errors (missing contract, signing failures)
-        and returns None. Re-raises all other errors.
+        Maps the contract name to a flow and calls sign_permit().
+        Returns None on failure so callers degrade gracefully.
         """
         import logging
 
         logger = logging.getLogger("remitmd")
+        flow = _CONTRACT_TO_FLOW.get(contract)
+        if not flow:
+            logger.warning("unknown contract for permit: %s", contract)
+            return None
         try:
-            contracts = await self.get_contracts()
-            spender = str(contracts.get(contract, ""))
-            if not spender:
-                return None
-            usdc = str(contracts.get("usdc", ""))
-            return await self.sign_permit(spender, amount, usdc_address=usdc or None)
-        except (ValueError, KeyError, TypeError, RuntimeError) as exc:
+            return await self.sign_permit(flow, amount)
+        except Exception as exc:
             logger.warning(
                 "auto-permit failed for %s (amount=%s): %s",
                 contract,

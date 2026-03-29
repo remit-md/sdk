@@ -24,6 +24,27 @@ def _make_wallet() -> Wallet:
     return Wallet(private_key=_KEY, chain="localhost", testnet=True)
 
 
+def _mock_api_http() -> AsyncMock:
+    """Return a mock authenticated HTTP client for /x402/prepare calls."""
+    mock = AsyncMock()
+
+    async def _post(path: str, body: dict) -> dict:
+        # Decode the payment_required to get amount + payTo for realistic response.
+        pr = json.loads(base64.b64decode(body["payment_required"]))
+        return {
+            "hash": "0x" + "00" * 32,
+            "from": _ADDR.lower(),
+            "to": pr["payTo"],
+            "value": pr["amount"],
+            "valid_after": "0",
+            "valid_before": "9999999999",
+            "nonce": "0x" + "ab" * 32,
+        }
+
+    mock.post = _post
+    return mock
+
+
 def _make_payment_required(
     amount: str = "100000",  # 0.10 USDC
     scheme: str = "exact",
@@ -151,6 +172,7 @@ async def test_successful_payment_retry() -> None:
     """402 within limit: retries with PAYMENT-SIGNATURE header and returns 200."""
     wallet = _make_wallet()
     client = X402Client(wallet=wallet, max_auto_pay_usdc=1.0)
+    client._api_http = _mock_api_http()
 
     header_402 = _make_payment_required(amount="100000")  # 0.10 USDC
     r402 = _mock_response(402, headers={"payment-required": header_402})
@@ -198,6 +220,7 @@ async def test_payment_chainid_parsed_from_network() -> None:
     """chainId is parsed from the CAIP-2 network string."""
     wallet = _make_wallet()
     client = X402Client(wallet=wallet, max_auto_pay_usdc=1.0)
+    client._api_http = _mock_api_http()
 
     # Use Base Sepolia network (84532).
     header_402 = _make_payment_required(amount="1000", network="eip155:84532")
@@ -227,6 +250,7 @@ async def test_v2_fields_available_via_last_payment() -> None:
     """V2 optional fields (resource, description, mimeType) are exposed via last_payment."""
     wallet = _make_wallet()
     client = X402Client(wallet=wallet, max_auto_pay_usdc=1.0)
+    client._api_http = _mock_api_http()
     header_402 = _make_payment_required(
         amount="1000",
         resource="/api/v1/premium",

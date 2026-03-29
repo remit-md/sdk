@@ -21,6 +21,9 @@ export interface Signer {
     value: Record<string, unknown>,
   ): Promise<string>;
 
+  /** Sign a raw 32-byte hash and return the 0x-prefixed hex signature (65 bytes: r+s+v). */
+  signHash(hash: Uint8Array): Promise<string>;
+
   /** Return the checksummed public address. */
   getAddress(): string;
 }
@@ -53,6 +56,10 @@ export class PrivateKeySigner implements Signer {
       primaryType,
       message: value,
     } as unknown as SignTypedDataParameters);
+  }
+
+  async signHash(hash: Uint8Array): Promise<string> {
+    return this.#account.sign({ hash: `0x${Buffer.from(hash).toString("hex")}` as `0x${string}` });
   }
 
   getAddress(): string {

@@ -98,7 +98,6 @@ impl MockRemit {
             address: MOCK_WALLET.to_string(),
             chain_id: ChainId::BASE_SEPOLIA,
             chain: "base".to_string(),
-            chain_key: "base-sepolia".to_string(),
             contracts_cache: Mutex::new(None),
             signer,
         }
@@ -723,6 +722,31 @@ impl MockTransport {
                     "balance": s.balance,
                 }))
             }
+
+            // ─── Permits prepare ──────────────────────────────────────────
+            ("POST", "/api/v1/permits/prepare") => {
+                // Return a dummy 32-byte hash plus value/deadline for mock signing.
+                let amount_str = b["amount"].as_str().unwrap_or("0");
+                let amount_f64 = amount_str.parse::<f64>().unwrap_or(0.0);
+                let value = (amount_f64 * 1_000_000.0).round() as u64;
+                let deadline = Utc::now().timestamp() as u64 + 3600;
+                Ok(json!({
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+                    "value": value.to_string(),
+                    "deadline": deadline.to_string(),
+                }))
+            }
+
+            // ─── x402 prepare ────────────────────────────────────────────────
+            ("POST", "/api/v1/x402/prepare") => Ok(json!({
+                "hash": "0x0000000000000000000000000000000000000000000000000000000000000002",
+                "from": MOCK_WALLET,
+                "to": "0x0000000000000000000000000000000000000002",
+                "value": "100000",
+                "validAfter": "0",
+                "validBefore": (Utc::now().timestamp() as u64 + 60).to_string(),
+                "nonce": format!("0x{}", mock_hash()),
+            })),
 
             // ─── Catch-all: return empty success ──────────────────────────
             _ => Ok(Value::Null),

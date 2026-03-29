@@ -8,9 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::cli_signer::{cli_install_hint, CliSigner};
 use crate::error::{codes, remit_err, remit_err_ctx, RemitError};
-use crate::http::{
-    chain_config, compute_permit_digest, fetch_permit_nonce, usdc_address, HttpTransport, Transport,
-};
+use crate::http::{chain_config, HttpTransport, Transport};
 use crate::models::*;
 use crate::signer::{PrivateKeySigner, Signer};
 
@@ -55,8 +53,6 @@ pub struct Wallet {
     pub(crate) address: String,
     pub(crate) chain_id: ChainId,
     pub(crate) chain: String,
-    /// Full chain key (e.g. "base-sepolia") for USDC/RPC lookups.
-    pub(crate) chain_key: String,
     pub(crate) contracts_cache: Mutex<Option<ContractAddresses>>,
     /// Retained signer reference for permit signing.
     pub(crate) signer: Arc<dyn Signer>,
@@ -184,135 +180,130 @@ impl Wallet {
     }
 }
 
-// ─── EIP-2612 Permit ─────────────────────────────────────────────────────────
+// ─── EIP-2612 Permit (via /permits/prepare) ─────────────────────────────────
+
+/// Contract name to flow name for /permits/prepare.
+const CONTRACT_TO_FLOW: &[(&str, &str)] = &[
+    ("router", "direct"),
+    ("escrow", "escrow"),
+    ("tab", "tab"),
+    ("stream", "stream"),
+    ("bounty", "bounty"),
+    ("deposit", "deposit"),
+    ("relayer", "direct"),
+];
 
 impl Wallet {
-    /// Sign an EIP-2612 permit for USDC approval.
+    /// Sign a USDC permit via the server's `/permits/prepare` endpoint.
     ///
-    /// Auto-fetches the on-chain nonce and sets a default deadline of 1 hour from now.
+    /// The server computes the EIP-712 hash, manages nonces, and resolves
+    /// contract addresses. The SDK only signs the hash.
     ///
     /// # Arguments
-    /// - `spender` - contract address that will call `transferFrom` (e.g. Router, Escrow)
-    /// - `amount` - USDC amount (e.g. 1.50 for $1.50)
-    /// - `deadline` - optional Unix timestamp; defaults to 1 hour from now
+    /// - `flow` - payment flow (`"direct"`, `"escrow"`, `"tab"`, `"stream"`, `"bounty"`, `"deposit"`)
+    /// - `amount` - USDC amount (e.g. 5.0 for $5.00)
     pub async fn sign_permit(
         &self,
-        spender: &str,
+        flow: &str,
         amount: f64,
-        deadline: Option<u64>,
     ) -> Result<PermitSignature, RemitError> {
-        self.sign_permit_with_usdc(spender, amount, deadline, None)
-            .await
-    }
+        let data: Value = self
+            .transport
+            .post(
+                "/api/v1/permits/prepare",
+                Some(json!({
+                    "flow": flow,
+                    "amount": amount.to_string(),
+                    "owner": self.address,
+                })),
+            )
+            .await?;
 
-    /// Like `sign_permit`, but accepts an explicit USDC contract address
-    /// instead of looking it up from the hardcoded map.
-    async fn sign_permit_with_usdc(
-        &self,
-        spender: &str,
-        amount: f64,
-        deadline: Option<u64>,
-        usdc_override: Option<&str>,
-    ) -> Result<PermitSignature, RemitError> {
-        validate_address(spender)?;
-
-        let usdc_addr = match usdc_override {
-            Some(addr) => addr,
-            None => usdc_address(&self.chain_key).ok_or_else(|| {
-                remit_err(
-                    codes::CHAIN_MISMATCH,
-                    format!("no USDC address known for chain {:?}", self.chain_key),
-                )
-            })?,
-        };
-
-        let nonce = fetch_permit_nonce(self.transport.as_ref(), &self.address).await?;
-
-        let dl = deadline.unwrap_or_else(|| {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs()
-                + 3600
-        });
-
-        // Convert human amount (e.g. 1.50) to base units (1_500_000).
-        let raw_amount = (amount * 1_000_000.0).round() as u64;
-
-        let digest = compute_permit_digest(
-            self.chain_id.0,
-            usdc_addr,
-            &self.address,
-            spender,
-            raw_amount,
-            nonce,
-            dl,
-        )?;
-
-        let sig_bytes = self.signer.sign(&digest)?;
-
-        // Split 65-byte signature into r (32), s (32), v (1).
-        if sig_bytes.len() != 65 {
+        let hash_hex = data["hash"]
+            .as_str()
+            .ok_or_else(|| remit_err(codes::SERVER_ERROR, "permits/prepare: missing hash"))?;
+        let hash_str = hash_hex.strip_prefix("0x").unwrap_or(hash_hex);
+        let hash_bytes_vec = hex::decode(hash_str).map_err(|e| {
+            remit_err(
+                codes::SERVER_ERROR,
+                format!("permits/prepare: invalid hash hex: {e}"),
+            )
+        })?;
+        if hash_bytes_vec.len() != 32 {
             return Err(remit_err(
-                codes::INVALID_SIGNATURE,
-                format!("expected 65-byte signature, got {}", sig_bytes.len()),
+                codes::SERVER_ERROR,
+                format!(
+                    "permits/prepare: expected 32-byte hash, got {}",
+                    hash_bytes_vec.len()
+                ),
             ));
         }
-        let r = format!("0x{}", hex::encode(&sig_bytes[0..32]));
-        let s = format!("0x{}", hex::encode(&sig_bytes[32..64]));
-        let v = sig_bytes[64];
+        let mut hash: [u8; 32] = [0u8; 32];
+        hash.copy_from_slice(&hash_bytes_vec);
+
+        let sig_hex = self.signer.sign_hash(&hash)?;
+        let sig_raw = sig_hex.strip_prefix("0x").unwrap_or(&sig_hex);
+        if sig_raw.len() != 130 {
+            return Err(remit_err(
+                codes::INVALID_SIGNATURE,
+                format!(
+                    "expected 65-byte signature (130 hex chars), got {}",
+                    sig_raw.len()
+                ),
+            ));
+        }
+        let r = format!("0x{}", &sig_raw[..64]);
+        let s = format!("0x{}", &sig_raw[64..128]);
+        let v = u8::from_str_radix(&sig_raw[128..130], 16).unwrap_or(0);
+
+        let value = data["value"]
+            .as_str()
+            .or_else(|| data["value"].as_u64().map(|_| ""))
+            .and_then(|s| {
+                if s.is_empty() {
+                    data["value"].as_u64()
+                } else {
+                    s.parse::<u64>().ok()
+                }
+            })
+            .unwrap_or(0);
+        let deadline = data["deadline"]
+            .as_str()
+            .or_else(|| data["deadline"].as_u64().map(|_| ""))
+            .and_then(|s| {
+                if s.is_empty() {
+                    data["deadline"].as_u64()
+                } else {
+                    s.parse::<u64>().ok()
+                }
+            })
+            .unwrap_or(0);
 
         Ok(PermitSignature {
-            value: raw_amount,
-            deadline: dl,
+            value,
+            deadline,
             v,
             r,
             s,
         })
     }
 
-    /// Auto-sign a permit for the given contract type and USDC amount.
+    /// Internal: auto-sign a permit via `/permits/prepare`.
     ///
-    /// Looks up the contract address from `get_contracts()`, then calls `sign_permit`.
-    async fn auto_permit(
-        &self,
-        contract: &str,
-        amount: f64,
-    ) -> Result<PermitSignature, RemitError> {
-        let contracts = self.get_contracts().await?;
-        let spender = match contract {
-            "router" => &contracts.router,
-            "escrow" => &contracts.escrow,
-            "tab" => &contracts.tab,
-            "stream" => &contracts.stream,
-            "bounty" => &contracts.bounty,
-            "deposit" => &contracts.deposit,
-            "relayer" => match &contracts.relayer {
-                Some(addr) => addr,
-                None => {
-                    return Err(remit_err(
-                        codes::SERVER_ERROR,
-                        "relayer address not available from /contracts".to_string(),
-                    ))
-                }
-            },
-            _ => {
-                return Err(remit_err(
-                    codes::SERVER_ERROR,
-                    format!("unknown contract type: {contract}"),
-                ))
+    /// Maps the contract name to a flow and calls `sign_permit()`.
+    /// Returns `None` on failure so callers degrade gracefully.
+    async fn try_auto_permit(&self, contract: &str, amount: Decimal) -> Option<PermitSignature> {
+        let flow = CONTRACT_TO_FLOW
+            .iter()
+            .find(|(k, _)| *k == contract)
+            .map(|(_, v)| *v);
+        let flow = match flow {
+            Some(f) => f,
+            None => {
+                eprintln!("[remitmd] unknown contract for permit: {contract}");
+                return None;
             }
         };
-        self.sign_permit_with_usdc(spender, amount, None, Some(&contracts.usdc))
-            .await
-    }
-
-    /// Try to auto-sign a permit. Returns `Some(permit)` on success, `None` on failure.
-    ///
-    /// This is used by the convenience payment methods so they gracefully fall back
-    /// to server-side approval when the RPC is unreachable (e.g., in mock tests).
-    /// Failures are logged to stderr so they are visible for debugging.
-    async fn try_auto_permit(&self, contract: &str, amount: Decimal) -> Option<PermitSignature> {
         let amount_f64 = match decimal_to_f64(amount) {
             Ok(v) => v,
             Err(e) => {
@@ -320,7 +311,7 @@ impl Wallet {
                 return None;
             }
         };
-        match self.auto_permit(contract, amount_f64).await {
+        match self.sign_permit(flow, amount_f64).await {
             Ok(permit) => Some(permit),
             Err(e) => {
                 eprintln!(
@@ -1079,12 +1070,12 @@ impl Wallet {
             body["agent_name"] = json!(name);
         }
         // Auto-sign a permit for the relayer (best-effort)
-        match self.auto_permit("relayer", 999_999_999.0).await {
+        match self.sign_permit("direct", 999_999_999.0).await {
             Ok(permit) => {
                 body["permit"] = serde_json::to_value(&permit).unwrap();
             }
             Err(e) => {
-                eprintln!("[remitmd] fund link: auto_permit for relayer failed (link created without permit): {e}");
+                eprintln!("[remitmd] fund link: sign_permit for relayer failed (link created without permit): {e}");
             }
         }
         self.post("/api/v1/links/fund", body).await
@@ -1114,12 +1105,12 @@ impl Wallet {
             body["agent_name"] = json!(name);
         }
         // Auto-sign a permit for the relayer (best-effort)
-        match self.auto_permit("relayer", 999_999_999.0).await {
+        match self.sign_permit("direct", 999_999_999.0).await {
             Ok(permit) => {
                 body["permit"] = serde_json::to_value(&permit).unwrap();
             }
             Err(e) => {
-                eprintln!("[remitmd] withdraw link: auto_permit for relayer failed (link created without permit): {e}");
+                eprintln!("[remitmd] withdraw link: sign_permit for relayer failed (link created without permit): {e}");
             }
         }
         self.post("/api/v1/links/withdraw", body).await
@@ -1275,7 +1266,6 @@ fn build_wallet(
         address,
         chain_id: ChainId(cfg.chain_id),
         chain: chain.to_string(),
-        chain_key,
         contracts_cache: Mutex::new(None),
         signer,
     })

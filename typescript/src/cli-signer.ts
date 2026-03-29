@@ -125,6 +125,34 @@ export class CliSigner implements Signer {
     return sig;
   }
 
+  async signHash(hash: Uint8Array): Promise<string> {
+    if (hash.length !== 32) {
+      throw new Error(`CliSigner: hash must be exactly 32 bytes, got ${hash.length}`);
+    }
+    const hexDigest = `0x${Buffer.from(hash).toString("hex")}`;
+
+    let result: { stdout: string; stderr: string };
+    try {
+      result = await spawnWithStdin(
+        this.#cliPath,
+        ["sign", "--digest"],
+        hexDigest,
+        CLI_TIMEOUT,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`CliSigner: hash signing failed: ${msg}`);
+    }
+
+    const sig = result.stdout.trim();
+    if (!sig.startsWith("0x") || sig.length !== 132) {
+      throw new Error(
+        `CliSigner: invalid signature from CLI: ${result.stderr.trim() || sig}`,
+      );
+    }
+    return sig;
+  }
+
   /**
    * Check conditions for CliSigner activation:
    * 1. ~/.remit/keys/default.meta exists (keychain — no password needed), OR

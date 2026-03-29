@@ -674,7 +674,7 @@ func TestBountyLifecycle(t *testing.T) {
 	// 1. Create bounty: $5 reward, 1 hour deadline
 	deadline := time.Now().Unix() + 3600
 	// Explicit permit with $1 headroom (same pattern as TS/Python tests)
-	permit, err := poster.SignPermit(ctx, contracts.Bounty, 6.0)
+	permit, err := poster.SignPermit(ctx, "bounty", 6.0)
 	if err != nil {
 		t.Fatalf("SignPermit for bounty: %v", err)
 	}

@@ -31,9 +31,8 @@ describe("SDK: Escrow Lifecycle", { timeout: 180_000 }, () => {
 
     const agentBefore = await getUsdcBalance(agent.address);
     const providerBefore = await getUsdcBalance(provider.address);
-    // Sign permit for Escrow contract
-    const contracts = await agent.getContracts();
-    const permit = await agent.signPermit(contracts.escrow, amount + 1);
+    // Sign permit via /permits/prepare
+    const permit = await agent.signPermit("escrow", amount + 1);
 
     // Fund escrow
     const escrow = await agent.pay(

@@ -40,22 +40,25 @@ public struct X402Response: Sendable {
 /// On receiving a 402, the client:
 /// 1. Decodes the `PAYMENT-REQUIRED` header (base64 JSON)
 /// 2. Checks the amount is within `maxAutoPayUsdc`
-/// 3. Builds and signs an EIP-3009 `transferWithAuthorization`
-/// 4. Base64-encodes the `PAYMENT-SIGNATURE` header
-/// 5. Retries the original request with payment attached
+/// 3. Calls `/x402/prepare` to get hash + authorization fields
+/// 4. Signs the hash
+/// 5. Base64-encodes the `PAYMENT-SIGNATURE` header
+/// 6. Retries the original request with payment attached
 public final class X402Client: @unchecked Sendable {
     private let signer: any Signer
     private let address: String
     private let maxAutoPayUsdc: Double
+    private let apiTransport: any Transport
     private let session: URLSession
 
     /// The last PAYMENT-REQUIRED decoded before payment. Useful for logging/display.
     public var lastPayment: PaymentRequired?
 
-    public init(signer: any Signer, address: String, maxAutoPayUsdc: Double = 0.10) {
+    public init(signer: any Signer, address: String, maxAutoPayUsdc: Double = 0.10, apiTransport: any Transport) {
         self.signer = signer
         self.address = address
         self.maxAutoPayUsdc = maxAutoPayUsdc
+        self.apiTransport = apiTransport
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         self.session = URLSession(configuration: config)
@@ -114,36 +117,20 @@ public final class X402Client: @unchecked Sendable {
             throw AllowanceExceededError(amountUsdc: amountUsdc, limitUsdc: maxAutoPayUsdc)
         }
 
-        // 4. Parse chainId from CAIP-2 network string (e.g. "eip155:84532" -> 84532).
-        let chainComponents = required.network.split(separator: ":")
-        guard chainComponents.count == 2, let chainId = UInt64(chainComponents[1]) else {
-            throw RemitError(RemitError.serverError, "Cannot parse chainId from network: \(required.network)")
-        }
-
-        // 5. Build EIP-3009 authorization fields.
-        let nowSecs = UInt64(Date().timeIntervalSince1970)
-        let validBefore = nowSecs + UInt64(required.maxTimeoutSeconds ?? 60)
-
-        var nonceBytes = [UInt8](repeating: 0, count: 32)
-        for i in 0..<32 { nonceBytes[i] = UInt8.random(in: 0...255) }
-        let nonceData = Data(nonceBytes)
-        let nonceHex = "0x" + nonceData.hexString
-
-        // 6. Build EIP-712 digest for TransferWithAuthorization
-        let digest = eip3009Hash(
-            chainId: chainId,
-            asset: required.asset,
-            from: address,
-            to: required.payTo,
-            value: amountBaseUnits,
-            validAfter: 0,
-            validBefore: validBefore,
-            nonce: nonceData
+        // 4. Call /x402/prepare to get the hash + authorization fields.
+        let prepareData: X402PrepareResponse = try await apiTransport.request(
+            method: "POST", path: "/api/v1/x402/prepare",
+            body: X402PrepareBody(payment_required: raw, payer: address)
         )
 
-        let signature = try signer.sign(digest: digest)
+        // 5. Sign the hash.
+        let hashHex = prepareData.hash.hasPrefix("0x") ? String(prepareData.hash.dropFirst(2)) : prepareData.hash
+        guard let hashBytes = Data(hexString: hashHex), hashBytes.count == 32 else {
+            throw RemitError(RemitError.serverError, "Invalid hash from /x402/prepare: \(prepareData.hash)")
+        }
+        let signature = try await signer.signHash(hashBytes)
 
-        // 7. Build PAYMENT-SIGNATURE JSON payload.
+        // 6. Build PAYMENT-SIGNATURE JSON payload.
         let paymentPayload: [String: Any] = [
             "scheme": required.scheme,
             "network": required.network,
@@ -151,12 +138,12 @@ public final class X402Client: @unchecked Sendable {
             "payload": [
                 "signature": signature,
                 "authorization": [
-                    "from": address,
-                    "to": required.payTo,
-                    "value": required.amount,
-                    "validAfter": "0",
-                    "validBefore": String(validBefore),
-                    "nonce": nonceHex,
+                    "from": prepareData.from,
+                    "to": prepareData.to,
+                    "value": prepareData.value,
+                    "validAfter": prepareData.validAfter,
+                    "validBefore": prepareData.validBefore,
+                    "nonce": prepareData.nonce,
                 ] as [String: Any],
             ] as [String: Any],
         ]
@@ -164,7 +151,7 @@ public final class X402Client: @unchecked Sendable {
         let paymentJSON = try JSONSerialization.data(withJSONObject: paymentPayload)
         let paymentHeader = paymentJSON.base64EncodedString()
 
-        // 8. Retry with PAYMENT-SIGNATURE header.
+        // 7. Retry with PAYMENT-SIGNATURE header.
         var retryReq = originalRequest
         retryReq.setValue(paymentHeader, forHTTPHeaderField: "PAYMENT-SIGNATURE")
 
@@ -177,78 +164,25 @@ public final class X402Client: @unchecked Sendable {
     }
 }
 
-// MARK: - EIP-3009 hash computation
+// MARK: - /x402/prepare request/response
 
-/// Compute the EIP-712 hash for a TransferWithAuthorization (EIP-3009).
-///
-/// Domain: name="USD Coin", version="2", chainId, verifyingContract=asset
-/// Struct: TransferWithAuthorization(address from, address to, uint256 value,
-///         uint256 validAfter, uint256 validBefore, bytes32 nonce)
-private func eip3009Hash(
-    chainId: UInt64,
-    asset: String,
-    from: String,
-    to: String,
-    value: UInt64,
-    validAfter: UInt64,
-    validBefore: UInt64,
-    nonce: Data
-) -> Data {
-    let domainTypeHash = keccak256(Data("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".utf8))
-    let typeHash = keccak256(Data("TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)".utf8))
-
-    let nameHash = keccak256(Data("USD Coin".utf8))
-    let versionHash = keccak256(Data("2".utf8))
-    let chainIdEnc = x402EncodeUint256(chainId)
-    let assetEnc = x402EncodeAddress(asset)
-
-    var domainData = Data()
-    domainData.append(domainTypeHash)
-    domainData.append(nameHash)
-    domainData.append(versionHash)
-    domainData.append(chainIdEnc)
-    domainData.append(assetEnc)
-    let domainSep = keccak256(domainData)
-
-    let fromEnc = x402EncodeAddress(from)
-    let toEnc = x402EncodeAddress(to)
-    let valueEnc = x402EncodeUint256(value)
-    let validAfterEnc = x402EncodeUint256(validAfter)
-    let validBeforeEnc = x402EncodeUint256(validBefore)
-    var paddedNonce = Data(repeating: 0, count: 32)
-    let bytesToCopy = min(nonce.count, 32)
-    paddedNonce.replaceSubrange(0..<bytesToCopy, with: nonce.prefix(bytesToCopy))
-
-    var structData = Data()
-    structData.append(typeHash)
-    structData.append(fromEnc)
-    structData.append(toEnc)
-    structData.append(valueEnc)
-    structData.append(validAfterEnc)
-    structData.append(validBeforeEnc)
-    structData.append(paddedNonce)
-    let structHash = keccak256(structData)
-
-    var finalData = Data([0x19, 0x01])
-    finalData.append(domainSep)
-    finalData.append(structHash)
-    return keccak256(finalData)
+private struct X402PrepareBody: Codable {
+    let payment_required: String
+    let payer: String
 }
 
-private func x402EncodeUint256(_ value: UInt64) -> Data {
-    var result = Data(repeating: 0, count: 32)
-    var v = value
-    for i in stride(from: 31, through: 24, by: -1) {
-        result[i] = UInt8(v & 0xFF)
-        v >>= 8
+private struct X402PrepareResponse: Codable {
+    let hash: String
+    let from: String
+    let to: String
+    let value: String
+    let validAfter: String
+    let validBefore: String
+    let nonce: String
+
+    enum CodingKeys: String, CodingKey {
+        case hash, from, to, value, nonce
+        case validAfter = "valid_after"
+        case validBefore = "valid_before"
     }
-    return result
-}
-
-private func x402EncodeAddress(_ address: String) -> Data {
-    var result = Data(repeating: 0, count: 32)
-    let hex = address.hasPrefix("0x") ? String(address.dropFirst(2)) : address
-    guard hex.count == 40, let addrData = Data(hexString: hex) else { return result }
-    result.replaceSubrange(12..<32, with: addrData)
-    return result
 }

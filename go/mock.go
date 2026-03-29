@@ -241,6 +241,29 @@ func (t *mockTransport) dispatch(_ context.Context, method, path string, body an
 	case method == "GET" && strings.HasPrefix(path, "/api/v1/wallet/history"):
 		return t.respond(dst, m.mockHistory())
 
+	case method == "POST" && path == "/api/v1/permits/prepare":
+		// Mock permits/prepare: return a dummy hash + value/deadline
+		b := mustBody(body)
+		amount := mustDecimal(b["amount"])
+		baseUnits := amount.Mul(decimal.NewFromInt(1_000_000)).IntPart()
+		return t.respond(dst, map[string]any{
+			"hash":     "0x" + strings.Repeat("ab", 32),
+			"value":    baseUnits,
+			"deadline": time.Now().Unix() + 3600,
+		})
+
+	case method == "POST" && path == "/api/v1/x402/prepare":
+		// Mock x402/prepare: return dummy hash + authorization fields
+		return t.respond(dst, map[string]any{
+			"hash":         "0x" + strings.Repeat("cd", 32),
+			"from":         "0x0000000000000000000000000000000000000001",
+			"to":           "0x0000000000000000000000000000000000000002",
+			"value":        "1000",
+			"valid_after":  "0",
+			"valid_before": "9999999999",
+			"nonce":        "0x" + strings.Repeat("ef", 32),
+		})
+
 	default:
 		// Unhandled routes succeed with an empty response (permissive mock)
 		return nil
@@ -463,6 +486,10 @@ type mockSigner struct{}
 
 func (s *mockSigner) Sign(_ [32]byte) ([]byte, error) {
 	return make([]byte, 65), nil
+}
+
+func (s *mockSigner) SignHash(_ []byte) (string, error) {
+	return "0x" + strings.Repeat("00", 65), nil
 }
 
 func (s *mockSigner) Address() common.Address {

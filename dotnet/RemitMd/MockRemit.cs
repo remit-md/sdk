@@ -144,6 +144,7 @@ public sealed class MockRemit
 
             object result = path switch
             {
+                "/api/v1/permits/prepare"              => HandlePermitsPrepare(body),
                 "/api/v1/payments/direct"              => HandlePay(body, id, now),
 
                 "/api/v1/invoices"                     => HandleCreateInvoice(body),
@@ -176,6 +177,19 @@ public sealed class MockRemit
             };
 
             return Task.FromResult(Reserialize<T>(result));
+        }
+
+        // ── Permit ───────────────────────────────────────────────────────────
+
+        private object HandlePermitsPrepare(object body)
+        {
+            // Return a deterministic mock hash and permit fields.
+            return new Dictionary<string, object>
+            {
+                ["hash"] = "0x" + new string('a', 64),
+                ["value"] = 1000000L,
+                ["deadline"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600,
+            };
         }
 
         // ── Payment ──────────────────────────────────────────────────────────

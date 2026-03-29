@@ -86,24 +86,15 @@ final class PaymentTests: XCTestCase {
 ## Permits (Gasless USDC Approval)
 
 All payment methods auto-sign EIP-2612 permits when no explicit permit is provided.
-The wallet fetches the on-chain nonce, signs the permit, and includes it in the request automatically.
+The server computes the EIP-712 hash via `/permits/prepare`; the SDK only signs the hash.
 
 ```swift
 // Auto-permit (recommended) - just call the method, permit is handled internally
 let tx = try await wallet.pay(to: "0xRecipient...", amount: 5.0)
 
-// Manual permit - sign yourself if you need control over deadline/nonce
-let contracts = try await wallet.getContracts()
-let permit = try await wallet.signPermit(spender: contracts.router, amount: 5.0)
+// Manual permit - sign via server-side /permits/prepare
+let permit = try await wallet.signPermit("direct", amount: 5.0)
 let tx = try await wallet.pay(to: "0xRecipient...", amount: 5.0, permit: permit)
-
-// Low-level permit - full control over all parameters
-let permit = try wallet.signUsdcPermit(
-    spender: contracts.router,
-    value: 5_000_000,    // base units (6 decimals)
-    deadline: Int(Date().timeIntervalSince1970) + 3600,
-    nonce: 0
-)
 ```
 
 Auto-permit works on: `pay`, `createEscrow`, `openTab`, `startStream`, `postBounty`, `placeDeposit`.

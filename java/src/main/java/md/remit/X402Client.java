@@ -1,15 +1,14 @@
 package md.remit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import md.remit.internal.ApiClient;
 import md.remit.signer.Signer;
 
-import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -22,8 +21,8 @@ import java.util.Map;
  * <ol>
  *   <li>Decodes the {@code PAYMENT-REQUIRED} header (base64 JSON)</li>
  *   <li>Checks the amount is within {@code maxAutoPayUsdc}</li>
- *   <li>Builds and signs an EIP-3009 {@code transferWithAuthorization}</li>
- *   <li>Base64-encodes the {@code PAYMENT-SIGNATURE} header</li>
+ *   <li>Calls {@code /x402/prepare} to get a signable hash and authorization fields</li>
+ *   <li>Signs the hash and builds the {@code PAYMENT-SIGNATURE} header</li>
  *   <li>Retries the original request with payment attached</li>
  * </ol>
  *
@@ -36,11 +35,10 @@ import java.util.Map;
 public class X402Client {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final SecureRandom RNG = new SecureRandom();
 
     private final Signer signer;
     private final String address;
-    private final long chainId;
+    private final ApiClient apiClient;
     private final double maxAutoPayUsdc;
     private final HttpClient http;
 
@@ -63,10 +61,9 @@ public class X402Client {
     }
 
     public X402Client(Wallet wallet, double maxAutoPayUsdc) {
-        // Access internal fields via package-private references
         this.signer = wallet.signer();
         this.address = wallet.address();
-        this.chainId = wallet.chainId();
+        this.apiClient = wallet.apiClient();
         this.maxAutoPayUsdc = maxAutoPayUsdc;
         this.http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -115,35 +112,26 @@ public class X402Client {
             throw new AllowanceExceededError(amountUsdc, maxAutoPayUsdc);
         }
 
-        // Parse chainId from CAIP-2 network string (e.g. "eip155:84532")
-        String network = (String) required.get("network");
-        long payChainId = Long.parseLong(network.split(":")[1]);
+        // Call /x402/prepare to get the hash + authorization fields
+        Map<String, Object> prepareData = apiClient.post(
+            "/api/v1/x402/prepare",
+            Map.of("payment_required", decoded, "payer", address),
+            Map.class);
 
-        String asset = (String) required.get("asset");
-        String payTo = (String) required.get("payTo");
-        Object timeoutObj = required.get("maxTimeoutSeconds");
-        int maxTimeout = timeoutObj instanceof Number ? ((Number) timeoutObj).intValue() : 60;
-
-        // Build EIP-3009 authorization
-        long nowSecs = System.currentTimeMillis() / 1000;
-        long validBefore = nowSecs + maxTimeout;
-        byte[] nonceBytes = new byte[32];
-        RNG.nextBytes(nonceBytes);
-        String nonce = "0x" + HexFormat.of().formatHex(nonceBytes);
-
-        // Sign EIP-712 transferWithAuthorization
-        String signature = signEip3009(
-            payChainId, asset, address, payTo,
-            amountBaseUnits, 0, validBefore, nonceBytes);
+        // Sign the hash
+        String hashHex = (String) prepareData.get("hash");
+        byte[] hashBytes = HexFormat.of().parseHex(hashHex.substring(2));
+        String signature = signer.signHash(hashBytes);
 
         // Build PAYMENT-SIGNATURE JSON payload
+        String network = (String) required.get("network");
         Map<String, Object> authorization = Map.of(
-            "from", address,
-            "to", payTo,
-            "value", amountStr,
-            "validAfter", "0",
-            "validBefore", String.valueOf(validBefore),
-            "nonce", nonce
+            "from", (String) prepareData.get("from"),
+            "to", (String) prepareData.get("to"),
+            "value", (String) prepareData.get("value"),
+            "validAfter", (String) prepareData.get("valid_after"),
+            "validBefore", (String) prepareData.get("valid_before"),
+            "nonce", (String) prepareData.get("nonce")
         );
         Map<String, Object> payload = Map.of(
             "scheme", scheme,
@@ -170,88 +158,5 @@ public class X402Client {
 
     public Map<String, Object> lastPayment() {
         return lastPayment;
-    }
-
-    private String signEip3009(
-            long chainId, String asset, String from, String to,
-            long value, long validAfter, long validBefore, byte[] nonce) {
-
-        byte[] domainTypeHash = keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                .getBytes(StandardCharsets.UTF_8));
-        byte[] nameHash = keccak256("USD Coin".getBytes(StandardCharsets.UTF_8));
-        byte[] versionHash = keccak256("2".getBytes(StandardCharsets.UTF_8));
-
-        byte[] domainSep = keccak256(concat(
-            domainTypeHash, nameHash, versionHash,
-            toUint256(chainId), addressToBytes32(asset)));
-
-        byte[] typeHash = keccak256(
-            "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
-                .getBytes(StandardCharsets.UTF_8));
-
-        byte[] paddedNonce = new byte[32];
-        System.arraycopy(nonce, 0, paddedNonce, 0, Math.min(nonce.length, 32));
-
-        byte[] structHash = keccak256(concat(
-            typeHash,
-            addressToBytes32(from),
-            addressToBytes32(to),
-            toUint256(value),
-            toUint256(validAfter),
-            toUint256(validBefore),
-            paddedNonce));
-
-        byte[] finalData = new byte[2 + 32 + 32];
-        finalData[0] = 0x19;
-        finalData[1] = 0x01;
-        System.arraycopy(domainSep, 0, finalData, 2, 32);
-        System.arraycopy(structHash, 0, finalData, 34, 32);
-        byte[] digest = keccak256(finalData);
-
-        try {
-            byte[] sig = signer.sign(digest);
-            return "0x" + HexFormat.of().formatHex(sig);
-        } catch (Exception e) {
-            throw new RemitError(ErrorCodes.INVALID_SIGNATURE,
-                "Failed to sign EIP-3009 authorization.",
-                Map.of());
-        }
-    }
-
-    private static byte[] keccak256(byte[] input) {
-        return org.web3j.crypto.Hash.sha3(input);
-    }
-
-    private static byte[] toUint256(long value) {
-        BigInteger bi = value >= 0 ? BigInteger.valueOf(value) : new BigInteger(Long.toUnsignedString(value));
-        byte[] b = bi.toByteArray();
-        byte[] result = new byte[32];
-        int start = (b.length > 1 && b[0] == 0) ? 1 : 0;
-        int len = b.length - start;
-        System.arraycopy(b, start, result, 32 - len, len);
-        return result;
-    }
-
-    private static byte[] addressToBytes32(String address) {
-        if (address == null || address.isBlank()) return new byte[32];
-        String hex = address.startsWith("0x") ? address.substring(2) : address;
-        if (hex.length() != 40) return new byte[32];
-        byte[] addr = HexFormat.of().parseHex(hex);
-        byte[] result = new byte[32];
-        System.arraycopy(addr, 0, result, 12, 20);
-        return result;
-    }
-
-    private static byte[] concat(byte[]... arrays) {
-        int total = 0;
-        for (byte[] a : arrays) total += a.length;
-        byte[] result = new byte[total];
-        int pos = 0;
-        for (byte[] a : arrays) {
-            System.arraycopy(a, 0, result, pos, a.length);
-            pos += a.length;
-        }
-        return result;
     }
 }

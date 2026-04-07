@@ -8,9 +8,9 @@ defmodule RemitMd.MixProject do
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      description: "remit.md SDK for Elixir - universal payment protocol for AI agents",
+      description: "DEPRECATED: Use pay-cli or pay SDKs instead. See https://pay-skill.com/docs",
       package: package(),
-      source_url: "https://github.com/remit-md/sdk",
+      source_url: "https://github.com/remit-md/pay-sdk",
       docs: [main: "RemitMd", extras: ["README.md"]],
       # Coverage gate: target 50%, gate 35%.
       test_coverage: [tool: ExCoveralls],
@@ -37,7 +37,7 @@ defmodule RemitMd.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/remit-md/sdk"},
+      links: %{"GitHub" => "https://github.com/remit-md/pay-sdk"},
       files: ~w(lib mix.exs README.md LICENSE),
       maintainers: ["remit.md"]
     ]

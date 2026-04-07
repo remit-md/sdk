@@ -1,0 +1,103 @@
+name: Deprecate All Registries
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write  # PyPI OIDC
+
+concurrency:
+  group: deprecate
+  cancel-in-progress: false
+
+jobs:
+  deprecate-crates:
+    name: Yank crates.io (remitmd)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Yank all versions
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          # Get all versions from crates.io API
+          VERSIONS=$(curl -s https://crates.io/api/v1/crates/remitmd/versions | jq -r '.versions[].num')
+          for v in $VERSIONS; do
+            echo "Yanking remitmd@$v..."
+            cargo yank --version "$v" remitmd 2>&1 || echo "  (already yanked or error)"
+          done
+
+  deprecate-rubygems:
+    name: Yank RubyGems (remitmd)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Yank all versions
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+        run: |
+          gem install gemcutter 2>/dev/null || true
+          # Get versions from API
+          VERSIONS=$(curl -s https://rubygems.org/api/v1/versions/remitmd.json | jq -r '.[].number')
+          for v in $VERSIONS; do
+            echo "Yanking remitmd-$v..."
+            gem yank remitmd -v "$v" 2>&1 || echo "  (already yanked or error)"
+          done
+
+  deprecate-hex:
+    name: Retire Hex.pm (remit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retire all versions
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        run: |
+          # Get versions from Hex API
+          VERSIONS=$(curl -s https://hex.pm/api/packages/remit | jq -r '.releases[].version')
+          for v in $VERSIONS; do
+            echo "Retiring remit@$v..."
+            curl -s -X POST "https://hex.pm/api/packages/remit/releases/$v/retire" \
+              -H "Authorization: $HEX_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"reason":"renamed","message":"DEPRECATED: Use pay-cli (cargo install pay-cli) or pay-sdk (pip install pay-sdk). See https://pay-skill.com/docs"}' \
+              2>&1 || echo "  (error)"
+          done
+
+  deprecate-nuget:
+    name: Deprecate NuGet (Remit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deprecate all versions
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          # NuGet doesn't have a CLI deprecate command, but we can unlist versions
+          VERSIONS=$(curl -s "https://api.nuget.org/v3-flatcontainer/remit/index.json" | jq -r '.versions[]')
+          for v in $VERSIONS; do
+            echo "Unlisting Remit@$v..."
+            dotnet nuget delete Remit "$v" \
+              --source https://api.nuget.org/v3/index.json \
+              --api-key "$NUGET_API_KEY" \
+              --non-interactive 2>&1 || echo "  (already unlisted or error)"
+          done
+
+  deprecate-pypi:
+    name: Publish deprecation notice to PyPI (remitmd)
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build deprecation release
+        working-directory: python
+        run: |
+          pip install build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist/

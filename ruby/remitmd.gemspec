@@ -3,19 +3,20 @@ require_relative "lib/remitmd"
 Gem::Specification.new do |s|
   s.name        = "remitmd"
   s.version     = Remitmd::VERSION
-  s.summary     = "remit.md — universal payment protocol SDK for AI agents"
-  s.description = "Send and receive USDC via the remit.md protocol. Supports direct payments, " \
-                  "escrow, metered tabs, payment streams, bounties, and security deposits. " \
-                  "Includes MockRemit for zero-network testing."
+  s.summary     = "DEPRECATED: Use pay-cli or pay SDKs instead. See https://pay-skill.com/docs"
+  s.description = "DEPRECATED: This gem is no longer maintained. Use pay-cli (cargo install pay-cli) " \
+                  "or pay SDKs (pip install pay-sdk / npm install @pay-skill/sdk). " \
+                  "See https://pay-skill.com/docs for migration."
   s.authors     = ["remit.md"]
   s.email       = ["hello@remit.md"]
-  s.homepage    = "https://remit.md"
+  s.homepage    = "https://pay-skill.com"
   s.license     = "MIT"
   s.metadata    = {
-    "homepage_uri"      => "https://remit.md",
-    "source_code_uri"   => "https://github.com/remit-md/sdk",
-    "changelog_uri"     => "https://github.com/remit-md/sdk/releases",
+    "homepage_uri"      => "https://pay-skill.com",
+    "source_code_uri"   => "https://github.com/remit-md/pay-sdk",
+    "changelog_uri"     => "https://github.com/remit-md/pay-sdk/releases",
   }
+  s.post_install_message = "WARNING: remitmd is deprecated. Use pay-cli or pay SDKs instead. See https://pay-skill.com/docs"
 
   s.required_ruby_version = ">= 3.0"
 

@@ -1,7 +1,7 @@
 {
   "name": "@remitmd/sdk",
   "version": "0.4.0",
-  "description": "TypeScript SDK for the remit.md universal AI payment protocol",
+  "description": "DEPRECATED: Use @pay-skill/sdk instead. See https://pay-skill.com/docs/sdk/typescript",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

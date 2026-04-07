@@ -1,3 +1,5 @@
+// Deprecated: Use pay-cli (cargo install pay-cli) or pay SDKs instead.
+// See https://pay-skill.com/docs for migration.
 module github.com/remit-md/sdk/go
 
 go 1.22

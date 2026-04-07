@@ -25,7 +25,7 @@ jobs:
         run: |
           for CRATE in remitmd remit-cli; do
             echo "=== Yanking $CRATE ==="
-            VERSIONS=$(curl -s "https://crates.io/api/v1/crates/$CRATE/versions" | jq -r '.versions[].num')
+            VERSIONS=$(curl -s -H "User-Agent: remit-deprecation (hello@remit.md)" "https://crates.io/api/v1/crates/$CRATE/versions" | jq -r '.versions[].num')
             for v in $VERSIONS; do
               echo "Yanking $CRATE@$v..."
               cargo yank --version "$v" "$CRATE" 2>&1 || echo "  (already yanked or error)"
@@ -86,21 +86,6 @@ jobs:
               --non-interactive 2>&1 || echo "  (already unlisted or error)"
           done
 
-  deprecate-pypi:
-    name: Publish deprecation notice to PyPI (remitmd)
-    runs-on: ubuntu-latest
-    environment: pypi
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Build deprecation release
-        working-directory: python
-        run: |
-          pip install build
-          python -m build
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: python/dist/
+  # PyPI: Use the existing publish.yml workflow to publish v0.4.1 with
+  # "Development Status :: 7 - Inactive" classifier. The OIDC trusted publisher
+  # is configured for publish.yml, not this workflow.

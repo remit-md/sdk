@@ -1,0 +1,50 @@
+name: Unyank All Registries
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unyank-crates:
+    name: Unyank crates.io (remitmd + remit-cli)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Unyank all versions
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          for CRATE in remitmd remit-cli; do
+            echo "=== Unyanking $CRATE ==="
+            VERSIONS=$(curl -s -H "User-Agent: remit-unyank (hello@remit.md)" "https://crates.io/api/v1/crates/$CRATE/versions" | jq -r '.versions[] | select(.yanked == true) | .num')
+            if [ -z "$VERSIONS" ]; then
+              echo "No yanked versions for $CRATE"
+              continue
+            fi
+            for v in $VERSIONS; do
+              echo "Unyanking $CRATE@$v..."
+              cargo yank --undo --version "$v" "$CRATE" 2>&1 || echo "  (error)"
+              sleep 1
+            done
+          done
+
+  unyank-rubygems:
+    name: Unyank RubyGems (remitmd)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Note
+        run: |
+          echo "RubyGems does NOT support unyanking after 30 days."
+          echo "Since we just yanked, we can try immediately."
+          echo "If this fails, we need to publish a new version instead."
+      - name: Attempt unyank
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+        run: |
+          # RubyGems unyank is done via PUT to /api/v1/gems/yank
+          # Actually RubyGems removed unyank in 2015. We need to publish a new version.
+          echo "RubyGems does not support unyanking. Will need to publish a new version with deprecation notice."
+          echo "Current yanked versions cannot be restored."

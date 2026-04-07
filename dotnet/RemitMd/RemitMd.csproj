@@ -10,11 +10,11 @@
 
     <!-- NuGet package metadata -->
     <PackageId>Remit</PackageId>
-    <PackageProjectUrl>https://remit.md</PackageProjectUrl>
+    <PackageProjectUrl>https://pay-skill.com</PackageProjectUrl>
     <Version>0.4.0</Version>
     <Authors>remit-md</Authors>
-    <Description>C#/.NET SDK for the remit.md universal AI payment protocol. Pay any AI agent in USDC with three lines of code.</Description>
-    <RepositoryUrl>https://github.com/remit-md/sdk</RepositoryUrl>
+    <Description>DEPRECATED: Use pay-cli or pay SDKs instead. See https://pay-skill.com/docs</Description>
+    <RepositoryUrl>https://github.com/remit-md/pay-sdk</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>payments;usdc;agents;ai;ethereum;base;stablecoin;remitmd;mcp</PackageTags>

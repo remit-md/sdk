@@ -12,52 +12,86 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  deprecate-pypi:
+    name: Publish deprecation to PyPI (remitmd 0.4.1)
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build deprecation release
+        working-directory: python
+        run: |
+          pip install build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist/
+
   deprecate-crates:
-    name: Yank crates.io (remitmd + remit-cli)
+    name: Publish deprecation to crates.io (remitmd 0.4.1)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Yank all versions
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish deprecation version
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        working-directory: rust
         run: |
-          for CRATE in remitmd remit-cli; do
-            echo "=== Yanking $CRATE ==="
-            VERSIONS=$(curl -s -H "User-Agent: remit-deprecation (hello@remit.md)" "https://crates.io/api/v1/crates/$CRATE/versions" | jq -r '.versions[].num')
-            for v in $VERSIONS; do
-              echo "Yanking $CRATE@$v..."
-              cargo yank --version "$v" "$CRATE" 2>&1 || echo "  (already yanked or error)"
-              sleep 1  # rate limit
-            done
-          done
+          # Update version to 0.4.1
+          sed -i 's/^version = "0.4.0"/version = "0.4.1"/' Cargo.toml
+          cargo publish --allow-dirty 2>&1 || echo "Publish failed (may already exist)"
 
   deprecate-rubygems:
-    name: Yank RubyGems (remitmd)
+    name: Publish deprecation to RubyGems (remitmd 0.4.1)
     runs-on: ubuntu-latest
     steps:
-      - name: Yank all versions
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+      - name: Publish deprecation version
         env:
           GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+        working-directory: ruby
         run: |
-          gem install gemcutter 2>/dev/null || true
-          # Get versions from API
-          VERSIONS=$(curl -s https://rubygems.org/api/v1/versions/remitmd.json | jq -r '.[].number')
-          for v in $VERSIONS; do
-            echo "Yanking remitmd-$v..."
-            gem yank remitmd -v "$v" 2>&1 || echo "  (already yanked or error)"
-          done
+          # Update version to 0.4.1
+          sed -i 's/VERSION = "0.4.0"/VERSION = "0.4.1"/' lib/remitmd.rb
+          gem build remitmd.gemspec
+          gem push remitmd-0.4.1.gem 2>&1 || echo "Push failed (may already exist)"
+
+  deprecate-nuget:
+    name: Publish deprecation to NuGet (Remit 0.4.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Publish deprecation version
+        working-directory: dotnet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          # Update version to 0.4.1
+          sed -i 's/<Version>0.4.0</<Version>0.4.1</' RemitMd/RemitMd.csproj
+          dotnet pack RemitMd/RemitMd.csproj -c Release -o ./nupkg
+          dotnet nuget push ./nupkg/*.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" 2>&1 || echo "Push failed (may already exist)"
 
   deprecate-hex:
-    name: Retire Hex.pm (remit)
+    name: Retire Hex.pm (remit) — already done
     runs-on: ubuntu-latest
     steps:
       - name: Retire all versions
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
         run: |
-          # Get versions from Hex API
           VERSIONS=$(curl -s https://hex.pm/api/packages/remit | jq -r '.releases[].version')
           for v in $VERSIONS; do
             echo "Retiring remit@$v..."
@@ -65,27 +99,5 @@ jobs:
               -H "Authorization: $HEX_API_KEY" \
               -H "Content-Type: application/json" \
               -d '{"reason":"renamed","message":"DEPRECATED: Use pay-cli (cargo install pay-cli) or pay-sdk (pip install pay-sdk). See https://pay-skill.com/docs"}' \
-              2>&1 || echo "  (error)"
+              2>&1 || echo "  (already retired or error)"
           done
-
-  deprecate-nuget:
-    name: Deprecate NuGet (Remit)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deprecate all versions
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          # NuGet doesn't have a CLI deprecate command, but we can unlist versions
-          VERSIONS=$(curl -s "https://api.nuget.org/v3-flatcontainer/remit/index.json" | jq -r '.versions[]')
-          for v in $VERSIONS; do
-            echo "Unlisting Remit@$v..."
-            dotnet nuget delete Remit "$v" \
-              --source https://api.nuget.org/v3/index.json \
-              --api-key "$NUGET_API_KEY" \
-              --non-interactive 2>&1 || echo "  (already unlisted or error)"
-          done
-
-  # PyPI: Use the existing publish.yml workflow to publish v0.4.1 with
-  # "Development Status :: 7 - Inactive" classifier. The OIDC trusted publisher
-  # is configured for publish.yml, not this workflow.

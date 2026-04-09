@@ -416,11 +416,12 @@ module Remitmd
       @events     = h["events"] || []
       @chains     = h["chains"] || []
       @active     = h["active"] == true
+      @secret     = h["secret"]
       @created_at = parse_time(h["created_at"])
       @updated_at = parse_time(h["updated_at"])
     end
 
-    attr_reader :id, :wallet, :url, :events, :chains, :active, :created_at, :updated_at
+    attr_reader :id, :wallet, :url, :events, :chains, :active, :secret, :created_at, :updated_at
 
     private :parse_time
   end

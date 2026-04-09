@@ -81,6 +81,7 @@ export interface Webhook {
   events: string[];
   chains: string[];
   active: boolean;
+  secret?: string;
   createdAt: number;
 }
 

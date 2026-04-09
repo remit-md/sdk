@@ -226,6 +226,7 @@ public record Webhook(
     [property: JsonPropertyName("events")]     IReadOnlyList<string> Events,
     [property: JsonPropertyName("chains")]     IReadOnlyList<string> Chains,
     [property: JsonPropertyName("active")]     bool Active,
+    [property: JsonPropertyName("secret")]     string? Secret,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt
 );

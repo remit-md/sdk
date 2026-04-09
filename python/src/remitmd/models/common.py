@@ -139,4 +139,5 @@ class Webhook(BaseModel):
     events: list[str]
     chains: list[str]
     active: bool
+    secret: str | None = None
     created_at: int

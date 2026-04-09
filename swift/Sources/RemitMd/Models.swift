@@ -521,11 +521,12 @@ public struct Webhook: Codable, Sendable {
     public let events: [String]
     public let chains: [String]
     public let active: Bool
+    public let secret: String?
     public let createdAt: String
     public let updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, wallet, url, events, chains, active
+        case id, wallet, url, events, chains, active, secret
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }

@@ -27,6 +27,9 @@ public class Webhook {
     @JsonProperty("active")
     public boolean active;
 
+    @JsonProperty("secret")
+    public String secret;
+
     @JsonProperty("created_at")
     public String createdAt;
 

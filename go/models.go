@@ -330,6 +330,7 @@ type Webhook struct {
 	Events    []string  `json:"events"`
 	Chains    []string  `json:"chains"`
 	Active    bool      `json:"active"`
+	Secret    string    `json:"secret,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
